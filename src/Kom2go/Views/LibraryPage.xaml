@@ -59,16 +59,14 @@
                                         <Image Source="{Binding CoverPath}"
                                                Aspect="AspectFill"
                                                HeightRequest="150"/>
-                                        <BoxView Grid.Row="0"
-                                                 Color="#80000000"
-                                                 VerticalOptions="End"
-                                                 HeightRequest="4"/>
-                                        <BoxView Grid.Row="0"
-                                                 Color="{StaticResource Primary}"
-                                                 VerticalOptions="End"
-                                                 HeightRequest="4"
-                                                 HorizontalOptions="Start"
-                                                 WidthRequest="{Binding CurrentPage, StringFormat='{0:F0}'}"/>
+                                        <Grid Grid.Row="0"
+                                              VerticalOptions="End"
+                                              HeightRequest="4">
+                                            <BoxView Color="#80000000"/>
+                                            <ProgressBar Progress="{Binding ReadingProgress}"
+                                                         ProgressColor="{StaticResource Primary}"
+                                                         HeightRequest="4"/>
+                                        </Grid>
                                         <Label Grid.Row="1" 
                                                Text="{Binding Title}" 
                                                FontSize="12"

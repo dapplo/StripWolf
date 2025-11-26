@@ -91,6 +91,12 @@ public class Comic
     public bool IsCompleted { get; set; }
 
     /// <summary>
+    /// Reading progress as a value between 0 and 1
+    /// </summary>
+    [SQLite.Ignore]
+    public double ReadingProgress => PageCount > 0 ? (double)CurrentPage / PageCount : 0;
+
+    /// <summary>
     /// Format of the comic file (CBZ, CBR)
     /// </summary>
     public ComicFormat Format { get; set; }

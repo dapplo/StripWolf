@@ -35,6 +35,8 @@ public partial class ReaderViewModel : BaseViewModel
     [ObservableProperty]
     private double _zoomLevel = 1.0;
 
+    private bool _isLoadingPage;
+
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
     public string PageDisplay => Comic is null ? "" : $"{CurrentPage + 1} / {Comic.PageCount}";
@@ -48,7 +50,30 @@ public partial class ReaderViewModel : BaseViewModel
 
     partial void OnComicIdChanged(int value)
     {
-        _ = LoadComicAsync();
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                await LoadComicAsync();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Failed to load comic: {ex.Message}";
+            }
+        });
+    }
+
+    partial void OnCurrentPageChanged(int value)
+    {
+        // Only trigger page load when not already loading (to avoid loops)
+        if (!_isLoadingPage && Comic is not null)
+        {
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await LoadPageAsync();
+                await SaveProgressAsync();
+            });
+        }
     }
 
     [RelayCommand]
@@ -65,7 +90,9 @@ public partial class ReaderViewModel : BaseViewModel
             if (Comic is not null)
             {
                 Title = Comic.Title;
+                _isLoadingPage = true;
                 CurrentPage = Comic.CurrentPage;
+                _isLoadingPage = false;
                 await LoadPageAsync();
             }
         }, "Failed to load comic");
@@ -73,11 +100,12 @@ public partial class ReaderViewModel : BaseViewModel
 
     private async Task LoadPageAsync()
     {
-        if (Comic is null)
+        if (Comic is null || _isLoadingPage)
         {
             return;
         }
 
+        _isLoadingPage = true;
         try
         {
             var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
@@ -86,6 +114,10 @@ public partial class ReaderViewModel : BaseViewModel
         catch (Exception ex)
         {
             ErrorMessage = $"Failed to load page: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingPage = false;
         }
     }
 

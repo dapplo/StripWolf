@@ -78,7 +78,7 @@
                 <Slider Grid.Column="1"
                         Minimum="0"
                         Maximum="{Binding Comic.PageCount, Converter={StaticResource SubtractOneConverter}}"
-                        Value="{Binding CurrentPage}"
+                        Value="{Binding CurrentPage, Mode=TwoWay}"
                         Margin="8,0"
                         ThumbColor="{StaticResource Primary}"/>
                 
