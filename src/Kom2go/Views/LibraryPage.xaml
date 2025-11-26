@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Kom2go.ViewModels"
+             xmlns:models="clr-namespace:Kom2go.Models"
+             x:Class="Kom2go.Views.LibraryPage"
+             x:DataType="vm:LibraryViewModel"
+             Title="{Binding Title}">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto">
+            <Label Text="{Binding Title}" 
+                   FontSize="20" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center"/>
+            <Button Grid.Column="1"
+                    Text="Import"
+                    Command="{Binding ImportFileCommand}"
+                    HeightRequest="36"
+                    Padding="16,0"
+                    Margin="0,0,8,0"/>
+        </Grid>
+    </Shell.TitleView>
+
+    <RefreshView IsRefreshing="{Binding IsRefreshing}"
+                 Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <VerticalStackLayout Spacing="16" Padding="16">
+                
+                <!-- Error Message -->
+                <Frame BackgroundColor="#FFEBEE"
+                       Padding="12"
+                       CornerRadius="8"
+                       IsVisible="{Binding ErrorMessage, Converter={StaticResource IsNotNullConverter}}">
+                    <Label Text="{Binding ErrorMessage}" TextColor="#C62828"/>
+                </Frame>
+
+                <!-- In Progress Section -->
+                <VerticalStackLayout IsVisible="{Binding InProgressComics.Count, Converter={StaticResource IsNotEqualConverter}, ConverterParameter=0}">
+                    <Label Text="Continue Reading" 
+                           FontSize="18" 
+                           FontAttributes="Bold"
+                           Margin="0,0,0,8"/>
+                    <CollectionView ItemsSource="{Binding InProgressComics}"
+                                    HeightRequest="200"
+                                    ItemsLayout="HorizontalList">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Comic">
+                                <Frame Padding="0" 
+                                       CornerRadius="8" 
+                                       Margin="0,0,12,0"
+                                       WidthRequest="120">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer 
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=OpenComicCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    </Frame.GestureRecognizers>
+                                    <Grid RowDefinitions="150,Auto,Auto">
+                                        <Image Source="{Binding CoverPath}"
+                                               Aspect="AspectFill"
+                                               HeightRequest="150"/>
+                                        <BoxView Grid.Row="0"
+                                                 Color="#80000000"
+                                                 VerticalOptions="End"
+                                                 HeightRequest="4"/>
+                                        <BoxView Grid.Row="0"
+                                                 Color="{StaticResource Primary}"
+                                                 VerticalOptions="End"
+                                                 HeightRequest="4"
+                                                 HorizontalOptions="Start"
+                                                 WidthRequest="{Binding CurrentPage, StringFormat='{0:F0}'}"/>
+                                        <Label Grid.Row="1" 
+                                               Text="{Binding Title}" 
+                                               FontSize="12"
+                                               LineBreakMode="TailTruncation"
+                                               Margin="8,4"/>
+                                        <Label Grid.Row="2" 
+                                               Text="{Binding CurrentPage, StringFormat='Page {0}'}"
+                                               FontSize="10"
+                                               TextColor="Gray"
+                                               Margin="8,0,8,4"/>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- Recent Section -->
+                <VerticalStackLayout IsVisible="{Binding RecentComics.Count, Converter={StaticResource IsNotEqualConverter}, ConverterParameter=0}">
+                    <Label Text="Recently Added" 
+                           FontSize="18" 
+                           FontAttributes="Bold"
+                           Margin="0,0,0,8"/>
+                    <CollectionView ItemsSource="{Binding RecentComics}"
+                                    HeightRequest="200"
+                                    ItemsLayout="HorizontalList">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Comic">
+                                <Frame Padding="0" 
+                                       CornerRadius="8" 
+                                       Margin="0,0,12,0"
+                                       WidthRequest="120">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer 
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=OpenComicCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    </Frame.GestureRecognizers>
+                                    <Grid RowDefinitions="150,Auto">
+                                        <Image Source="{Binding CoverPath}"
+                                               Aspect="AspectFill"
+                                               HeightRequest="150"/>
+                                        <Label Grid.Row="1" 
+                                               Text="{Binding Title}" 
+                                               FontSize="12"
+                                               LineBreakMode="TailTruncation"
+                                               Margin="8,4"/>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- All Comics Section -->
+                <VerticalStackLayout>
+                    <Label Text="All Comics" 
+                           FontSize="18" 
+                           FontAttributes="Bold"
+                           Margin="0,0,0,8"/>
+                    
+                    <!-- Empty State -->
+                    <VerticalStackLayout IsVisible="{Binding Comics.Count, Converter={StaticResource IsEqualConverter}, ConverterParameter=0}"
+                                         HorizontalOptions="Center"
+                                         VerticalOptions="Center"
+                                         Spacing="16"
+                                         Padding="32">
+                        <Label Text="📚" FontSize="64" HorizontalOptions="Center"/>
+                        <Label Text="No comics yet" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Text="Import a comic file or download from Komga to get started"
+                               TextColor="Gray"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"/>
+                        <Button Text="Import Comic"
+                                Command="{Binding ImportFileCommand}"
+                                HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+
+                    <!-- Comics Grid -->
+                    <CollectionView ItemsSource="{Binding Comics}"
+                                    IsVisible="{Binding Comics.Count, Converter={StaticResource IsNotEqualConverter}, ConverterParameter=0}">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical"
+                                           Span="3"
+                                           HorizontalItemSpacing="8"
+                                           VerticalItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Comic">
+                                <Frame Padding="0" CornerRadius="8">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer 
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=OpenComicCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    </Frame.GestureRecognizers>
+                                    <Grid RowDefinitions="150,Auto,Auto">
+                                        <Image Source="{Binding CoverPath}"
+                                               Aspect="AspectFill"
+                                               HeightRequest="150"/>
+                                        <Label Grid.Row="1" 
+                                               Text="{Binding Title}" 
+                                               FontSize="12"
+                                               FontAttributes="Bold"
+                                               LineBreakMode="TailTruncation"
+                                               MaxLines="2"
+                                               Margin="8,4"/>
+                                        <Label Grid.Row="2" 
+                                               Text="{Binding PageCount, StringFormat='{0} pages'}"
+                                               FontSize="10"
+                                               TextColor="Gray"
+                                               Margin="8,0,8,8"/>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+</ContentPage>

@@ -1,0 +1,23 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Kom2go"
+             xmlns:converters="clr-namespace:Kom2go.Converters"
+             x:Class="Kom2go.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Converters -->
+            <converters:SubtractOneConverter x:Key="SubtractOneConverter"/>
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter"/>
+            <converters:IsNullConverter x:Key="IsNullConverter"/>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <converters:IsEqualConverter x:Key="IsEqualConverter"/>
+            <converters:IsNotEqualConverter x:Key="IsNotEqualConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

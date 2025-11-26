@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Kom2go.ViewModels"
+             x:Class="Kom2go.Views.ReaderPage"
+             x:DataType="vm:ReaderViewModel"
+             Title="{Binding Title}"
+             Shell.NavBarIsVisible="{Binding IsControlsVisible}">
+
+    <Grid>
+        <!-- Main Image View -->
+        <ScrollView x:Name="ImageScrollView"
+                    Orientation="Both"
+                    HorizontalScrollBarVisibility="Never"
+                    VerticalScrollBarVisibility="Never">
+            <Image Source="{Binding CurrentPageImage}"
+                   Aspect="AspectFit"
+                   Scale="{Binding ZoomLevel}">
+                <Image.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding ToggleControlsCommand}"/>
+                </Image.GestureRecognizers>
+            </Image>
+        </ScrollView>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                           IsVisible="{Binding IsBusy}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Color="{StaticResource Primary}"/>
+
+        <!-- Error Message -->
+        <Frame BackgroundColor="#FFEBEE"
+               Padding="12"
+               CornerRadius="8"
+               IsVisible="{Binding ErrorMessage, Converter={StaticResource IsNotNullConverter}}"
+               VerticalOptions="Center"
+               HorizontalOptions="Center"
+               Margin="32">
+            <Label Text="{Binding ErrorMessage}" TextColor="#C62828"/>
+        </Frame>
+
+        <!-- Navigation Tap Zones -->
+        <Grid ColumnDefinitions="*,*" IsVisible="{Binding IsControlsVisible, Converter={StaticResource InvertedBoolConverter}}">
+            <!-- Previous Page Zone -->
+            <BoxView Grid.Column="0" Color="Transparent">
+                <BoxView.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding GoToPreviousPageCommand}"/>
+                </BoxView.GestureRecognizers>
+            </BoxView>
+            
+            <!-- Next Page Zone -->
+            <BoxView Grid.Column="1" Color="Transparent">
+                <BoxView.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding GoToNextPageCommand}"/>
+                </BoxView.GestureRecognizers>
+            </BoxView>
+        </Grid>
+
+        <!-- Bottom Controls -->
+        <Grid RowDefinitions="Auto"
+              VerticalOptions="End"
+              BackgroundColor="#E0000000"
+              Padding="16"
+              IsVisible="{Binding IsControlsVisible}">
+            
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
+                <!-- Previous Button -->
+                <Button Grid.Column="0"
+                        Text="◀"
+                        Command="{Binding GoToPreviousPageCommand}"
+                        IsEnabled="{Binding HasPreviousPage}"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="20"/>
+                
+                <!-- Page Slider -->
+                <Slider Grid.Column="1"
+                        Minimum="0"
+                        Maximum="{Binding Comic.PageCount, Converter={StaticResource SubtractOneConverter}}"
+                        Value="{Binding CurrentPage}"
+                        Margin="8,0"
+                        ThumbColor="{StaticResource Primary}"/>
+                
+                <!-- Next Button -->
+                <Button Grid.Column="2"
+                        Text="▶"
+                        Command="{Binding GoToNextPageCommand}"
+                        IsEnabled="{Binding HasNextPage}"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="20"/>
+
+                <!-- Page Display -->
+                <Label Grid.Column="3"
+                       Text="{Binding PageDisplay}"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       Margin="16,0"/>
+
+                <!-- Zoom Controls -->
+                <Button Grid.Column="4"
+                        Text="−"
+                        Command="{Binding ZoomOutCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="20"
+                        WidthRequest="40"/>
+                
+                <Label Grid.Column="5"
+                       Text="{Binding ZoomLevel, StringFormat='{0:P0}'}"
+                       TextColor="White"
+                       VerticalOptions="Center"
+                       WidthRequest="50"
+                       HorizontalTextAlignment="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ResetZoomCommand}"/>
+                    </Label.GestureRecognizers>
+                </Label>
+                
+                <Button Grid.Column="6"
+                        Text="+"
+                        Command="{Binding ZoomInCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="20"
+                        WidthRequest="40"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>

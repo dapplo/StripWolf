@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Kom2go.ViewModels"
+             xmlns:komga="clr-namespace:Kom2go.Models.Komga"
+             
+             x:Class="Kom2go.Views.KomgaPage"
+             x:DataType="vm:KomgaViewModel"
+             Title="{Binding Title}">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto">
+            <Label Text="{Binding Title}" 
+                   FontSize="20" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center"/>
+            <Button Grid.Column="1"
+                    Text="⚙️"
+                    Command="{Binding OpenSettingsCommand}"
+                    BackgroundColor="Transparent"
+                    FontSize="24"
+                    Margin="0,0,8,0"/>
+        </Grid>
+    </Shell.TitleView>
+
+    <Grid>
+        <RefreshView IsRefreshing="{Binding IsRefreshing}"
+                     Command="{Binding RefreshCommand}">
+            <ScrollView>
+                <VerticalStackLayout Spacing="16" Padding="16">
+                    
+                    <!-- Error Message -->
+                    <Frame BackgroundColor="#FFEBEE"
+                           Padding="12"
+                           CornerRadius="8"
+                           IsVisible="{Binding ErrorMessage, Converter={StaticResource IsNotNullConverter}}">
+                        <Label Text="{Binding ErrorMessage}" TextColor="#C62828"/>
+                    </Frame>
+
+                    <!-- Not Connected State -->
+                    <VerticalStackLayout IsVisible="{Binding IsConnected, Converter={StaticResource InvertedBoolConverter}}"
+                                         HorizontalOptions="Center"
+                                         VerticalOptions="Center"
+                                         Spacing="16"
+                                         Padding="32">
+                        <Label Text="🌐" FontSize="64" HorizontalOptions="Center"/>
+                        <Label Text="Not Connected" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center"/>
+                        <Label Text="Configure a Komga server in settings to browse and download comics"
+                               TextColor="Gray"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"/>
+                        <Button Text="Open Settings"
+                                Command="{Binding OpenSettingsCommand}"
+                                HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+
+                    <!-- Connected Content -->
+                    <VerticalStackLayout IsVisible="{Binding IsConnected}" Spacing="16">
+                        
+                        <!-- Breadcrumb Navigation -->
+                        <HorizontalStackLayout Spacing="8">
+                            <Button Text="Libraries"
+                                    Command="{Binding GoBackToLibrariesCommand}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource Primary}"
+                                    Padding="0"
+                                    IsVisible="{Binding SelectedLibrary, Converter={StaticResource IsNotNullConverter}}"/>
+                            <Label Text="/"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding SelectedLibrary, Converter={StaticResource IsNotNullConverter}}"/>
+                            <Button Text="{Binding SelectedLibrary.Name}"
+                                    Command="{Binding GoBackToSeriesCommand}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource Primary}"
+                                    Padding="0"
+                                    IsVisible="{Binding SelectedSeries, Converter={StaticResource IsNotNullConverter}}"/>
+                            <Label Text="/"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding SelectedSeries, Converter={StaticResource IsNotNullConverter}}"/>
+                            <Label Text="{Binding SelectedSeries.Name}"
+                                   VerticalOptions="Center"
+                                   FontAttributes="Bold"
+                                   IsVisible="{Binding SelectedSeries, Converter={StaticResource IsNotNullConverter}}"/>
+                        </HorizontalStackLayout>
+
+                        <!-- Libraries List -->
+                        <VerticalStackLayout IsVisible="{Binding SelectedLibrary, Converter={StaticResource IsNullConverter}}">
+                            <Label Text="Libraries" FontSize="18" FontAttributes="Bold" Margin="0,0,0,8"/>
+                            <CollectionView ItemsSource="{Binding Libraries}">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="komga:KomgaLibrary">
+                                        <Frame Padding="16" Margin="0,0,0,8" CornerRadius="8">
+                                            <Frame.GestureRecognizers>
+                                                <TapGestureRecognizer 
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:KomgaViewModel}}, Path=SelectLibraryCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            </Frame.GestureRecognizers>
+                                            <HorizontalStackLayout Spacing="12">
+                                                <Label Text="📚" FontSize="24" VerticalOptions="Center"/>
+                                                <Label Text="{Binding Name}" FontSize="16" VerticalOptions="Center"/>
+                                            </HorizontalStackLayout>
+                                        </Frame>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+
+                        <!-- Series Grid -->
+                        <VerticalStackLayout IsVisible="{Binding SelectedLibrary, Converter={StaticResource IsNotNullConverter}}">
+                            <VerticalStackLayout IsVisible="{Binding SelectedSeries, Converter={StaticResource IsNullConverter}}">
+                                <Label Text="Series" FontSize="18" FontAttributes="Bold" Margin="0,0,0,8"/>
+                                <CollectionView ItemsSource="{Binding Series}"
+                                                RemainingItemsThreshold="5"
+                                                RemainingItemsThresholdReachedCommand="{Binding LoadMoreSeriesCommand}">
+                                    <CollectionView.ItemsLayout>
+                                        <GridItemsLayout Orientation="Vertical"
+                                                        Span="3"
+                                                        HorizontalItemSpacing="8"
+                                                        VerticalItemSpacing="8"/>
+                                    </CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="komga:KomgaSeries">
+                                            <Frame Padding="0" CornerRadius="8">
+                                                <Frame.GestureRecognizers>
+                                                    <TapGestureRecognizer 
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:KomgaViewModel}}, Path=SelectSeriesCommand}"
+                                                        CommandParameter="{Binding .}"/>
+                                                </Frame.GestureRecognizers>
+                                                <Grid RowDefinitions="150,Auto,Auto">
+                                                    <BoxView Color="LightGray" HeightRequest="150"/>
+                                                    <Label Grid.Row="1" 
+                                                           Text="{Binding Name}" 
+                                                           FontSize="12"
+                                                           FontAttributes="Bold"
+                                                           LineBreakMode="TailTruncation"
+                                                           MaxLines="2"
+                                                           Margin="8,4"/>
+                                                    <Label Grid.Row="2" 
+                                                           Text="{Binding BooksCount, StringFormat='{0} books'}"
+                                                           FontSize="10"
+                                                           TextColor="Gray"
+                                                           Margin="8,0,8,8"/>
+                                                </Grid>
+                                            </Frame>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+
+                        <!-- Books Grid -->
+                        <VerticalStackLayout IsVisible="{Binding SelectedSeries, Converter={StaticResource IsNotNullConverter}}">
+                            <Label Text="Books" FontSize="18" FontAttributes="Bold" Margin="0,0,0,8"/>
+                            <CollectionView ItemsSource="{Binding Books}"
+                                            RemainingItemsThreshold="5"
+                                            RemainingItemsThresholdReachedCommand="{Binding LoadMoreBooksCommand}">
+                                <CollectionView.ItemsLayout>
+                                    <GridItemsLayout Orientation="Vertical"
+                                                    Span="3"
+                                                    HorizontalItemSpacing="8"
+                                                    VerticalItemSpacing="8"/>
+                                </CollectionView.ItemsLayout>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="komga:KomgaBook">
+                                        <Frame Padding="0" CornerRadius="8">
+                                            <Grid RowDefinitions="150,Auto,Auto,Auto">
+                                                <BoxView Color="LightGray" HeightRequest="150"/>
+                                                <Label Grid.Row="1" 
+                                                       Text="{Binding Name}" 
+                                                       FontSize="12"
+                                                       FontAttributes="Bold"
+                                                       LineBreakMode="TailTruncation"
+                                                       MaxLines="2"
+                                                       Margin="8,4"/>
+                                                <Label Grid.Row="2" 
+                                                       Text="{Binding Media.PagesCount, StringFormat='{0} pages'}"
+                                                       FontSize="10"
+                                                       TextColor="Gray"
+                                                       Margin="8,0,8,4"/>
+                                                <Button Grid.Row="3"
+                                                        Text="Download"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:KomgaViewModel}}, Path=DownloadBookCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        FontSize="10"
+                                                        Padding="8,4"
+                                                        Margin="8,0,8,8"
+                                                        HeightRequest="28"/>
+                                            </Grid>
+                                        </Frame>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+
+        <!-- Download Progress Overlay -->
+        <Grid BackgroundColor="#80000000"
+              IsVisible="{Binding IsDownloading}">
+            <Frame VerticalOptions="Center"
+                   HorizontalOptions="Center"
+                   Padding="24"
+                   CornerRadius="12"
+                   WidthRequest="300">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Downloading..."
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                    <Label Text="{Binding DownloadingBookName}"
+                           HorizontalOptions="Center"
+                           LineBreakMode="TailTruncation"/>
+                    <ProgressBar Progress="{Binding DownloadProgress}"
+                                 ProgressColor="{StaticResource Primary}"/>
+                    <Label Text="{Binding DownloadProgress, StringFormat='{0:P0}'}"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Frame>
+        </Grid>
+    </Grid>
+</ContentPage>
