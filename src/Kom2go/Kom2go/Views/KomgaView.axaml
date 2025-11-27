@@ -46,12 +46,12 @@
                     IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="/" VerticalAlignment="Center"
                        IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-            <Button Content="{Binding SelectedLibrary.Name}" Command="{Binding GoBackToSeriesCommand}"
+            <Button Content="{Binding SelectedLibrary.Name, FallbackValue=''}" Command="{Binding GoBackToSeriesCommand}"
                     Background="Transparent" Padding="0"
                     IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="/" VerticalAlignment="Center"
                        IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-            <TextBlock Text="{Binding SelectedSeries.Name}" FontWeight="Bold" VerticalAlignment="Center"
+            <TextBlock Text="{Binding SelectedSeries.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center"
                        IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
           </StackPanel>
 
@@ -62,7 +62,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="komga:KomgaLibrary">
                   <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
-                          Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, ElementName=Root}"
+                          Command="{Binding #Root.((vm:KomgaViewModel)DataContext).SelectLibraryCommand}"
                           CommandParameter="{Binding}">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                       <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
@@ -88,15 +88,15 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeries">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, ElementName=Root}"
+                            Command="{Binding #Root.((vm:KomgaViewModel)DataContext).SelectSeriesCommand}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
                         <Grid RowDefinitions="150,Auto,Auto">
                           <controls:AsyncImage Grid.Row="0" Height="150" 
                                                SourceUrl="{Binding ThumbnailUrl}"
-                                               Username="{Binding ((vm:KomgaViewModel)DataContext).ServerUsername, ElementName=Root}"
-                                               Password="{Binding ((vm:KomgaViewModel)DataContext).ServerPassword, ElementName=Root}"
+                                               Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
+                                               Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
                                                Stretch="UniformToFill"/>
                           <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                      TextTrimming="CharacterEllipsis" Margin="8,4"/>
@@ -129,15 +129,15 @@
                     <Grid RowDefinitions="150,Auto,Auto,Auto">
                       <controls:AsyncImage Grid.Row="0" Height="150" 
                                            SourceUrl="{Binding ThumbnailUrl}"
-                                           Username="{Binding ((vm:KomgaViewModel)DataContext).ServerUsername, ElementName=Root}"
-                                           Password="{Binding ((vm:KomgaViewModel)DataContext).ServerPassword, ElementName=Root}"
+                                           Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
+                                           Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
                                            Stretch="UniformToFill"/>
                       <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                  TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                      <TextBlock Grid.Row="2" Text="{Binding Media.PagesCount, StringFormat='{}{0} pages'}"
+                      <TextBlock Grid.Row="2" Text="{Binding Media.PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                       <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, ElementName=Root}"
+                              Command="{Binding #Root.((vm:KomgaViewModel)DataContext).DownloadBookCommand}"
                               CommandParameter="{Binding}"/>
                     </Grid>
                   </Border>

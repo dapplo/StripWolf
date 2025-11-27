@@ -13,6 +13,7 @@ public partial class ReaderViewModel : ViewModelBase
 {
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
+    private readonly KomgaApiService _komgaApiService;
 
     [ObservableProperty]
     private int _comicId;
@@ -33,36 +34,101 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isControlsVisible = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomDisplay))]
     private double _zoomLevel = 1.0;
+
+    [ObservableProperty]
+    private bool _isFullScreen;
+
+    [ObservableProperty]
+    private StretchMode _stretchMode = StretchMode.FitPage;
 
     private bool _isLoadingPage;
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
     public string PageDisplay => Comic is null ? "" : $"{CurrentPage + 1} / {Comic.PageCount}";
+    public string ZoomDisplay => $"{ZoomLevel:P0}";
 
-    public ReaderViewModel(LibraryService libraryService, ComicReaderService comicReaderService)
+    /// <summary>
+    /// Event raised when the reader should be closed
+    /// </summary>
+    public event EventHandler? CloseRequested;
+
+    public ReaderViewModel(
+        LibraryService libraryService, 
+        ComicReaderService comicReaderService,
+        KomgaApiService komgaApiService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
+        _komgaApiService = komgaApiService;
         Title = "Reader";
     }
 
     public async Task LoadComicAsync(int comicId)
     {
         ComicId = comicId;
-        await ExecuteAsync(async () =>
+        try
         {
+            IsBusy = true;
+            ErrorMessage = null;
+            
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
             {
                 Title = Comic.Title;
+                
+                // Sync with Komga if this is a Komga comic
+                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
+                {
+                    await SyncReadProgressFromKomgaAsync();
+                }
+                
                 _isLoadingPage = true;
                 CurrentPage = Comic.CurrentPage;
                 _isLoadingPage = false;
                 await LoadPageAsync();
+                
+                // Mark as started reading
+                await SaveProgressAsync();
             }
-        }, "Failed to load comic");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load comic: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SyncReadProgressFromKomgaAsync()
+    {
+        if (Comic is null || string.IsNullOrEmpty(Comic.KomgaId) || !_komgaApiService.IsConfigured)
+        {
+            return;
+        }
+
+        try
+        {
+            var book = await _komgaApiService.GetBookAsync(Comic.KomgaId);
+            if (book?.ReadProgress is not null)
+            {
+                // Komga uses 1-based page numbers
+                var komgaPage = book.ReadProgress.Page - 1;
+                if (komgaPage >= 0 && komgaPage > Comic.CurrentPage)
+                {
+                    Comic.CurrentPage = komgaPage;
+                    Comic.IsCompleted = book.ReadProgress.Completed;
+                }
+            }
+        }
+        catch
+        {
+            // Failed to sync, continue with local progress
+        }
     }
 
     private async Task LoadPageAsync()
@@ -73,11 +139,17 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         _isLoadingPage = true;
+        IsBusy = true;
         try
         {
             var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
             using var stream = new MemoryStream(pageData);
-            CurrentPageImage = new Bitmap(stream);
+            
+            // Create new bitmap first, then dispose old one to avoid memory leak
+            var newBitmap = new Bitmap(stream);
+            var oldBitmap = CurrentPageImage;
+            CurrentPageImage = newBitmap;
+            oldBitmap?.Dispose();
         }
         catch (Exception ex)
         {
@@ -86,6 +158,7 @@ public partial class ReaderViewModel : ViewModelBase
         finally
         {
             _isLoadingPage = false;
+            IsBusy = false;
         }
     }
 
@@ -150,18 +223,18 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private void ZoomIn()
     {
-        if (ZoomLevel < 3.0)
+        if (ZoomLevel < 5.0)
         {
-            ZoomLevel += 0.25;
+            ZoomLevel = Math.Min(5.0, ZoomLevel + 0.25);
         }
     }
 
     [RelayCommand]
     private void ZoomOut()
     {
-        if (ZoomLevel > 0.5)
+        if (ZoomLevel > 0.25)
         {
-            ZoomLevel -= 0.25;
+            ZoomLevel = Math.Max(0.25, ZoomLevel - 0.25);
         }
     }
 
@@ -169,6 +242,40 @@ public partial class ReaderViewModel : ViewModelBase
     private void ResetZoom()
     {
         ZoomLevel = 1.0;
+    }
+
+    /// <summary>
+    /// Adjusts zoom level based on scroll delta (for mouse wheel)
+    /// </summary>
+    public void AdjustZoom(double delta)
+    {
+        if (delta > 0)
+        {
+            ZoomIn();
+        }
+        else if (delta < 0)
+        {
+            ZoomOut();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleFullScreen()
+    {
+        IsFullScreen = !IsFullScreen;
+    }
+
+    [RelayCommand]
+    private void CycleStretchMode()
+    {
+        StretchMode = StretchMode switch
+        {
+            StretchMode.FitPage => StretchMode.FitWidth,
+            StretchMode.FitWidth => StretchMode.FitHeight,
+            StretchMode.FitHeight => StretchMode.Original,
+            StretchMode.Original => StretchMode.FitPage,
+            _ => StretchMode.FitPage
+        };
     }
 
     private async Task SaveProgressAsync()
@@ -192,6 +299,17 @@ public partial class ReaderViewModel : ViewModelBase
     private async Task GoBackAsync()
     {
         await SaveProgressAsync();
-        // Navigation will be handled by the view
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
+}
+
+/// <summary>
+/// Image stretch/fit modes for the reader
+/// </summary>
+public enum StretchMode
+{
+    FitPage,    // Fit entire page in view (maintain aspect ratio)
+    FitWidth,   // Fit to width (may scroll vertically)
+    FitHeight,  // Fit to height (may scroll horizontally)
+    Original    // Original size (100%)
 }

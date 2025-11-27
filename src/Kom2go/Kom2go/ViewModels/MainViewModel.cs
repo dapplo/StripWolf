@@ -19,6 +19,9 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private int _selectedTabIndex;
 
+    [ObservableProperty]
+    private bool _isInReader;
+
     public MainViewModel(
         LibraryViewModel libraryViewModel,
         KomgaViewModel komgaViewModel,
@@ -32,6 +35,20 @@ public partial class MainViewModel : ViewModelBase
         
         Title = "Kom2go";
         _currentView = _libraryViewModel;
+
+        // Subscribe to events
+        _libraryViewModel.ComicOpenRequested += OnComicOpenRequested;
+        _readerViewModel.CloseRequested += OnReaderCloseRequested;
+    }
+
+    private async void OnComicOpenRequested(object? sender, int comicId)
+    {
+        await OpenReaderAsync(comicId);
+    }
+
+    private void OnReaderCloseRequested(object? sender, EventArgs e)
+    {
+        CloseReader();
     }
 
     public LibraryViewModel LibraryViewModel => _libraryViewModel;
@@ -41,13 +58,16 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnSelectedTabIndexChanged(int value)
     {
-        CurrentView = value switch
+        if (!IsInReader)
         {
-            0 => _libraryViewModel,
-            1 => _komgaViewModel,
-            2 => _settingsViewModel,
-            _ => _libraryViewModel
-        };
+            CurrentView = value switch
+            {
+                0 => _libraryViewModel,
+                1 => _komgaViewModel,
+                2 => _settingsViewModel,
+                _ => _libraryViewModel
+            };
+        }
     }
 
     [RelayCommand]
@@ -71,6 +91,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task OpenReaderAsync(int comicId)
     {
+        IsInReader = true;
         await _readerViewModel.LoadComicAsync(comicId);
         CurrentView = _readerViewModel;
     }
@@ -78,6 +99,9 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void CloseReader()
     {
+        IsInReader = false;
         CurrentView = _libraryViewModel;
+        // Refresh the library to show updated progress
+        _ = _libraryViewModel.RefreshCommand.ExecuteAsync(null);
     }
 }

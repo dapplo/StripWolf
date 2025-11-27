@@ -5,19 +5,44 @@
              xmlns:vm="using:Kom2go.ViewModels"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.ReaderView"
-             x:DataType="vm:ReaderViewModel">
+             x:DataType="vm:ReaderViewModel"
+             Background="Black"
+             x:Name="Root"
+             Focusable="True">
   
   <Grid>
-    <!-- Main Image View -->
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-      <Image Source="{Binding CurrentPageImage}" 
-             Stretch="Uniform"
-             RenderTransformOrigin="0.5,0.5">
-        <Image.RenderTransform>
-          <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
-        </Image.RenderTransform>
-      </Image>
+    <!-- Main Image View with scroll support -->
+    <ScrollViewer x:Name="ImageScroller" 
+                  HorizontalScrollBarVisibility="Auto" 
+                  VerticalScrollBarVisibility="Auto"
+                  PointerWheelChanged="OnPointerWheelChanged">
+      <Grid x:Name="ImageContainer">
+        <Image x:Name="PageImage"
+               Source="{Binding CurrentPageImage}" 
+               Stretch="Uniform"
+               RenderTransformOrigin="0.5,0.5"
+               PointerPressed="OnImagePointerPressed">
+          <Image.RenderTransform>
+            <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+          </Image.RenderTransform>
+        </Image>
+      </Grid>
     </ScrollViewer>
+
+    <!-- Left tap zone for previous page -->
+    <Button HorizontalAlignment="Left" VerticalAlignment="Stretch" Width="100"
+            Command="{Binding GoToPreviousPageCommand}"
+            Background="Transparent" Opacity="0.01" IsEnabled="{Binding HasPreviousPage}"/>
+
+    <!-- Right tap zone for next page -->
+    <Button HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="100"
+            Command="{Binding GoToNextPageCommand}"
+            Background="Transparent" Opacity="0.01" IsEnabled="{Binding HasNextPage}"/>
+
+    <!-- Center tap zone for toggling controls -->
+    <Button HorizontalAlignment="Center" VerticalAlignment="Center" Width="300" Height="300"
+            Command="{Binding ToggleControlsCommand}"
+            Background="Transparent" Opacity="0.01"/>
 
     <!-- Loading Indicator -->
     <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
@@ -33,23 +58,35 @@
     <!-- Top Controls -->
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
-      <Grid ColumnDefinitions="Auto,*">
-        <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" Background="Transparent" Foreground="White"/>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" 
+                Background="Transparent" Foreground="White"/>
         <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
-                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Margin="16,0"/>
+        <!-- Stretch mode button -->
+        <Button Grid.Column="2" Command="{Binding CycleStretchModeCommand}"
+                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode">
+          <TextBlock Text="{Binding StretchMode}"/>
+        </Button>
+        <!-- Fullscreen button -->
+        <Button Grid.Column="3" Command="{Binding ToggleFullScreenCommand}"
+                Background="Transparent" Foreground="White" FontSize="18" ToolTip.Tip="Toggle fullscreen">
+          <TextBlock Text="⛶"/>
+        </Button>
       </Grid>
     </Border>
 
     <!-- Bottom Controls -->
     <Border VerticalAlignment="Bottom" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto">
         <!-- Previous Button -->
         <Button Grid.Column="0" Content="◀" Command="{Binding GoToPreviousPageCommand}"
                 IsEnabled="{Binding HasPreviousPage}" Background="Transparent" Foreground="White" FontSize="20"/>
         
         <!-- Page Slider -->
-        <Slider Grid.Column="1" Minimum="0" Maximum="{Binding Comic.PageCount}"
+        <Slider Grid.Column="1" Minimum="0" Maximum="{Binding Comic.PageCount, FallbackValue=0}"
                 Value="{Binding CurrentPage}" Margin="8,0"/>
         
         <!-- Next Button -->
@@ -64,17 +101,16 @@
         <Button Grid.Column="4" Content="−" Command="{Binding ZoomOutCommand}"
                 Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
         
-        <TextBlock Grid.Column="5" Text="{Binding ZoomLevel}" Foreground="White"
-                   VerticalAlignment="Center" Width="50" TextAlignment="Center"/>
+        <TextBlock Grid.Column="5" Text="{Binding ZoomDisplay}" Foreground="White"
+                   VerticalAlignment="Center" Width="60" TextAlignment="Center"/>
         
         <Button Grid.Column="6" Content="+" Command="{Binding ZoomInCommand}"
                 Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+
+        <Button Grid.Column="7" Content="⟲" Command="{Binding ResetZoomCommand}"
+                Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                ToolTip.Tip="Reset zoom"/>
       </Grid>
     </Border>
-
-    <!-- Toggle Controls Button (invisible tap area) -->
-    <Button VerticalAlignment="Center" HorizontalAlignment="Center"
-            Command="{Binding ToggleControlsCommand}"
-            Background="Transparent" Opacity="0.01" Width="200" Height="200"/>
   </Grid>
 </UserControl>

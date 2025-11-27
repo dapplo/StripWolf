@@ -27,9 +27,10 @@
       </ContentControl.DataTemplates>
     </ContentControl>
 
-    <!-- Tab Bar -->
+    <!-- Tab Bar - Hidden when in reader -->
     <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-            BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            IsVisible="{Binding !IsInReader}">
       <Grid ColumnDefinitions="*,*,*" Height="60">
         <Button Grid.Column="0" Command="{Binding NavigateToLibraryCommand}" 
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"

@@ -29,6 +29,11 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isRefreshing;
 
+    /// <summary>
+    /// Event raised when a comic should be opened in the reader
+    /// </summary>
+    public event EventHandler<int>? ComicOpenRequested;
+
     public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService)
     {
         _libraryService = libraryService;
@@ -99,7 +104,8 @@ public partial class LibraryViewModel : ViewModelBase
         }
 
         SelectedComic = comic;
-        // Navigation will be handled by the view
+        // Raise event to request opening the reader
+        ComicOpenRequested?.Invoke(this, comic.Id);
     }
 
     [RelayCommand]
