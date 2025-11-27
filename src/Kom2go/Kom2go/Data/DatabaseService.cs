@@ -51,10 +51,13 @@ public class DatabaseService : IAsyncDisposable
     public async Task<List<Comic>> GetRecentComicsAsync(int count = 10)
     {
         var db = await GetDatabaseAsync();
-        return await db.Table<Comic>()
+        // Fetch all comics and sort in memory since SQLite-net doesn't support 
+        // null-coalescing operator in OrderBy expressions
+        var allComics = await db.Table<Comic>().ToListAsync();
+        return allComics
             .OrderByDescending(c => c.LastReadDate ?? c.AddedDate)
             .Take(count)
-            .ToListAsync();
+            .ToList();
     }
 
     public async Task<List<Comic>> GetInProgressComicsAsync()
