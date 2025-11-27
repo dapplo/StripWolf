@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Kom2go.Data;
 using Kom2go.Models;
 using Kom2go.Models.Komga;
 using Kom2go.Services;
@@ -15,7 +14,7 @@ public partial class KomgaViewModel : ViewModelBase
 {
     private readonly KomgaApiService _komgaApiService;
     private readonly LibraryService _libraryService;
-    private readonly DatabaseService _databaseService;
+    private readonly SettingsService _settingsService;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -57,11 +56,11 @@ public partial class KomgaViewModel : ViewModelBase
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
-        DatabaseService databaseService)
+        SettingsService settingsService)
     {
         _komgaApiService = komgaApiService;
         _libraryService = libraryService;
-        _databaseService = databaseService;
+        _settingsService = settingsService;
         Title = "Komga";
     }
 
@@ -70,7 +69,8 @@ public partial class KomgaViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
-            var server = await _databaseService.GetActiveServerAsync();
+            var settings = await _settingsService.LoadSettingsAsync();
+            var server = settings.Servers.FirstOrDefault(s => s.IsActive);
             if (server is not null)
             {
                 _komgaApiService.Configure(server);

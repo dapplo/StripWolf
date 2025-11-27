@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Kom2go.Data;
 using Kom2go.Models;
 using Kom2go.Services;
 
@@ -12,8 +11,11 @@ namespace Kom2go.ViewModels;
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase
 {
-    private readonly DatabaseService _databaseService;
+    private readonly SettingsService _settingsService;
     private readonly KomgaApiService _komgaApiService;
+    
+    private AppSettings? _appSettings;
+    private int _nextServerId = 1;
 
     [ObservableProperty]
     private ObservableCollection<KomgaServer> _servers = [];
@@ -44,9 +46,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(DatabaseService databaseService, KomgaApiService komgaApiService)
+    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService)
     {
-        _databaseService = databaseService;
+        _settingsService = settingsService;
         _komgaApiService = komgaApiService;
         Title = "Settings";
     }
@@ -56,11 +58,17 @@ public partial class SettingsViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
-            var servers = await _databaseService.GetServersAsync();
+            _appSettings = await _settingsService.LoadSettingsAsync();
             Servers.Clear();
-            foreach (var server in servers)
+            foreach (var server in _appSettings.Servers)
             {
                 Servers.Add(server);
+            }
+            
+            // Track the next available ID
+            if (_appSettings.Servers.Count > 0)
+            {
+                _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
             }
         });
     }
@@ -123,22 +131,36 @@ public partial class SettingsViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            var server = _editingServer ?? new KomgaServer();
+            _appSettings ??= new AppSettings();
+            
+            KomgaServer server;
+            if (_editingServer is not null)
+            {
+                server = _editingServer;
+            }
+            else
+            {
+                server = new KomgaServer
+                {
+                    Id = _nextServerId++
+                };
+            }
+            
             server.Name = ServerName;
             server.BaseUrl = ServerUrl.TrimEnd('/');
             server.Username = Username;
             server.Password = Password;
             
             // Make the first server active by default
-            if (Servers.Count == 0 && _editingServer is null)
+            if (_appSettings.Servers.Count == 0 && _editingServer is null)
             {
                 server.IsActive = true;
+                _appSettings.ActiveServerId = server.Id;
             }
-
-            await _databaseService.SaveServerAsync(server);
 
             if (_editingServer is null)
             {
+                _appSettings.Servers.Add(server);
                 Servers.Add(server);
             }
             else
@@ -148,7 +170,17 @@ public partial class SettingsViewModel : ViewModelBase
                 {
                     Servers[index] = server;
                 }
+                
+                // Update in settings list
+                var settingsIndex = _appSettings.Servers.FindIndex(s => s.Id == server.Id);
+                if (settingsIndex >= 0)
+                {
+                    _appSettings.Servers[settingsIndex] = server;
+                }
             }
+
+            // Persist settings with encrypted password
+            await _settingsService.SaveSettingsAsync(_appSettings);
 
             IsEditing = false;
             _editingServer = null;
@@ -165,15 +197,20 @@ public partial class SettingsViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            await _databaseService.DeleteServerAsync(server);
+            _appSettings?.Servers.RemoveAll(s => s.Id == server.Id);
             Servers.Remove(server);
+            
+            if (_appSettings is not null)
+            {
+                await _settingsService.SaveSettingsAsync(_appSettings);
+            }
         }, "Failed to delete server");
     }
 
     [RelayCommand]
     private async Task SetActiveServerAsync(KomgaServer? server)
     {
-        if (server is null)
+        if (server is null || _appSettings is null)
         {
             return;
         }
@@ -181,18 +218,27 @@ public partial class SettingsViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             // Deactivate all servers
+            foreach (var s in _appSettings.Servers)
+            {
+                s.IsActive = false;
+            }
             foreach (var s in Servers)
             {
-                if (s.IsActive)
-                {
-                    s.IsActive = false;
-                    await _databaseService.SaveServerAsync(s);
-                }
+                s.IsActive = false;
             }
 
             // Activate selected server
             server.IsActive = true;
-            await _databaseService.SaveServerAsync(server);
+            _appSettings.ActiveServerId = server.Id;
+            
+            var settingsServer = _appSettings.Servers.FirstOrDefault(s => s.Id == server.Id);
+            if (settingsServer is not null)
+            {
+                settingsServer.IsActive = true;
+            }
+
+            // Persist the change
+            await _settingsService.SaveSettingsAsync(_appSettings);
 
             // Refresh the list
             await LoadServersAsync();

@@ -55,6 +55,7 @@ public partial class App : Application
     {
         // Register services
         services.AddSingleton<DatabaseService>();
+        services.AddSingleton<SettingsService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<LibraryService>();
