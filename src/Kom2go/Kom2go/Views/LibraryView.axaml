@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Kom2go.ViewModels"
+             xmlns:models="using:Kom2go.Models"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="Kom2go.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+  
+  <Grid RowDefinitions="Auto,*">
+    <!-- Header -->
+    <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="Library" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="Import" Command="{Binding ImportFileCommand}" Padding="16,8"/>
+      </Grid>
+    </Border>
+    
+    <!-- Content -->
+    <ScrollViewer Grid.Row="1" Padding="16">
+      <StackPanel Spacing="24">
+        
+        <!-- Error Message -->
+        <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+        </Border>
+
+        <!-- All Comics Section -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="All Comics" FontSize="18" FontWeight="Bold"/>
+          
+          <!-- Empty State -->
+          <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32"
+                      IsVisible="{Binding !Comics.Count}">
+            <TextBlock Text="📚" FontSize="64" HorizontalAlignment="Center"/>
+            <TextBlock Text="No comics yet" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <TextBlock Text="Import a comic file or download from Komga to get started"
+                       Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
+            <Button Content="Import Comic" Command="{Binding ImportFileCommand}" HorizontalAlignment="Center"/>
+          </StackPanel>
+
+          <!-- Comics Grid -->
+          <ItemsControl ItemsSource="{Binding Comics}" IsVisible="{Binding Comics.Count}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto">
+                    <Border Grid.Row="0" Background="LightGray" Height="200"/>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

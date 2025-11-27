@@ -1,0 +1,80 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Kom2go.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="Kom2go.Views.ReaderView"
+             x:DataType="vm:ReaderViewModel">
+  
+  <Grid>
+    <!-- Main Image View -->
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+      <Image Source="{Binding CurrentPageImage}" 
+             Stretch="Uniform"
+             RenderTransformOrigin="0.5,0.5">
+        <Image.RenderTransform>
+          <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+        </Image.RenderTransform>
+      </Image>
+    </ScrollViewer>
+
+    <!-- Loading Indicator -->
+    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" Width="100"/>
+
+    <!-- Error Message -->
+    <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+            VerticalAlignment="Center" HorizontalAlignment="Center" Margin="32"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+    </Border>
+
+    <!-- Top Controls -->
+    <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
+            IsVisible="{Binding IsControlsVisible}">
+      <Grid ColumnDefinitions="Auto,*">
+        <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" Background="Transparent" Foreground="White"/>
+        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
+                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <!-- Bottom Controls -->
+    <Border VerticalAlignment="Bottom" Background="#E0000000" Padding="16"
+            IsVisible="{Binding IsControlsVisible}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto">
+        <!-- Previous Button -->
+        <Button Grid.Column="0" Content="◀" Command="{Binding GoToPreviousPageCommand}"
+                IsEnabled="{Binding HasPreviousPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+        
+        <!-- Page Slider -->
+        <Slider Grid.Column="1" Minimum="0" Maximum="{Binding Comic.PageCount}"
+                Value="{Binding CurrentPage}" Margin="8,0"/>
+        
+        <!-- Next Button -->
+        <Button Grid.Column="2" Content="▶" Command="{Binding GoToNextPageCommand}"
+                IsEnabled="{Binding HasNextPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+
+        <!-- Page Display -->
+        <TextBlock Grid.Column="3" Text="{Binding PageDisplay}" Foreground="White"
+                   VerticalAlignment="Center" Margin="16,0"/>
+
+        <!-- Zoom Controls -->
+        <Button Grid.Column="4" Content="−" Command="{Binding ZoomOutCommand}"
+                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+        
+        <TextBlock Grid.Column="5" Text="{Binding ZoomLevel}" Foreground="White"
+                   VerticalAlignment="Center" Width="50" TextAlignment="Center"/>
+        
+        <Button Grid.Column="6" Content="+" Command="{Binding ZoomInCommand}"
+                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+      </Grid>
+    </Border>
+
+    <!-- Toggle Controls Button (invisible tap area) -->
+    <Button VerticalAlignment="Center" HorizontalAlignment="Center"
+            Command="{Binding ToggleControlsCommand}"
+            Background="Transparent" Opacity="0.01" Width="200" Height="200"/>
+  </Grid>
+</UserControl>
