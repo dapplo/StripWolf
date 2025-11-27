@@ -15,6 +15,8 @@ public partial class KomgaViewModel : ViewModelBase
     private readonly KomgaApiService _komgaApiService;
     private readonly LibraryService _libraryService;
     private readonly SettingsService _settingsService;
+    
+    private KomgaServer? _activeServer;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -53,6 +55,16 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _hasMoreSeries = true;
     private bool _hasMoreBooks = true;
 
+    /// <summary>
+    /// Username for the active server (used for authenticated image loading)
+    /// </summary>
+    public string? ServerUsername => _activeServer?.Username;
+
+    /// <summary>
+    /// Password for the active server (used for authenticated image loading)
+    /// </summary>
+    public string? ServerPassword => _activeServer?.Password;
+
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
@@ -67,13 +79,17 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task InitializeAsync()
     {
-        await ExecuteAsync(async () =>
+        try
         {
             var settings = await _settingsService.LoadSettingsAsync();
-            var server = settings.Servers.FirstOrDefault(s => s.IsActive);
-            if (server is not null)
+            _activeServer = settings.Servers.FirstOrDefault(s => s.IsActive);
+            
+            OnPropertyChanged(nameof(ServerUsername));
+            OnPropertyChanged(nameof(ServerPassword));
+            
+            if (_activeServer is not null)
             {
-                _komgaApiService.Configure(server);
+                _komgaApiService.Configure(_activeServer);
                 IsConnected = await _komgaApiService.TestConnectionAsync();
                 
                 if (IsConnected)
@@ -81,7 +97,12 @@ public partial class KomgaViewModel : ViewModelBase
                     await LoadLibrariesAsync();
                 }
             }
-        });
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to initialize: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error initializing Komga: {ex}");
+        }
     }
 
     [RelayCommand]
@@ -100,7 +121,7 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteAsync(async () =>
+        try
         {
             var libs = await _komgaApiService.GetLibrariesAsync();
             Libraries.Clear();
@@ -108,7 +129,12 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 Libraries.Add(lib);
             }
-        });
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load libraries: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error loading libraries: {ex}");
+        }
     }
 
     [RelayCommand]
@@ -135,8 +161,9 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteAsync(async () =>
+        try
         {
+            IsBusy = true;
             var result = await _komgaApiService.GetSeriesAsync(
                 page: _currentPage,
                 size: 20,
@@ -144,12 +171,23 @@ public partial class KomgaViewModel : ViewModelBase
 
             foreach (var s in result.Content)
             {
+                // Set the thumbnail URL for image binding
+                s.ThumbnailUrl = _komgaApiService.GetSeriesThumbnailUrl(s.Id);
                 Series.Add(s);
             }
 
             _hasMoreSeries = !result.Last;
             _currentPage++;
-        });
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load series: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error loading series: {ex}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
@@ -180,8 +218,9 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteAsync(async () =>
+        try
         {
+            IsBusy = true;
             var result = await _komgaApiService.GetBooksForSeriesAsync(
                 SelectedSeries.Id,
                 page: _currentPage,
@@ -189,12 +228,23 @@ public partial class KomgaViewModel : ViewModelBase
 
             foreach (var b in result.Content)
             {
+                // Set the thumbnail URL for image binding
+                b.ThumbnailUrl = _komgaApiService.GetBookThumbnailUrl(b.Id);
                 Books.Add(b);
             }
 
             _hasMoreBooks = !result.Last;
             _currentPage++;
-        });
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load books: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error loading books: {ex}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]

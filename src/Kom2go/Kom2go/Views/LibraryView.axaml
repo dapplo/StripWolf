@@ -6,14 +6,15 @@
              xmlns:models="using:Kom2go.Models"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.LibraryView"
-             x:DataType="vm:LibraryViewModel">
+             x:DataType="vm:LibraryViewModel"
+             x:Name="Root">
   
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="Library" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="Import" Command="{Binding ImportFileCommand}" Padding="16,8"/>
+        <Button Grid.Column="1" Content="Import" Click="OnImportClicked" Padding="16,8"/>
       </Grid>
     </Border>
     
@@ -38,7 +39,7 @@
             <TextBlock Text="No comics yet" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
             <TextBlock Text="Import a comic file or download from Komga to get started"
                        Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
-            <Button Content="Import Comic" Command="{Binding ImportFileCommand}" HorizontalAlignment="Center"/>
+            <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
           </StackPanel>
 
           <!-- Comics Grid -->

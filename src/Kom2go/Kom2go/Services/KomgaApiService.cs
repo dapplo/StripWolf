@@ -25,6 +25,35 @@ public class KomgaApiService : IDisposable
     }
 
     /// <summary>
+    /// Gets the base URL of the configured server
+    /// </summary>
+    public string? BaseUrl => _currentServer?.BaseUrl;
+
+    /// <summary>
+    /// Gets the thumbnail URL for a series
+    /// </summary>
+    public string GetSeriesThumbnailUrl(string seriesId)
+    {
+        if (_currentServer is null)
+        {
+            return string.Empty;
+        }
+        return $"{_currentServer.BaseUrl}/api/v1/series/{seriesId}/thumbnail";
+    }
+
+    /// <summary>
+    /// Gets the thumbnail URL for a book
+    /// </summary>
+    public string GetBookThumbnailUrl(string bookId)
+    {
+        if (_currentServer is null)
+        {
+            return string.Empty;
+        }
+        return $"{_currentServer.BaseUrl}/api/v1/books/{bookId}/thumbnail";
+    }
+
+    /// <summary>
     /// Gets whether the service is configured with a server
     /// </summary>
     public bool IsConfigured => _currentServer is not null && _httpClient is not null;
@@ -262,7 +291,10 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/file", HttpCompletionOption.ResponseHeadersRead);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -278,7 +310,10 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/file", HttpCompletionOption.ResponseHeadersRead);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return false;

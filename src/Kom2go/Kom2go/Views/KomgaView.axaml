@@ -4,9 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Kom2go.ViewModels"
              xmlns:komga="using:Kom2go.Models.Komga"
+             xmlns:controls="using:Kom2go.Controls"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.KomgaView"
-             x:DataType="vm:KomgaViewModel">
+             x:DataType="vm:KomgaViewModel"
+             x:Name="Root">
   
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
@@ -60,7 +62,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="komga:KomgaLibrary">
                   <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
-                          Command="{Binding $parent[ItemsControl].((vm:KomgaViewModel)DataContext).SelectLibraryCommand}"
+                          Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, ElementName=Root}"
                           CommandParameter="{Binding}">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                       <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
@@ -86,15 +88,19 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeries">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding $parent[ItemsControl].((vm:KomgaViewModel)DataContext).SelectSeriesCommand}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, ElementName=Root}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
                         <Grid RowDefinitions="150,Auto,Auto">
-                          <Border Grid.Row="0" Background="LightGray" Height="150"/>
+                          <controls:AsyncImage Grid.Row="0" Height="150" 
+                                               SourceUrl="{Binding ThumbnailUrl}"
+                                               Username="{Binding ((vm:KomgaViewModel)DataContext).ServerUsername, ElementName=Root}"
+                                               Password="{Binding ((vm:KomgaViewModel)DataContext).ServerPassword, ElementName=Root}"
+                                               Stretch="UniformToFill"/>
                           <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                      TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                          <TextBlock Grid.Row="2" Text="{Binding BooksCount}"
+                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
                                      FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
                         </Grid>
                       </Border>
@@ -121,13 +127,17 @@
                   <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
                           Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150">
                     <Grid RowDefinitions="150,Auto,Auto,Auto">
-                      <Border Grid.Row="0" Background="LightGray" Height="150"/>
+                      <controls:AsyncImage Grid.Row="0" Height="150" 
+                                           SourceUrl="{Binding ThumbnailUrl}"
+                                           Username="{Binding ((vm:KomgaViewModel)DataContext).ServerUsername, ElementName=Root}"
+                                           Password="{Binding ((vm:KomgaViewModel)DataContext).ServerPassword, ElementName=Root}"
+                                           Stretch="UniformToFill"/>
                       <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                  TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                      <TextBlock Grid.Row="2" Text="{Binding Media.PagesCount}"
+                      <TextBlock Grid.Row="2" Text="{Binding Media.PagesCount, StringFormat='{}{0} pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                       <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding $parent[ItemsControl].((vm:KomgaViewModel)DataContext).DownloadBookCommand}"
+                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, ElementName=Root}"
                               CommandParameter="{Binding}"/>
                     </Grid>
                   </Border>
@@ -149,7 +159,7 @@
             <TextBlock Text="Downloading..." FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding DownloadingBookName}" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             <ProgressBar Value="{Binding DownloadProgress}" Maximum="1"/>
-            <TextBlock Text="{Binding DownloadProgress}" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:P0}'}" HorizontalAlignment="Center"/>
           </StackPanel>
         </Border>
       </Border>

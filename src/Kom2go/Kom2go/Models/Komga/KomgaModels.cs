@@ -123,6 +123,12 @@ public class KomgaSeries
 
     [JsonPropertyName("oneshot")]
     public bool Oneshot { get; set; }
+
+    /// <summary>
+    /// Gets the thumbnail URL for the series (computed from the server URL)
+    /// </summary>
+    [JsonIgnore]
+    public string? ThumbnailUrl { get; set; }
 }
 
 /// <summary>
@@ -279,6 +285,12 @@ public class KomgaBook
 
     [JsonPropertyName("oneshot")]
     public bool Oneshot { get; set; }
+
+    /// <summary>
+    /// Gets the thumbnail URL for the book (computed from the server URL)
+    /// </summary>
+    [JsonIgnore]
+    public string? ThumbnailUrl { get; set; }
 }
 
 /// <summary>
