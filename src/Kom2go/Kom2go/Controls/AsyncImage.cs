@@ -19,6 +19,12 @@ public class AsyncImage : Control
     // The client is never disposed as it's shared across all AsyncImage instances.
     private static readonly HttpClient SharedHttpClient;
     
+    /// <summary>
+    /// Delay in milliseconds to wait for bindings to settle before loading images.
+    /// This helps when the control is attached before DataContext bindings are evaluated.
+    /// </summary>
+    private const int BindingSettleDelayMs = 100;
+    
     private Bitmap? _loadedBitmap;
     private bool _isLoading;
     private CancellationTokenSource? _cts;
@@ -128,6 +134,7 @@ public class AsyncImage : Control
         // If we have a URL but no bitmap loaded (possibly due to failed auth), retry loading
         if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
         {
+            System.Diagnostics.Debug.WriteLine($"AsyncImage: Credentials changed, retrying load for '{SourceUrl}'");
             _cts?.Cancel();
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
@@ -174,6 +181,10 @@ public class AsyncImage : Control
                 var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"AsyncImage: Loading '{SourceUrl}' without credentials");
+            }
 
             using var response = await SharedHttpClient.SendAsync(request, cancellationToken);
             
@@ -191,6 +202,10 @@ public class AsyncImage : Control
                         InvalidateVisual();
                     }
                 });
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load '{SourceUrl}': HTTP {(int)response.StatusCode}");
             }
         }
         finally
@@ -254,6 +269,51 @@ public class AsyncImage : Control
 
             default:
                 return bounds;
+        }
+    }
+
+    /// <summary>
+    /// When attached to the visual tree, check if we need to load an image
+    /// This handles the case where credentials become available after initial binding
+    /// </summary>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        
+        // If we have a URL but no bitmap, try to load it now with a short delay
+        // This helps when the initial binding evaluated before DataContext was set
+        if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            // Add a small delay to allow bindings to update
+            _ = LoadImageWithDelayAsync(_cts.Token);
+        }
+    }
+
+    /// <summary>
+    /// Load image with a small delay to allow bindings to settle
+    /// </summary>
+    private async Task LoadImageWithDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Wait a bit for bindings to update (especially credentials)
+            await Task.Delay(BindingSettleDelayMs, cancellationToken);
+            
+            if (!cancellationToken.IsCancellationRequested && _loadedBitmap is null && !_isLoading)
+            {
+                await LoadImageAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when cancelled
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load image with delay: {ex.Message}");
         }
     }
 
