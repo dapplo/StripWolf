@@ -86,7 +86,9 @@ public partial class ReaderViewModel : ViewModelBase
                 }
                 
                 _isLoadingPage = true;
-                CurrentPage = Comic.CurrentPage;
+                // Ensure CurrentPage is within valid range (0 to PageCount-1)
+                var validPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
+                CurrentPage = Comic.PageCount > 0 ? validPage : 0;
                 _isLoadingPage = false;
                 await LoadPageAsync();
                 
@@ -118,7 +120,8 @@ public partial class ReaderViewModel : ViewModelBase
             {
                 // Komga uses 1-based page numbers
                 var komgaPage = book.ReadProgress.Page - 1;
-                if (komgaPage >= 0 && komgaPage > Comic.CurrentPage)
+                // Ensure page is within valid range
+                if (komgaPage >= 0 && komgaPage < Comic.PageCount && komgaPage > Comic.CurrentPage)
                 {
                     Comic.CurrentPage = komgaPage;
                     Comic.IsCompleted = book.ReadProgress.Completed;
@@ -136,6 +139,19 @@ public partial class ReaderViewModel : ViewModelBase
         if (Comic is null || _isLoadingPage)
         {
             return;
+        }
+
+        // Validate page index is within range
+        if (Comic.PageCount == 0)
+        {
+            ErrorMessage = "Comic has no pages";
+            return;
+        }
+
+        // Ensure CurrentPage is within valid bounds
+        if (CurrentPage < 0 || CurrentPage >= Comic.PageCount)
+        {
+            CurrentPage = Math.Max(0, Math.Min(CurrentPage, Comic.PageCount - 1));
         }
 
         _isLoadingPage = true;
