@@ -191,7 +191,14 @@ public class ComicReaderService
             }
 
             var entry = entries[pageIndex];
+            
+            // Handle entries that may not be extractable
             using var stream = entry.OpenEntryStream();
+            if (stream is null)
+            {
+                throw new InvalidOperationException($"Could not extract page {pageIndex} from CBR archive. The entry may be corrupted or use an unsupported compression method.");
+            }
+            
             using var memoryStream = new MemoryStream();
             stream.CopyTo(memoryStream);
             return memoryStream.ToArray();

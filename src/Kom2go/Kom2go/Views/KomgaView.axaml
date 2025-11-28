@@ -92,12 +92,16 @@
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
-                        <Grid RowDefinitions="150,Auto,Auto">
-                          <controls:AsyncImage Grid.Row="0" Height="150" 
-                                               SourceUrl="{Binding ThumbnailUrl}"
-                                               Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
-                                               Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
-                                               Stretch="UniformToFill"/>
+                        <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
+                        <Grid RowDefinitions="200,Auto,Auto">
+                          <Border Grid.Row="0" Height="200" Background="LightGray" ClipToBounds="True">
+                            <controls:AsyncImage SourceUrl="{Binding ThumbnailUrl}"
+                                                 Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
+                                                 Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
+                                                 Stretch="Uniform"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Center"/>
+                          </Border>
                           <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                      TextTrimming="CharacterEllipsis" Margin="8,4"/>
                           <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
@@ -125,13 +129,18 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="komga:KomgaBook">
                   <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
-                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150">
-                    <Grid RowDefinitions="150,Auto,Auto,Auto">
-                      <controls:AsyncImage Grid.Row="0" Height="150" 
-                                           SourceUrl="{Binding ThumbnailUrl}"
-                                           Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
-                                           Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
-                                           Stretch="UniformToFill"/>
+                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                          ClipToBounds="True">
+                    <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
+                    <Grid RowDefinitions="200,Auto,Auto,Auto">
+                      <Border Grid.Row="0" Height="200" Background="LightGray" ClipToBounds="True">
+                        <controls:AsyncImage SourceUrl="{Binding ThumbnailUrl}"
+                                             Username="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerUsername, FallbackValue=''}"
+                                             Password="{Binding #Root.((vm:KomgaViewModel)DataContext).ServerPassword, FallbackValue=''}"
+                                             Stretch="Uniform"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"/>
+                      </Border>
                       <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
                                  TextTrimming="CharacterEllipsis" Margin="8,4"/>
                       <TextBlock Grid.Row="2" Text="{Binding Media.PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"

@@ -31,6 +31,12 @@ public partial class ReaderViewModel : ViewModelBase
     private Bitmap? _currentPageImage;
 
     [ObservableProperty]
+    private Bitmap? _leftPageImage;
+
+    [ObservableProperty]
+    private Bitmap? _rightPageImage;
+
+    [ObservableProperty]
     private bool _isControlsVisible = true;
 
     [ObservableProperty]
@@ -41,14 +47,47 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isFullScreen;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StretchModeIcon))]
     private StretchMode _stretchMode = StretchMode.FitPage;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TwoPageModeIcon))]
+    [NotifyPropertyChangedFor(nameof(PageDisplay))]
+    [NotifyPropertyChangedFor(nameof(MaxSliderValue))]
+    private bool _isTwoPageMode;
 
     private bool _isLoadingPage;
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
-    public string PageDisplay => Comic is null ? "" : $"{CurrentPage + 1} / {Comic.PageCount}";
+    
+    public string PageDisplay
+    {
+        get
+        {
+            if (Comic is null) return "";
+            if (IsTwoPageMode && CurrentPage + 1 < Comic.PageCount)
+            {
+                return $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}";
+            }
+            return $"{CurrentPage + 1} / {Comic.PageCount}";
+        }
+    }
+    
     public string ZoomDisplay => $"{ZoomLevel:P0}";
+    
+    public string StretchModeIcon => StretchMode switch
+    {
+        StretchMode.FitPage => "⊡",   // Fit page icon
+        StretchMode.FitWidth => "↔",  // Fit width icon  
+        StretchMode.FitHeight => "↕", // Fit height icon
+        StretchMode.Original => "⊟",  // Original size icon
+        _ => "⊡"
+    };
+    
+    public string TwoPageModeIcon => IsTwoPageMode ? "📖" : "📄";
+    
+    public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
 
     /// <summary>
     /// Event raised when the reader should be closed
@@ -158,14 +197,48 @@ public partial class ReaderViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
-            using var stream = new MemoryStream(pageData);
-            
-            // Create new bitmap first, then dispose old one to avoid memory leak
-            var newBitmap = new Bitmap(stream);
-            var oldBitmap = CurrentPageImage;
-            CurrentPageImage = newBitmap;
-            oldBitmap?.Dispose();
+            if (IsTwoPageMode)
+            {
+                // Load two pages for two-page mode
+                var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+                using var leftStream = new MemoryStream(leftPageData);
+                var newLeftBitmap = new Bitmap(leftStream);
+                var oldLeftBitmap = LeftPageImage;
+                LeftPageImage = newLeftBitmap;
+                oldLeftBitmap?.Dispose();
+                
+                // Also update the single page image for consistency
+                CurrentPageImage = LeftPageImage;
+                
+                // Load right page if available
+                if (CurrentPage + 1 < Comic.PageCount)
+                {
+                    var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage + 1);
+                    using var rightStream = new MemoryStream(rightPageData);
+                    var newRightBitmap = new Bitmap(rightStream);
+                    var oldRightBitmap = RightPageImage;
+                    RightPageImage = newRightBitmap;
+                    oldRightBitmap?.Dispose();
+                }
+                else
+                {
+                    var oldRightBitmap = RightPageImage;
+                    RightPageImage = null;
+                    oldRightBitmap?.Dispose();
+                }
+            }
+            else
+            {
+                // Single page mode
+                var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+                using var stream = new MemoryStream(pageData);
+                
+                // Create new bitmap first, then dispose old one to avoid memory leak
+                var newBitmap = new Bitmap(stream);
+                var oldBitmap = CurrentPageImage;
+                CurrentPageImage = newBitmap;
+                oldBitmap?.Dispose();
+            }
         }
         catch (Exception ex)
         {
@@ -191,6 +264,18 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
+    partial void OnIsTwoPageModeChanged(bool value)
+    {
+        // Reload pages when switching modes
+        if (Comic is not null && !_isLoadingPage)
+        {
+            _ = Task.Run(async () =>
+            {
+                await LoadPageAsync();
+            });
+        }
+    }
+
     [RelayCommand]
     private async Task GoToPreviousPageAsync()
     {
@@ -199,7 +284,9 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        CurrentPage--;
+        // In two-page mode, go back 2 pages
+        var step = IsTwoPageMode ? 2 : 1;
+        CurrentPage = Math.Max(0, CurrentPage - step);
         await LoadPageAsync();
         await SaveProgressAsync();
     }
@@ -212,7 +299,12 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        CurrentPage++;
+        // In two-page mode, advance 2 pages
+        var step = IsTwoPageMode ? 2 : 1;
+        if (Comic is not null)
+        {
+            CurrentPage = Math.Min(Comic.PageCount - 1, CurrentPage + step);
+        }
         await LoadPageAsync();
         await SaveProgressAsync();
     }
@@ -234,6 +326,12 @@ public partial class ReaderViewModel : ViewModelBase
     private void ToggleControls()
     {
         IsControlsVisible = !IsControlsVisible;
+    }
+
+    [RelayCommand]
+    private void ToggleTwoPageMode()
+    {
+        IsTwoPageMode = !IsTwoPageMode;
     }
 
     [RelayCommand]

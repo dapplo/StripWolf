@@ -39,24 +39,31 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="models:Comic">
-                <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                        Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
-                        CommandParameter="{Binding}">
-                  <Border CornerRadius="8" ClipToBounds="True" Width="150"
-                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                    <Grid RowDefinitions="200,Auto,Auto,Auto">
-                      <Border Grid.Row="0" Background="LightGray" Height="200">
-                        <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border Background="LightGray" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath}" Stretch="Uniform" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
                       </Border>
-                      <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                                 TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                      <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
-                                   Height="4" Margin="8,2"/>
-                      <TextBlock Grid.Row="3" Text="{Binding CurrentPage, StringFormat='Page {0}'}"
-                                 FontSize="10" Foreground="Gray" Margin="8,2,8,8"/>
-                    </Grid>
-                  </Border>
-                </Button>
+                    </Button>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
+                                 Height="4" Margin="8,2"/>
+                    <TextBlock Grid.Row="3" Text="{Binding CurrentPage, StringFormat='Page {0}'}"
+                               FontSize="10" Foreground="Gray" Margin="8,2,8,4"/>
+                    <!-- Delete Button -->
+                    <Button Grid.Row="4" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -85,22 +92,29 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="models:Comic">
-                <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                        Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
-                        CommandParameter="{Binding}">
-                  <Border CornerRadius="8" ClipToBounds="True" Width="150"
-                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                    <Grid RowDefinitions="200,Auto,Auto">
-                      <Border Grid.Row="0" Background="LightGray" Height="200">
-                        <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border Background="LightGray" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath}" Stretch="Uniform"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
                       </Border>
-                      <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                                 TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                      <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
-                                 FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                    </Grid>
-                  </Border>
-                </Button>
+                    </Button>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Delete Button -->
+                    <Button Grid.Row="3" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

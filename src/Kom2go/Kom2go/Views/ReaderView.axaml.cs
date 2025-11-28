@@ -10,6 +10,7 @@ public partial class ReaderView : UserControl
 {
     private Image? _pageImage;
     private ScrollViewer? _imageScroller;
+    private Viewbox? _imageViewbox;
 
     public ReaderView()
     {
@@ -32,10 +33,31 @@ public partial class ReaderView : UserControl
         }
     }
 
-    private void OnImagePointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnLeftZonePressed(object? sender, PointerPressedEventArgs e)
     {
-        // Placeholder for future touch/gesture handling
-        // Avalonia handles pinch-to-zoom through gestures on supported platforms
+        if (DataContext is ReaderViewModel vm && vm.HasPreviousPage)
+        {
+            vm.GoToPreviousPageCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void OnRightZonePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is ReaderViewModel vm && vm.HasNextPage)
+        {
+            vm.GoToNextPageCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void OnCenterZonePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is ReaderViewModel vm)
+        {
+            vm.ToggleControlsCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -91,6 +113,13 @@ public partial class ReaderView : UserControl
                 e.Handled = true;
                 break;
                 
+            case Key.D2:
+            case Key.NumPad2:
+                // Toggle two-page mode with "2" key
+                vm.ToggleTwoPageModeCommand.Execute(null);
+                e.Handled = true;
+                break;
+                
             case Key.F:
             case Key.F11:
                 vm.ToggleFullScreenCommand.Execute(null);
@@ -140,6 +169,7 @@ public partial class ReaderView : UserControl
         // Cache control references to avoid repeated FindControl calls
         _pageImage = this.FindControl<Image>("PageImage");
         _imageScroller = this.FindControl<ScrollViewer>("ImageScroller");
+        _imageViewbox = this.FindControl<Viewbox>("ImageViewbox");
         
         // Focus this control to receive keyboard events
         Focus();
@@ -155,6 +185,7 @@ public partial class ReaderView : UserControl
         // Clear cached references
         _pageImage = null;
         _imageScroller = null;
+        _imageViewbox = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -175,35 +206,60 @@ public partial class ReaderView : UserControl
 
     private void UpdateImageStretch()
     {
-        if (DataContext is not ReaderViewModel vm || _pageImage is null || _imageScroller is null)
+        if (DataContext is not ReaderViewModel vm || _imageViewbox is null || _imageScroller is null)
         {
             return;
         }
 
-        _pageImage.Stretch = vm.StretchMode switch
-        {
-            StretchMode.FitPage => Stretch.Uniform,
-            StretchMode.FitWidth => Stretch.UniformToFill,
-            StretchMode.FitHeight => Stretch.UniformToFill,
-            StretchMode.Original => Stretch.None,
-            _ => Stretch.Uniform
-        };
-
-        // Adjust scroll behavior based on stretch mode
+        // Configure the Viewbox stretch to match the desired mode
         switch (vm.StretchMode)
         {
-            case StretchMode.FitWidth:
+            case StretchMode.FitPage:
+                // Fit the entire page within the viewport (both width and height)
+                _imageViewbox.Stretch = Stretch.Uniform;
+                _imageViewbox.StretchDirection = StretchDirection.Both;
                 _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
-                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-                break;
-            case StretchMode.FitHeight:
-                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
                 _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
                 break;
-            default:
+                
+            case StretchMode.FitWidth:
+                // Fit to viewport width, allow vertical scrolling
+                _imageViewbox.Stretch = Stretch.Uniform;
+                _imageViewbox.StretchDirection = StretchDirection.Both;
+                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+                // Force width-based sizing - set viewbox width constraint
+                _imageViewbox.MaxWidth = _imageScroller.Bounds.Width > 0 ? _imageScroller.Bounds.Width : double.PositiveInfinity;
+                _imageViewbox.MaxHeight = double.PositiveInfinity;
+                break;
+                
+            case StretchMode.FitHeight:
+                // Fit to viewport height, allow horizontal scrolling
+                _imageViewbox.Stretch = Stretch.Uniform;
+                _imageViewbox.StretchDirection = StretchDirection.Both;
+                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+                // Force height-based sizing - set viewbox height constraint
+                _imageViewbox.MaxWidth = double.PositiveInfinity;
+                _imageViewbox.MaxHeight = _imageScroller.Bounds.Height > 0 ? _imageScroller.Bounds.Height : double.PositiveInfinity;
+                break;
+                
+            case StretchMode.Original:
+                // Original size (100%), allow scrolling in both directions
+                _imageViewbox.Stretch = Stretch.None;
+                _imageViewbox.StretchDirection = StretchDirection.DownOnly;
                 _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
                 _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+                _imageViewbox.MaxWidth = double.PositiveInfinity;
+                _imageViewbox.MaxHeight = double.PositiveInfinity;
                 break;
         }
+    }
+
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+        // Re-apply stretch mode when size changes
+        UpdateImageStretch();
     }
 }

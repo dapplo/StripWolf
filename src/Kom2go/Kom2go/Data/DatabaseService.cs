@@ -63,9 +63,10 @@ public class DatabaseService : IAsyncDisposable
     public async Task<List<Comic>> GetInProgressComicsAsync()
     {
         var db = await GetDatabaseAsync();
+        // Include comics that have been read (LastReadDate is set) and are not completed
+        // For Komga comics, also include those with CurrentPage > 0 OR that have been opened
         return await db.Table<Comic>()
-            .Where(c => c.CurrentPage > 0 && !c.IsCompleted)
-            .OrderByDescending(c => c.LastReadDate)
+            .Where(c => !c.IsCompleted && (c.CurrentPage > 0 || c.LastReadDate != null))
             .ToListAsync();
     }
 
