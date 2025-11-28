@@ -211,6 +211,11 @@ public partial class ReaderView : UserControl
             return;
         }
 
+        // Cache bounds to avoid repeated property access
+        var scrollerBounds = _imageScroller.Bounds;
+        var scrollerWidth = scrollerBounds.Width;
+        var scrollerHeight = scrollerBounds.Height;
+
         // Configure the Viewbox stretch to match the desired mode
         switch (vm.StretchMode)
         {
@@ -220,6 +225,8 @@ public partial class ReaderView : UserControl
                 _imageViewbox.StretchDirection = StretchDirection.Both;
                 _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
                 _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+                _imageViewbox.MaxWidth = double.PositiveInfinity;
+                _imageViewbox.MaxHeight = double.PositiveInfinity;
                 break;
                 
             case StretchMode.FitWidth:
@@ -229,7 +236,7 @@ public partial class ReaderView : UserControl
                 _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
                 _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
                 // Force width-based sizing - set viewbox width constraint
-                _imageViewbox.MaxWidth = _imageScroller.Bounds.Width > 0 ? _imageScroller.Bounds.Width : double.PositiveInfinity;
+                _imageViewbox.MaxWidth = scrollerWidth > 0 ? scrollerWidth : double.PositiveInfinity;
                 _imageViewbox.MaxHeight = double.PositiveInfinity;
                 break;
                 
@@ -241,7 +248,7 @@ public partial class ReaderView : UserControl
                 _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
                 // Force height-based sizing - set viewbox height constraint
                 _imageViewbox.MaxWidth = double.PositiveInfinity;
-                _imageViewbox.MaxHeight = _imageScroller.Bounds.Height > 0 ? _imageScroller.Bounds.Height : double.PositiveInfinity;
+                _imageViewbox.MaxHeight = scrollerHeight > 0 ? scrollerHeight : double.PositiveInfinity;
                 break;
                 
             case StretchMode.Original:

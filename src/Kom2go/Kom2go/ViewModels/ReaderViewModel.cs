@@ -256,12 +256,14 @@ public partial class ReaderViewModel : ViewModelBase
         // Only trigger page load when not already loading (to avoid loops)
         if (!_isLoadingPage && Comic is not null)
         {
-            _ = Task.Run(async () =>
-            {
-                await LoadPageAsync();
-                await SaveProgressAsync();
-            });
+            _ = LoadAndSaveProgressAsync();
         }
+    }
+    
+    private async Task LoadAndSaveProgressAsync()
+    {
+        await LoadPageAsync();
+        await SaveProgressAsync();
     }
 
     partial void OnIsTwoPageModeChanged(bool value)
@@ -269,10 +271,7 @@ public partial class ReaderViewModel : ViewModelBase
         // Reload pages when switching modes
         if (Comic is not null && !_isLoadingPage)
         {
-            _ = Task.Run(async () =>
-            {
-                await LoadPageAsync();
-            });
+            _ = LoadPageAsync();
         }
     }
 
