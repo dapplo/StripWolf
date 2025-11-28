@@ -4,10 +4,15 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Kom2go.ViewModels"
              xmlns:models="using:Kom2go.Models"
+             xmlns:converters="using:Kom2go.Converters"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.LibraryView"
              x:DataType="vm:LibraryViewModel"
              x:Name="Root">
+  
+  <UserControl.Resources>
+    <converters:FilePathToBitmapConverter x:Key="FilePathToBitmapConverter"/>
+  </UserControl.Resources>
   
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
@@ -47,7 +52,7 @@
                             Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
                             CommandParameter="{Binding}">
                       <Border Background="LightGray" CornerRadius="8,8,0,0">
-                        <Image Source="{Binding CoverPath}" Stretch="Uniform" 
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform" 
                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
                       </Border>
                     </Button>
@@ -100,7 +105,7 @@
                             Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
                             CommandParameter="{Binding}">
                       <Border Background="LightGray" CornerRadius="8,8,0,0">
-                        <Image Source="{Binding CoverPath}" Stretch="Uniform"
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
                       </Border>
                     </Button>

@@ -36,6 +36,8 @@ public class AsyncImage : Control
         
         AffectsRender<AsyncImage>(SourceUrlProperty, PlaceholderBrushProperty, StretchProperty);
         SourceUrlProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnSourceUrlChanged());
+        UsernameProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnCredentialsChanged());
+        PasswordProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnCredentialsChanged());
     }
 
     public static readonly StyledProperty<string?> SourceUrlProperty =
@@ -116,6 +118,21 @@ public class AsyncImage : Control
         }
         
         InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Called when Username or Password changes - reload the image if we have a URL but no loaded bitmap
+    /// </summary>
+    private void OnCredentialsChanged()
+    {
+        // If we have a URL but no bitmap loaded (possibly due to failed auth), retry loading
+        if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            _ = LoadImageSafeAsync(_cts.Token);
+        }
     }
 
     /// <summary>
