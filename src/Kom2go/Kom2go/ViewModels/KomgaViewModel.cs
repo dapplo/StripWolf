@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kom2go.Models;
@@ -17,6 +19,7 @@ public partial class KomgaViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     
     private KomgaServer? _activeServer;
+    private CancellationTokenSource? _loadingCts;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -25,10 +28,10 @@ public partial class KomgaViewModel : ViewModelBase
     private ObservableCollection<KomgaLibrary> _libraries = [];
 
     [ObservableProperty]
-    private ObservableCollection<KomgaSeries> _series = [];
+    private ObservableCollection<KomgaSeriesDisplay> _series = [];
 
     [ObservableProperty]
-    private ObservableCollection<KomgaBook> _books = [];
+    private ObservableCollection<KomgaBookDisplay> _books = [];
 
     [ObservableProperty]
     private KomgaLibrary? _selectedLibrary;
@@ -140,6 +143,11 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task SelectLibraryAsync(KomgaLibrary? library)
     {
+        // Cancel any ongoing loading
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+        
         SelectedLibrary = library;
         SelectedSeries = null;
         _currentPage = 0;
@@ -169,15 +177,18 @@ public partial class KomgaViewModel : ViewModelBase
                 size: 20,
                 libraryId: SelectedLibrary?.Id);
 
-            foreach (var s in result.Content)
-            {
-                // Set the thumbnail URL for image binding
-                s.ThumbnailUrl = _komgaApiService.GetSeriesThumbnailUrl(s.Id);
-                Series.Add(s);
-            }
-
             _hasMoreSeries = !result.Last;
             _currentPage++;
+            
+            // Load thumbnails in background and add items progressively
+            var ct = _loadingCts?.Token ?? CancellationToken.None;
+            foreach (var s in result.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                
+                // Start background thumbnail loading
+                _ = LoadSeriesThumbnailAsync(s, ct);
+            }
         }
         catch (Exception ex)
         {
@@ -190,6 +201,68 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Loads a series thumbnail in the background and adds it to the collection
+    /// </summary>
+    private async Task LoadSeriesThumbnailAsync(KomgaSeries series, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            
+            // Try to load the thumbnail
+            var thumbnailBytes = await _komgaApiService.GetSeriesThumbnailAsync(series.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            // Add to collection on UI thread
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    Series.Add(new KomgaSeriesDisplay
+                    {
+                        Series = series,
+                        Thumbnail = thumbnail
+                    });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading thumbnail for series '{series.Name}': {ex.Message}");
+            
+            // Add without thumbnail
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        Series.Add(new KomgaSeriesDisplay
+                        {
+                            Series = series,
+                            Thumbnail = null
+                        });
+                    }
+                });
+            }
+        }
+    }
+
     [RelayCommand]
     private async Task LoadMoreSeriesAsync()
     {
@@ -197,14 +270,19 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SelectSeriesAsync(KomgaSeries? series)
+    private async Task SelectSeriesAsync(KomgaSeriesDisplay? seriesDisplay)
     {
-        SelectedSeries = series;
+        // Cancel any ongoing loading
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+        
+        SelectedSeries = seriesDisplay?.Series;
         _currentPage = 0;
         _hasMoreBooks = true;
         Books.Clear();
         
-        if (series is not null)
+        if (SelectedSeries is not null)
         {
             await LoadBooksAsync();
         }
@@ -226,15 +304,18 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: 20);
 
-            foreach (var b in result.Content)
-            {
-                // Set the thumbnail URL for image binding
-                b.ThumbnailUrl = _komgaApiService.GetBookThumbnailUrl(b.Id);
-                Books.Add(b);
-            }
-
             _hasMoreBooks = !result.Last;
             _currentPage++;
+            
+            // Load thumbnails in background and add items progressively
+            var ct = _loadingCts?.Token ?? CancellationToken.None;
+            foreach (var b in result.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                
+                // Start background thumbnail loading
+                _ = LoadBookThumbnailAsync(b, ct);
+            }
         }
         catch (Exception ex)
         {
@@ -247,6 +328,68 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Loads a book thumbnail in the background and adds it to the collection
+    /// </summary>
+    private async Task LoadBookThumbnailAsync(KomgaBook book, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            
+            // Try to load the thumbnail
+            var thumbnailBytes = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            // Add to collection on UI thread
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    Books.Add(new KomgaBookDisplay
+                    {
+                        Book = book,
+                        Thumbnail = thumbnail
+                    });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading thumbnail for book '{book.Name}': {ex.Message}");
+            
+            // Add without thumbnail
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        Books.Add(new KomgaBookDisplay
+                        {
+                            Book = book,
+                            Thumbnail = null
+                        });
+                    }
+                });
+            }
+        }
+    }
+
     [RelayCommand]
     private async Task LoadMoreBooksAsync()
     {
@@ -254,8 +397,9 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task DownloadBookAsync(KomgaBook? book)
+    private async Task DownloadBookAsync(KomgaBookDisplay? bookDisplay)
     {
+        var book = bookDisplay?.Book;
         if (book is null || IsDownloading)
         {
             return;
