@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Kom2go.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="Kom2go.Views.ReaderView"
+             x:DataType="vm:ReaderViewModel"
+             Background="Black"
+             x:Name="Root"
+             Focusable="True">
+  
+  <Grid>
+    <!-- Main Image View with scroll support -->
+    <ScrollViewer x:Name="ImageScroller" 
+                  HorizontalScrollBarVisibility="Auto" 
+                  VerticalScrollBarVisibility="Auto"
+                  PointerWheelChanged="OnPointerWheelChanged">
+      <!-- Container that sizes to fit viewport for proper fit modes -->
+      <Viewbox x:Name="ImageViewbox" Stretch="Uniform" StretchDirection="DownOnly">
+        <Grid x:Name="ImageContainer">
+          <!-- Two-page mode: shows two pages side by side when enabled -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"
+                      IsVisible="{Binding IsTwoPageMode}">
+            <Image x:Name="LeftPageImage"
+                   Source="{Binding LeftPageImage}"
+                   Stretch="Uniform"
+                   RenderTransformOrigin="0.5,0.5">
+              <Image.RenderTransform>
+                <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+              </Image.RenderTransform>
+            </Image>
+            <Image x:Name="RightPageImage"
+                   Source="{Binding RightPageImage}"
+                   Stretch="Uniform"
+                   RenderTransformOrigin="0.5,0.5"
+                   Margin="4,0,0,0">
+              <Image.RenderTransform>
+                <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+              </Image.RenderTransform>
+            </Image>
+          </StackPanel>
+          
+          <!-- Single-page mode -->
+          <Image x:Name="PageImage"
+                 Source="{Binding CurrentPageImage}" 
+                 Stretch="Uniform"
+                 RenderTransformOrigin="0.5,0.5"
+                 IsVisible="{Binding !IsTwoPageMode}">
+            <Image.RenderTransform>
+              <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+            </Image.RenderTransform>
+          </Image>
+        </Grid>
+      </Viewbox>
+    </ScrollViewer>
+
+    <!-- Overlay for tap zones - invisible grid that handles touch/click areas -->
+    <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent">
+      <!-- Left tap zone (25% width) - previous page -->
+      <Border Grid.Column="0" Background="Transparent" PointerPressed="OnLeftZonePressed" Cursor="Hand"/>
+      
+      <!-- Center tap zone (50% width) - toggle controls -->
+      <Border Grid.Column="1" Background="Transparent" PointerPressed="OnCenterZonePressed" Cursor="Hand"/>
+      
+      <!-- Right tap zone (25% width) - next page -->
+      <Border Grid.Column="2" Background="Transparent" PointerPressed="OnRightZonePressed" Cursor="Hand"/>
+    </Grid>
+
+    <!-- Loading Indicator -->
+    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" Width="100"/>
+
+    <!-- Error Message -->
+    <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+            VerticalAlignment="Center" HorizontalAlignment="Center" Margin="32"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+    </Border>
+
+    <!-- Top Controls - animated visibility -->
+    <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
+            IsVisible="{Binding IsControlsVisible}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+        <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" 
+                Background="Transparent" Foreground="White"/>
+        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Margin="16,0"/>
+        <!-- Two-page mode toggle -->
+        <Button Grid.Column="2" Command="{Binding ToggleTwoPageModeCommand}"
+                Background="Transparent" Foreground="White" Margin="8,0" 
+                ToolTip.Tip="Toggle two-page mode (2)">
+          <TextBlock Text="{Binding TwoPageModeIcon}"/>
+        </Button>
+        <!-- Stretch mode button -->
+        <Button Grid.Column="3" Command="{Binding CycleStretchModeCommand}"
+                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode">
+          <TextBlock Text="{Binding StretchModeIcon}"/>
+        </Button>
+        <!-- Fullscreen button -->
+        <Button Grid.Column="4" Command="{Binding ToggleFullScreenCommand}"
+                Background="Transparent" Foreground="White" FontSize="18" ToolTip.Tip="Toggle fullscreen (F)">
+          <TextBlock Text="⛶"/>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Bottom Controls -->
+    <Border VerticalAlignment="Bottom" Background="#E0000000" Padding="16"
+            IsVisible="{Binding IsControlsVisible}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto">
+        <!-- Previous Button -->
+        <Button Grid.Column="0" Content="◀" Command="{Binding GoToPreviousPageCommand}"
+                IsEnabled="{Binding HasPreviousPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+        
+        <!-- Page Slider -->
+        <Slider Grid.Column="1" Minimum="0" Maximum="{Binding MaxSliderValue, FallbackValue=0}"
+                Value="{Binding CurrentPage}" Margin="8,0"/>
+        
+        <!-- Next Button -->
+        <Button Grid.Column="2" Content="▶" Command="{Binding GoToNextPageCommand}"
+                IsEnabled="{Binding HasNextPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+
+        <!-- Page Display -->
+        <TextBlock Grid.Column="3" Text="{Binding PageDisplay}" Foreground="White"
+                   VerticalAlignment="Center" Margin="16,0"/>
+
+        <!-- Zoom Controls -->
+        <Button Grid.Column="4" Content="−" Command="{Binding ZoomOutCommand}"
+                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+        
+        <TextBlock Grid.Column="5" Text="{Binding ZoomDisplay}" Foreground="White"
+                   VerticalAlignment="Center" Width="60" TextAlignment="Center"/>
+        
+        <Button Grid.Column="6" Content="+" Command="{Binding ZoomInCommand}"
+                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+
+        <Button Grid.Column="7" Content="⟲" Command="{Binding ResetZoomCommand}"
+                Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                ToolTip.Tip="Reset zoom"/>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

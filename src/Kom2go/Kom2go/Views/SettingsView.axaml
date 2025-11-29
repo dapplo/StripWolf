@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Kom2go.ViewModels"
+             xmlns:models="using:Kom2go.Models"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="Kom2go.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  
+  <Grid>
+    <!-- Server List View -->
+    <ScrollViewer IsVisible="{Binding !IsEditing}" Padding="16">
+      <StackPanel Spacing="16">
+        <!-- Header -->
+        <TextBlock Text="Settings" FontSize="24" FontWeight="Bold"/>
+        
+        <!-- Error Message -->
+        <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+        </Border>
+
+        <!-- Komga Servers Section -->
+        <TextBlock Text="Komga Servers" FontSize="18" FontWeight="Bold"/>
+        
+        <!-- Add Server Button -->
+        <Button Content="Add Server" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
+
+        <!-- Servers List -->
+        <ItemsControl ItemsSource="{Binding Servers}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:KomgaServer">
+              <Border Padding="16" Margin="0,0,0,8" CornerRadius="8" 
+                      Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
+                      <Border Background="{DynamicResource AccentFillColorDefaultBrush}" 
+                              Padding="6,2" CornerRadius="4" IsVisible="{Binding IsActive}">
+                        <TextBlock Text="Active" Foreground="White" FontSize="10"/>
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding BaseUrl}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Text="{Binding Username}" Foreground="Gray" FontSize="12"/>
+                  </StackPanel>
+                  
+                  <Button Grid.Column="1" Content="✓" 
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).SetActiveServerCommand}"
+                          CommandParameter="{Binding}"
+                          IsVisible="{Binding !IsActive}"
+                          Background="Transparent" FontSize="20" Width="44"/>
+                  
+                  <Button Grid.Column="2" Content="✏️"
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditServerCommand}"
+                          CommandParameter="{Binding}"
+                          Background="Transparent" FontSize="16" Width="44"/>
+                  
+                  <Button Grid.Column="3" Content="🗑️"
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteServerCommand}"
+                          CommandParameter="{Binding}"
+                          Background="Transparent" FontSize="16" Width="44"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Empty State -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="32"
+                    IsVisible="{Binding !Servers.Count}">
+          <TextBlock Text="No servers configured" Foreground="Gray" HorizontalAlignment="Center"/>
+          <TextBlock Text="Add a Komga server to browse and download comics"
+                     Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
+        </StackPanel>
+
+        <!-- About Section -->
+        <TextBlock Text="About" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Kom2go" FontSize="16" FontWeight="Bold"/>
+            <TextBlock Text="A comic book reader with Komga integration" Foreground="Gray"/>
+            <TextBlock Text="Version 1.0.0 (Avalonia)" Foreground="Gray" FontSize="12"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Edit Server Form -->
+    <ScrollViewer IsVisible="{Binding IsEditing}" Padding="16">
+      <StackPanel Spacing="16" MaxWidth="400">
+        <TextBlock Text="Server Configuration" FontSize="18" FontWeight="Bold"/>
+        
+        <StackPanel Spacing="4">
+          <TextBlock Text="Name"/>
+          <TextBox Text="{Binding ServerName}" Watermark="My Komga Server"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="Server URL"/>
+          <TextBox Text="{Binding ServerUrl}" Watermark="https://komga.example.com"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="Username"/>
+          <TextBox Text="{Binding Username}" Watermark="username"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="Password"/>
+          <TextBox Text="{Binding Password}" Watermark="password" PasswordChar="•"/>
+        </StackPanel>
+
+        <!-- Connection Status -->
+        <TextBlock Text="{Binding ConnectionStatus}" HorizontalAlignment="Center"
+                   IsVisible="{Binding ConnectionStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+        <!-- Action Buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+          <Button Content="Test Connection" Command="{Binding TestConnectionCommand}"
+                  IsEnabled="{Binding !IsTestingConnection}"/>
+          
+          <Button Content="Cancel" Command="{Binding CancelEditCommand}"/>
+          
+          <Button Content="Save" Command="{Binding SaveServerCommand}" Classes="accent"/>
+        </StackPanel>
+
+        <!-- Testing Indicator -->
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsTestingConnection}"
+                     HorizontalAlignment="Center" Width="100"/>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

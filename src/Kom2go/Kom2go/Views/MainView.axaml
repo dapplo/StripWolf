@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Kom2go.ViewModels"
+             xmlns:views="using:Kom2go.Views"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="Kom2go.Views.MainView"
+             x:DataType="vm:MainViewModel">
+  
+  <Grid RowDefinitions="*,Auto">
+    <!-- Content Area -->
+    <ContentControl Grid.Row="0" Content="{Binding CurrentView}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
+          <views:LibraryView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:KomgaViewModel}">
+          <views:KomgaView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+          <views:SettingsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ReaderViewModel}">
+          <views:ReaderView />
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+    <!-- Tab Bar - Hidden when in reader -->
+    <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+            BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            IsVisible="{Binding !IsInReader}">
+      <Grid ColumnDefinitions="*,*,*" Height="60">
+        <Button Grid.Column="0" Command="{Binding NavigateToLibraryCommand}" 
+                Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+          <StackPanel Spacing="4">
+            <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="Library" FontSize="12" HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="1" Command="{Binding NavigateToKomgaCommand}"
+                Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+          <StackPanel Spacing="4">
+            <TextBlock Text="☁️" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="Komga" FontSize="12" HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Command="{Binding NavigateToSettingsCommand}"
+                Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+          <StackPanel Spacing="4">
+            <TextBlock Text="⚙️" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="Settings" FontSize="12" HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>
