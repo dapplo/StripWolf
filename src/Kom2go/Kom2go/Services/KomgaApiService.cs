@@ -171,8 +171,10 @@ public class KomgaApiService : IDisposable
     public async Task<byte[]?> GetSeriesThumbnailAsync(string seriesId)
     {
         EnsureConfigured();
-        
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/thumbnail");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/series/{seriesId}/thumbnail");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -244,8 +246,10 @@ public class KomgaApiService : IDisposable
     public async Task<byte[]?> GetBookThumbnailAsync(string bookId)
     {
         EnsureConfigured();
-        
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/thumbnail");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/thumbnail");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
