@@ -131,16 +131,26 @@ public class AsyncImage : Control
     /// </summary>
     private void OnCredentialsChanged()
     {
-        // If we have a URL but no bitmap loaded (possibly due to failed auth), retry loading
-        if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
+        // Only retry loading if:
+        // 1. We have a URL but no bitmap loaded (possibly due to failed auth)
+        // 2. Both username AND password are now available (not null)
+        // 3. We're still attached to the visual tree
+        var hasCredentials = !string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password);
+        
+        if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading && hasCredentials && IsAttachedToVisualTree)
         {
-            System.Diagnostics.Debug.WriteLine($"AsyncImage: Credentials changed, retrying load for '{SourceUrl}'");
+            System.Diagnostics.Debug.WriteLine($"AsyncImage: Credentials now available, retrying load for '{SourceUrl}'");
             _cts?.Cancel();
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
             _ = LoadImageSafeAsync(_cts.Token);
         }
     }
+    
+    /// <summary>
+    /// Tracks whether this control is currently attached to the visual tree
+    /// </summary>
+    private bool IsAttachedToVisualTree { get; set; }
 
     /// <summary>
     /// Safely loads the image with proper exception handling for fire-and-forget scenarios
@@ -169,6 +179,17 @@ public class AsyncImage : Control
             return;
         }
 
+        // For remote URLs, require credentials before attempting to load
+        // This prevents unnecessary failed requests
+        var isRemoteUrl = SourceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                          SourceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+        
+        if (isRemoteUrl && (string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password)))
+        {
+            // Don't log for every image, just silently wait for credentials
+            return;
+        }
+
         _isLoading = true;
 
         try
@@ -180,10 +201,6 @@ public class AsyncImage : Control
             {
                 var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"AsyncImage: Loading '{SourceUrl}' without credentials");
             }
 
             using var response = await SharedHttpClient.SendAsync(request, cancellationToken);
@@ -280,6 +297,8 @@ public class AsyncImage : Control
     {
         base.OnAttachedToVisualTree(e);
         
+        IsAttachedToVisualTree = true;
+        
         // If we have a URL but no bitmap, try to load it now with a short delay
         // This helps when the initial binding evaluated before DataContext was set
         if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
@@ -323,6 +342,8 @@ public class AsyncImage : Control
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        
+        IsAttachedToVisualTree = false;
         
         _cts?.Cancel();
         _cts?.Dispose();

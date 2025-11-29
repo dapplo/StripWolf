@@ -19,7 +19,7 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 
 ## Requirements
 
-- .NET 9.0 SDK
+- .NET 10.0 SDK
 
 ## Building
 
