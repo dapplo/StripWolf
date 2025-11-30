@@ -33,6 +33,15 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isRefreshing;
 
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<Comic> _searchResults = [];
+
+    [ObservableProperty]
+    private bool _isSearching;
+
     /// <summary>
     /// Whether the app is running on desktop (not mobile)
     /// </summary>
@@ -50,11 +59,54 @@ public partial class LibraryViewModel : ViewModelBase
         Title = "Library";
     }
 
+    partial void OnSearchTextChanged(string value)
+    {
+        // Trigger search when text changes
+        _ = SearchAsync();
+    }
+
+    [RelayCommand]
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            IsSearching = false;
+            SearchResults.Clear();
+            return;
+        }
+
+        IsSearching = true;
+        try
+        {
+            var results = await _libraryService.SearchComicsAsync(SearchText);
+            SearchResults.Clear();
+            foreach (var comic in results)
+            {
+                SearchResults.Add(comic);
+            }
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+
+    [RelayCommand]
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
+        IsSearching = false;
+        SearchResults.Clear();
+    }
+
     [RelayCommand]
     private async Task LoadComicsAsync()
     {
         await ExecuteAsync(async () =>
         {
+            // Clean up comics with missing files on first load
+            await _libraryService.CleanupMissingFilesAsync();
+            
             var newComics = await _libraryService.GetNewComicsAsync();
             NewComics.Clear();
             foreach (var comic in newComics)

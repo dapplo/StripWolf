@@ -105,6 +105,24 @@ public class DatabaseService : IAsyncDisposable
         return await db.Table<Comic>().FirstOrDefaultAsync(c => c.FilePath == filePath);
     }
 
+    public async Task<List<Comic>> SearchComicsAsync(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return [];
+        }
+        
+        var db = await GetDatabaseAsync();
+        var allComics = await db.Table<Comic>().ToListAsync();
+        var lowerSearch = searchText.ToLowerInvariant();
+        
+        return allComics
+            .Where(c => (c.Title?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.SeriesName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.Authors?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+    }
+
     public async Task<int> SaveComicAsync(Comic comic)
     {
         var db = await GetDatabaseAsync();

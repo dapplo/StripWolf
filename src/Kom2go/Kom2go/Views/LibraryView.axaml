@@ -29,6 +29,60 @@
     <ScrollViewer Grid.Row="1" Padding="16">
       <StackPanel Spacing="24">
         
+        <!-- Search Box -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="🔍 Search comics..."
+                   VerticalContentAlignment="Center"/>
+          <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
+                  Padding="8,6" Margin="4,0,0,0"
+                  IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </Grid>
+
+        <!-- Search Results Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsSearching}">
+          <TextBlock Text="Search Results" FontSize="18" FontWeight="Bold"/>
+          
+          <!-- No Results -->
+          <TextBlock Text="No comics found" Foreground="Gray" 
+                     IsVisible="{Binding !SearchResults.Count}" Margin="0,8"/>
+          
+          <!-- Results Grid -->
+          <ItemsControl ItemsSource="{Binding SearchResults}" IsVisible="{Binding SearchResults.Count}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                      </Border>
+                    </Button>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Delete Button -->
+                    <Button Grid.Row="3" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        
         <!-- Error Message -->
         <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
                 IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -86,6 +140,9 @@
           </ItemsControl>
         </StackPanel>
 
+        <!-- Main Content (hidden when searching) -->
+        <StackPanel Spacing="24" IsVisible="{Binding !IsSearching}">
+          
         <!-- In Progress Section -->
         <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
           <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
@@ -232,6 +289,8 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </StackPanel>
+        
+        </StackPanel> <!-- End of Main Content (hidden when searching) -->
       </StackPanel>
     </ScrollViewer>
   </Grid>

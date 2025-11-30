@@ -56,6 +56,44 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Checks if all comic files exist and removes missing ones from the library
+    /// </summary>
+    public async Task<int> CleanupMissingFilesAsync()
+    {
+        var removedCount = 0;
+        var comics = await _databaseService.GetComicsAsync();
+        
+        foreach (var comic in comics)
+        {
+            if (!File.Exists(comic.FilePath))
+            {
+                await _databaseService.DeleteComicAsync(comic);
+                
+                // Clean up cover if it exists
+                if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
+                {
+                    var coverDir = Path.GetDirectoryName(comic.CoverPath);
+                    if (!string.IsNullOrEmpty(coverDir) && Directory.Exists(coverDir))
+                    {
+                        try
+                        {
+                            Directory.Delete(coverDir, true);
+                        }
+                        catch
+                        {
+                            // Ignore cleanup errors
+                        }
+                    }
+                }
+                
+                removedCount++;
+            }
+        }
+        
+        return removedCount;
+    }
+
+    /// <summary>
     /// Gets recently read or added comics
     /// </summary>
     public Task<List<Comic>> GetRecentComicsAsync(int count = 10)
@@ -93,6 +131,14 @@ public class LibraryService
     public Task<Comic?> GetComicAsync(int id)
     {
         return _databaseService.GetComicAsync(id);
+    }
+
+    /// <summary>
+    /// Searches comics by title, series name, or authors
+    /// </summary>
+    public Task<List<Comic>> SearchComicsAsync(string searchText)
+    {
+        return _databaseService.SearchComicsAsync(searchText);
     }
 
     /// <summary>

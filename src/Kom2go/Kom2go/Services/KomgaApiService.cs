@@ -147,6 +147,40 @@ public class KomgaApiService : IDisposable
     }
 
     /// <summary>
+    /// Searches for series by name
+    /// </summary>
+    public async Task<KomgaPage<KomgaSeries>> SearchSeriesAsync(string searchQuery, int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var encodedQuery = Uri.EscapeDataString(searchQuery);
+        var url = $"api/v1/series?page={page}&size={size}&search={encodedQuery}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaSeries>>(json, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+    }
+
+    /// <summary>
+    /// Searches for books by name
+    /// </summary>
+    public async Task<KomgaPage<KomgaBook>> SearchBooksAsync(string searchQuery, int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var encodedQuery = Uri.EscapeDataString(searchQuery);
+        var url = $"api/v1/books?page={page}&size={size}&search={encodedQuery}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+    }
+
+    /// <summary>
     /// Gets a specific series by ID
     /// </summary>
     public async Task<KomgaSeries?> GetSeriesAsync(string seriesId)
