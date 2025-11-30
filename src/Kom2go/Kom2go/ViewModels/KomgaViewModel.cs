@@ -139,9 +139,9 @@ public partial class KomgaViewModel : ViewModelBase
                 _ = LoadSearchBookThumbnailAsync(b, ct);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail
+            System.Diagnostics.Debug.WriteLine($"Komga search failed: {ex.Message}");
         }
     }
 

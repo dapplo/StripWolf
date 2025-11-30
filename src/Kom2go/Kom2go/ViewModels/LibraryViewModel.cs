@@ -90,9 +90,9 @@ public partial class LibraryViewModel : ViewModelBase
                 SearchResults.Add(comic);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail
+            System.Diagnostics.Debug.WriteLine($"Search failed: {ex.Message}");
         }
     }
 

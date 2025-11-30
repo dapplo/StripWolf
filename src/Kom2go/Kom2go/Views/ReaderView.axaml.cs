@@ -33,6 +33,8 @@ public partial class ReaderView : UserControl
             else
             {
                 // Use scroll wheel to change pages
+                // Scroll down (negative delta) = next page (like scrolling through a document)
+                // Scroll up (positive delta) = previous page (going back)
                 if (e.Delta.Y > 0 && vm.HasPreviousPage)
                 {
                     vm.GoToPreviousPageCommand.Execute(null);
