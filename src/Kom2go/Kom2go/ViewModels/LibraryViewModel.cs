@@ -384,9 +384,40 @@ public partial class LibraryViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
+            // Store old state for UI update
+            var wasCompleted = comic.IsCompleted;
+            
+            // Save to database first (this updates the comic state in the database)
             await _libraryService.ToggleReadStatusAsync(comic.Id);
-            // Refresh to update the sections
-            await LoadComicsAsync();
+            
+            // Update the local comic object to match what the database now has
+            comic.IsCompleted = !wasCompleted;
+            if (!comic.IsCompleted)
+            {
+                comic.CurrentPage = 0;
+                comic.LastReadDate = null;
+            }
+            
+            // Move comic between collections for immediate UI feedback
+            if (wasCompleted)
+            {
+                // Was completed, now unread -> move to New Comics
+                CompletedComics.Remove(comic);
+                if (!NewComics.Contains(comic))
+                {
+                    NewComics.Insert(0, comic);
+                }
+            }
+            else
+            {
+                // Was not completed, now completed -> move to Read
+                NewComics.Remove(comic);
+                InProgressComics.Remove(comic);
+                if (!CompletedComics.Contains(comic))
+                {
+                    CompletedComics.Insert(0, comic);
+                }
+            }
         }, "Failed to update read status");
     }
 
