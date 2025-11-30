@@ -22,13 +22,27 @@ public partial class ReaderView : UserControl
 
     private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        // Handle scroll wheel zoom when Ctrl is held
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        if (DataContext is ReaderViewModel vm)
         {
-            if (DataContext is ReaderViewModel vm)
+            // Handle scroll wheel zoom when Ctrl is held
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 vm.AdjustZoom(e.Delta.Y);
                 e.Handled = true;
+            }
+            else
+            {
+                // Use scroll wheel to change pages
+                if (e.Delta.Y > 0 && vm.HasPreviousPage)
+                {
+                    vm.GoToPreviousPageCommand.Execute(null);
+                    e.Handled = true;
+                }
+                else if (e.Delta.Y < 0 && vm.HasNextPage)
+                {
+                    vm.GoToNextPageCommand.Execute(null);
+                    e.Handled = true;
+                }
             }
         }
     }

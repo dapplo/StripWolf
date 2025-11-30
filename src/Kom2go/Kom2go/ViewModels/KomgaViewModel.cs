@@ -68,6 +68,11 @@ public partial class KomgaViewModel : ViewModelBase
     /// </summary>
     public string? ServerPassword => _activeServer?.Password;
 
+    /// <summary>
+    /// Name of the active Komga server
+    /// </summary>
+    public string? ActiveServerName => _activeServer?.Name;
+
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
@@ -89,6 +94,7 @@ public partial class KomgaViewModel : ViewModelBase
             
             OnPropertyChanged(nameof(ServerUsername));
             OnPropertyChanged(nameof(ServerPassword));
+            OnPropertyChanged(nameof(ActiveServerName));
             
             if (_activeServer is not null)
             {

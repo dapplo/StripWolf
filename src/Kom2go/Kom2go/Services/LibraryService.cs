@@ -35,6 +35,11 @@ public class LibraryService
         Directory.CreateDirectory(_coversDirectory);
     }
 
+    /// <summary>
+    /// Gets the comics directory path
+    /// </summary>
+    public string ComicsDirectory => _comicsDirectory;
+
     private static string GetAppDataDirectory()
     {
         // Cross-platform app data directory
@@ -67,11 +72,35 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets comics that have been completely read
+    /// </summary>
+    public Task<List<Comic>> GetCompletedComicsAsync()
+    {
+        return _databaseService.GetCompletedComicsAsync();
+    }
+
+    /// <summary>
+    /// Gets comics that haven't been started yet
+    /// </summary>
+    public Task<List<Comic>> GetNewComicsAsync()
+    {
+        return _databaseService.GetNewComicsAsync();
+    }
+
+    /// <summary>
     /// Gets a comic by ID
     /// </summary>
     public Task<Comic?> GetComicAsync(int id)
     {
         return _databaseService.GetComicAsync(id);
+    }
+
+    /// <summary>
+    /// Toggle the read/unread status of a comic
+    /// </summary>
+    public Task ToggleReadStatusAsync(int comicId)
+    {
+        return _databaseService.ToggleReadStatusAsync(comicId);
     }
 
     /// <summary>

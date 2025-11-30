@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kom2go.Models;
@@ -15,13 +16,13 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly ComicReaderService _comicReaderService;
 
     [ObservableProperty]
-    private ObservableCollection<Comic> _comics = [];
-
-    [ObservableProperty]
-    private ObservableCollection<Comic> _recentComics = [];
+    private ObservableCollection<Comic> _newComics = [];
 
     [ObservableProperty]
     private ObservableCollection<Comic> _inProgressComics = [];
+
+    [ObservableProperty]
+    private ObservableCollection<Comic> _completedComics = [];
 
     [ObservableProperty]
     private ObservableCollection<PendingImport> _pendingImports = [];
@@ -31,6 +32,11 @@ public partial class LibraryViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isRefreshing;
+
+    /// <summary>
+    /// Whether the app is running on desktop (not mobile)
+    /// </summary>
+    public bool IsDesktop => !OperatingSystem.IsAndroid() && !OperatingSystem.IsIOS();
 
     /// <summary>
     /// Event raised when a comic should be opened in the reader
@@ -49,18 +55,11 @@ public partial class LibraryViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
-            var comics = await _libraryService.GetAllComicsAsync();
-            Comics.Clear();
-            foreach (var comic in comics)
+            var newComics = await _libraryService.GetNewComicsAsync();
+            NewComics.Clear();
+            foreach (var comic in newComics)
             {
-                Comics.Add(comic);
-            }
-
-            var recent = await _libraryService.GetRecentComicsAsync();
-            RecentComics.Clear();
-            foreach (var comic in recent)
-            {
-                RecentComics.Add(comic);
+                NewComics.Add(comic);
             }
 
             var inProgress = await _libraryService.GetInProgressComicsAsync();
@@ -68,6 +67,13 @@ public partial class LibraryViewModel : ViewModelBase
             foreach (var comic in inProgress)
             {
                 InProgressComics.Add(comic);
+            }
+
+            var completed = await _libraryService.GetCompletedComicsAsync();
+            CompletedComics.Clear();
+            foreach (var comic in completed)
+            {
+                CompletedComics.Add(comic);
             }
         });
     }
@@ -78,6 +84,31 @@ public partial class LibraryViewModel : ViewModelBase
         IsRefreshing = true;
         await LoadComicsAsync();
         IsRefreshing = false;
+    }
+
+    [RelayCommand]
+    private void OpenComicsDirectory()
+    {
+        try
+        {
+            var path = _libraryService.ComicsDirectory;
+            if (OperatingSystem.IsWindows())
+            {
+                Process.Start("explorer.exe", path);
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                Process.Start("open", path);
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                Process.Start("xdg-open", path);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to open directory: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -139,9 +170,9 @@ public partial class LibraryViewModel : ViewModelBase
                 pending.Status = "Completed";
                 pending.Progress = 1.0;
 
-                if (!Comics.Any(c => c.Id == comic.Id))
+                if (!NewComics.Any(c => c.Id == comic.Id))
                 {
-                    Comics.Insert(0, comic);
+                    NewComics.Insert(0, comic);
                 }
 
                 // Remove completed item after a short delay
@@ -181,10 +212,26 @@ public partial class LibraryViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             await _libraryService.DeleteComicAsync(comic);
-            Comics.Remove(comic);
-            RecentComics.Remove(comic);
+            NewComics.Remove(comic);
             InProgressComics.Remove(comic);
+            CompletedComics.Remove(comic);
         }, "Failed to delete comic");
+    }
+
+    [RelayCommand]
+    private async Task ToggleReadStatusAsync(Comic? comic)
+    {
+        if (comic is null)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            await _libraryService.ToggleReadStatusAsync(comic.Id);
+            // Refresh to update the sections
+            await LoadComicsAsync();
+        }, "Failed to update read status");
     }
 
     [RelayCommand]

@@ -44,6 +44,12 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string? _connectionStatus;
 
+    [ObservableProperty]
+    private bool _isPasswordVisible;
+
+    [ObservableProperty]
+    private bool _isReleaseNotesVisible;
+
     private KomgaServer? _editingServer;
 
     public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService)
@@ -51,6 +57,24 @@ public partial class SettingsViewModel : ViewModelBase
         _settingsService = settingsService;
         _komgaApiService = komgaApiService;
         Title = "Settings";
+    }
+
+    [RelayCommand]
+    private void TogglePasswordVisibility()
+    {
+        IsPasswordVisible = !IsPasswordVisible;
+    }
+
+    [RelayCommand]
+    private void ShowReleaseNotes()
+    {
+        IsReleaseNotesVisible = true;
+    }
+
+    [RelayCommand]
+    private void HideReleaseNotes()
+    {
+        IsReleaseNotesVisible = false;
     }
 
     [RelayCommand]
@@ -82,6 +106,7 @@ public partial class SettingsViewModel : ViewModelBase
         Username = string.Empty;
         Password = string.Empty;
         ConnectionStatus = null;
+        IsPasswordVisible = false;
         IsEditing = true;
     }
 
@@ -99,6 +124,7 @@ public partial class SettingsViewModel : ViewModelBase
         Username = server.Username;
         Password = server.Password;
         ConnectionStatus = null;
+        IsPasswordVisible = false;
         IsEditing = true;
     }
 
@@ -106,6 +132,7 @@ public partial class SettingsViewModel : ViewModelBase
     private void CancelEdit()
     {
         IsEditing = false;
+        IsPasswordVisible = false;
         _editingServer = null;
     }
 
