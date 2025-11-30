@@ -22,6 +22,7 @@ public class ComicReaderService
         {
             ".cbz" => ComicFormat.Cbz,
             ".cbr" => ComicFormat.Cbr,
+            ".pdf" => ComicFormat.Pdf,
             _ => ComicFormat.Unknown
         };
     }

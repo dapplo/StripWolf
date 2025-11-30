@@ -4,7 +4,8 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 
 ## Features
 
-- **Local Comic Reading**: Read CBZ and CBR comic files stored on your device
+- **Local Comic Reading**: Read CBZ, CBR, and PDF files stored on your device
+- **PDF Support**: Import PDF files - they are automatically converted to CBZ format for optimal viewing
 - **Komga Integration**: Connect to your Komga server to browse and download comics
 - **Offline Reading**: Download comics from Komga for offline access
 - **Reading Progress**: Automatically tracks your reading progress
@@ -46,9 +47,10 @@ src/Kom2go/
 │   ├── Models/           # Data models (Comic, KomgaServer, etc.)
 │   │   └── Komga/        # Komga API models
 │   ├── Services/         # Business logic services
-│   │   ├── ComicReaderService.cs   # CBZ/CBR reading
-│   │   ├── KomgaApiService.cs      # Komga API client
-│   │   └── LibraryService.cs       # Library management
+│   │   ├── ComicReaderService.cs       # CBZ/CBR reading
+│   │   ├── PdfToCbzConverterService.cs # PDF to CBZ conversion
+│   │   ├── KomgaApiService.cs          # Komga API client
+│   │   └── LibraryService.cs           # Library management
 │   ├── ViewModels/       # MVVM view models
 │   └── Views/            # Avalonia XAML views
 ├── Kom2go.Desktop/       # Desktop launcher (Windows/Linux/macOS)
@@ -70,6 +72,7 @@ Configure your server URL and credentials in the Settings page to:
 - **MVVM**: CommunityToolkit.Mvvm
 - **Storage**: SQLite via sqlite-net-pcl
 - **CBR Support**: SharpCompress
+- **PDF Support**: PDFiumCore for PDF rendering, SixLabors.ImageSharp for image processing
 
 ## License
 

@@ -111,7 +111,8 @@ public enum ComicFormat
 {
     Unknown,
     Cbz,
-    Cbr
+    Cbr,
+    Pdf
 }
 
 public enum ComicSource

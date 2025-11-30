@@ -58,6 +58,7 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<KomgaApiService>();
+        services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<LibraryService>();
 
         // Register view models
