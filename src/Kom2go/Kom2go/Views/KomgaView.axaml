@@ -13,7 +13,13 @@
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
       <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="Komga" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="Komga" FontSize="24" FontWeight="Bold"/>
+          <TextBlock Text="-" FontSize="24" VerticalAlignment="Center"
+                     IsVisible="{Binding ActiveServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <TextBlock Text="{Binding ActiveServerName}" FontSize="18" VerticalAlignment="Center" Foreground="Gray"
+                     IsVisible="{Binding ActiveServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
         <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshCommand}" Padding="16,8"/>
       </Grid>
     </Border>
@@ -32,12 +38,97 @@
       <!-- Connected Content -->
       <ScrollViewer IsVisible="{Binding IsConnected}" Padding="16">
         <StackPanel Spacing="16">
+          <!-- Search Box -->
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="🔍 Search on Komga..."
+                     VerticalContentAlignment="Center"/>
+            <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
+                    Padding="8,6" Margin="4,0,0,0"
+                    IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          </Grid>
+
+          <!-- Search Results Section -->
+          <StackPanel Spacing="16" IsVisible="{Binding IsSearching}">
+            <!-- Series Search Results -->
+            <StackPanel Spacing="8" IsVisible="{Binding SearchSeriesResults.Count}">
+              <TextBlock Text="Series Results" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding SearchSeriesResults}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
+                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                            Command="{Binding DataContext.SelectSeriesCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+                              Width="150" ClipToBounds="True">
+                        <Grid RowDefinitions="200,Auto,Auto">
+                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
+                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+                        </Grid>
+                      </Border>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <!-- Book Search Results -->
+            <StackPanel Spacing="8" IsVisible="{Binding SearchBookResults.Count}">
+              <TextBlock Text="Book Results" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding SearchBookResults}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
+                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                            ClipToBounds="True">
+                      <Grid RowDefinitions="200,Auto,Auto,Auto">
+                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                          <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                        <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                CommandParameter="{Binding}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <!-- No Results -->
+            <TextBlock Text="No results found" Foreground="Gray" 
+                       IsVisible="{Binding !SearchSeriesResults.Count}" Margin="0,8"/>
+          </StackPanel>
+          
           <!-- Error Message -->
           <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
           </Border>
 
+          <!-- Main Content (hidden when searching) -->
+          <StackPanel Spacing="16" IsVisible="{Binding !IsSearching}">
+            
           <!-- Breadcrumb Navigation -->
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="Libraries" Command="{Binding GoBackToLibrariesCommand}"
@@ -93,7 +184,7 @@
                               Width="150" ClipToBounds="True">
                         <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
                         <Grid RowDefinitions="200,Auto,Auto">
-                          <Border Grid.Row="0" Height="200" Background="LightGray" ClipToBounds="True">
+                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
                             <Image Source="{Binding Thumbnail}"
                                    Stretch="Uniform"
                                    HorizontalAlignment="Center"
@@ -130,7 +221,7 @@
                           ClipToBounds="True">
                     <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
                     <Grid RowDefinitions="200,Auto,Auto,Auto">
-                      <Border Grid.Row="0" Height="200" Background="LightGray" ClipToBounds="True">
+                      <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
                         <Image Source="{Binding Thumbnail}"
                                Stretch="Uniform"
                                HorizontalAlignment="Center"
@@ -151,6 +242,8 @@
             <Button Content="Load More" Command="{Binding LoadMoreBooksCommand}" 
                     HorizontalAlignment="Center" Margin="0,8,0,0"/>
           </StackPanel>
+          
+          </StackPanel> <!-- End of Main Content (hidden when searching) -->
         </StackPanel>
       </ScrollViewer>
 

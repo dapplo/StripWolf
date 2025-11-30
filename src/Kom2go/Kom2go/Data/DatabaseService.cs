@@ -70,6 +70,23 @@ public class DatabaseService : IAsyncDisposable
             .ToListAsync();
     }
 
+    public async Task<List<Comic>> GetCompletedComicsAsync()
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<Comic>()
+            .Where(c => c.IsCompleted)
+            .ToListAsync();
+    }
+
+    public async Task<List<Comic>> GetNewComicsAsync()
+    {
+        var db = await GetDatabaseAsync();
+        // New comics are those that haven't been started (no reading progress and not completed)
+        return await db.Table<Comic>()
+            .Where(c => !c.IsCompleted && c.CurrentPage == 0 && c.LastReadDate == null)
+            .ToListAsync();
+    }
+
     public async Task<Comic?> GetComicAsync(int id)
     {
         var db = await GetDatabaseAsync();
@@ -86,6 +103,24 @@ public class DatabaseService : IAsyncDisposable
     {
         var db = await GetDatabaseAsync();
         return await db.Table<Comic>().FirstOrDefaultAsync(c => c.FilePath == filePath);
+    }
+
+    public async Task<List<Comic>> SearchComicsAsync(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return [];
+        }
+        
+        var db = await GetDatabaseAsync();
+        var allComics = await db.Table<Comic>().ToListAsync();
+        var lowerSearch = searchText.ToLowerInvariant();
+        
+        return allComics
+            .Where(c => (c.Title?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.SeriesName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (c.Authors?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
     }
 
     public async Task<int> SaveComicAsync(Comic comic)
@@ -115,6 +150,22 @@ public class DatabaseService : IAsyncDisposable
             comic.CurrentPage = currentPage;
             comic.IsCompleted = isCompleted;
             comic.LastReadDate = DateTime.UtcNow;
+            await SaveComicAsync(comic);
+        }
+    }
+
+    public async Task ToggleReadStatusAsync(int comicId)
+    {
+        var comic = await GetComicAsync(comicId);
+        if (comic is not null)
+        {
+            comic.IsCompleted = !comic.IsCompleted;
+            // If marking as not read, also reset progress
+            if (!comic.IsCompleted)
+            {
+                comic.CurrentPage = 0;
+                comic.LastReadDate = null;
+            }
             await SaveComicAsync(comic);
         }
     }

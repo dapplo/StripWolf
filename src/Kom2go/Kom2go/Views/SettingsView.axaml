@@ -82,6 +82,38 @@
             <TextBlock Text="Kom2go" FontSize="16" FontWeight="Bold"/>
             <TextBlock Text="A comic book reader with Komga integration" Foreground="Gray"/>
             <TextBlock Text="Version 1.0.0 (Avalonia)" Foreground="Gray" FontSize="12"/>
+            <Button Content="📋 View Release Notes" Command="{Binding ShowReleaseNotesCommand}" 
+                    Background="Transparent" Padding="0" Margin="0,8,0,0"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Release Notes Section (shown when clicking the button) -->
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                Margin="0,8,0,0" IsVisible="{Binding IsReleaseNotesVisible}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Release Notes" FontSize="14" FontWeight="Bold"/>
+              <Button Grid.Column="1" Content="✕" Padding="4,2" Background="Transparent"
+                      Command="{Binding HideReleaseNotesCommand}"/>
+            </Grid>
+            <TextBlock Text="Version 1.0.0" FontWeight="SemiBold" Margin="0,4,0,0"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
+              <Run Text="• Initial release with Komga integration"/>
+              <LineBreak/>
+              <Run Text="• Support for CBZ, CBR, and PDF comic formats"/>
+              <LineBreak/>
+              <Run Text="• Offline reading and progress tracking"/>
+              <LineBreak/>
+              <Run Text="• Cross-platform support (Windows, Linux, macOS, Android)"/>
+              <LineBreak/>
+              <Run Text="• Two-page reading mode"/>
+              <LineBreak/>
+              <Run Text="• Library management with read/unread status"/>
+              <LineBreak/>
+              <Run Text="• Black background for comic covers"/>
+              <LineBreak/>
+              <Run Text="• Scroll wheel page navigation"/>
+            </TextBlock>
           </StackPanel>
         </Border>
       </StackPanel>
@@ -109,7 +141,17 @@
 
         <StackPanel Spacing="4">
           <TextBlock Text="Password"/>
-          <TextBox Text="{Binding Password}" Watermark="password" PasswordChar="•"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding Password}" Watermark="password" 
+                     PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
+            <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
+                    Margin="4,0,0,0" ToolTip.Tip="Show/Hide Password" Padding="8,6">
+              <Panel>
+                <TextBlock Text="👁" FontSize="14" IsVisible="{Binding !IsPasswordVisible}"/>
+                <TextBlock Text="👁‍🗨" FontSize="14" IsVisible="{Binding IsPasswordVisible}"/>
+              </Panel>
+            </Button>
+          </Grid>
         </StackPanel>
 
         <!-- Connection Status -->

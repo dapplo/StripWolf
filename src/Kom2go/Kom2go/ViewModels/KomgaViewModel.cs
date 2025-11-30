@@ -54,6 +54,18 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private string _downloadingBookName = string.Empty;
 
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<KomgaSeriesDisplay> _searchSeriesResults = [];
+
+    [ObservableProperty]
+    private ObservableCollection<KomgaBookDisplay> _searchBookResults = [];
+
+    [ObservableProperty]
+    private bool _isSearching;
+
     private int _currentPage;
     private bool _hasMoreSeries = true;
     private bool _hasMoreBooks = true;
@@ -68,6 +80,11 @@ public partial class KomgaViewModel : ViewModelBase
     /// </summary>
     public string? ServerPassword => _activeServer?.Password;
 
+    /// <summary>
+    /// Name of the active Komga server
+    /// </summary>
+    public string? ActiveServerName => _activeServer?.Name;
+
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
@@ -77,6 +94,154 @@ public partial class KomgaViewModel : ViewModelBase
         _libraryService = libraryService;
         _settingsService = settingsService;
         Title = "Komga";
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        _ = SearchAsync();
+    }
+
+    [RelayCommand]
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText) || !_komgaApiService.IsConfigured)
+        {
+            IsSearching = false;
+            SearchSeriesResults.Clear();
+            SearchBookResults.Clear();
+            return;
+        }
+
+        IsSearching = true;
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+
+        try
+        {
+            var ct = _loadingCts.Token;
+            
+            // Search series
+            var seriesResults = await _komgaApiService.SearchSeriesAsync(SearchText, 0, 10);
+            SearchSeriesResults.Clear();
+            foreach (var s in seriesResults.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                _ = LoadSearchSeriesThumbnailAsync(s, ct);
+            }
+
+            // Search books
+            var bookResults = await _komgaApiService.SearchBooksAsync(SearchText, 0, 10);
+            SearchBookResults.Clear();
+            foreach (var b in bookResults.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                _ = LoadSearchBookThumbnailAsync(b, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Komga search failed: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSearchSeriesThumbnailAsync(KomgaSeries series, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            var thumbnailBytes = await _komgaApiService.GetSeriesThumbnailAsync(series.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    SearchSeriesResults.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = thumbnail });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        SearchSeriesResults.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = null });
+                    }
+                });
+            }
+        }
+    }
+
+    private async Task LoadSearchBookThumbnailAsync(KomgaBook book, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            var thumbnailBytes = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    SearchBookResults.Add(new KomgaBookDisplay { Book = book, Thumbnail = thumbnail });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        SearchBookResults.Add(new KomgaBookDisplay { Book = book, Thumbnail = null });
+                    }
+                });
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
+        IsSearching = false;
+        SearchSeriesResults.Clear();
+        SearchBookResults.Clear();
     }
 
     [RelayCommand]
@@ -89,6 +254,7 @@ public partial class KomgaViewModel : ViewModelBase
             
             OnPropertyChanged(nameof(ServerUsername));
             OnPropertyChanged(nameof(ServerPassword));
+            OnPropertyChanged(nameof(ActiveServerName));
             
             if (_activeServer is not null)
             {

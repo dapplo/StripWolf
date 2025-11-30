@@ -55,8 +55,9 @@
       </Viewbox>
     </ScrollViewer>
 
-    <!-- Overlay for tap zones - invisible grid that handles touch/click areas -->
-    <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent">
+    <!-- Overlay for tap zones - invisible grid that handles touch/click areas and scroll wheel -->
+    <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent"
+          PointerWheelChanged="OnPointerWheelChanged">
       <!-- Left tap zone (25% width) - previous page -->
       <Border Grid.Column="0" Background="Transparent" PointerPressed="OnLeftZonePressed" Cursor="Hand"/>
       

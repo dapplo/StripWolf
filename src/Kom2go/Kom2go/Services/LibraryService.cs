@@ -35,6 +35,11 @@ public class LibraryService
         Directory.CreateDirectory(_coversDirectory);
     }
 
+    /// <summary>
+    /// Gets the comics directory path
+    /// </summary>
+    public string ComicsDirectory => _comicsDirectory;
+
     private static string GetAppDataDirectory()
     {
         // Cross-platform app data directory
@@ -48,6 +53,44 @@ public class LibraryService
     public Task<List<Comic>> GetAllComicsAsync()
     {
         return _databaseService.GetComicsAsync();
+    }
+
+    /// <summary>
+    /// Checks if all comic files exist and removes missing ones from the library
+    /// </summary>
+    public async Task<int> CleanupMissingFilesAsync()
+    {
+        var removedCount = 0;
+        var comics = await _databaseService.GetComicsAsync();
+        
+        foreach (var comic in comics)
+        {
+            if (!File.Exists(comic.FilePath))
+            {
+                await _databaseService.DeleteComicAsync(comic);
+                
+                // Clean up cover if it exists
+                if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
+                {
+                    var coverDir = Path.GetDirectoryName(comic.CoverPath);
+                    if (!string.IsNullOrEmpty(coverDir) && Directory.Exists(coverDir))
+                    {
+                        try
+                        {
+                            Directory.Delete(coverDir, true);
+                        }
+                        catch
+                        {
+                            // Ignore cleanup errors
+                        }
+                    }
+                }
+                
+                removedCount++;
+            }
+        }
+        
+        return removedCount;
     }
 
     /// <summary>
@@ -67,11 +110,43 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets comics that have been completely read
+    /// </summary>
+    public Task<List<Comic>> GetCompletedComicsAsync()
+    {
+        return _databaseService.GetCompletedComicsAsync();
+    }
+
+    /// <summary>
+    /// Gets comics that haven't been started yet
+    /// </summary>
+    public Task<List<Comic>> GetNewComicsAsync()
+    {
+        return _databaseService.GetNewComicsAsync();
+    }
+
+    /// <summary>
     /// Gets a comic by ID
     /// </summary>
     public Task<Comic?> GetComicAsync(int id)
     {
         return _databaseService.GetComicAsync(id);
+    }
+
+    /// <summary>
+    /// Searches comics by title, series name, or authors
+    /// </summary>
+    public Task<List<Comic>> SearchComicsAsync(string searchText)
+    {
+        return _databaseService.SearchComicsAsync(searchText);
+    }
+
+    /// <summary>
+    /// Toggle the read/unread status of a comic
+    /// </summary>
+    public Task ToggleReadStatusAsync(int comicId)
+    {
+        return _databaseService.ToggleReadStatusAsync(comicId);
     }
 
     /// <summary>
