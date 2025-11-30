@@ -13,6 +13,11 @@ public class PdfToCbzConverterService
 {
     private static bool _pdfiumInitialized;
     private static readonly object InitLock = new();
+    
+    /// <summary>
+    /// White background color in ARGB format (opaque white)
+    /// </summary>
+    private const uint WhiteBackgroundColor = 0xFFFFFFFF;
 
     /// <summary>
     /// The DPI to use when rendering PDF pages
@@ -63,8 +68,8 @@ public class PdfToCbzConverterService
         // Ensure output directory exists
         Directory.CreateDirectory(outputDirectory);
 
-        // Create a temporary directory for extracted pages
-        var tempDir = Path.Combine(Path.GetTempPath(), $"Kom2go_PDF_{Guid.NewGuid()}");
+        // Create a temporary directory for extracted pages with a unique random name
+        var tempDir = Path.Combine(Path.GetTempPath(), $"Kom2go_PDF_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
@@ -79,7 +84,7 @@ public class PdfToCbzConverterService
         }
         finally
         {
-            // Clean up temporary directory
+            // Clean up temporary directory - best effort, non-critical
             try
             {
                 if (Directory.Exists(tempDir))
@@ -87,9 +92,13 @@ public class PdfToCbzConverterService
                     Directory.Delete(tempDir, true);
                 }
             }
-            catch
+            catch (IOException)
             {
-                // Ignore cleanup errors
+                // Temporary directory cleanup is best-effort; files will be cleaned up by OS temp cleanup
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Temporary directory cleanup is best-effort; files will be cleaned up by OS temp cleanup
             }
         }
     }
@@ -104,7 +113,8 @@ public class PdfToCbzConverterService
         var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
         if (document == null)
         {
-            throw new InvalidOperationException($"Failed to open PDF file: {pdfFilePath}");
+            var fileName = Path.GetFileName(pdfFilePath);
+            throw new InvalidOperationException($"Failed to open PDF file: {fileName}");
         }
 
         try
@@ -138,7 +148,8 @@ public class PdfToCbzConverterService
             if (document == null)
             {
                 var error = fpdfview.FPDF_GetLastError();
-                throw new InvalidOperationException($"Failed to open PDF file. Error code: {error}");
+                var fileName = Path.GetFileName(pdfFilePath);
+                throw new InvalidOperationException($"Failed to open PDF file '{fileName}'. Error code: {error}");
             }
 
             try
@@ -191,7 +202,7 @@ public class PdfToCbzConverterService
             }
 
             // Fill with white background
-            fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, widthInPixels, heightInPixels, 0xFFFFFFFF);
+            fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, widthInPixels, heightInPixels, WhiteBackgroundColor);
 
             // Render page to bitmap
             fpdfview.FPDF_RenderPageBitmap(
@@ -212,11 +223,8 @@ public class PdfToCbzConverterService
             var pixelData = new byte[dataSize];
             System.Runtime.InteropServices.Marshal.Copy(buffer, pixelData, 0, dataSize);
 
-            // Convert BGRA to RGBA for ImageSharp
-            for (var j = 0; j < pixelData.Length; j += 4)
-            {
-                (pixelData[j], pixelData[j + 2]) = (pixelData[j + 2], pixelData[j]);
-            }
+            // Convert BGRA to RGBA for ImageSharp using Span for better performance
+            ConvertBgraToRgba(pixelData);
 
             // Save as JPG using ImageSharp
             using var image = Image.LoadPixelData<Rgba32>(pixelData, widthInPixels, heightInPixels);
@@ -231,6 +239,18 @@ public class PdfToCbzConverterService
                 fpdfview.FPDFBitmapDestroy(bitmap);
             }
             fpdfview.FPDF_ClosePage(page);
+        }
+    }
+    
+    /// <summary>
+    /// Converts pixel data from BGRA to RGBA format in-place
+    /// </summary>
+    private static void ConvertBgraToRgba(Span<byte> pixelData)
+    {
+        for (var i = 0; i < pixelData.Length; i += 4)
+        {
+            // Swap B and R channels (indices 0 and 2)
+            (pixelData[i], pixelData[i + 2]) = (pixelData[i + 2], pixelData[i]);
         }
     }
 
