@@ -23,7 +23,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/Kom2go/Kom2go.sln
+        run: dotnet restore src/Kom2go/Kom2go.Desktop/Kom2go.Desktop.csproj
 
       - name: Build Windows Release
         run: dotnet publish src/Kom2go/Kom2go.Desktop/Kom2go.Desktop.csproj -c Release -r win-x64 --self-contained -o publish/windows
@@ -54,7 +54,7 @@ jobs:
         run: dotnet workload install android
 
       - name: Restore dependencies
-        run: dotnet restore src/Kom2go/Kom2go.sln
+        run: dotnet restore src/Kom2go/Kom2go.Android/Kom2go.Android.csproj
 
       - name: Build Android APK
         run: dotnet publish src/Kom2go/Kom2go.Android/Kom2go.Android.csproj -c Release -o publish/android
