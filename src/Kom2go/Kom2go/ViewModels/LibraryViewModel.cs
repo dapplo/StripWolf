@@ -24,6 +24,9 @@ public partial class LibraryViewModel : ViewModelBase
     private ObservableCollection<Comic> _inProgressComics = [];
 
     [ObservableProperty]
+    private ObservableCollection<PendingImport> _pendingImports = [];
+
+    [ObservableProperty]
     private Comic? _selectedComic;
 
     [ObservableProperty]
@@ -85,14 +88,73 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteAsync(async () =>
+        await ImportFilesAsync([filePath]);
+    }
+
+    [RelayCommand]
+    private async Task ImportFilesAsync(IList<string>? filePaths)
+    {
+        if (filePaths is null || filePaths.Count == 0)
         {
-            var comic = await _libraryService.ImportLocalComicAsync(filePath);
-            if (!Comics.Any(c => c.Id == comic.Id))
+            return;
+        }
+
+        // Create pending import items for each file
+        var pendingItems = new List<PendingImport>();
+        foreach (var filePath in filePaths)
+        {
+            var pending = new PendingImport
             {
-                Comics.Insert(0, comic);
+                FilePath = filePath,
+                FileName = Path.GetFileName(filePath),
+                Status = "Waiting..."
+            };
+            pendingItems.Add(pending);
+            PendingImports.Add(pending);
+        }
+
+        // Process files sequentially
+        foreach (var pending in pendingItems)
+        {
+            pending.IsProcessing = true;
+            pending.Status = ComicReaderService.GetComicFormat(pending.FilePath) == ComicFormat.Pdf 
+                ? "Converting PDF..." 
+                : "Importing...";
+
+            try
+            {
+                var progress = new Progress<double>(p =>
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        pending.Progress = p;
+                        pending.Status = $"Converting... {p:P0}";
+                    });
+                });
+
+                var comic = await _libraryService.ImportLocalComicAsync(pending.FilePath, progress);
+                
+                pending.IsProcessing = false;
+                pending.IsCompleted = true;
+                pending.Status = "Completed";
+                pending.Progress = 1.0;
+
+                if (!Comics.Any(c => c.Id == comic.Id))
+                {
+                    Comics.Insert(0, comic);
+                }
+
+                // Remove completed item after a short delay
+                await RemoveCompletedImportAfterDelayAsync(pending);
             }
-        }, "Failed to import comic file");
+            catch (Exception ex)
+            {
+                pending.IsProcessing = false;
+                pending.IsFailed = true;
+                pending.Status = "Failed";
+                pending.ErrorMessage = ex.Message;
+            }
+        }
     }
 
     [RelayCommand]
@@ -123,5 +185,23 @@ public partial class LibraryViewModel : ViewModelBase
             RecentComics.Remove(comic);
             InProgressComics.Remove(comic);
         }, "Failed to delete comic");
+    }
+
+    [RelayCommand]
+    private void RemovePendingImport(PendingImport? pending)
+    {
+        if (pending is not null)
+        {
+            PendingImports.Remove(pending);
+        }
+    }
+
+    private async Task RemoveCompletedImportAfterDelayAsync(PendingImport pending)
+    {
+        await Task.Delay(2000);
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            PendingImports.Remove(pending);
+        });
     }
 }

@@ -77,7 +77,7 @@ public class LibraryService
     /// <summary>
     /// Imports a local comic file into the library
     /// </summary>
-    public async Task<Comic> ImportLocalComicAsync(string filePath)
+    public async Task<Comic> ImportLocalComicAsync(string filePath, IProgress<double>? progress = null)
     {
         // Check if already imported
         var existing = await _databaseService.GetComicByFilePathAsync(filePath);
@@ -96,7 +96,7 @@ public class LibraryService
         string actualFilePath = filePath;
         if (format == ComicFormat.Pdf)
         {
-            actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory);
+            actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
         }
 
         var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
