@@ -45,13 +45,17 @@ public partial class LibraryView : UserControl
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select Comic File",
-            AllowMultiple = false,
+            Title = "Select Comic Files",
+            AllowMultiple = true,
             FileTypeFilter =
             [
                 new FilePickerFileType("Comic Files")
                 {
                     Patterns = ["*.cbz", "*.cbr"]
+                },
+                new FilePickerFileType("PDF Files")
+                {
+                    Patterns = ["*.pdf"]
                 },
                 new FilePickerFileType("All Files")
                 {
@@ -60,13 +64,17 @@ public partial class LibraryView : UserControl
             ]
         });
 
-        if (files.Count > 0)
+        if (files.Count > 0 && DataContext is LibraryViewModel viewModel)
         {
-            var file = files[0];
-            var path = file.TryGetLocalPath();
-            if (!string.IsNullOrEmpty(path) && DataContext is LibraryViewModel viewModel)
+            var paths = files
+                .Select(f => f.TryGetLocalPath())
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Cast<string>()
+                .ToList();
+            
+            if (paths.Count > 0)
             {
-                await viewModel.ImportFileCommand.ExecuteAsync(path);
+                await viewModel.ImportFilesCommand.ExecuteAsync(paths);
             }
         }
     }

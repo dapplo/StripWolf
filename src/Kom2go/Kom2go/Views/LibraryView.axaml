@@ -33,6 +33,57 @@
           <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
         </Border>
 
+        <!-- Pending Imports Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding PendingImports.Count}">
+          <TextBlock Text="Importing..." FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding PendingImports}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:PendingImport">
+                <Border Margin="0,0,0,8" CornerRadius="8" Padding="12"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Grid.RowSpan="3" Width="48" Height="48" 
+                            CornerRadius="8" Background="LightGray" Margin="0,0,12,0"
+                            VerticalAlignment="Center">
+                      <TextBlock Text="📄" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    
+                    <!-- File name -->
+                    <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}" 
+                               FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    
+                    <!-- Status -->
+                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" 
+                               FontSize="12" Foreground="Gray"/>
+                    
+                    <!-- Progress bar -->
+                    <ProgressBar Grid.Column="1" Grid.Row="2" Minimum="0" Maximum="1" 
+                                 Value="{Binding Progress}" Height="6" Margin="0,4,0,0"
+                                 IsVisible="{Binding IsProcessing}"/>
+                    
+                    <!-- Error message -->
+                    <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding ErrorMessage}" 
+                               FontSize="10" Foreground="#C62828" Margin="0,4,0,0"
+                               IsVisible="{Binding IsFailed}" TextWrapping="Wrap"/>
+                    
+                    <!-- Remove button (for failed items) -->
+                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4"
+                            VerticalAlignment="Center" IsVisible="{Binding IsFailed}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).RemovePendingImportCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                    
+                    <!-- Completed checkmark -->
+                    <TextBlock Grid.Column="2" Grid.RowSpan="3" Text="✓" FontSize="20" 
+                               Foreground="Green" VerticalAlignment="Center"
+                               IsVisible="{Binding IsCompleted}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
         <!-- In Progress Section -->
         <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
           <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>

@@ -12,17 +12,20 @@ public class LibraryService
     private readonly DatabaseService _databaseService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly PdfToCbzConverterService _pdfConverter;
     private readonly string _comicsDirectory;
     private readonly string _coversDirectory;
 
     public LibraryService(
         DatabaseService databaseService,
         ComicReaderService comicReaderService,
-        KomgaApiService komgaApiService)
+        KomgaApiService komgaApiService,
+        PdfToCbzConverterService pdfConverter)
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
+        _pdfConverter = pdfConverter;
         
         var appDataDir = GetAppDataDirectory();
         _comicsDirectory = Path.Combine(appDataDir, "Comics");
@@ -74,7 +77,7 @@ public class LibraryService
     /// <summary>
     /// Imports a local comic file into the library
     /// </summary>
-    public async Task<Comic> ImportLocalComicAsync(string filePath)
+    public async Task<Comic> ImportLocalComicAsync(string filePath, IProgress<double>? progress = null)
     {
         // Check if already imported
         var existing = await _databaseService.GetComicByFilePathAsync(filePath);
@@ -86,10 +89,17 @@ public class LibraryService
         var format = ComicReaderService.GetComicFormat(filePath);
         if (format == ComicFormat.Unknown)
         {
-            throw new NotSupportedException("Unsupported comic format. Only CBZ and CBR files are supported.");
+            throw new NotSupportedException("Unsupported comic format. Only CBZ, CBR, and PDF files are supported.");
         }
 
-        var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(filePath);
+        // For PDF files, convert to CBZ first
+        string actualFilePath = filePath;
+        if (format == ComicFormat.Pdf)
+        {
+            actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+        }
+
+        var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
         
         // Create cover directory for this comic
         var comicId = Guid.NewGuid().ToString();
@@ -100,7 +110,7 @@ public class LibraryService
         string? coverPath = null;
         try
         {
-            coverPath = await _comicReaderService.ExtractCoverAsync(filePath, coverDir);
+            coverPath = await _comicReaderService.ExtractCoverAsync(actualFilePath, coverDir);
         }
         catch
         {
@@ -110,11 +120,11 @@ public class LibraryService
         var comic = new Comic
         {
             Title = Path.GetFileNameWithoutExtension(filePath),
-            FilePath = filePath,
+            FilePath = actualFilePath,
             PageCount = pageCount,
             FileSize = fileSize,
             CoverPath = coverPath,
-            Format = format,
+            Format = format == ComicFormat.Pdf ? ComicFormat.Cbz : format, // PDF is converted to CBZ
             Source = ComicSource.Local,
             AddedDate = DateTime.UtcNow
         };
@@ -263,7 +273,8 @@ public class LibraryService
 
         var files = Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories)
             .Where(f => f.EndsWith(".cbz", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cbr", StringComparison.OrdinalIgnoreCase));
+                        f.EndsWith(".cbr", StringComparison.OrdinalIgnoreCase) ||
+                        f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
 
         foreach (var file in files)
         {
