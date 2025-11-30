@@ -89,6 +89,36 @@
           <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
         </Border>
 
+        <!-- Deleted Comics (Undo Bar) -->
+        <ItemsControl ItemsSource="{Binding DeletedComics}" IsVisible="{Binding DeletedComics.Count}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:DeletedComic">
+              <Border Margin="0,0,0,8" CornerRadius="8" Padding="12"
+                      Background="#FFF3E0">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                  <TextBlock Grid.Column="0" Text="🗑️" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Comic.Title}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock FontSize="12" Foreground="Gray">
+                      <TextBlock.Text>
+                        <MultiBinding StringFormat="Deleted - {0}s remaining to undo">
+                          <Binding Path="SecondsRemaining"/>
+                        </MultiBinding>
+                      </TextBlock.Text>
+                    </TextBlock>
+                  </StackPanel>
+                  <Button Grid.Column="2" Content="↩ Undo" Padding="12,6" Margin="8,0"
+                          Command="{Binding ((vm:LibraryViewModel)DataContext).UndoDeleteCommand, ElementName=Root}"
+                          CommandParameter="{Binding}"/>
+                  <ProgressBar Grid.Column="3" Width="40" Height="40" 
+                               Value="{Binding SecondsRemaining}" Maximum="120"
+                               VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <!-- Pending Imports Section -->
         <StackPanel Spacing="8" IsVisible="{Binding PendingImports.Count}">
           <TextBlock Text="Importing..." FontSize="18" FontWeight="Bold"/>

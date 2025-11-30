@@ -28,6 +28,9 @@ public partial class LibraryViewModel : ViewModelBase
     private ObservableCollection<PendingImport> _pendingImports = [];
 
     [ObservableProperty]
+    private ObservableCollection<DeletedComic> _deletedComics = [];
+
+    [ObservableProperty]
     private Comic? _selectedComic;
 
     [ObservableProperty]
@@ -41,6 +44,8 @@ public partial class LibraryViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isSearching;
+
+    private const int DeleteUndoTimeoutSeconds = 120; // 2 minutes
 
     /// <summary>
     /// Whether the app is running on desktop (not mobile)
@@ -261,13 +266,112 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteAsync(async () =>
+        // Remove from UI collections immediately (soft delete)
+        NewComics.Remove(comic);
+        InProgressComics.Remove(comic);
+        CompletedComics.Remove(comic);
+        SearchResults.Remove(comic);
+
+        // Create a deleted comic entry
+        var deletedComic = new DeletedComic
         {
-            await _libraryService.DeleteComicAsync(comic);
-            NewComics.Remove(comic);
-            InProgressComics.Remove(comic);
-            CompletedComics.Remove(comic);
-        }, "Failed to delete comic");
+            Comic = comic,
+            DeletedAt = DateTime.UtcNow,
+            SecondsRemaining = DeleteUndoTimeoutSeconds,
+            CancellationToken = new CancellationTokenSource()
+        };
+        DeletedComics.Add(deletedComic);
+
+        // Start countdown timer
+        _ = StartDeleteCountdownAsync(deletedComic);
+    }
+
+    private async Task StartDeleteCountdownAsync(DeletedComic deletedComic)
+    {
+        var cts = deletedComic.CancellationToken;
+        if (cts is null) return;
+
+        try
+        {
+            while (deletedComic.SecondsRemaining > 0 && !cts.Token.IsCancellationRequested)
+            {
+                await Task.Delay(1000, cts.Token);
+                if (!cts.Token.IsCancellationRequested)
+                {
+                    deletedComic.SecondsRemaining--;
+                }
+            }
+
+            // If not cancelled, perform permanent delete
+            if (!cts.Token.IsCancellationRequested)
+            {
+                await PerformPermanentDeleteAsync(deletedComic);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Undo was triggered, comic was restored
+        }
+    }
+
+    private async Task PerformPermanentDeleteAsync(DeletedComic deletedComic)
+    {
+        try
+        {
+            await _libraryService.DeleteComicAsync(deletedComic.Comic);
+        }
+        catch
+        {
+            // Silently fail permanent delete
+        }
+        finally
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                DeletedComics.Remove(deletedComic);
+            });
+        }
+    }
+
+    [RelayCommand]
+    private async Task UndoDeleteAsync(DeletedComic? deletedComic)
+    {
+        if (deletedComic is null)
+        {
+            return;
+        }
+
+        // Cancel the deletion countdown
+        deletedComic.CancellationToken?.Cancel();
+        deletedComic.CancellationToken?.Dispose();
+        deletedComic.CancellationToken = null;
+
+        // Remove from deleted list
+        DeletedComics.Remove(deletedComic);
+
+        // Add back to appropriate collection based on status
+        var comic = deletedComic.Comic;
+        if (comic.IsCompleted)
+        {
+            if (!CompletedComics.Contains(comic))
+            {
+                CompletedComics.Add(comic);
+            }
+        }
+        else if (comic.CurrentPage > 0 || comic.LastReadDate != null)
+        {
+            if (!InProgressComics.Contains(comic))
+            {
+                InProgressComics.Add(comic);
+            }
+        }
+        else
+        {
+            if (!NewComics.Contains(comic))
+            {
+                NewComics.Add(comic);
+            }
+        }
     }
 
     [RelayCommand]
