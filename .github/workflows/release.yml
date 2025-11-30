@@ -1,0 +1,152 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Kom2go/Kom2go.sln
+
+      - name: Build Windows Release
+        run: dotnet publish src/Kom2go/Kom2go.Desktop/Kom2go.Desktop.csproj -c Release -r win-x64 --self-contained -o publish/windows
+
+      - name: Create Windows ZIP
+        run: Compress-Archive -Path publish/windows/* -DestinationPath Kom2go-Windows-x64.zip
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: Kom2go-Windows-x64.zip
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Restore dependencies
+        run: dotnet restore src/Kom2go/Kom2go.sln
+
+      - name: Build Android APK
+        run: dotnet publish src/Kom2go/Kom2go.Android/Kom2go.Android.csproj -c Release -o publish/android
+
+      - name: Find and rename APK
+        run: |
+          APK_PATH=$(find publish/android -name "*.apk" | head -1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" Kom2go-Android.apk
+          else
+            echo "APK not found in publish output, checking signed APK location..."
+            APK_PATH=$(find . -path "*/bin/Release/*/publish/*.apk" | head -1)
+            if [ -n "$APK_PATH" ]; then
+              cp "$APK_PATH" Kom2go-Android.apk
+            else
+              echo "Error: Could not find APK file"
+              find . -name "*.apk" 2>/dev/null || true
+              exit 1
+            fi
+          fi
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: Kom2go-Android.apk
+
+  create-release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-build
+
+      - name: Generate version
+        id: version
+        run: |
+          # Generate version based on date and short commit SHA
+          VERSION="v$(date +'%Y.%m.%d')-${GITHUB_SHA::7}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get the previous tag if it exists
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          # Generate release notes
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "## Changes since $PREVIOUS_TAG" > release_notes.md
+            echo "" >> release_notes.md
+            git log "$PREVIOUS_TAG"..HEAD --pretty=format:"- %s (%an)" >> release_notes.md
+          else
+            echo "## Initial Release" > release_notes.md
+            echo "" >> release_notes.md
+            echo "First automated release of Kom2go." >> release_notes.md
+            echo "" >> release_notes.md
+            echo "### Features" >> release_notes.md
+            echo "- Cross-platform comic book reader" >> release_notes.md
+            echo "- Support for CBZ, CBR, and PDF formats" >> release_notes.md
+            echo "- Komga server integration" >> release_notes.md
+            echo "- Offline reading support" >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Downloads" >> release_notes.md
+          echo "- **Windows**: Kom2go-Windows-x64.zip" >> release_notes.md
+          echo "- **Android**: Kom2go-Android.apk" >> release_notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            Kom2go-Windows-x64.zip
+            Kom2go-Android.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
