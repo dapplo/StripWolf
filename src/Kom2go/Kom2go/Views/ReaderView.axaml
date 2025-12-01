@@ -55,6 +55,13 @@
       </Viewbox>
     </ScrollViewer>
 
+    <!-- Gesture layer for swipe and pinch gestures (captures touch events but doesn't block tap zones) -->
+    <Grid x:Name="GestureLayer" Background="Transparent" 
+          PointerPressed="OnGesturePointerPressed"
+          PointerMoved="OnGesturePointerMoved"
+          PointerReleased="OnGesturePointerReleased"
+          IsHitTestVisible="True"/>
+
     <!-- Overlay for tap zones - invisible grid that handles touch/click areas and scroll wheel -->
     <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent"
           PointerWheelChanged="OnPointerWheelChanged">

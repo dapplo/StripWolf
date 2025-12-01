@@ -11,6 +11,18 @@ public partial class ReaderView : UserControl
     private Image? _pageImage;
     private ScrollViewer? _imageScroller;
     private Viewbox? _imageViewbox;
+    
+    // Swipe gesture tracking
+    private Point? _swipeStartPoint;
+    private DateTime _swipeStartTime;
+    private const double SwipeThreshold = 80; // Minimum distance for a swipe (in pixels)
+    private const double SwipeMaxTimeMs = 500; // Maximum time in milliseconds for a swipe
+    private const double SwipeMaxVerticalDeviation = 100; // Maximum vertical deviation allowed
+    
+    // Pinch zoom tracking (for multi-touch)
+    private readonly Dictionary<long, Point> _activePointers = new();
+    private double _initialPinchDistance;
+    private double _initialZoomLevel;
 
     public ReaderView()
     {
@@ -285,4 +297,127 @@ public partial class ReaderView : UserControl
         // Re-apply stretch mode when size changes
         UpdateImageStretch();
     }
+    
+    #region Gesture Handling (Swipe and Pinch)
+    
+    /// <summary>
+    /// Handle pointer pressed for swipe and pinch gesture tracking
+    /// </summary>
+    private void OnGesturePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var pointer = e.GetCurrentPoint(this);
+        var pointerId = (long)e.Pointer.Id;
+        var position = pointer.Position;
+        
+        _activePointers[pointerId] = position;
+        
+        if (_activePointers.Count == 1)
+        {
+            // Single touch - start tracking for potential swipe
+            _swipeStartPoint = position;
+            _swipeStartTime = DateTime.UtcNow;
+        }
+        else if (_activePointers.Count == 2 && DataContext is ReaderViewModel vm)
+        {
+            // Two touches - start tracking for pinch zoom
+            var points = _activePointers.Values.ToArray();
+            _initialPinchDistance = GetDistance(points[0], points[1]);
+            _initialZoomLevel = vm.ZoomLevel;
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer moved for pinch zoom detection
+    /// </summary>
+    private void OnGesturePointerMoved(object? sender, PointerEventArgs e)
+    {
+        var pointer = e.GetCurrentPoint(this);
+        var pointerId = (long)e.Pointer.Id;
+        var position = pointer.Position;
+        
+        if (_activePointers.ContainsKey(pointerId))
+        {
+            _activePointers[pointerId] = position;
+            
+            // Handle pinch zoom with two fingers
+            if (_activePointers.Count == 2 && DataContext is ReaderViewModel vm && _initialPinchDistance > 0)
+            {
+                var points = _activePointers.Values.ToArray();
+                var currentDistance = GetDistance(points[0], points[1]);
+                
+                // Calculate scale factor
+                var scale = currentDistance / _initialPinchDistance;
+                var newZoom = _initialZoomLevel * scale;
+                
+                // Clamp zoom level between 0.25 and 5.0
+                newZoom = Math.Max(0.25, Math.Min(5.0, newZoom));
+                
+                vm.ZoomLevel = newZoom;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer released for swipe detection
+    /// </summary>
+    private void OnGesturePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var pointer = e.GetCurrentPoint(this);
+        var pointerId = (long)e.Pointer.Id;
+        var position = pointer.Position;
+        
+        // Check for swipe gesture when the last finger is released
+        if (_activePointers.Count == 1 && _swipeStartPoint.HasValue && DataContext is ReaderViewModel vm)
+        {
+            var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
+            var deltaX = position.X - _swipeStartPoint.Value.X;
+            var deltaY = position.Y - _swipeStartPoint.Value.Y;
+            
+            // Check if this qualifies as a horizontal swipe
+            if (elapsed < SwipeMaxTimeMs && 
+                Math.Abs(deltaX) > SwipeThreshold && 
+                Math.Abs(deltaY) < SwipeMaxVerticalDeviation)
+            {
+                if (deltaX > 0 && vm.HasPreviousPage)
+                {
+                    // Swipe right = previous page
+                    vm.GoToPreviousPageCommand.Execute(null);
+                    e.Handled = true;
+                }
+                else if (deltaX < 0 && vm.HasNextPage)
+                {
+                    // Swipe left = next page
+                    vm.GoToNextPageCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+        }
+        
+        // Clean up tracking
+        _activePointers.Remove(pointerId);
+        
+        if (_activePointers.Count == 0)
+        {
+            _swipeStartPoint = null;
+            _initialPinchDistance = 0;
+        }
+        else if (_activePointers.Count == 1)
+        {
+            // Reset for potential new swipe
+            _swipeStartPoint = _activePointers.Values.First();
+            _swipeStartTime = DateTime.UtcNow;
+        }
+    }
+    
+    /// <summary>
+    /// Calculate distance between two points
+    /// </summary>
+    private static double GetDistance(Point p1, Point p2)
+    {
+        var dx = p2.X - p1.X;
+        var dy = p2.Y - p1.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+    
+    #endregion
 }
