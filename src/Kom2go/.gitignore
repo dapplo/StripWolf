@@ -452,3 +452,7 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Android keystore files (sensitive - should not be committed)
+*.keystore
+*.jks

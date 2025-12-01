@@ -56,17 +56,47 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore src/Kom2go/Kom2go.Android/Kom2go.Android.csproj
 
+      - name: Setup signing keystore
+        run: |
+          # Create keystore for signing the APK
+          # For production/store releases, use secrets to store the keystore
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > src/Kom2go/Kom2go.Android/kom2go.keystore
+          else
+            # Generate a new keystore for CI builds (suitable for sideloading)
+            keytool -genkeypair -v \
+              -keystore src/Kom2go/Kom2go.Android/kom2go.keystore \
+              -alias kom2go \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Kom2go, OU=Development, O=Dapplo, L=Unknown, ST=Unknown, C=NL"
+          fi
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
       - name: Build Android APK
         run: dotnet publish src/Kom2go/Kom2go.Android/Kom2go.Android.csproj -c Release -o publish/android
+        env:
+          ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
+          ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
 
       - name: Find and rename APK
         run: |
-          APK_PATH=$(find publish/android -name "*.apk" | head -1)
+          APK_PATH=$(find publish/android -name "*-Signed.apk" | head -1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find publish/android -name "*.apk" | head -1)
+          fi
           if [ -n "$APK_PATH" ]; then
             cp "$APK_PATH" Kom2go-Android.apk
           else
             echo "APK not found in publish output, checking signed APK location..."
-            APK_PATH=$(find . -path "*/bin/Release/*/publish/*.apk" | head -1)
+            APK_PATH=$(find . -path "*/bin/Release/*/publish/*-Signed.apk" | head -1)
+            if [ -z "$APK_PATH" ]; then
+              APK_PATH=$(find . -path "*/bin/Release/*/publish/*.apk" | head -1)
+            fi
             if [ -n "$APK_PATH" ]; then
               cp "$APK_PATH" Kom2go-Android.apk
             else
