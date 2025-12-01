@@ -35,6 +35,28 @@ Download the latest APK from the [Releases](https://github.com/dapplo/Kom2go/rel
 
 Download the `Kom2go-Windows-x64.zip` from the [Releases](https://github.com/dapplo/Kom2go/releases) page and extract it to your preferred location.
 
+### Linux
+
+Download the `Kom2go-Linux-x64.tar.gz` from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
+
+```bash
+tar -xzvf Kom2go-Linux-x64.tar.gz -C /opt/kom2go
+chmod +x /opt/kom2go/Kom2go.Desktop
+```
+
+### macOS
+
+Download the appropriate archive from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
+- **Intel Macs**: `Kom2go-macOS-x64.tar.gz`
+- **Apple Silicon (M1/M2/M3)**: `Kom2go-macOS-arm64.tar.gz`
+
+Extract the archive:
+```bash
+tar -xzvf Kom2go-macOS-*.tar.gz -C ~/Applications
+```
+
+**Note**: On first run, you may need to allow the app in System Preferences > Security & Privacy if macOS blocks it.
+
 ## Requirements
 
 - .NET 10.0 SDK
