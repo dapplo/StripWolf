@@ -37,7 +37,7 @@
 
       <!-- Connected Content -->
       <ScrollViewer IsVisible="{Binding IsConnected}" Padding="16">
-        <StackPanel Spacing="16">
+        <StackPanel Spacing="16" Margin="0,0,0,60">
           <!-- Search Box -->
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="🔍 Search on Komga..."

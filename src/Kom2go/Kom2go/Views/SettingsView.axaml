@@ -90,7 +90,7 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <TextBlock Text="Select a language or use the system default. Changes take effect immediately."
+            <TextBlock Text="Select a language or use the system default. Changes will take effect after restarting the app."
                        Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
