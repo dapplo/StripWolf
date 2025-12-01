@@ -131,42 +131,152 @@
             
           <!-- Breadcrumb Navigation -->
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Libraries" Command="{Binding GoBackToLibrariesCommand}"
-                    Background="Transparent" Padding="0"
-                    IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-            <TextBlock Text="/" VerticalAlignment="Center"
-                       IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <Button Content="Home" Command="{Binding GoBackToLibrariesCommand}"
+                    Background="Transparent" Padding="0">
+              <Button.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                </MultiBinding>
+              </Button.IsVisible>
+            </Button>
+            <TextBlock Text="/" VerticalAlignment="Center">
+              <TextBlock.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                </MultiBinding>
+              </TextBlock.IsVisible>
+            </TextBlock>
+            <!-- Read List breadcrumb -->
+            <TextBlock Text="{Binding SelectedReadList.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center"
+                       IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <!-- Library breadcrumb -->
             <Button Content="{Binding SelectedLibrary.Name, FallbackValue=''}" Command="{Binding GoBackToSeriesCommand}"
                     Background="Transparent" Padding="0"
                     IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <TextBlock Text="{Binding SelectedLibrary.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center">
+              <TextBlock.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+                </MultiBinding>
+              </TextBlock.IsVisible>
+            </TextBlock>
             <TextBlock Text="/" VerticalAlignment="Center"
                        IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="{Binding SelectedSeries.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center"
                        IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
           </StackPanel>
 
-          <!-- Libraries List -->
-          <StackPanel Spacing="8" IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNull}}">
-            <TextBlock Text="Libraries" FontSize="18" FontWeight="Bold"/>
-            <ItemsControl ItemsSource="{Binding Libraries}">
+          <!-- Libraries and Read Lists (shown when nothing is selected) -->
+          <StackPanel Spacing="16">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNull}"/>
+                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+              </MultiBinding>
+            </StackPanel.IsVisible>
+            
+            <!-- Libraries List -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Libraries" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding Libraries}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaLibrary">
+                    <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
+                            Command="{Binding DataContext.SelectLibraryCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Name}" FontSize="16" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            
+            <!-- Read Lists -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Read Lists" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding ReadLists}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaReadListDisplay">
+                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                            Command="{Binding DataContext.SelectReadListCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+                              Width="150" ClipToBounds="True">
+                        <Grid RowDefinitions="200,Auto,Auto">
+                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
+                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+                        </Grid>
+                      </Border>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
+                      HorizontalAlignment="Center" Margin="0,8,0,0"
+                      IsVisible="{Binding HasMoreReadLists}"/>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Read List Books Grid -->
+          <StackPanel Spacing="8" IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="Books" FontSize="18" FontWeight="Bold"/>
+            <ItemsControl ItemsSource="{Binding Books}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="komga:KomgaLibrary">
-                  <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
-                          Command="{Binding DataContext.SelectLibraryCommand, ElementName=Root}"
-                          CommandParameter="{Binding}">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                      <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
-                      <TextBlock Text="{Binding Name}" FontSize="16" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
+                <DataTemplate x:DataType="komga:KomgaBookDisplay">
+                  <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                          ClipToBounds="True">
+                    <Grid RowDefinitions="200,Auto,Auto,Auto">
+                      <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                        <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
+                      <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                      <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                                 FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                      <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                              Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                              CommandParameter="{Binding}"/>
+                    </Grid>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <Button Content="Load More" Command="{Binding LoadMoreBooksForReadListCommand}" 
+                    HorizontalAlignment="Center" Margin="0,8,0,48"/>
           </StackPanel>
 
-          <!-- Series Grid -->
-          <StackPanel Spacing="8" 
-                      IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <!-- Series Grid (only show when library is selected but no read list) -->
+          <StackPanel Spacing="8">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+              </MultiBinding>
+            </StackPanel.IsVisible>
             <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
               <TextBlock Text="Series" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
               
@@ -236,8 +346,14 @@
             </StackPanel>
           </StackPanel>
 
-          <!-- Books Grid -->
-          <StackPanel Spacing="8" IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <!-- Books Grid (for series) -->
+          <StackPanel Spacing="8">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+              </MultiBinding>
+            </StackPanel.IsVisible>
             <TextBlock Text="Books" FontSize="18" FontWeight="Bold"/>
             <ItemsControl ItemsSource="{Binding Books}">
               <ItemsControl.ItemsPanel>
@@ -288,13 +404,14 @@
             <Binding Path="!IsSearching"/>
             <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
             <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
           </MultiBinding>
         </Border.IsVisible>
         <Button Content="📥 Load More Series" Padding="16,8"
                 Command="{Binding LoadMoreSeriesCommand}"/>
       </Border>
 
-      <!-- Floating Load More Button for Books - Always visible at the bottom when browsing books in a series -->
+      <!-- Floating Load More Button for Books (series) - Always visible at the bottom when browsing books in a series -->
       <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
               Margin="0,0,0,16" Padding="4" CornerRadius="20"
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
@@ -303,10 +420,26 @@
             <Binding Path="IsConnected"/>
             <Binding Path="!IsSearching"/>
             <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
           </MultiBinding>
         </Border.IsVisible>
         <Button Content="📥 Load More Books" Padding="16,8"
                 Command="{Binding LoadMoreBooksCommand}"/>
+      </Border>
+
+      <!-- Floating Load More Button for Books (read list) - Always visible at the bottom when browsing books in a read list -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Button Content="📥 Load More Books" Padding="16,8"
+                Command="{Binding LoadMoreBooksForReadListCommand}"/>
       </Border>
 
       <!-- Download Progress Overlay -->

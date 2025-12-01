@@ -43,3 +43,24 @@ public class KomgaBookDisplay
     public string Name => Book.Name;
     public int? PagesCount => Book.Media?.PagesCount;
 }
+
+/// <summary>
+/// Display model for a Komga read list with pre-loaded thumbnail
+/// </summary>
+public class KomgaReadListDisplay
+{
+    /// <summary>
+    /// The underlying Komga read list data
+    /// </summary>
+    public KomgaReadList ReadList { get; set; } = new();
+
+    /// <summary>
+    /// Pre-loaded thumbnail bitmap
+    /// </summary>
+    public Bitmap? Thumbnail { get; set; }
+
+    // Convenience properties for binding
+    public string Id => ReadList.Id;
+    public string Name => ReadList.Name;
+    public int BookCount => ReadList.BookIds.Count;
+}

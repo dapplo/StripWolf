@@ -547,3 +547,33 @@ public class KomgaPageInfo
     [JsonPropertyName("size")]
     public string Size { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Represents a read list from Komga
+/// </summary>
+public class KomgaReadList
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("summary")]
+    public string Summary { get; set; } = string.Empty;
+
+    [JsonPropertyName("ordered")]
+    public bool Ordered { get; set; }
+
+    [JsonPropertyName("bookIds")]
+    public List<string> BookIds { get; set; } = [];
+
+    [JsonPropertyName("createdDate")]
+    public DateTime CreatedDate { get; set; }
+
+    [JsonPropertyName("lastModifiedDate")]
+    public DateTime LastModifiedDate { get; set; }
+
+    [JsonPropertyName("filtered")]
+    public bool Filtered { get; set; }
+}
