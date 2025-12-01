@@ -314,7 +314,8 @@ public class LibraryService
         var needsConversion = format == ComicFormat.Cb7 || 
                               format == ComicFormat.Cbt ||
                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
-
+        var pageCount = book.Media?.PagesCount ?? 0;
+        var fileSize = book.SizeBytes;
         if (needsConversion)
         {
             actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
@@ -323,6 +324,8 @@ public class LibraryService
             {
                 File.Delete(filePath);
             }
+            // update the pagecount and filesize after conversion
+            (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
         }
 
         // Create cover directory
@@ -332,10 +335,23 @@ public class LibraryService
         // Download thumbnail
         string? coverPath = null;
         var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+
         if (thumbnailData is not null)
         {
             coverPath = Path.Combine(coverDir, "cover.jpg");
             await File.WriteAllBytesAsync(coverPath, thumbnailData);
+        }
+        else
+        {
+            // Extract cover if Komga didn't have one
+            try
+            {
+                coverPath = await _comicReaderService.ExtractCoverAsync(actualFilePath, coverDir);
+            }
+            catch
+            {
+                // Cover extraction failed, continue without cover
+            }
         }
 
         // Parse release date
@@ -360,8 +376,8 @@ public class LibraryService
                 : null,
             ReleaseDate = releaseDate,
             FilePath = actualFilePath,
-            PageCount = book.Media?.PagesCount ?? 0,
-            FileSize = book.SizeBytes,
+            PageCount = pageCount,
+            FileSize = fileSize,
             CoverPath = coverPath,
             Format = needsConversion ? ComicFormat.Cbz : format,
             Source = ComicSource.Komga,
