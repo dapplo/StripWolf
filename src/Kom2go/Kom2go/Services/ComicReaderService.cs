@@ -2,16 +2,16 @@ using System.IO.Compression;
 using Kom2go.Models;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
+using SharpCompress.Archives.SevenZip;
+using SharpCompress.Archives.Tar;
 
 namespace Kom2go.Services;
 
 /// <summary>
-/// Service for reading comic book archives (CBZ and CBR files)
+/// Service for reading comic book archives (CBZ, CBR, CB7, and CBT files)
 /// </summary>
 public class ComicReaderService
 {
-    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
-
     /// <summary>
     /// Gets the format of a comic file based on its extension
     /// </summary>
@@ -22,6 +22,8 @@ public class ComicReaderService
         {
             ".cbz" => ComicFormat.Cbz,
             ".cbr" => ComicFormat.Cbr,
+            ".cb7" => ComicFormat.Cb7,
+            ".cbt" => ComicFormat.Cbt,
             ".pdf" => ComicFormat.Pdf,
             _ => ComicFormat.Unknown
         };
@@ -44,6 +46,8 @@ public class ComicReaderService
         {
             ComicFormat.Cbz => await GetCbzPageCountAsync(filePath),
             ComicFormat.Cbr => await GetCbrPageCountAsync(filePath),
+            ComicFormat.Cb7 => await GetCb7PageCountAsync(filePath),
+            ComicFormat.Cbt => await GetCbtPageCountAsync(filePath),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
 
@@ -61,6 +65,8 @@ public class ComicReaderService
         {
             ComicFormat.Cbz => await GetCbzPageNamesAsync(filePath),
             ComicFormat.Cbr => await GetCbrPageNamesAsync(filePath),
+            ComicFormat.Cb7 => await GetCb7PageNamesAsync(filePath),
+            ComicFormat.Cbt => await GetCbtPageNamesAsync(filePath),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
     }
@@ -76,6 +82,8 @@ public class ComicReaderService
         {
             ComicFormat.Cbz => await GetCbzPageAsync(filePath, pageIndex),
             ComicFormat.Cbr => await GetCbrPageAsync(filePath, pageIndex),
+            ComicFormat.Cb7 => await GetCb7PageAsync(filePath, pageIndex),
+            ComicFormat.Cbt => await GetCbtPageAsync(filePath, pageIndex),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
     }
@@ -120,8 +128,8 @@ public class ComicReaderService
             using var archive = ZipFile.OpenRead(filePath);
             return archive.Entries
                 .Where(e => IsImageFile(e.FullName))
-                .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
                 .Select(e => e.FullName)
+                .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
         });
     }
@@ -131,17 +139,23 @@ public class ComicReaderService
         return await Task.Run(() =>
         {
             using var archive = ZipFile.OpenRead(filePath);
-            var entries = archive.Entries
+            var sortedNames = archive.Entries
                 .Where(e => IsImageFile(e.FullName))
-                .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
+                .Select(e => e.FullName)
+                .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
 
-            if (pageIndex < 0 || pageIndex >= entries.Count)
+            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
             {
                 throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
             }
 
-            var entry = entries[pageIndex];
+            var entry = archive.GetEntry(sortedNames[pageIndex]);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find page {pageIndex} in archive");
+            }
+            
             using var stream = entry.Open();
             using var memoryStream = new MemoryStream();
             stream.CopyTo(memoryStream);
@@ -170,8 +184,8 @@ public class ComicReaderService
             using var archive = RarArchive.Open(filePath);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-                .OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
         });
     }
@@ -181,17 +195,32 @@ public class ComicReaderService
         return await Task.Run(() =>
         {
             using var archive = RarArchive.Open(filePath);
-            var entries = archive.Entries
+            
+            // Check if this is a solid archive
+            if (archive.IsSolid)
+            {
+                // For solid archives, we must read sequentially
+                return GetPageFromSolidRar(archive, pageIndex);
+            }
+            
+            var sortedNames = archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-                .OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
 
-            if (pageIndex < 0 || pageIndex >= entries.Count)
+            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
             {
                 throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
             }
 
-            var entry = entries[pageIndex];
+            var targetName = sortedNames[pageIndex];
+            var entry = archive.Entries.FirstOrDefault(e => e.Key == targetName);
+            
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find page {pageIndex} in archive");
+            }
             
             // Handle entries that may not be extractable
             using var stream = entry.OpenEntryStream();
@@ -206,11 +235,275 @@ public class ComicReaderService
         });
     }
 
+    private static byte[] GetPageFromSolidRar(RarArchive archive, int pageIndex)
+    {
+        // Build sorted list of image entry names
+        var sortedNames = archive.Entries
+            .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+            .Select(e => e.Key ?? string.Empty)
+            .OrderBy(name => name, ComicPageComparer.Instance)
+            .ToList();
+
+        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+        }
+
+        var targetName = sortedNames[pageIndex];
+        
+        // For solid archives, we must read through sequentially
+        using var reader = archive.ExtractAllEntries();
+        while (reader.MoveToNextEntry())
+        {
+            if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
+            {
+                using var entryStream = reader.OpenEntryStream();
+                using var memoryStream = new MemoryStream();
+                entryStream.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            }
+        }
+
+        throw new InvalidOperationException($"Could not find page {pageIndex} in solid RAR archive");
+    }
+
     #endregion
 
-    private static bool IsImageFile(string fileName)
+    #region CB7 (7-Zip) Operations
+
+    private static async Task<int> GetCb7PageCountAsync(string filePath)
     {
-        var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        return ImageExtensions.Contains(extension);
+        return await Task.Run(() =>
+        {
+            using var archive = SevenZipArchive.Open(filePath);
+            return archive.Entries
+                .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
+        });
+    }
+
+    private static async Task<List<string>> GetCb7PageNamesAsync(string filePath)
+    {
+        return await Task.Run(() =>
+        {
+            using var archive = SevenZipArchive.Open(filePath);
+            return archive.Entries
+                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
+                .ToList();
+        });
+    }
+
+    private static async Task<byte[]> GetCb7PageAsync(string filePath, int pageIndex)
+    {
+        return await Task.Run(() =>
+        {
+            using var archive = SevenZipArchive.Open(filePath);
+            var sortedNames = archive.Entries
+                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
+                .ToList();
+
+            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+            }
+
+            var targetName = sortedNames[pageIndex];
+            
+            // 7z archives may be solid, so we use ExtractAllEntries
+            using var reader = archive.ExtractAllEntries();
+            while (reader.MoveToNextEntry())
+            {
+                if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
+                {
+                    using var entryStream = reader.OpenEntryStream();
+                    using var memoryStream = new MemoryStream();
+                    entryStream.CopyTo(memoryStream);
+                    return memoryStream.ToArray();
+                }
+            }
+
+            throw new InvalidOperationException($"Could not find page {pageIndex} in CB7 archive");
+        });
+    }
+
+    #endregion
+
+    #region CBT (TAR) Operations
+
+    private static async Task<int> GetCbtPageCountAsync(string filePath)
+    {
+        return await Task.Run(() =>
+        {
+            using var archive = TarArchive.Open(filePath);
+            return archive.Entries
+                .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
+        });
+    }
+
+    private static async Task<List<string>> GetCbtPageNamesAsync(string filePath)
+    {
+        return await Task.Run(() =>
+        {
+            using var archive = TarArchive.Open(filePath);
+            return archive.Entries
+                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
+                .ToList();
+        });
+    }
+
+    private static async Task<byte[]> GetCbtPageAsync(string filePath, int pageIndex)
+    {
+        return await Task.Run(() =>
+        {
+            using var archive = TarArchive.Open(filePath);
+            var entries = archive.Entries
+                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .ToList();
+            
+            var sortedNames = entries
+                .Select(e => e.Key ?? string.Empty)
+                .OrderBy(name => name, ComicPageComparer.Instance)
+                .ToList();
+
+            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+            }
+
+            var targetName = sortedNames[pageIndex];
+            var entry = entries.FirstOrDefault(e => e.Key == targetName);
+            
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find page {pageIndex} in CBT archive");
+            }
+            
+            using var stream = entry.OpenEntryStream();
+            using var memoryStream = new MemoryStream();
+            stream.CopyTo(memoryStream);
+            return memoryStream.ToArray();
+        });
+    }
+
+    #endregion
+
+    private static bool IsImageFile(string fileName) => ComicConstants.IsImageFile(fileName);
+}
+
+/// <summary>
+/// Comparer for comic page file paths.
+/// Sorts directories first, then files within each directory.
+/// Uses natural string ordering for proper numeric sorting.
+/// </summary>
+internal sealed class ComicPageComparer : IComparer<string>
+{
+    public static readonly ComicPageComparer Instance = new();
+
+    private ComicPageComparer() { }
+
+    public int Compare(string? x, string? y)
+    {
+        if (x == null && y == null) return 0;
+        if (x == null) return -1;
+        if (y == null) return 1;
+
+        // Normalize path separators
+        x = x.Replace('\\', '/');
+        y = y.Replace('\\', '/');
+
+        var xParts = x.Split('/');
+        var yParts = y.Split('/');
+
+        // Compare path components
+        var minParts = Math.Min(xParts.Length, yParts.Length);
+        
+        for (var i = 0; i < minParts; i++)
+        {
+            var isLastX = i == xParts.Length - 1;
+            var isLastY = i == yParts.Length - 1;
+            
+            // If one is a directory component and the other is a file, directory goes first
+            if (!isLastX && isLastY)
+            {
+                // x has more path components (is in a subdirectory), compare at this level
+                var cmp = NaturalCompare(xParts[i], yParts[i]);
+                if (cmp != 0) return cmp;
+                // If same prefix, directory path sorts before file at same level
+                return -1;
+            }
+            if (isLastX && !isLastY)
+            {
+                var cmp = NaturalCompare(xParts[i], yParts[i]);
+                if (cmp != 0) return cmp;
+                // If same prefix, file sorts after directory at same level
+                return 1;
+            }
+
+            // Both are at the same depth level, compare naturally
+            var result = NaturalCompare(xParts[i], yParts[i]);
+            if (result != 0)
+            {
+                return result;
+            }
+        }
+
+        // If all compared parts are equal, shorter path comes first
+        return xParts.Length.CompareTo(yParts.Length);
+    }
+
+    /// <summary>
+    /// Natural string comparison that handles numbers correctly.
+    /// "page2" comes before "page10".
+    /// </summary>
+    private static int NaturalCompare(string x, string y)
+    {
+        var xi = 0;
+        var yi = 0;
+
+        while (xi < x.Length && yi < y.Length)
+        {
+            var xc = x[xi];
+            var yc = y[yi];
+
+            // If both are digits, compare as numbers
+            if (char.IsDigit(xc) && char.IsDigit(yc))
+            {
+                // Extract the full number from both strings
+                var xNumStart = xi;
+                while (xi < x.Length && char.IsDigit(x[xi])) xi++;
+                if (!long.TryParse(x.AsSpan(xNumStart, xi - xNumStart), out var xNum))
+                {
+                    // Fallback to string comparison if number is too large
+                    return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+                }
+
+                var yNumStart = yi;
+                while (yi < y.Length && char.IsDigit(y[yi])) yi++;
+                if (!long.TryParse(y.AsSpan(yNumStart, yi - yNumStart), out var yNum))
+                {
+                    // Fallback to string comparison if number is too large
+                    return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+                }
+
+                var numCmp = xNum.CompareTo(yNum);
+                if (numCmp != 0) return numCmp;
+            }
+            else
+            {
+                // Compare as characters (case-insensitive)
+                var charCmp = char.ToLowerInvariant(xc).CompareTo(char.ToLowerInvariant(yc));
+                if (charCmp != 0) return charCmp;
+                xi++;
+                yi++;
+            }
+        }
+
+        // If we've exhausted one string, the shorter one comes first
+        return (x.Length - xi).CompareTo(y.Length - yi);
     }
 }

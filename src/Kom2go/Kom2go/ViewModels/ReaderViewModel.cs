@@ -60,6 +60,12 @@ public partial class ReaderViewModel : ViewModelBase
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
+
+    [ObservableProperty]
+    private ComicInfo? _comicInfo;
+
+    [ObservableProperty]
+    private bool _isInfoPanelVisible;
     
     public string PageDisplay
     {
@@ -389,6 +395,31 @@ public partial class ReaderViewModel : ViewModelBase
             StretchMode.Original => StretchMode.FitPage,
             _ => StretchMode.FitPage
         };
+    }
+
+    [RelayCommand]
+    private async Task ToggleInfoPanelAsync()
+    {
+        if (IsInfoPanelVisible)
+        {
+            IsInfoPanelVisible = false;
+            return;
+        }
+
+        // Load ComicInfo if not already loaded
+        if (ComicInfo is null && Comic is not null)
+        {
+            try
+            {
+                ComicInfo = await _libraryService.GetComicInfoAsync(Comic.FilePath);
+            }
+            catch
+            {
+                // ComicInfo not available
+            }
+        }
+
+        IsInfoPanelVisible = true;
     }
 
     private async Task SaveProgressAsync()

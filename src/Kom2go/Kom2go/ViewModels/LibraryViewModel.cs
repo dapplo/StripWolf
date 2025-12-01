@@ -215,9 +215,14 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var pending in pendingItems)
         {
             pending.IsProcessing = true;
-            pending.Status = ComicReaderService.GetComicFormat(pending.FilePath) == ComicFormat.Pdf 
-                ? "Converting PDF..." 
-                : "Importing...";
+            var format = ComicReaderService.GetComicFormat(pending.FilePath);
+            pending.Status = format switch
+            {
+                ComicFormat.Pdf => "Converting PDF...",
+                ComicFormat.Cb7 => "Converting CB7...",
+                ComicFormat.Cbt => "Converting CBT...",
+                _ => "Importing..."
+            };
 
             try
             {

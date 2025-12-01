@@ -117,6 +117,8 @@ public enum ComicFormat
     Unknown,
     Cbz,
     Cbr,
+    Cb7,
+    Cbt,
     Pdf
 }
 
