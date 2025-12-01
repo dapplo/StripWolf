@@ -55,24 +55,20 @@
       </Viewbox>
     </ScrollViewer>
 
-    <!-- Gesture layer for swipe and pinch gestures (captures touch events but doesn't block tap zones) -->
-    <Grid x:Name="GestureLayer" Background="Transparent" 
+    <!-- Overlay for tap/swipe/pinch zones - handles both gestures and taps -->
+    <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent"
+          PointerWheelChanged="OnPointerWheelChanged"
           PointerPressed="OnGesturePointerPressed"
           PointerMoved="OnGesturePointerMoved"
-          PointerReleased="OnGesturePointerReleased"
-          IsHitTestVisible="True"/>
-
-    <!-- Overlay for tap zones - invisible grid that handles touch/click areas and scroll wheel -->
-    <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent"
-          PointerWheelChanged="OnPointerWheelChanged">
-      <!-- Left tap zone (25% width) - previous page -->
-      <Border Grid.Column="0" Background="Transparent" PointerPressed="OnLeftZonePressed" Cursor="Hand"/>
+          PointerReleased="OnGesturePointerReleased">
+      <!-- Left tap zone (25% width) - previous page (handled via swipe or press detection in code) -->
+      <Border Grid.Column="0" x:Name="LeftZone" Background="Transparent" Cursor="Hand"/>
       
       <!-- Center tap zone (50% width) - toggle controls -->
-      <Border Grid.Column="1" Background="Transparent" PointerPressed="OnCenterZonePressed" Cursor="Hand"/>
+      <Border Grid.Column="1" x:Name="CenterZone" Background="Transparent" Cursor="Hand"/>
       
       <!-- Right tap zone (25% width) - next page -->
-      <Border Grid.Column="2" Background="Transparent" PointerPressed="OnRightZonePressed" Cursor="Hand"/>
+      <Border Grid.Column="2" x:Name="RightZone" Background="Transparent" Cursor="Hand"/>
     </Grid>
 
     <!-- Loading Indicator -->

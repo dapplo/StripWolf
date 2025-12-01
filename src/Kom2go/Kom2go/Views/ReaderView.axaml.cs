@@ -61,33 +61,6 @@ public partial class ReaderView : UserControl
         }
     }
 
-    private void OnLeftZonePressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is ReaderViewModel vm && vm.HasPreviousPage)
-        {
-            vm.GoToPreviousPageCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void OnRightZonePressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is ReaderViewModel vm && vm.HasNextPage)
-        {
-            vm.GoToNextPageCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
-    private void OnCenterZonePressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is ReaderViewModel vm)
-        {
-            vm.ToggleControlsCommand.Execute(null);
-            e.Handled = true;
-        }
-    }
-
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not ReaderViewModel vm)
@@ -358,13 +331,15 @@ public partial class ReaderView : UserControl
     }
     
     /// <summary>
-    /// Handle pointer released for swipe detection
+    /// Handle pointer released for swipe detection and tap handling
     /// </summary>
     private void OnGesturePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         var pointer = e.GetCurrentPoint(this);
         var pointerId = (long)e.Pointer.Id;
         var position = pointer.Position;
+        
+        var wasSwipe = false;
         
         // Check for swipe gesture when the last finger is released
         if (_activePointers.Count == 1 && _swipeStartPoint.HasValue && DataContext is ReaderViewModel vm)
@@ -378,6 +353,7 @@ public partial class ReaderView : UserControl
                 Math.Abs(deltaX) > SwipeThreshold && 
                 Math.Abs(deltaY) < SwipeMaxVerticalDeviation)
             {
+                wasSwipe = true;
                 if (deltaX > 0 && vm.HasPreviousPage)
                 {
                     // Swipe right = previous page
@@ -390,6 +366,13 @@ public partial class ReaderView : UserControl
                     vm.GoToNextPageCommand.Execute(null);
                     e.Handled = true;
                 }
+            }
+            
+            // If no swipe was detected, handle as a tap based on position
+            if (!wasSwipe && _activePointers.Count == 1)
+            {
+                HandleTap(position, vm);
+                e.Handled = true;
             }
         }
         
@@ -406,6 +389,39 @@ public partial class ReaderView : UserControl
             // Reset for potential new swipe
             _swipeStartPoint = _activePointers.Values.First();
             _swipeStartTime = DateTime.UtcNow;
+        }
+    }
+    
+    /// <summary>
+    /// Handle a tap at the given position by determining which zone was tapped
+    /// </summary>
+    private void HandleTap(Point position, ReaderViewModel vm)
+    {
+        var width = Bounds.Width;
+        if (width <= 0) return;
+        
+        var relativeX = position.X / width;
+        
+        if (relativeX < 0.25)
+        {
+            // Left zone - previous page
+            if (vm.HasPreviousPage)
+            {
+                vm.GoToPreviousPageCommand.Execute(null);
+            }
+        }
+        else if (relativeX > 0.75)
+        {
+            // Right zone - next page
+            if (vm.HasNextPage)
+            {
+                vm.GoToNextPageCommand.Execute(null);
+            }
+        }
+        else
+        {
+            // Center zone - toggle controls
+            vm.ToggleControlsCommand.Execute(null);
         }
     }
     
