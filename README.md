@@ -40,8 +40,9 @@ Download the `Kom2go-Windows-x64.zip` from the [Releases](https://github.com/dap
 Download the `Kom2go-Linux-x64.tar.gz` from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
 
 ```bash
-tar -xzvf Kom2go-Linux-x64.tar.gz -C /opt/kom2go
-chmod +x /opt/kom2go/Kom2go.Desktop
+mkdir -p ~/kom2go
+tar -xzvf Kom2go-Linux-x64.tar.gz -C ~/kom2go
+chmod +x ~/kom2go/Kom2go.Desktop
 ```
 
 ### macOS
