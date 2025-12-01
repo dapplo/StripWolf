@@ -169,6 +169,37 @@
                       IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
               <TextBlock Text="Series" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+              
+              <!-- A-Z Letter Filter -->
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                <ItemsControl ItemsSource="{x:Static vm:KomgaViewModel.LetterFilters}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="4"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Button Content="{Binding}" MinWidth="36" Padding="8,6"
+                              Command="{Binding DataContext.SelectLetterFilterCommand, ElementName=Root}"
+                              CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              
+              <!-- Selected Letter Filter Indicator -->
+              <TextBlock Margin="0,0,0,8" FontSize="14" Foreground="Gray">
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="Showing series starting with: {0}">
+                    <Binding Path="SelectedLetterFilter" FallbackValue="All"/>
+                  </MultiBinding>
+                </TextBlock.Text>
+                <TextBlock.IsVisible>
+                  <Binding Path="SelectedLetterFilter" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                </TextBlock.IsVisible>
+              </TextBlock>
+              
               <ItemsControl ItemsSource="{Binding Series}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -201,7 +232,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <Button Content="Load More" Command="{Binding LoadMoreSeriesCommand}" 
-                      HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                      HorizontalAlignment="Center" Margin="0,8,0,48"/>
             </StackPanel>
           </StackPanel>
 
@@ -240,12 +271,43 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <Button Content="Load More" Command="{Binding LoadMoreBooksCommand}" 
-                    HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    HorizontalAlignment="Center" Margin="0,8,0,48"/>
           </StackPanel>
           
           </StackPanel> <!-- End of Main Content (hidden when searching) -->
         </StackPanel>
       </ScrollViewer>
+
+      <!-- Floating Load More Button for Series - Always visible at the bottom when browsing series -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Button Content="📥 Load More Series" Padding="16,8"
+                Command="{Binding LoadMoreSeriesCommand}"/>
+      </Border>
+
+      <!-- Floating Load More Button for Books - Always visible at the bottom when browsing books in a series -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Button Content="📥 Load More Books" Padding="16,8"
+                Command="{Binding LoadMoreBooksCommand}"/>
+      </Border>
 
       <!-- Download Progress Overlay -->
       <Border Background="#80000000" IsVisible="{Binding IsDownloading}">

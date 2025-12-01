@@ -150,6 +150,22 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets comics marked as favorites
+    /// </summary>
+    public Task<List<Comic>> GetFavoriteComicsAsync()
+    {
+        return _databaseService.GetFavoriteComicsAsync();
+    }
+
+    /// <summary>
+    /// Toggle the favorite status of a comic
+    /// </summary>
+    public Task ToggleFavoriteAsync(int comicId)
+    {
+        return _databaseService.ToggleFavoriteAsync(comicId);
+    }
+
+    /// <summary>
     /// Imports a local comic file into the library
     /// </summary>
     public async Task<Comic> ImportLocalComicAsync(string filePath, IProgress<double>? progress = null)

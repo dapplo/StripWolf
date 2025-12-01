@@ -170,6 +170,24 @@ public class DatabaseService : IAsyncDisposable
         }
     }
 
+    public async Task<List<Comic>> GetFavoriteComicsAsync()
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<Comic>()
+            .Where(c => c.IsFavorite)
+            .ToListAsync();
+    }
+
+    public async Task ToggleFavoriteAsync(int comicId)
+    {
+        var comic = await GetComicAsync(comicId);
+        if (comic is not null)
+        {
+            comic.IsFavorite = !comic.IsFavorite;
+            await SaveComicAsync(comic);
+        }
+    }
+
     #endregion
 
     #region Komga Servers

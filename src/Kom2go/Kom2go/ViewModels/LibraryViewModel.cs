@@ -25,6 +25,9 @@ public partial class LibraryViewModel : ViewModelBase
     private ObservableCollection<Comic> _completedComics = [];
 
     [ObservableProperty]
+    private ObservableCollection<Comic> _favoriteComics = [];
+
+    [ObservableProperty]
     private ObservableCollection<PendingImport> _pendingImports = [];
 
     [ObservableProperty]
@@ -45,7 +48,7 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSearching;
 
-    private const int DeleteUndoTimeoutSeconds = 120; // 2 minutes
+    private const int DeleteUndoTimeoutSeconds = 20; // 20 seconds
 
     /// <summary>
     /// Whether the app is running on desktop (not mobile)
@@ -111,6 +114,13 @@ public partial class LibraryViewModel : ViewModelBase
         {
             // Clean up comics with missing files on first load
             await _libraryService.CleanupMissingFilesAsync();
+            
+            var favorites = await _libraryService.GetFavoriteComicsAsync();
+            FavoriteComics.Clear();
+            foreach (var comic in favorites)
+            {
+                FavoriteComics.Add(comic);
+            }
             
             var newComics = await _libraryService.GetNewComicsAsync();
             NewComics.Clear();
@@ -270,6 +280,7 @@ public partial class LibraryViewModel : ViewModelBase
         NewComics.Remove(comic);
         InProgressComics.Remove(comic);
         CompletedComics.Remove(comic);
+        FavoriteComics.Remove(comic);
         SearchResults.Remove(comic);
 
         // Create a deleted comic entry
@@ -351,6 +362,13 @@ public partial class LibraryViewModel : ViewModelBase
 
         // Add back to appropriate collection based on status
         var comic = deletedComic.Comic;
+        
+        // Restore to favorites if it was a favorite
+        if (comic.IsFavorite && !FavoriteComics.Contains(comic))
+        {
+            FavoriteComics.Add(comic);
+        }
+        
         if (comic.IsCompleted)
         {
             if (!CompletedComics.Contains(comic))
@@ -422,6 +440,40 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task ToggleFavoriteAsync(Comic? comic)
+    {
+        if (comic is null)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            // Store old state for UI update
+            var wasFavorite = comic.IsFavorite;
+            
+            // Save to database first
+            await _libraryService.ToggleFavoriteAsync(comic.Id);
+            
+            // Update the local comic object
+            comic.IsFavorite = !wasFavorite;
+            
+            // Update the favorites collection
+            if (comic.IsFavorite)
+            {
+                if (!FavoriteComics.Contains(comic))
+                {
+                    FavoriteComics.Insert(0, comic);
+                }
+            }
+            else
+            {
+                FavoriteComics.Remove(comic);
+            }
+        }, "Failed to update favorite status");
+    }
+
+    [RelayCommand]
     private void RemovePendingImport(PendingImport? pending)
     {
         if (pending is not null)
@@ -437,5 +489,35 @@ public partial class LibraryViewModel : ViewModelBase
         {
             PendingImports.Remove(pending);
         });
+    }
+
+    /// <summary>
+    /// Performs permanent deletion of all comics in the pending delete queue.
+    /// Should be called when the application is closing.
+    /// </summary>
+    public async Task DeleteAllPendingComicsAsync()
+    {
+        // Create a copy of the list to avoid modification during iteration
+        var pendingDeletes = DeletedComics.ToList();
+        
+        foreach (var deletedComic in pendingDeletes)
+        {
+            // Cancel the countdown timer
+            deletedComic.CancellationToken?.Cancel();
+            deletedComic.CancellationToken?.Dispose();
+            deletedComic.CancellationToken = null;
+            
+            // Perform permanent delete
+            try
+            {
+                await _libraryService.DeleteComicAsync(deletedComic.Comic);
+            }
+            catch
+            {
+                // Silently fail - app is closing anyway
+            }
+        }
+        
+        DeletedComics.Clear();
     }
 }

@@ -104,4 +104,13 @@ public partial class MainViewModel : ViewModelBase
         // Refresh the library to show updated progress
         _ = _libraryViewModel.RefreshCommand.ExecuteAsync(null);
     }
+
+    /// <summary>
+    /// Performs cleanup operations when the application is shutting down.
+    /// This includes permanently deleting any comics that are pending deletion.
+    /// </summary>
+    public async Task OnShutdownAsync()
+    {
+        await _libraryViewModel.DeleteAllPendingComicsAsync();
+    }
 }
