@@ -109,12 +109,13 @@ public partial class LibraryView : UserControl
                 return null;
             }
 
-            var targetPath = Path.Combine(libraryService.ComicsDirectory, file.Name);
+            var sanitizedName = LibraryService.SanitizeFileName(file.Name);
+            var targetPath = Path.Combine(libraryService.ComicsDirectory, sanitizedName);
             
             // Ensure unique filename if file already exists
             var counter = 1;
-            var baseName = Path.GetFileNameWithoutExtension(file.Name);
-            var extension = Path.GetExtension(file.Name);
+            var baseName = Path.GetFileNameWithoutExtension(sanitizedName);
+            var extension = Path.GetExtension(sanitizedName);
             while (File.Exists(targetPath))
             {
                 targetPath = Path.Combine(libraryService.ComicsDirectory, $"{baseName}_{counter}{extension}");

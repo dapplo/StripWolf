@@ -369,7 +369,7 @@ public class LibraryService
         return comics;
     }
 
-    private static string SanitizeFileName(string fileName)
+    internal static string SanitizeFileName(string fileName)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
