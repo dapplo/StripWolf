@@ -15,6 +15,12 @@ namespace Kom2go;
 public partial class App : Application
 {
     public static IServiceProvider? Services { get; private set; }
+    
+    /// <summary>
+    /// Action to register the platform-specific PDF renderer.
+    /// Set this before Initialize() is called if you need a custom renderer (e.g., on Android).
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterPdfRenderer { get; set; }
 
     public override void Initialize()
     {
@@ -58,6 +64,18 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<KomgaApiService>();
+        
+        // Register platform-specific PDF renderer
+        // Use the custom registration action if set (e.g., for Android), otherwise default to PDFium
+        if (RegisterPdfRenderer != null)
+        {
+            RegisterPdfRenderer(services);
+        }
+        else
+        {
+            services.AddSingleton<IPdfRenderer, PdfiumPdfRenderer>();
+        }
+        
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<LibraryService>();
 
