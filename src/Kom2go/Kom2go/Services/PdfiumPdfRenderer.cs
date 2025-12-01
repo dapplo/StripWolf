@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
 using PDFiumCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -60,6 +63,154 @@ public class PdfiumPdfRenderer : IPdfRenderer
         finally
         {
             fpdfview.FPDF_CloseDocument(document);
+        }
+    }
+
+    /// <inheritdoc />
+    public PdfMetadata? GetMetadata(string pdfFilePath)
+    {
+        EnsurePdfiumInitialized();
+
+        var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
+        if (document == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var metadata = new PdfMetadata
+            {
+                Title = GetMetaText(document, "Title"),
+                Author = GetMetaText(document, "Author"),
+                Subject = GetMetaText(document, "Subject"),
+                Keywords = GetMetaText(document, "Keywords"),
+                Creator = GetMetaText(document, "Creator"),
+                Producer = GetMetaText(document, "Producer"),
+                CreationDate = ParsePdfDate(GetMetaText(document, "CreationDate")),
+                ModificationDate = ParsePdfDate(GetMetaText(document, "ModDate"))
+            };
+
+            return metadata.HasAnyMetadata ? metadata : null;
+        }
+        finally
+        {
+            fpdfview.FPDF_CloseDocument(document);
+        }
+    }
+
+    /// <summary>
+    /// Gets a metadata text value from the PDF document
+    /// </summary>
+    private static string? GetMetaText(FpdfDocumentT document, string tag)
+    {
+        // First call with null buffer to get the required buffer size
+        var requiredSize = fpdf_doc.FPDF_GetMetaText(document, tag, IntPtr.Zero, 0);
+        if (requiredSize <= 2) // Size includes null terminator, 2 bytes for empty UTF-16 string
+        {
+            return null;
+        }
+
+        // Allocate buffer and get the actual text
+        var buffer = Marshal.AllocHGlobal((int)requiredSize);
+        try
+        {
+            fpdf_doc.FPDF_GetMetaText(document, tag, buffer, requiredSize);
+            
+            // PDFium returns UTF-16LE encoded strings
+            var text = Marshal.PtrToStringUni(buffer);
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    /// <summary>
+    /// Parses a PDF date string to a DateTime.
+    /// PDF dates are in the format: D:YYYYMMDDHHmmSSOHH'mm'
+    /// where O is the timezone offset direction (+ or -)
+    /// </summary>
+    private static DateTime? ParsePdfDate(string? pdfDate)
+    {
+        if (string.IsNullOrWhiteSpace(pdfDate))
+        {
+            return null;
+        }
+
+        // Remove the "D:" prefix if present
+        if (pdfDate.StartsWith("D:", StringComparison.Ordinal))
+        {
+            pdfDate = pdfDate[2..];
+        }
+
+        // Try to parse the date components
+        // Format: YYYYMMDDHHmmSS with optional timezone
+        if (pdfDate.Length < 4)
+        {
+            return null;
+        }
+
+        try
+        {
+            // Extract year (required)
+            if (!int.TryParse(pdfDate.AsSpan(0, 4), out var year))
+            {
+                return null;
+            }
+
+            // Extract month (default to 1)
+            var month = 1;
+            if (pdfDate.Length >= 6 && int.TryParse(pdfDate.AsSpan(4, 2), out var m))
+            {
+                month = m;
+            }
+
+            // Extract day (default to 1)
+            var day = 1;
+            if (pdfDate.Length >= 8 && int.TryParse(pdfDate.AsSpan(6, 2), out var d))
+            {
+                day = d;
+            }
+
+            // Extract hour (default to 0)
+            var hour = 0;
+            if (pdfDate.Length >= 10 && int.TryParse(pdfDate.AsSpan(8, 2), out var h))
+            {
+                hour = h;
+            }
+
+            // Extract minute (default to 0)
+            var minute = 0;
+            if (pdfDate.Length >= 12 && int.TryParse(pdfDate.AsSpan(10, 2), out var min))
+            {
+                minute = min;
+            }
+
+            // Extract second (default to 0)
+            var second = 0;
+            if (pdfDate.Length >= 14 && int.TryParse(pdfDate.AsSpan(12, 2), out var s))
+            {
+                second = s;
+            }
+
+            // Validate ranges
+            if (year < 1 || year > 9999 ||
+                month < 1 || month > 12 ||
+                day < 1 || day > DateTime.DaysInMonth(year, month) ||
+                hour < 0 || hour > 23 ||
+                minute < 0 || minute > 59 ||
+                second < 0 || second > 59)
+            {
+                return null;
+            }
+
+            return new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
+        }
+        catch
+        {
+            return null;
         }
     }
 

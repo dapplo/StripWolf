@@ -296,6 +296,46 @@ public class ComicInfo
         if (!string.IsNullOrEmpty(Penciller)) authors.AddRange(Penciller.Split(',', StringSplitOptions.TrimEntries));
         return string.Join(", ", authors.Distinct());
     }
+
+    #region ShouldSerialize methods for nullable value types
+
+    /// <summary>Determines if Count should be serialized</summary>
+    public bool ShouldSerializeCount() => Count.HasValue;
+
+    /// <summary>Determines if Volume should be serialized</summary>
+    public bool ShouldSerializeVolume() => Volume.HasValue;
+
+    /// <summary>Determines if AlternateCount should be serialized</summary>
+    public bool ShouldSerializeAlternateCount() => AlternateCount.HasValue;
+
+    /// <summary>Determines if Year should be serialized</summary>
+    public bool ShouldSerializeYear() => Year.HasValue;
+
+    /// <summary>Determines if Month should be serialized</summary>
+    public bool ShouldSerializeMonth() => Month.HasValue;
+
+    /// <summary>Determines if Day should be serialized</summary>
+    public bool ShouldSerializeDay() => Day.HasValue;
+
+    /// <summary>Determines if PageCount should be serialized</summary>
+    public bool ShouldSerializePageCount() => PageCount.HasValue;
+
+    /// <summary>Determines if BlackAndWhite should be serialized</summary>
+    public bool ShouldSerializeBlackAndWhite() => BlackAndWhite.HasValue;
+
+    /// <summary>Determines if Manga should be serialized</summary>
+    public bool ShouldSerializeManga() => Manga.HasValue;
+
+    /// <summary>Determines if AgeRating should be serialized</summary>
+    public bool ShouldSerializeAgeRating() => AgeRating.HasValue;
+
+    /// <summary>Determines if CommunityRating should be serialized</summary>
+    public bool ShouldSerializeCommunityRating() => CommunityRating.HasValue;
+
+    /// <summary>Determines if Pages should be serialized</summary>
+    public bool ShouldSerializePages() => Pages is { Count: > 0 };
+
+    #endregion
 }
 
 /// <summary>
@@ -312,8 +352,18 @@ public class ComicPageInfo
     /// <summary>
     /// Page type
     /// </summary>
-    [XmlAttribute("Type")]
+    [XmlIgnore]
     public ComicPageType? Type { get; set; }
+
+    /// <summary>
+    /// Page type as string for XML serialization
+    /// </summary>
+    [XmlAttribute("Type")]
+    public string? TypeString
+    {
+        get => Type?.ToString();
+        set => Type = string.IsNullOrEmpty(value) ? null : Enum.TryParse<ComicPageType>(value, out var result) ? result : null;
+    }
 
     /// <summary>
     /// Whether the page should be shown in double page spread

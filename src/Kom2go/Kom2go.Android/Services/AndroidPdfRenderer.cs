@@ -36,6 +36,15 @@ public class AndroidPdfRenderer : IPdfRenderer
     }
 
     /// <inheritdoc />
+    public PdfMetadata? GetMetadata(string pdfFilePath)
+    {
+        // Android's PdfRenderer does not provide access to PDF metadata.
+        // Return null to indicate no metadata is available.
+        // The file name will be used as the title fallback in PdfToCbzConverterService.
+        return null;
+    }
+
+    /// <inheritdoc />
     public async Task RenderPdfPagesToJpgAsync(
         string pdfFilePath,
         string outputDir,
