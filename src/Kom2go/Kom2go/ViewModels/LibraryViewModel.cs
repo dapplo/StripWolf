@@ -45,7 +45,7 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSearching;
 
-    private const int DeleteUndoTimeoutSeconds = 120; // 2 minutes
+    private const int DeleteUndoTimeoutSeconds = 20; // 20 seconds
 
     /// <summary>
     /// Whether the app is running on desktop (not mobile)
@@ -437,5 +437,35 @@ public partial class LibraryViewModel : ViewModelBase
         {
             PendingImports.Remove(pending);
         });
+    }
+
+    /// <summary>
+    /// Performs permanent deletion of all comics in the pending delete queue.
+    /// Should be called when the application is closing.
+    /// </summary>
+    public async Task DeleteAllPendingComicsAsync()
+    {
+        // Create a copy of the list to avoid modification during iteration
+        var pendingDeletes = DeletedComics.ToList();
+        
+        foreach (var deletedComic in pendingDeletes)
+        {
+            // Cancel the countdown timer
+            deletedComic.CancellationToken?.Cancel();
+            deletedComic.CancellationToken?.Dispose();
+            deletedComic.CancellationToken = null;
+            
+            // Perform permanent delete
+            try
+            {
+                await _libraryService.DeleteComicAsync(deletedComic.Comic);
+            }
+            catch
+            {
+                // Silently fail - app is closing anyway
+            }
+        }
+        
+        DeletedComics.Clear();
     }
 }

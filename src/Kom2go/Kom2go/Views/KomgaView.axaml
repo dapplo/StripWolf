@@ -201,7 +201,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <Button Content="Load More" Command="{Binding LoadMoreSeriesCommand}" 
-                      HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                      HorizontalAlignment="Center" Margin="0,8,0,48"/>
             </StackPanel>
           </StackPanel>
 
@@ -240,12 +240,43 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <Button Content="Load More" Command="{Binding LoadMoreBooksCommand}" 
-                    HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    HorizontalAlignment="Center" Margin="0,8,0,48"/>
           </StackPanel>
           
           </StackPanel> <!-- End of Main Content (hidden when searching) -->
         </StackPanel>
       </ScrollViewer>
+
+      <!-- Floating Load More Button for Series - Always visible at the bottom when browsing series -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Button Content="📥 Load More Series" Padding="16,8"
+                Command="{Binding LoadMoreSeriesCommand}"/>
+      </Border>
+
+      <!-- Floating Load More Button for Books - Always visible at the bottom when browsing books in a series -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
+              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Button Content="📥 Load More Books" Padding="16,8"
+                Command="{Binding LoadMoreBooksCommand}"/>
+      </Border>
 
       <!-- Download Progress Overlay -->
       <Border Background="#80000000" IsVisible="{Binding IsDownloading}">

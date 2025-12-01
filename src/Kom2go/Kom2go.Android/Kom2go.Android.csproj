@@ -9,6 +9,8 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <!-- Exclude PDFium from Android build to reduce APK size -->
+    <ExcludePdfium>true</ExcludePdfium>
   </PropertyGroup>
 
   <!-- Release signing configuration -->

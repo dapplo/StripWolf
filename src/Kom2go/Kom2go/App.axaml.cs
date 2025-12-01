@@ -45,6 +45,12 @@ public partial class App : Application
             {
                 DataContext = mainViewModel
             };
+            
+            // Handle shutdown to delete pending comics
+            desktop.ShutdownRequested += async (sender, args) =>
+            {
+                await mainViewModel.OnShutdownAsync();
+            };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
         {
@@ -71,10 +77,12 @@ public partial class App : Application
         {
             RegisterPdfRenderer(services);
         }
+#if !EXCLUDE_PDFIUM
         else
         {
             services.AddSingleton<IPdfRenderer, PdfiumPdfRenderer>();
         }
+#endif
         
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<LibraryService>();
