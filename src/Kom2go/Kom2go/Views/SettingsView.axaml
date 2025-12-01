@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Kom2go.ViewModels"
              xmlns:models="using:Kom2go.Models"
+             xmlns:res="using:Kom2go.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
@@ -13,7 +14,7 @@
     <ScrollViewer IsVisible="{Binding !IsEditing}" Padding="16">
       <StackPanel Spacing="16">
         <!-- Header -->
-        <TextBlock Text="Settings" FontSize="24" FontWeight="Bold"/>
+        <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
         
         <!-- Error Message -->
         <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
@@ -22,10 +23,10 @@
         </Border>
 
         <!-- Komga Servers Section -->
-        <TextBlock Text="Komga Servers" FontSize="18" FontWeight="Bold"/>
+        <TextBlock Text="{Binding KomgaServers, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
         
         <!-- Add Server Button -->
-        <Button Content="Add Server" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
+        <Button Content="{Binding AddServer, Source={x:Static res:Loc.Instance}}" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
 
         <!-- Servers List -->
         <ItemsControl ItemsSource="{Binding Servers}">
@@ -39,7 +40,7 @@
                       <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
                       <Border Background="{DynamicResource AccentFillColorDefaultBrush}" 
                               Padding="6,2" CornerRadius="4" IsVisible="{Binding IsActive}">
-                        <TextBlock Text="Active" Foreground="White" FontSize="10"/>
+                        <TextBlock Text="{Binding Active, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
                       </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding BaseUrl}" Foreground="Gray" FontSize="12"/>
@@ -70,16 +71,16 @@
         <!-- Empty State -->
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="32"
                     IsVisible="{Binding !Servers.Count}">
-          <TextBlock Text="No servers configured" Foreground="Gray" HorizontalAlignment="Center"/>
-          <TextBlock Text="Add a Komga server to browse and download comics"
+          <TextBlock Text="{Binding NoServersConfigured, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center"/>
+          <TextBlock Text="{Binding AddServerHint, Source={x:Static res:Loc.Instance}}"
                      Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
         </StackPanel>
 
         <!-- Language Settings Section -->
-        <TextBlock Text="Language Settings" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <TextBlock Text="{Binding LanguageSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
         <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
           <StackPanel Spacing="8">
-            <TextBlock Text="Language" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding Language, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
             <ComboBox ItemsSource="{Binding AvailableLanguages}" 
                       SelectedItem="{Binding SelectedLanguage}"
                       HorizontalAlignment="Stretch"
@@ -96,13 +97,13 @@
         </Border>
 
         <!-- About Section -->
-        <TextBlock Text="About" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
         <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
           <StackPanel Spacing="8">
             <TextBlock Text="Kom2go" FontSize="16" FontWeight="Bold"/>
-            <TextBlock Text="A comic book reader with Komga integration" Foreground="Gray"/>
+            <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
             <TextBlock Text="Version 1.0.0 (Avalonia)" Foreground="Gray" FontSize="12"/>
-            <Button Content="📋 View Release Notes" Command="{Binding ShowReleaseNotesCommand}" 
+            <Button Content="{Binding ViewReleaseNotes, Source={x:Static res:Loc.Instance}}" Command="{Binding ShowReleaseNotesCommand}" 
                     Background="Transparent" Padding="0" Margin="0,8,0,0"/>
           </StackPanel>
         </Border>
@@ -112,7 +113,7 @@
                 Margin="0,8,0,0" IsVisible="{Binding IsReleaseNotesVisible}">
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="Release Notes" FontSize="14" FontWeight="Bold"/>
+              <TextBlock Text="{Binding ReleaseNotes, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="Bold"/>
               <Button Grid.Column="1" Content="✕" Padding="4,2" Background="Transparent"
                       Command="{Binding HideReleaseNotesCommand}"/>
             </Grid>
@@ -142,25 +143,25 @@
     <!-- Edit Server Form -->
     <ScrollViewer IsVisible="{Binding IsEditing}" Padding="16">
       <StackPanel Spacing="16" MaxWidth="400">
-        <TextBlock Text="Server Configuration" FontSize="18" FontWeight="Bold"/>
+        <TextBlock Text="{Binding ServerConfiguration, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
         
         <StackPanel Spacing="4">
-          <TextBlock Text="Name"/>
+          <TextBlock Text="{Binding Name, Source={x:Static res:Loc.Instance}}"/>
           <TextBox Text="{Binding ServerName}" Watermark="My Komga Server"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
-          <TextBlock Text="Server URL"/>
+          <TextBlock Text="{Binding ServerUrl, Source={x:Static res:Loc.Instance}}"/>
           <TextBox Text="{Binding ServerUrl}" Watermark="https://komga.example.com"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
-          <TextBlock Text="Username"/>
+          <TextBlock Text="{Binding Username, Source={x:Static res:Loc.Instance}}"/>
           <TextBox Text="{Binding Username}" Watermark="username"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
-          <TextBlock Text="Password"/>
+          <TextBlock Text="{Binding Password, Source={x:Static res:Loc.Instance}}"/>
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0" Text="{Binding Password}" Watermark="password" 
                      PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
@@ -180,12 +181,12 @@
 
         <!-- Action Buttons -->
         <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-          <Button Content="Test Connection" Command="{Binding TestConnectionCommand}"
+          <Button Content="{Binding TestConnection, Source={x:Static res:Loc.Instance}}" Command="{Binding TestConnectionCommand}"
                   IsEnabled="{Binding !IsTestingConnection}"/>
           
-          <Button Content="Cancel" Command="{Binding CancelEditCommand}"/>
+          <Button Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" Command="{Binding CancelEditCommand}"/>
           
-          <Button Content="Save" Command="{Binding SaveServerCommand}" Classes="accent"/>
+          <Button Content="{Binding Save, Source={x:Static res:Loc.Instance}}" Command="{Binding SaveServerCommand}" Classes="accent"/>
         </StackPanel>
 
         <!-- Testing Indicator -->

@@ -5,6 +5,7 @@
              xmlns:vm="using:Kom2go.ViewModels"
              xmlns:models="using:Kom2go.Models"
              xmlns:converters="using:Kom2go.Converters"
+             xmlns:res="using:Kom2go.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.LibraryView"
              x:DataType="vm:LibraryViewModel"
@@ -18,10 +19,10 @@
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
       <Grid ColumnDefinitions="*,Auto,Auto">
-        <TextBlock Text="Library" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="📁 Open Folder" Command="{Binding OpenComicsDirectoryCommand}" 
                 Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
-        <Button Grid.Column="2" Content="Import" Click="OnImportClicked" Padding="16,8"/>
+        <Button Grid.Column="2" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
       </Grid>
     </Border>
     
