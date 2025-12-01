@@ -230,7 +230,7 @@
               </ItemsControl>
               <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
                       HorizontalAlignment="Center" Margin="0,8,0,0"
-                      IsVisible="{Binding ReadLists.Count}"/>
+                      IsVisible="{Binding HasMoreReadLists}"/>
             </StackPanel>
           </StackPanel>
 

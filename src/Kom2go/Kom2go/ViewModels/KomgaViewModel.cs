@@ -75,6 +75,9 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private KomgaReadList? _selectedReadList;
 
+    [ObservableProperty]
+    private bool _hasMoreReadLists = true;
+
     /// <summary>
     /// Available letter filters for A-Z browsing
     /// </summary>
@@ -87,7 +90,6 @@ public partial class KomgaViewModel : ViewModelBase
     private int _currentPage;
     private bool _hasMoreSeries = true;
     private bool _hasMoreBooks = true;
-    private bool _hasMoreReadLists = true;
     private int _currentReadListPage;
 
     /// <summary>
@@ -671,9 +673,12 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedReadList = null;
         Books.Clear();
         Series.Clear();
+        ReadLists.Clear();
         _currentPage = 0;
         _hasMoreSeries = true;
         _hasMoreBooks = true;
+        _currentReadListPage = 0;
+        HasMoreReadLists = true;
     }
 
     [RelayCommand]
@@ -699,7 +704,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadReadListsAsync()
     {
-        if (!_komgaApiService.IsConfigured || !_hasMoreReadLists)
+        if (!_komgaApiService.IsConfigured || !HasMoreReadLists)
         {
             return;
         }
@@ -712,7 +717,7 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentReadListPage,
                 size: 20);
 
-            _hasMoreReadLists = !result.Last;
+            HasMoreReadLists = !result.Last;
             _currentReadListPage++;
             
             // Load thumbnails in background and add items progressively
