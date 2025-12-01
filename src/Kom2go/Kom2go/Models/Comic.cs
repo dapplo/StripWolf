@@ -91,6 +91,11 @@ public class Comic
     public bool IsCompleted { get; set; }
 
     /// <summary>
+    /// Whether the comic is marked as a favorite
+    /// </summary>
+    public bool IsFavorite { get; set; }
+
+    /// <summary>
     /// Reading progress as a value between 0 and 1
     /// </summary>
     [SQLite.Ignore]

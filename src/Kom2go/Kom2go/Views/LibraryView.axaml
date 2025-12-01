@@ -173,62 +173,10 @@
         <!-- Main Content (hidden when searching) -->
         <StackPanel Spacing="24" IsVisible="{Binding !IsSearching}">
           
-        <!-- In Progress Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
-          <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding InProgressComics}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:Comic">
-                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
-                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto,Auto">
-                    <!-- Cover with click handler -->
-                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
-                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
-                            CommandParameter="{Binding}">
-                      <Border Background="Black" CornerRadius="8,8,0,0">
-                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform" 
-                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                      </Border>
-                    </Button>
-                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
-                    <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
-                                 Height="4" Margin="8,2"/>
-                    <TextBlock Grid.Row="3" FontSize="10" Foreground="Gray" Margin="8,2,8,4">
-                      <TextBlock.Text>
-                        <MultiBinding StringFormat="Page {0} of {1}">
-                          <Binding Path="CurrentPage"/>
-                          <Binding Path="PageCount"/>
-                        </MultiBinding>
-                      </TextBlock.Text>
-                    </TextBlock>
-                    <!-- Mark as Read Button -->
-                    <Button Grid.Row="4" Content="✓ Mark as Read" FontSize="10" Padding="8,4" Margin="8,0,8,4"
-                            HorizontalAlignment="Stretch"
-                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, ElementName=Root}"
-                            CommandParameter="{Binding}"/>
-                    <!-- Delete Button -->
-                    <Button Grid.Row="5" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                            HorizontalAlignment="Stretch"
-                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
-                            CommandParameter="{Binding}"/>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-
-        <!-- Completed (Read) Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding CompletedComics.Count}">
-          <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding CompletedComics}">
+        <!-- Favorites Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding FavoriteComics.Count}">
+          <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding FavoriteComics}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
@@ -252,13 +200,133 @@
                                TextTrimming="CharacterEllipsis" Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                    <!-- Mark as Unread Button -->
-                    <Button Grid.Row="3" Content="↩ Mark as Unread" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                    <!-- Remove from Favorites Button -->
+                    <Button Grid.Row="3" Content="★ Remove from Favorites" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                    <!-- Delete Button -->
+                    <Button Grid.Row="4" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+          
+        <!-- In Progress Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
+          <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding InProgressComics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                      </Border>
+                    </Button>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
+                                 Height="4" Margin="8,2"/>
+                    <TextBlock Grid.Row="3" FontSize="10" Foreground="Gray" Margin="8,2,8,4">
+                      <TextBlock.Text>
+                        <MultiBinding StringFormat="Page {0} of {1}">
+                          <Binding Path="CurrentPage"/>
+                          <Binding Path="PageCount"/>
+                        </MultiBinding>
+                      </TextBlock.Text>
+                    </TextBlock>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="4" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
+                    <!-- Mark as Read Button -->
+                    <Button Grid.Row="5" Content="✓ Mark as Read" FontSize="10" Padding="8,4" Margin="8,0,8,4"
                             HorizontalAlignment="Stretch"
                             Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, ElementName=Root}"
                             CommandParameter="{Binding}"/>
                     <!-- Delete Button -->
-                    <Button Grid.Row="4" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                    <Button Grid.Row="6" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Completed (Read) Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding CompletedComics.Count}">
+          <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding CompletedComics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                      </Border>
+                    </Button>
+                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="3" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
+                    <!-- Mark as Unread Button -->
+                    <Button Grid.Row="4" Content="↩ Mark as Unread" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, ElementName=Root}"
+                            CommandParameter="{Binding}"/>
+                    <!-- Delete Button -->
+                    <Button Grid.Row="5" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
                             HorizontalAlignment="Stretch"
                             Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
                             CommandParameter="{Binding}"/>
@@ -294,7 +362,7 @@
               <DataTemplate x:DataType="models:Comic">
                 <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
                         Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                  <Grid RowDefinitions="200,Auto,Auto,Auto">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
                     <!-- Cover with click handler -->
                     <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
                             Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, ElementName=Root}"
@@ -308,8 +376,20 @@
                                TextTrimming="CharacterEllipsis" Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="3" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
                     <!-- Delete Button -->
-                    <Button Grid.Row="3" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                    <Button Grid.Row="4" Content="🗑️ Delete" FontSize="10" Padding="8,4" Margin="8,0,8,8"
                             HorizontalAlignment="Stretch"
                             Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, ElementName=Root}"
                             CommandParameter="{Binding}"/>
