@@ -72,20 +72,16 @@ public class LibraryService
             {
                 await _databaseService.DeleteComicAsync(comic);
                 
-                // Clean up cover if it exists
+                // Clean up cover if it exists (now just a single file)
                 if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
                 {
-                    var coverDir = Path.GetDirectoryName(comic.CoverPath);
-                    if (!string.IsNullOrEmpty(coverDir) && Directory.Exists(coverDir))
+                    try
                     {
-                        try
-                        {
-                            Directory.Delete(coverDir, true);
-                        }
-                        catch
-                        {
-                            // Ignore cleanup errors
-                        }
+                        File.Delete(comic.CoverPath);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup errors
                     }
                 }
                 
@@ -227,16 +223,14 @@ public class LibraryService
 
         var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
         
-        // Create cover directory for this comic
-        var comicId = Guid.NewGuid().ToString();
-        var coverDir = Path.Combine(_coversDirectory, comicId);
-        Directory.CreateDirectory(coverDir);
+        // Generate a unique ID for the cover filename
+        var coverId = Guid.NewGuid().ToString();
         
-        // Extract cover
+        // Extract cover to the unified covers directory with unique filename
         string? coverPath = null;
         try
         {
-            coverPath = await _comicReaderService.ExtractCoverAsync(actualFilePath, coverDir);
+            coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, coverId);
         }
         catch
         {
@@ -328,17 +322,13 @@ public class LibraryService
             (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
         }
 
-        // Create cover directory
-        var coverDir = Path.Combine(_coversDirectory, book.Id);
-        Directory.CreateDirectory(coverDir);
-
-        // Download thumbnail
+        // Download thumbnail to unified covers directory
         string? coverPath = null;
         var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
 
         if (thumbnailData is not null)
         {
-            coverPath = Path.Combine(coverDir, "cover.jpg");
+            coverPath = Path.Combine(_coversDirectory, $"{book.Id}.jpg");
             await File.WriteAllBytesAsync(coverPath, thumbnailData);
         }
         else
@@ -346,7 +336,7 @@ public class LibraryService
             // Extract cover if Komga didn't have one
             try
             {
-                coverPath = await _comicReaderService.ExtractCoverAsync(actualFilePath, coverDir);
+                coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
             }
             catch
             {
@@ -424,13 +414,16 @@ public class LibraryService
             File.Delete(comic.FilePath);
         }
 
-        // Delete cover
+        // Delete cover (now just a single file in unified covers directory)
         if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
         {
-            var coverDir = Path.GetDirectoryName(comic.CoverPath);
-            if (!string.IsNullOrEmpty(coverDir) && Directory.Exists(coverDir))
+            try
             {
-                Directory.Delete(coverDir, true);
+                File.Delete(comic.CoverPath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
             }
         }
 
@@ -470,6 +463,27 @@ public class LibraryService
         }
 
         return comics;
+    }
+
+    /// <summary>
+    /// Extracts a cover to the unified covers directory with the specified ID as filename
+    /// </summary>
+    private async Task<string> ExtractCoverToUnifiedDirectoryAsync(string comicFilePath, string coverId)
+    {
+        var coverData = await _comicReaderService.GetPageAsync(comicFilePath, 0);
+        var pageNames = await _comicReaderService.GetPageNamesAsync(comicFilePath);
+        
+        if (pageNames.Count == 0)
+        {
+            throw new InvalidOperationException("Comic has no pages");
+        }
+
+        var extension = Path.GetExtension(pageNames[0]);
+        var coverPath = Path.Combine(_coversDirectory, $"{coverId}{extension}");
+        
+        await File.WriteAllBytesAsync(coverPath, coverData);
+        
+        return coverPath;
     }
 
     internal static string SanitizeFileName(string fileName)

@@ -15,44 +15,32 @@
     <ScrollViewer x:Name="ImageScroller" 
                   HorizontalScrollBarVisibility="Auto" 
                   VerticalScrollBarVisibility="Auto"
-                  PointerWheelChanged="OnPointerWheelChanged">
-      <!-- Container that sizes to fit viewport for proper fit modes -->
-      <Viewbox x:Name="ImageViewbox" Stretch="Uniform" StretchDirection="DownOnly">
-        <Grid x:Name="ImageContainer">
+                  PointerWheelChanged="OnPointerWheelChanged"
+                  PointerPressed="OnZoomPointerPressed"
+                  PointerMoved="OnZoomPointerMoved"
+                  PointerReleased="OnZoomPointerReleased">
+      <!-- Container for zoomed content - allows full screen viewing -->
+      <Canvas x:Name="ZoomCanvas" ClipToBounds="False">
+        <Grid x:Name="ImageContainer" Canvas.Left="0" Canvas.Top="0">
           <!-- Two-page mode: shows two pages side by side when enabled -->
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"
                       IsVisible="{Binding IsTwoPageMode}">
             <Image x:Name="LeftPageImage"
                    Source="{Binding LeftPageImage}"
-                   Stretch="Uniform"
-                   RenderTransformOrigin="0.5,0.5">
-              <Image.RenderTransform>
-                <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
-              </Image.RenderTransform>
-            </Image>
+                   Stretch="Uniform"/>
             <Image x:Name="RightPageImage"
                    Source="{Binding RightPageImage}"
                    Stretch="Uniform"
-                   RenderTransformOrigin="0.5,0.5"
-                   Margin="4,0,0,0">
-              <Image.RenderTransform>
-                <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
-              </Image.RenderTransform>
-            </Image>
+                   Margin="4,0,0,0"/>
           </StackPanel>
           
           <!-- Single-page mode -->
           <Image x:Name="PageImage"
                  Source="{Binding CurrentPageImage}" 
                  Stretch="Uniform"
-                 RenderTransformOrigin="0.5,0.5"
-                 IsVisible="{Binding !IsTwoPageMode}">
-            <Image.RenderTransform>
-              <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
-            </Image.RenderTransform>
-          </Image>
+                 IsVisible="{Binding !IsTwoPageMode}"/>
         </Grid>
-      </Viewbox>
+      </Canvas>
     </ScrollViewer>
 
     <!-- Overlay for tap/swipe/pinch zones - handles both gestures and taps -->

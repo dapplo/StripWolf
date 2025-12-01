@@ -20,6 +20,14 @@ public partial class KomgaViewModel : ViewModelBase
     
     private KomgaServer? _activeServer;
     private CancellationTokenSource? _loadingCts;
+    
+    // Cache timestamps for smart lists
+    private DateTime _readListsCacheTime;
+    private DateTime _keepReadingCacheTime;
+    private DateTime _onDeckCacheTime;
+    private DateTime _recentBooksCacheTime;
+    private DateTime _recentSeriesCacheTime;
+    private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
     [ObservableProperty]
     private bool _isConnected;
@@ -84,6 +92,31 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _hasMoreBooks = true;
     
     private int _currentReadListPage;
+    
+    // Smart Lists (Keep Reading, On Deck, Recently Added)
+    [ObservableProperty]
+    private ObservableCollection<KomgaBookDisplay> _keepReadingBooks = [];
+    
+    [ObservableProperty]
+    private ObservableCollection<KomgaBookDisplay> _onDeckBooks = [];
+    
+    [ObservableProperty]
+    private ObservableCollection<KomgaBookDisplay> _recentlyAddedBooks = [];
+    
+    [ObservableProperty]
+    private ObservableCollection<KomgaSeriesDisplay> _recentlyAddedSeries = [];
+    
+    [ObservableProperty]
+    private bool _hasKeepReading;
+    
+    [ObservableProperty]
+    private bool _hasOnDeck;
+    
+    [ObservableProperty]
+    private bool _hasRecentBooks;
+    
+    [ObservableProperty]
+    private bool _hasRecentSeries;
 
     /// <summary>
     /// Username for the active server (used for authenticated image loading)
@@ -279,7 +312,8 @@ public partial class KomgaViewModel : ViewModelBase
                 if (IsConnected)
                 {
                     await LoadLibrariesAsync();
-                    await LoadReadListsAsync();
+                    await LoadReadListsAsync(useCache: true);
+                    await LoadSmartListsAsync(useCache: true);
                 }
             }
         }
@@ -294,8 +328,234 @@ public partial class KomgaViewModel : ViewModelBase
     private async Task RefreshAsync()
     {
         IsRefreshing = true;
+        // Force refresh by clearing cache
+        _readListsCacheTime = DateTime.MinValue;
+        _keepReadingCacheTime = DateTime.MinValue;
+        _onDeckCacheTime = DateTime.MinValue;
+        _recentBooksCacheTime = DateTime.MinValue;
+        _recentSeriesCacheTime = DateTime.MinValue;
+        
         await InitializeAsync();
         IsRefreshing = false;
+    }
+    
+    [RelayCommand]
+    private async Task RefreshSmartListsAsync()
+    {
+        // Force refresh smart lists
+        _keepReadingCacheTime = DateTime.MinValue;
+        _onDeckCacheTime = DateTime.MinValue;
+        _recentBooksCacheTime = DateTime.MinValue;
+        _recentSeriesCacheTime = DateTime.MinValue;
+        await LoadSmartListsAsync(useCache: false);
+    }
+    
+    [RelayCommand]
+    private async Task RefreshReadListsAsync()
+    {
+        // Force refresh read lists
+        _readListsCacheTime = DateTime.MinValue;
+        _currentReadListPage = 0;
+        HasMoreReadLists = true;
+        ReadLists.Clear();
+        await LoadReadListsAsync(useCache: false);
+    }
+
+    /// <summary>
+    /// Loads smart lists (keep reading, on deck, recently added)
+    /// </summary>
+    private async Task LoadSmartListsAsync(bool useCache = true)
+    {
+        if (!_komgaApiService.IsConfigured)
+        {
+            return;
+        }
+
+        var ct = _loadingCts?.Token ?? CancellationToken.None;
+
+        // Load Keep Reading books (in progress)
+        if (!useCache || DateTime.UtcNow - _keepReadingCacheTime > CacheExpiration)
+        {
+            try
+            {
+                KeepReadingBooks.Clear();
+                var keepReading = await _komgaApiService.GetBooksInProgressAsync(0, 10);
+                HasKeepReading = keepReading.Content.Count > 0;
+                
+                foreach (var book in keepReading.Content)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    _ = LoadSmartListBookThumbnailAsync(book, KeepReadingBooks, ct);
+                }
+                _keepReadingCacheTime = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading keep reading: {ex.Message}");
+            }
+        }
+
+        // Load On Deck books
+        if (!useCache || DateTime.UtcNow - _onDeckCacheTime > CacheExpiration)
+        {
+            try
+            {
+                OnDeckBooks.Clear();
+                var onDeck = await _komgaApiService.GetBooksOnDeckAsync(0, 10);
+                HasOnDeck = onDeck.Content.Count > 0;
+                
+                foreach (var book in onDeck.Content)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    _ = LoadSmartListBookThumbnailAsync(book, OnDeckBooks, ct);
+                }
+                _onDeckCacheTime = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading on deck: {ex.Message}");
+            }
+        }
+
+        // Load Recently Added Books
+        if (!useCache || DateTime.UtcNow - _recentBooksCacheTime > CacheExpiration)
+        {
+            try
+            {
+                RecentlyAddedBooks.Clear();
+                var recentBooks = await _komgaApiService.GetBooksLatestAsync(0, 10);
+                HasRecentBooks = recentBooks.Content.Count > 0;
+                
+                foreach (var book in recentBooks.Content)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    _ = LoadSmartListBookThumbnailAsync(book, RecentlyAddedBooks, ct);
+                }
+                _recentBooksCacheTime = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading recent books: {ex.Message}");
+            }
+        }
+
+        // Load Recently Added Series
+        if (!useCache || DateTime.UtcNow - _recentSeriesCacheTime > CacheExpiration)
+        {
+            try
+            {
+                RecentlyAddedSeries.Clear();
+                var recentSeries = await _komgaApiService.GetSeriesLatestAsync(0, 10);
+                HasRecentSeries = recentSeries.Content.Count > 0;
+                
+                foreach (var s in recentSeries.Content)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    _ = LoadSmartListSeriesThumbnailAsync(s, RecentlyAddedSeries, ct);
+                }
+                _recentSeriesCacheTime = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading recent series: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads a book thumbnail for smart lists in the background
+    /// </summary>
+    private async Task LoadSmartListBookThumbnailAsync(KomgaBook book, ObservableCollection<KomgaBookDisplay> collection, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            var thumbnailBytes = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    collection.Add(new KomgaBookDisplay { Book = book, Thumbnail = thumbnail });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        collection.Add(new KomgaBookDisplay { Book = book, Thumbnail = null });
+                    }
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads a series thumbnail for smart lists in the background
+    /// </summary>
+    private async Task LoadSmartListSeriesThumbnailAsync(KomgaSeries series, ObservableCollection<KomgaSeriesDisplay> collection, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            var thumbnailBytes = await _komgaApiService.GetSeriesThumbnailAsync(series.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    collection.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = thumbnail });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        collection.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = null });
+                    }
+                });
+            }
+        }
     }
 
     [RelayCommand]
@@ -626,10 +886,11 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedReadList = null;
         Books.Clear();
         Series.Clear();
-        ReadLists.Clear();
+        // Don't clear ReadLists - they are cached
         _currentPage = 0;
         HasMoreSeries = true;
         HasMoreBooks = true;
+        // Reset read list page but don't clear cache
         _currentReadListPage = 0;
         HasMoreReadLists = true;
     }
@@ -655,9 +916,16 @@ public partial class KomgaViewModel : ViewModelBase
     #region Read Lists
 
     [RelayCommand]
-    private async Task LoadReadListsAsync()
+    private async Task LoadReadListsAsync(bool useCache = true)
     {
         if (!_komgaApiService.IsConfigured || !HasMoreReadLists)
+        {
+            return;
+        }
+
+        // Check cache if using cache and this is the first page
+        if (useCache && _currentReadListPage == 0 && ReadLists.Count > 0 && 
+            DateTime.UtcNow - _readListsCacheTime < CacheExpiration)
         {
             return;
         }
@@ -672,6 +940,12 @@ public partial class KomgaViewModel : ViewModelBase
 
             HasMoreReadLists = !result.Last;
             _currentReadListPage++;
+            
+            // Update cache time on first page load
+            if (_currentReadListPage == 1)
+            {
+                _readListsCacheTime = DateTime.UtcNow;
+            }
             
             // Load thumbnails in background and add items progressively
             var ct = _loadingCts?.Token ?? CancellationToken.None;

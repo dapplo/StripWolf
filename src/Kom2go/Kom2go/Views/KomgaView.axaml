@@ -178,6 +178,142 @@
               </MultiBinding>
             </StackPanel.IsVisible>
             
+            <!-- Keep Reading Section -->
+            <StackPanel Spacing="8" IsVisible="{Binding HasKeepReading}">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Keep Reading" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="↻" Command="{Binding RefreshSmartListsCommand}" 
+                        Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="Refresh"/>
+              </Grid>
+              <ItemsControl ItemsSource="{Binding KeepReadingBooks}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
+                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                            ClipToBounds="True">
+                      <Grid RowDefinitions="200,Auto,Auto,Auto">
+                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                          <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                        <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                CommandParameter="{Binding}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            
+            <!-- On Deck Section -->
+            <StackPanel Spacing="8" IsVisible="{Binding HasOnDeck}">
+              <TextBlock Text="On Deck" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding OnDeckBooks}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
+                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                            ClipToBounds="True">
+                      <Grid RowDefinitions="200,Auto,Auto,Auto">
+                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                          <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                        <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                CommandParameter="{Binding}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            
+            <!-- Recently Added Books Section -->
+            <StackPanel Spacing="8" IsVisible="{Binding HasRecentBooks}">
+              <TextBlock Text="Recently Added Books" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding RecentlyAddedBooks}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
+                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+                            ClipToBounds="True">
+                      <Grid RowDefinitions="200,Auto,Auto,Auto">
+                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                          <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                        <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
+                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                CommandParameter="{Binding}"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            
+            <!-- Recently Added Series Section -->
+            <StackPanel Spacing="8" IsVisible="{Binding HasRecentSeries}">
+              <TextBlock Text="Recently Added Series" FontSize="18" FontWeight="Bold"/>
+              <ItemsControl ItemsSource="{Binding RecentlyAddedSeries}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
+                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                            Command="{Binding DataContext.SelectSeriesCommand, ElementName=Root}"
+                            CommandParameter="{Binding}">
+                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+                              Width="150" ClipToBounds="True">
+                        <Grid RowDefinitions="200,Auto,Auto">
+                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
+                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+                        </Grid>
+                      </Border>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            
             <!-- Libraries List -->
             <StackPanel Spacing="8">
               <TextBlock Text="Libraries" FontSize="18" FontWeight="Bold"/>
@@ -199,7 +335,11 @@
             
             <!-- Read Lists -->
             <StackPanel Spacing="8">
-              <TextBlock Text="Read Lists" FontSize="18" FontWeight="Bold"/>
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Read Lists" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="↻" Command="{Binding RefreshReadListsCommand}" 
+                        Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="Refresh"/>
+              </Grid>
               <ItemsControl ItemsSource="{Binding ReadLists}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>

@@ -10,7 +10,8 @@ public partial class ReaderView : UserControl
 {
     private Image? _pageImage;
     private ScrollViewer? _imageScroller;
-    private Viewbox? _imageViewbox;
+    private Canvas? _zoomCanvas;
+    private Grid? _imageContainer;
     
     // Swipe gesture tracking
     private Point? _swipeStartPoint;
@@ -20,9 +21,16 @@ public partial class ReaderView : UserControl
     private const double SwipeMaxVerticalDeviation = 100; // Maximum vertical deviation allowed
     
     // Pinch zoom tracking (for multi-touch)
-    private readonly Dictionary<long, Point> _activePointers = new();
+    private readonly Dictionary<long, Point> _activeZoomPointers = new();
     private double _initialPinchDistance;
     private double _initialZoomLevel;
+    private Point _pinchCenter;
+    private Vector _initialScrollOffset;
+    
+    // Pan tracking (for single finger drag when zoomed)
+    private bool _isPanning;
+    private Point _panStartPoint;
+    private Vector _panScrollOffset;
 
     public ReaderView()
     {
@@ -39,7 +47,9 @@ public partial class ReaderView : UserControl
             // Handle scroll wheel zoom when Ctrl is held
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
-                vm.AdjustZoom(e.Delta.Y);
+                // Get position relative to image for zoom focus
+                var position = e.GetPosition(_imageScroller);
+                ZoomAtPoint(vm, e.Delta.Y > 0, position);
                 e.Handled = true;
             }
             else
@@ -170,13 +180,14 @@ public partial class ReaderView : UserControl
         // Cache control references to avoid repeated FindControl calls
         _pageImage = this.FindControl<Image>("PageImage");
         _imageScroller = this.FindControl<ScrollViewer>("ImageScroller");
-        _imageViewbox = this.FindControl<Viewbox>("ImageViewbox");
+        _zoomCanvas = this.FindControl<Canvas>("ZoomCanvas");
+        _imageContainer = this.FindControl<Grid>("ImageContainer");
         
         // Focus this control to receive keyboard events
         Focus();
         
-        // Update image stretch based on stretch mode
-        UpdateImageStretch();
+        // Update image sizing based on stretch mode and zoom
+        UpdateImageSizing();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -186,7 +197,8 @@ public partial class ReaderView : UserControl
         // Clear cached references
         _pageImage = null;
         _imageScroller = null;
-        _imageViewbox = null;
+        _zoomCanvas = null;
+        _imageContainer = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -197,84 +209,288 @@ public partial class ReaderView : UserControl
         {
             vm.PropertyChanged += (s, args) =>
             {
-                if (args.PropertyName == nameof(ReaderViewModel.StretchMode))
+                if (args.PropertyName == nameof(ReaderViewModel.StretchMode) ||
+                    args.PropertyName == nameof(ReaderViewModel.ZoomLevel) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage))
                 {
-                    UpdateImageStretch();
+                    UpdateImageSizing();
                 }
             };
         }
     }
 
-    private void UpdateImageStretch()
+    /// <summary>
+    /// Zooms the image centered on a specific point
+    /// </summary>
+    private void ZoomAtPoint(ReaderViewModel vm, bool zoomIn, Point viewportPoint)
     {
-        if (DataContext is not ReaderViewModel vm || _imageViewbox is null || _imageScroller is null)
+        if (_imageScroller is null || _imageContainer is null)
         {
             return;
         }
 
-        // Cache bounds to avoid repeated property access
-        var scrollerBounds = _imageScroller.Bounds;
-        var scrollerWidth = scrollerBounds.Width;
-        var scrollerHeight = scrollerBounds.Height;
+        var oldZoom = vm.ZoomLevel;
+        var newZoom = zoomIn ? Math.Min(5.0, oldZoom + 0.25) : Math.Max(0.25, oldZoom - 0.25);
+        
+        if (Math.Abs(newZoom - oldZoom) < 0.001)
+        {
+            return;
+        }
 
-        // Configure the Viewbox stretch to match the desired mode
+        // Calculate the position in content coordinates before zoom
+        var contentX = _imageScroller.Offset.X + viewportPoint.X;
+        var contentY = _imageScroller.Offset.Y + viewportPoint.Y;
+
+        // Apply zoom
+        vm.ZoomLevel = newZoom;
+        UpdateImageSizing();
+
+        // Calculate new scroll position to keep the point under the cursor
+        var scale = newZoom / oldZoom;
+        var newScrollX = contentX * scale - viewportPoint.X;
+        var newScrollY = contentY * scale - viewportPoint.Y;
+
+        // Clamp to valid range
+        var maxX = Math.Max(0, (_imageContainer.Width * newZoom) - _imageScroller.Viewport.Width);
+        var maxY = Math.Max(0, (_imageContainer.Height * newZoom) - _imageScroller.Viewport.Height);
+        
+        _imageScroller.Offset = new Vector(
+            Math.Max(0, Math.Min(maxX, newScrollX)),
+            Math.Max(0, Math.Min(maxY, newScrollY))
+        );
+    }
+
+    private void UpdateImageSizing()
+    {
+        if (DataContext is not ReaderViewModel vm || _zoomCanvas is null || _imageScroller is null || _imageContainer is null)
+        {
+            return;
+        }
+
+        // Get viewport size
+        var viewportWidth = _imageScroller.Viewport.Width;
+        var viewportHeight = _imageScroller.Viewport.Height;
+        
+        if (viewportWidth <= 0 || viewportHeight <= 0)
+        {
+            return;
+        }
+
+        // Get image size (use the bitmap size if available)
+        double imageWidth = 800;  // Default fallback
+        double imageHeight = 600; // Default fallback
+        
+        if (_pageImage?.Source is Avalonia.Media.Imaging.Bitmap bitmap)
+        {
+            imageWidth = bitmap.PixelSize.Width;
+            imageHeight = bitmap.PixelSize.Height;
+        }
+        
+        // Calculate base size based on stretch mode
+        double baseWidth, baseHeight;
+        
         switch (vm.StretchMode)
         {
             case StretchMode.FitPage:
                 // Fit the entire page within the viewport (both width and height)
-                _imageViewbox.Stretch = Stretch.Uniform;
-                _imageViewbox.StretchDirection = StretchDirection.Both;
-                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
-                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
-                _imageViewbox.MaxWidth = double.PositiveInfinity;
-                _imageViewbox.MaxHeight = double.PositiveInfinity;
+                var scaleToFit = Math.Min(viewportWidth / imageWidth, viewportHeight / imageHeight);
+                baseWidth = imageWidth * scaleToFit;
+                baseHeight = imageHeight * scaleToFit;
                 break;
                 
             case StretchMode.FitWidth:
-                // Fit to viewport width, allow vertical scrolling
-                _imageViewbox.Stretch = Stretch.Uniform;
-                _imageViewbox.StretchDirection = StretchDirection.Both;
-                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
-                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-                // Force width-based sizing - set viewbox width constraint
-                _imageViewbox.MaxWidth = scrollerWidth > 0 ? scrollerWidth : double.PositiveInfinity;
-                _imageViewbox.MaxHeight = double.PositiveInfinity;
+                // Fit to viewport width
+                var scaleToWidth = viewportWidth / imageWidth;
+                baseWidth = viewportWidth;
+                baseHeight = imageHeight * scaleToWidth;
                 break;
                 
             case StretchMode.FitHeight:
-                // Fit to viewport height, allow horizontal scrolling
-                _imageViewbox.Stretch = Stretch.Uniform;
-                _imageViewbox.StretchDirection = StretchDirection.Both;
-                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
-                // Force height-based sizing - set viewbox height constraint
-                _imageViewbox.MaxWidth = double.PositiveInfinity;
-                _imageViewbox.MaxHeight = scrollerHeight > 0 ? scrollerHeight : double.PositiveInfinity;
+                // Fit to viewport height
+                var scaleToHeight = viewportHeight / imageHeight;
+                baseWidth = imageWidth * scaleToHeight;
+                baseHeight = viewportHeight;
                 break;
                 
             case StretchMode.Original:
-                // Original size (100%), allow scrolling in both directions
-                _imageViewbox.Stretch = Stretch.None;
-                _imageViewbox.StretchDirection = StretchDirection.DownOnly;
-                _imageScroller.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-                _imageScroller.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-                _imageViewbox.MaxWidth = double.PositiveInfinity;
-                _imageViewbox.MaxHeight = double.PositiveInfinity;
+            default:
+                // Original size
+                baseWidth = imageWidth;
+                baseHeight = imageHeight;
                 break;
         }
+        
+        // Apply zoom level
+        var zoomedWidth = baseWidth * vm.ZoomLevel;
+        var zoomedHeight = baseHeight * vm.ZoomLevel;
+        
+        // Size the image container
+        _imageContainer.Width = zoomedWidth;
+        _imageContainer.Height = zoomedHeight;
+        
+        // Size the canvas to ensure scroll works correctly
+        _zoomCanvas.Width = Math.Max(zoomedWidth, viewportWidth);
+        _zoomCanvas.Height = Math.Max(zoomedHeight, viewportHeight);
+        
+        // Center the image if smaller than viewport
+        if (zoomedWidth < viewportWidth)
+        {
+            Canvas.SetLeft(_imageContainer, (viewportWidth - zoomedWidth) / 2);
+        }
+        else
+        {
+            Canvas.SetLeft(_imageContainer, 0);
+        }
+        
+        if (zoomedHeight < viewportHeight)
+        {
+            Canvas.SetTop(_imageContainer, (viewportHeight - zoomedHeight) / 2);
+        }
+        else
+        {
+            Canvas.SetTop(_imageContainer, 0);
+        }
+        
+        // Update scroll bar visibility
+        _imageScroller.HorizontalScrollBarVisibility = zoomedWidth > viewportWidth 
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Auto 
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+        _imageScroller.VerticalScrollBarVisibility = zoomedHeight > viewportHeight 
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Auto 
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
         base.OnSizeChanged(e);
-        // Re-apply stretch mode when size changes
-        UpdateImageStretch();
+        // Re-apply sizing when size changes
+        UpdateImageSizing();
     }
     
-    #region Gesture Handling (Swipe and Pinch)
+    #region Zoom Pointer Handling (for pinch zoom on image location)
     
     /// <summary>
-    /// Handle pointer pressed for swipe and pinch gesture tracking
+    /// Handle pointer pressed for pinch zoom and pan tracking
+    /// </summary>
+    private void OnZoomPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var pointer = e.GetCurrentPoint(_imageScroller);
+        var pointerId = (long)e.Pointer.Id;
+        var position = pointer.Position;
+        
+        _activeZoomPointers[pointerId] = position;
+        
+        if (_activeZoomPointers.Count == 1 && DataContext is ReaderViewModel vm && vm.ZoomLevel > 1.0)
+        {
+            // Start panning when zoomed
+            _isPanning = true;
+            _panStartPoint = position;
+            _panScrollOffset = _imageScroller?.Offset ?? new Vector(0, 0);
+        }
+        else if (_activeZoomPointers.Count == 2 && DataContext is ReaderViewModel vm2)
+        {
+            // Two touches - start tracking for pinch zoom
+            _isPanning = false;
+            var points = _activeZoomPointers.Values.ToArray();
+            _initialPinchDistance = GetDistance(points[0], points[1]);
+            _initialZoomLevel = vm2.ZoomLevel;
+            _pinchCenter = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
+            _initialScrollOffset = _imageScroller?.Offset ?? new Vector(0, 0);
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer moved for pinch zoom and pan
+    /// </summary>
+    private void OnZoomPointerMoved(object? sender, PointerEventArgs e)
+    {
+        var pointer = e.GetCurrentPoint(_imageScroller);
+        var pointerId = (long)e.Pointer.Id;
+        var position = pointer.Position;
+        
+        if (!_activeZoomPointers.ContainsKey(pointerId))
+        {
+            return;
+        }
+        
+        _activeZoomPointers[pointerId] = position;
+        
+        // Handle pan (single finger drag when zoomed)
+        if (_isPanning && _activeZoomPointers.Count == 1 && _imageScroller is not null)
+        {
+            var delta = _panStartPoint - position;
+            var newOffset = new Vector(
+                Math.Max(0, _panScrollOffset.X + delta.X),
+                Math.Max(0, _panScrollOffset.Y + delta.Y)
+            );
+            _imageScroller.Offset = newOffset;
+        }
+        // Handle pinch zoom with two fingers
+        else if (_activeZoomPointers.Count == 2 && DataContext is ReaderViewModel vm && _initialPinchDistance > 0 && _imageScroller is not null)
+        {
+            var points = _activeZoomPointers.Values.ToArray();
+            var currentDistance = GetDistance(points[0], points[1]);
+            var currentCenter = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
+            
+            // Calculate scale factor
+            var scale = currentDistance / _initialPinchDistance;
+            var newZoom = Math.Max(0.25, Math.Min(5.0, _initialZoomLevel * scale));
+            
+            if (Math.Abs(newZoom - vm.ZoomLevel) > 0.01)
+            {
+                // Calculate the point in content coordinates at the initial pinch center
+                var contentX = _initialScrollOffset.X + _pinchCenter.X;
+                var contentY = _initialScrollOffset.Y + _pinchCenter.Y;
+                
+                // Apply new zoom
+                vm.ZoomLevel = newZoom;
+                UpdateImageSizing();
+                
+                // Calculate new scroll position to keep pinch center stable
+                var actualScale = newZoom / _initialZoomLevel;
+                var newScrollX = contentX * actualScale - currentCenter.X;
+                var newScrollY = contentY * actualScale - currentCenter.Y;
+                
+                _imageScroller.Offset = new Vector(
+                    Math.Max(0, newScrollX),
+                    Math.Max(0, newScrollY)
+                );
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer released for pinch zoom
+    /// </summary>
+    private void OnZoomPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var pointerId = (long)e.Pointer.Id;
+        
+        _activeZoomPointers.Remove(pointerId);
+        
+        if (_activeZoomPointers.Count == 0)
+        {
+            _isPanning = false;
+            _initialPinchDistance = 0;
+        }
+        else if (_activeZoomPointers.Count == 1 && DataContext is ReaderViewModel vm && vm.ZoomLevel > 1.0)
+        {
+            // Switch to panning
+            _isPanning = true;
+            _panStartPoint = _activeZoomPointers.Values.First();
+            _panScrollOffset = _imageScroller?.Offset ?? new Vector(0, 0);
+        }
+    }
+    
+    #endregion
+    
+    #region Gesture Handling (Swipe and Tap)
+    
+    // Dictionary for swipe gesture tracking (separate from zoom pointers)
+    private readonly Dictionary<long, Point> _gesturePointers = new();
+    
+    /// <summary>
+    /// Handle pointer pressed for swipe gesture tracking
     /// </summary>
     private void OnGesturePointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -282,25 +498,18 @@ public partial class ReaderView : UserControl
         var pointerId = (long)e.Pointer.Id;
         var position = pointer.Position;
         
-        _activePointers[pointerId] = position;
+        _gesturePointers[pointerId] = position;
         
-        if (_activePointers.Count == 1)
+        if (_gesturePointers.Count == 1)
         {
             // Single touch - start tracking for potential swipe
             _swipeStartPoint = position;
             _swipeStartTime = DateTime.UtcNow;
         }
-        else if (_activePointers.Count == 2 && DataContext is ReaderViewModel vm)
-        {
-            // Two touches - start tracking for pinch zoom
-            var points = _activePointers.Values.ToArray();
-            _initialPinchDistance = GetDistance(points[0], points[1]);
-            _initialZoomLevel = vm.ZoomLevel;
-        }
     }
     
     /// <summary>
-    /// Handle pointer moved for pinch zoom detection
+    /// Handle pointer moved for swipe tracking (pinch handled by zoom handlers)
     /// </summary>
     private void OnGesturePointerMoved(object? sender, PointerEventArgs e)
     {
@@ -308,25 +517,9 @@ public partial class ReaderView : UserControl
         var pointerId = (long)e.Pointer.Id;
         var position = pointer.Position;
         
-        if (_activePointers.ContainsKey(pointerId))
+        if (_gesturePointers.ContainsKey(pointerId))
         {
-            _activePointers[pointerId] = position;
-            
-            // Handle pinch zoom with two fingers
-            if (_activePointers.Count == 2 && DataContext is ReaderViewModel vm && _initialPinchDistance > 0)
-            {
-                var points = _activePointers.Values.ToArray();
-                var currentDistance = GetDistance(points[0], points[1]);
-                
-                // Calculate scale factor
-                var scale = currentDistance / _initialPinchDistance;
-                var newZoom = _initialZoomLevel * scale;
-                
-                // Clamp zoom level between 0.25 and 5.0
-                newZoom = Math.Max(0.25, Math.Min(5.0, newZoom));
-                
-                vm.ZoomLevel = newZoom;
-            }
+            _gesturePointers[pointerId] = position;
         }
     }
     
@@ -342,7 +535,7 @@ public partial class ReaderView : UserControl
         var wasSwipe = false;
         
         // Check for swipe gesture when the last finger is released
-        if (_activePointers.Count == 1 && _swipeStartPoint.HasValue && DataContext is ReaderViewModel vm)
+        if (_gesturePointers.Count == 1 && _swipeStartPoint.HasValue && DataContext is ReaderViewModel vm)
         {
             var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
             var deltaX = position.X - _swipeStartPoint.Value.X;
@@ -369,7 +562,7 @@ public partial class ReaderView : UserControl
             }
             
             // If no swipe was detected, handle as a tap based on position
-            if (!wasSwipe && _activePointers.Count == 1)
+            if (!wasSwipe && _gesturePointers.Count == 1)
             {
                 HandleTap(position, vm);
                 e.Handled = true;
@@ -377,17 +570,16 @@ public partial class ReaderView : UserControl
         }
         
         // Clean up tracking
-        _activePointers.Remove(pointerId);
+        _gesturePointers.Remove(pointerId);
         
-        if (_activePointers.Count == 0)
+        if (_gesturePointers.Count == 0)
         {
             _swipeStartPoint = null;
-            _initialPinchDistance = 0;
         }
-        else if (_activePointers.Count == 1)
+        else if (_gesturePointers.Count == 1)
         {
             // Reset for potential new swipe
-            _swipeStartPoint = _activePointers.Values.First();
+            _swipeStartPoint = _gesturePointers.Values.First();
             _swipeStartTime = DateTime.UtcNow;
         }
     }

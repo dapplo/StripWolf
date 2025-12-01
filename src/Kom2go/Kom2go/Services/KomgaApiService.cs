@@ -516,6 +516,74 @@ public class KomgaApiService : IDisposable
 
     #endregion
 
+    #region Smart Lists (Keep Reading, On Deck, Recently Added)
+
+    /// <summary>
+    /// Gets books that are currently in progress (keep reading)
+    /// </summary>
+    public async Task<KomgaPage<KomgaBook>> GetBooksInProgressAsync(int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var url = $"api/v1/books?page={page}&size={size}&read_status=IN_PROGRESS&sort=readProgress.lastModified,desc";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+    }
+
+    /// <summary>
+    /// Gets books on deck (first unread book of series with at least one book read)
+    /// </summary>
+    public async Task<KomgaPage<KomgaBook>> GetBooksOnDeckAsync(int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var url = $"api/v1/books/ondeck?page={page}&size={size}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+    }
+
+    /// <summary>
+    /// Gets recently added/updated books
+    /// </summary>
+    public async Task<KomgaPage<KomgaBook>> GetBooksLatestAsync(int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var url = $"api/v1/books/latest?page={page}&size={size}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+    }
+
+    /// <summary>
+    /// Gets recently added/updated series
+    /// </summary>
+    public async Task<KomgaPage<KomgaSeries>> GetSeriesLatestAsync(int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var url = $"api/v1/series/latest?page={page}&size={size}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaSeries>>(json, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+    }
+
+    #endregion
+
     private void EnsureConfigured()
     {
         if (!IsConfigured)
