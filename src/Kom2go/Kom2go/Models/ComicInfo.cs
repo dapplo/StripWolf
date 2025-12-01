@@ -362,7 +362,17 @@ public class ComicPageInfo
     public string? TypeString
     {
         get => Type?.ToString();
-        set => Type = string.IsNullOrEmpty(value) ? null : Enum.TryParse<ComicPageType>(value, out var result) ? result : null;
+        set
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                Type = null;
+            }
+            else
+            {
+                Type = Enum.TryParse<ComicPageType>(value, out var result) ? result : null;
+            }
+        }
     }
 
     /// <summary>

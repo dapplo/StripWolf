@@ -206,7 +206,8 @@ public class PdfiumPdfRenderer : IPdfRenderer
                 return null;
             }
 
-            return new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
+            // Use Unspecified since PDF dates may contain timezone info that we're not fully parsing
+            return new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified);
         }
         catch
         {
