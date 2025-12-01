@@ -171,6 +171,11 @@ public class LibraryService
         string actualFilePath = filePath;
         if (format == ComicFormat.Pdf)
         {
+            // PDFium native library doesn't work on Android - it requires glibc pthread
+            if (OperatingSystem.IsAndroid())
+            {
+                throw new NotSupportedException("PDF import is not supported on Android. Please use CBZ or CBR files, or import PDFs from a desktop device.");
+            }
             actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
         }
 
@@ -220,11 +225,13 @@ public class LibraryService
             return existing;
         }
 
-        // Determine file extension from media type
-        var extension = book.Media?.MediaType switch
+        // Determine file extension from media type (strip parameters like "; version=4")
+        var baseMediaType = book.Media?.MediaType?.Split(';')[0].Trim();
+        var extension = baseMediaType switch
         {
             "application/zip" => ".cbz",
             "application/x-rar-compressed" => ".cbr",
+            "application/pdf" => ".pdf",
             _ => ".cbz"
         };
 
@@ -367,7 +374,7 @@ public class LibraryService
         return comics;
     }
 
-    private static string SanitizeFileName(string fileName)
+    internal static string SanitizeFileName(string fileName)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
