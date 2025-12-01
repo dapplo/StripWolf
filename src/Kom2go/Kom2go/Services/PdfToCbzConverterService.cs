@@ -111,12 +111,12 @@ public class PdfToCbzConverterService
         return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
     }
 
-    private Task RenderPdfPagesToJpgAsync(
+    private async Task RenderPdfPagesToJpgAsync(
         string pdfFilePath, 
         string outputDir,
         IProgress<double>? progress)
     {
-        return _pdfRenderer.RenderPdfPagesToJpgAsync(pdfFilePath, outputDir, progress);
+        await _pdfRenderer.RenderPdfPagesToJpgAsync(pdfFilePath, outputDir, progress);
     }
 
     private static async Task CreateCbzFromImagesAsync(string sourceDir, string cbzPath)
