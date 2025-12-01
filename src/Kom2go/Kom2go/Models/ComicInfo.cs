@@ -274,14 +274,16 @@ public class ComicInfo
         if (!Year.HasValue) return null;
         var month = Month ?? 1;
         var day = Day ?? 1;
-        try
-        {
-            return new DateTime(Year.Value, month, day);
-        }
-        catch
+        
+        // Validate ranges before creating DateTime
+        if (Year.Value < 1 || Year.Value > 9999 ||
+            month < 1 || month > 12 ||
+            day < 1 || day > DateTime.DaysInMonth(Year.Value, month))
         {
             return null;
         }
+        
+        return new DateTime(Year.Value, month, day);
     }
 
     /// <summary>

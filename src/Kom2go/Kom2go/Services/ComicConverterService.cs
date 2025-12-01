@@ -15,8 +15,6 @@ namespace Kom2go.Services;
 /// </summary>
 public class ComicConverterService
 {
-    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".avif"];
-
     /// <summary>
     /// Gets the underlying archive type for a comic book file
     /// </summary>
@@ -351,9 +349,11 @@ public class ComicConverterService
         // Sanitize the entry path to prevent path traversal
         var safePath = entryKey.Replace('\\', '/');
         
-        // Remove any leading slashes or parent directory references
-        while (safePath.StartsWith('/') || safePath.StartsWith("../"))
+        // Remove any leading slashes or parent directory references with loop protection
+        var previousLength = -1;
+        while (safePath.Length != previousLength && (safePath.StartsWith('/') || safePath.StartsWith("../")))
         {
+            previousLength = safePath.Length;
             safePath = safePath.TrimStart('/');
             if (safePath.StartsWith("../"))
             {
@@ -363,6 +363,12 @@ public class ComicConverterService
 
         // Remove any remaining parent directory references
         safePath = safePath.Replace("../", "");
+
+        // Ensure path is not empty
+        if (string.IsNullOrEmpty(safePath))
+        {
+            safePath = "extracted_file";
+        }
 
         return Path.Combine(outputDir, safePath);
     }
@@ -381,7 +387,7 @@ public class ComicConverterService
 
             // Get all files maintaining directory structure
             var allFiles = Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories)
-                .Where(f => IsImageFile(f) || IsComicInfoFile(f))
+                .Where(f => ComicConstants.IsImageFile(f) || ComicConstants.IsComicInfoFile(f))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
 
             foreach (var file in allFiles)
@@ -391,17 +397,6 @@ public class ComicConverterService
                 archive.CreateEntryFromFile(file, relativePath, CompressionLevel.Optimal);
             }
         });
-    }
-
-    private static bool IsImageFile(string fileName)
-    {
-        var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        return ImageExtensions.Contains(extension);
-    }
-
-    private static bool IsComicInfoFile(string fileName)
-    {
-        return Path.GetFileName(fileName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase);
     }
 
     #region ComicInfo Extraction

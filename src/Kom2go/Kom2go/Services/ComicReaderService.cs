@@ -12,8 +12,6 @@ namespace Kom2go.Services;
 /// </summary>
 public class ComicReaderService
 {
-    private static readonly string[] ImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".avif"];
-
     /// <summary>
     /// Gets the format of a comic file based on its extension
     /// </summary>
@@ -394,11 +392,7 @@ public class ComicReaderService
 
     #endregion
 
-    private static bool IsImageFile(string fileName)
-    {
-        var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        return ImageExtensions.Contains(extension);
-    }
+    private static bool IsImageFile(string fileName) => ComicConstants.IsImageFile(fileName);
 }
 
 /// <summary>
@@ -482,11 +476,19 @@ internal sealed class ComicPageComparer : IComparer<string>
                 // Extract the full number from both strings
                 var xNumStart = xi;
                 while (xi < x.Length && char.IsDigit(x[xi])) xi++;
-                var xNum = long.Parse(x.AsSpan(xNumStart, xi - xNumStart));
+                if (!long.TryParse(x.AsSpan(xNumStart, xi - xNumStart), out var xNum))
+                {
+                    // Fallback to string comparison if number is too large
+                    return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+                }
 
                 var yNumStart = yi;
                 while (yi < y.Length && char.IsDigit(y[yi])) yi++;
-                var yNum = long.Parse(y.AsSpan(yNumStart, yi - yNumStart));
+                if (!long.TryParse(y.AsSpan(yNumStart, yi - yNumStart), out var yNum))
+                {
+                    // Fallback to string comparison if number is too large
+                    return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+                }
 
                 var numCmp = xNum.CompareTo(yNum);
                 if (numCmp != 0) return numCmp;
