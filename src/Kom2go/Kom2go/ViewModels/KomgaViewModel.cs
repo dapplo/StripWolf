@@ -67,9 +67,6 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _isSearching;
 
     [ObservableProperty]
-    private string? _selectedLetterFilter;
-
-    [ObservableProperty]
     private ObservableCollection<KomgaReadListDisplay> _readLists = [];
 
     [ObservableProperty]
@@ -77,15 +74,6 @@ public partial class KomgaViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _hasMoreReadLists = true;
-
-    /// <summary>
-    /// Available letter filters for A-Z browsing
-    /// </summary>
-    public static IReadOnlyList<string> LetterFilters { get; } = new List<string>
-    {
-        "All", "0-9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
-    };
 
     private int _currentPage;
     
@@ -356,27 +344,6 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SelectLetterFilterAsync(string? letter)
-    {
-        if (letter == SelectedLetterFilter)
-        {
-            return;
-        }
-        
-        // Cancel any ongoing loading
-        _loadingCts?.Cancel();
-        _loadingCts?.Dispose();
-        _loadingCts = new CancellationTokenSource();
-        
-        SelectedLetterFilter = letter;
-        _currentPage = 0;
-        HasMoreSeries = true;
-        Series.Clear();
-        
-        await LoadSeriesAsync();
-    }
-
-    [RelayCommand]
     private async Task LoadSeriesAsync()
     {
         if (!_komgaApiService.IsConfigured || !HasMoreSeries)
@@ -388,28 +355,10 @@ public partial class KomgaViewModel : ViewModelBase
         {
             IsBusy = true;
             
-            // Build search prefix based on letter filter
-            string? searchPrefix = null;
-            if (!string.IsNullOrEmpty(SelectedLetterFilter) && SelectedLetterFilter != "All")
-            {
-                if (SelectedLetterFilter == "0-9")
-                {
-                    // For numbers, we'll search for each digit and combine
-                    // However, Komga API doesn't support OR queries easily
-                    // So we'll fetch more results and filter client-side
-                    searchPrefix = null;
-                }
-                else
-                {
-                    searchPrefix = SelectedLetterFilter;
-                }
-            }
-            
             var result = await _komgaApiService.GetSeriesAsync(
                 page: _currentPage,
                 size: 20,
-                libraryId: SelectedLibrary?.Id,
-                searchPrefix: searchPrefix);
+                libraryId: SelectedLibrary?.Id);
 
             HasMoreSeries = !result.Last;
             _currentPage++;
@@ -419,15 +368,6 @@ public partial class KomgaViewModel : ViewModelBase
             foreach (var s in result.Content)
             {
                 if (ct.IsCancellationRequested) break;
-                
-                // Apply client-side filtering for 0-9 (numbers)
-                if (SelectedLetterFilter == "0-9")
-                {
-                    if (string.IsNullOrEmpty(s.Name) || !char.IsDigit(s.Name[0]))
-                    {
-                        continue; // Skip series that don't start with a number
-                    }
-                }
                 
                 // Start background thumbnail loading
                 _ = LoadSeriesThumbnailAsync(s, ct);
