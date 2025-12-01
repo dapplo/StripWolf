@@ -4,11 +4,20 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
-    <ApplicationId>com.CompanyName.Kom2go</ApplicationId>
+    <ApplicationId>com.dapplo.Kom2go</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+  </PropertyGroup>
+
+  <!-- Release signing configuration -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>kom2go.keystore</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias>kom2go</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
+    <AndroidSigningStorePass>$(ANDROID_SIGNING_STORE_PASS)</AndroidSigningStorePass>
   </PropertyGroup>
 
   <ItemGroup>
