@@ -312,9 +312,8 @@ public partial class ReaderView : UserControl
                 baseHeight = viewportHeight;
                 break;
                 
-            case StretchMode.Original:
             default:
-                // Original size
+                // Original size (StretchMode.Original or any unknown mode)
                 baseWidth = imageWidth;
                 baseHeight = imageHeight;
                 break;

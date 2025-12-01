@@ -886,11 +886,12 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedReadList = null;
         Books.Clear();
         Series.Clear();
-        // Don't clear ReadLists - they are cached
+        // ReadLists and smart lists are cached with 5-minute expiration and only refreshed via explicit refresh button.
+        // Don't clear them here to avoid unnecessary API calls when navigating.
         _currentPage = 0;
         HasMoreSeries = true;
         HasMoreBooks = true;
-        // Reset read list page but don't clear cache
+        // Reset read list page counter (used for pagination) but preserve the cached list
         _currentReadListPage = 0;
         HasMoreReadLists = true;
     }

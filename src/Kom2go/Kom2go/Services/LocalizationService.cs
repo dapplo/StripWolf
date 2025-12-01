@@ -96,9 +96,10 @@ public class LocalizationService
     {
         _currentCulture = culture;
         
-        // Update the current thread's culture
+        // Update the culture for all threads in the application
+        // DefaultThreadCurrentUICulture affects new threads as well
+        CultureInfo.DefaultThreadCurrentUICulture = culture;
         Thread.CurrentThread.CurrentUICulture = culture;
-        CultureInfo.CurrentUICulture = culture;
         
         LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
