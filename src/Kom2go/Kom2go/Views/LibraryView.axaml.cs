@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Kom2go.Services;
 using Kom2go.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kom2go.Views;
 
@@ -66,16 +68,69 @@ public partial class LibraryView : UserControl
 
         if (files.Count > 0 && DataContext is LibraryViewModel viewModel)
         {
-            var paths = files
-                .Select(f => f.TryGetLocalPath())
-                .Where(p => !string.IsNullOrEmpty(p))
-                .Cast<string>()
-                .ToList();
+            var paths = new List<string>();
+
+            foreach (var file in files)
+            {
+                var localPath = file.TryGetLocalPath();
+                if (!string.IsNullOrEmpty(localPath))
+                {
+                    // Desktop: use the local path directly
+                    paths.Add(localPath);
+                }
+                else
+                {
+                    // Android/other platforms: copy file to local storage
+                    var copiedPath = await CopyFileToLocalStorageAsync(file);
+                    if (!string.IsNullOrEmpty(copiedPath))
+                    {
+                        paths.Add(copiedPath);
+                    }
+                }
+            }
             
             if (paths.Count > 0)
             {
                 await viewModel.ImportFilesCommand.ExecuteAsync(paths);
             }
+        }
+    }
+
+    /// <summary>
+    /// Copies a file from a storage provider (e.g., Android content URI) to local app storage.
+    /// </summary>
+    private async Task<string?> CopyFileToLocalStorageAsync(IStorageFile file)
+    {
+        try
+        {
+            var libraryService = App.Services?.GetService<LibraryService>();
+            if (libraryService is null)
+            {
+                return null;
+            }
+
+            var targetPath = Path.Combine(libraryService.ComicsDirectory, file.Name);
+            
+            // Ensure unique filename if file already exists
+            var counter = 1;
+            var baseName = Path.GetFileNameWithoutExtension(file.Name);
+            var extension = Path.GetExtension(file.Name);
+            while (File.Exists(targetPath))
+            {
+                targetPath = Path.Combine(libraryService.ComicsDirectory, $"{baseName}_{counter}{extension}");
+                counter++;
+            }
+
+            await using var sourceStream = await file.OpenReadAsync();
+            await using var targetStream = File.Create(targetPath);
+            await sourceStream.CopyToAsync(targetStream);
+            
+            return targetPath;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to copy file to local storage: {ex.Message}");
+            return null;
         }
     }
 }

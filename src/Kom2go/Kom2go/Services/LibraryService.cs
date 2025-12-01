@@ -220,11 +220,13 @@ public class LibraryService
             return existing;
         }
 
-        // Determine file extension from media type
-        var extension = book.Media?.MediaType switch
+        // Determine file extension from media type (strip parameters like "; version=4")
+        var baseMediaType = book.Media?.MediaType?.Split(';')[0].Trim();
+        var extension = baseMediaType switch
         {
             "application/zip" => ".cbz",
             "application/x-rar-compressed" => ".cbr",
+            "application/pdf" => ".pdf",
             _ => ".cbz"
         };
 
