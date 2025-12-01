@@ -13,6 +13,7 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly SettingsService _settingsService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly LocalizationService _localizationService;
     
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
@@ -50,12 +51,21 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isReleaseNotesVisible;
 
+    [ObservableProperty]
+    private LanguageOption _selectedLanguage = LocalizationService.AvailableLanguages[0];
+    
+    /// <summary>
+    /// Available languages for selection
+    /// </summary>
+    public IReadOnlyList<LanguageOption> AvailableLanguages => LocalizationService.AvailableLanguages;
+
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService)
+    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LocalizationService localizationService)
     {
         _settingsService = settingsService;
         _komgaApiService = komgaApiService;
+        _localizationService = localizationService;
         Title = "Settings";
     }
 
@@ -94,7 +104,32 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
             }
+            
+            // Load language setting
+            if (_appSettings.UseSystemLanguage)
+            {
+                SelectedLanguage = AvailableLanguages[0]; // System Default
+            }
+            else
+            {
+                SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
+                                   ?? AvailableLanguages[0];
+            }
         });
+    }
+
+    partial void OnSelectedLanguageChanged(LanguageOption value)
+    {
+        // Apply language change
+        _localizationService.SetLanguage(value.CultureCode);
+        
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.LanguageCode = value.CultureCode;
+            _appSettings.UseSystemLanguage = value.CultureCode is null;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
     }
 
     [RelayCommand]

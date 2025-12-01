@@ -75,6 +75,26 @@
                      Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
         </StackPanel>
 
+        <!-- Language Settings Section -->
+        <TextBlock Text="Language Settings" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Language" FontWeight="SemiBold"/>
+            <ComboBox ItemsSource="{Binding AvailableLanguages}" 
+                      SelectedItem="{Binding SelectedLanguage}"
+                      HorizontalAlignment="Stretch"
+                      Width="300">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding DisplayName}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="Select a language or use the system default. Changes take effect immediately."
+                       Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
         <!-- About Section -->
         <TextBlock Text="About" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
         <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">

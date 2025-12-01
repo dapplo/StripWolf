@@ -267,6 +267,16 @@ public class AppSettings
     public string? LastOpenedComicPath { get; set; }
     
     public string? ComicsDirectory { get; set; }
+    
+    /// <summary>
+    /// The preferred language code (e.g., "en", "de", "fr"), or null for system default
+    /// </summary>
+    public string? LanguageCode { get; set; }
+    
+    /// <summary>
+    /// Whether to use the system language setting
+    /// </summary>
+    public bool UseSystemLanguage { get; set; } = true;
 
     /// <summary>
     /// Creates a deep copy of the settings
@@ -288,7 +298,9 @@ public class AppSettings
             }).ToList(),
             ActiveServerId = ActiveServerId,
             LastOpenedComicPath = LastOpenedComicPath,
-            ComicsDirectory = ComicsDirectory
+            ComicsDirectory = ComicsDirectory,
+            LanguageCode = LanguageCode,
+            UseSystemLanguage = UseSystemLanguage
         };
     }
 }
