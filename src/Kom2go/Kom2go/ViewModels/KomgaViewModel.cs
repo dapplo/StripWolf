@@ -88,8 +88,13 @@ public partial class KomgaViewModel : ViewModelBase
     };
 
     private int _currentPage;
+    
+    [ObservableProperty]
     private bool _hasMoreSeries = true;
+    
+    [ObservableProperty]
     private bool _hasMoreBooks = true;
+    
     private int _currentReadListPage;
 
     /// <summary>
@@ -339,9 +344,8 @@ public partial class KomgaViewModel : ViewModelBase
         
         SelectedLibrary = library;
         SelectedSeries = null;
-        SelectedLetterFilter = "All"; // Reset filter when selecting a library
         _currentPage = 0;
-        _hasMoreSeries = true;
+        HasMoreSeries = true;
         Series.Clear();
         Books.Clear();
         
@@ -366,7 +370,7 @@ public partial class KomgaViewModel : ViewModelBase
         
         SelectedLetterFilter = letter;
         _currentPage = 0;
-        _hasMoreSeries = true;
+        HasMoreSeries = true;
         Series.Clear();
         
         await LoadSeriesAsync();
@@ -375,7 +379,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadSeriesAsync()
     {
-        if (!_komgaApiService.IsConfigured || !_hasMoreSeries)
+        if (!_komgaApiService.IsConfigured || !HasMoreSeries)
         {
             return;
         }
@@ -407,7 +411,7 @@ public partial class KomgaViewModel : ViewModelBase
                 libraryId: SelectedLibrary?.Id,
                 searchPrefix: searchPrefix);
 
-            _hasMoreSeries = !result.Last;
+            HasMoreSeries = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
@@ -518,8 +522,17 @@ public partial class KomgaViewModel : ViewModelBase
         
         SelectedSeries = seriesDisplay?.Series;
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
         Books.Clear();
+        
+        // Clear search state when navigating to a series
+        if (IsSearching)
+        {
+            IsSearching = false;
+            SearchText = string.Empty;
+            SearchSeriesResults.Clear();
+            SearchBookResults.Clear();
+        }
         
         if (SelectedSeries is not null)
         {
@@ -530,7 +543,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadBooksAsync()
     {
-        if (!_komgaApiService.IsConfigured || SelectedSeries is null || !_hasMoreBooks)
+        if (!_komgaApiService.IsConfigured || SelectedSeries is null || !HasMoreBooks)
         {
             return;
         }
@@ -543,7 +556,7 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: 20);
 
-            _hasMoreBooks = !result.Last;
+            HasMoreBooks = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
@@ -675,8 +688,8 @@ public partial class KomgaViewModel : ViewModelBase
         Series.Clear();
         ReadLists.Clear();
         _currentPage = 0;
-        _hasMoreSeries = true;
-        _hasMoreBooks = true;
+        HasMoreSeries = true;
+        HasMoreBooks = true;
         _currentReadListPage = 0;
         HasMoreReadLists = true;
     }
@@ -687,7 +700,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedSeries = null;
         Books.Clear();
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
     }
 
     [RelayCommand]
@@ -696,7 +709,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedReadList = null;
         Books.Clear();
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
     }
 
     #region Read Lists
@@ -821,7 +834,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedLibrary = null;
         SelectedSeries = null;
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
         Books.Clear();
         
         if (SelectedReadList is not null)
@@ -833,7 +846,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadBooksForReadListAsync()
     {
-        if (!_komgaApiService.IsConfigured || SelectedReadList is null || !_hasMoreBooks)
+        if (!_komgaApiService.IsConfigured || SelectedReadList is null || !HasMoreBooks)
         {
             return;
         }
@@ -846,7 +859,7 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: 20);
 
-            _hasMoreBooks = !result.Last;
+            HasMoreBooks = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
