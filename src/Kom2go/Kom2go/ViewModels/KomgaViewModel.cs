@@ -67,9 +67,6 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _isSearching;
 
     [ObservableProperty]
-    private string? _selectedLetterFilter;
-
-    [ObservableProperty]
     private ObservableCollection<KomgaReadListDisplay> _readLists = [];
 
     [ObservableProperty]
@@ -78,18 +75,14 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasMoreReadLists = true;
 
-    /// <summary>
-    /// Available letter filters for A-Z browsing
-    /// </summary>
-    public static IReadOnlyList<string> LetterFilters { get; } = new List<string>
-    {
-        "All", "0-9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"
-    };
-
     private int _currentPage;
+    
+    [ObservableProperty]
     private bool _hasMoreSeries = true;
+    
+    [ObservableProperty]
     private bool _hasMoreBooks = true;
+    
     private int _currentReadListPage;
 
     /// <summary>
@@ -339,9 +332,8 @@ public partial class KomgaViewModel : ViewModelBase
         
         SelectedLibrary = library;
         SelectedSeries = null;
-        SelectedLetterFilter = "All"; // Reset filter when selecting a library
         _currentPage = 0;
-        _hasMoreSeries = true;
+        HasMoreSeries = true;
         Series.Clear();
         Books.Clear();
         
@@ -352,30 +344,9 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SelectLetterFilterAsync(string? letter)
-    {
-        if (letter == SelectedLetterFilter)
-        {
-            return;
-        }
-        
-        // Cancel any ongoing loading
-        _loadingCts?.Cancel();
-        _loadingCts?.Dispose();
-        _loadingCts = new CancellationTokenSource();
-        
-        SelectedLetterFilter = letter;
-        _currentPage = 0;
-        _hasMoreSeries = true;
-        Series.Clear();
-        
-        await LoadSeriesAsync();
-    }
-
-    [RelayCommand]
     private async Task LoadSeriesAsync()
     {
-        if (!_komgaApiService.IsConfigured || !_hasMoreSeries)
+        if (!_komgaApiService.IsConfigured || !HasMoreSeries)
         {
             return;
         }
@@ -384,30 +355,12 @@ public partial class KomgaViewModel : ViewModelBase
         {
             IsBusy = true;
             
-            // Build search prefix based on letter filter
-            string? searchPrefix = null;
-            if (!string.IsNullOrEmpty(SelectedLetterFilter) && SelectedLetterFilter != "All")
-            {
-                if (SelectedLetterFilter == "0-9")
-                {
-                    // For numbers, we'll search for each digit and combine
-                    // However, Komga API doesn't support OR queries easily
-                    // So we'll fetch more results and filter client-side
-                    searchPrefix = null;
-                }
-                else
-                {
-                    searchPrefix = SelectedLetterFilter;
-                }
-            }
-            
             var result = await _komgaApiService.GetSeriesAsync(
                 page: _currentPage,
                 size: 20,
-                libraryId: SelectedLibrary?.Id,
-                searchPrefix: searchPrefix);
+                libraryId: SelectedLibrary?.Id);
 
-            _hasMoreSeries = !result.Last;
+            HasMoreSeries = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
@@ -415,15 +368,6 @@ public partial class KomgaViewModel : ViewModelBase
             foreach (var s in result.Content)
             {
                 if (ct.IsCancellationRequested) break;
-                
-                // Apply client-side filtering for 0-9 (numbers)
-                if (SelectedLetterFilter == "0-9")
-                {
-                    if (string.IsNullOrEmpty(s.Name) || !char.IsDigit(s.Name[0]))
-                    {
-                        continue; // Skip series that don't start with a number
-                    }
-                }
                 
                 // Start background thumbnail loading
                 _ = LoadSeriesThumbnailAsync(s, ct);
@@ -518,8 +462,17 @@ public partial class KomgaViewModel : ViewModelBase
         
         SelectedSeries = seriesDisplay?.Series;
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
         Books.Clear();
+        
+        // Clear search state when navigating to a series
+        if (IsSearching)
+        {
+            IsSearching = false;
+            SearchText = string.Empty;
+            SearchSeriesResults.Clear();
+            SearchBookResults.Clear();
+        }
         
         if (SelectedSeries is not null)
         {
@@ -530,7 +483,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadBooksAsync()
     {
-        if (!_komgaApiService.IsConfigured || SelectedSeries is null || !_hasMoreBooks)
+        if (!_komgaApiService.IsConfigured || SelectedSeries is null || !HasMoreBooks)
         {
             return;
         }
@@ -543,7 +496,7 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: 20);
 
-            _hasMoreBooks = !result.Last;
+            HasMoreBooks = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
@@ -675,8 +628,8 @@ public partial class KomgaViewModel : ViewModelBase
         Series.Clear();
         ReadLists.Clear();
         _currentPage = 0;
-        _hasMoreSeries = true;
-        _hasMoreBooks = true;
+        HasMoreSeries = true;
+        HasMoreBooks = true;
         _currentReadListPage = 0;
         HasMoreReadLists = true;
     }
@@ -687,7 +640,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedSeries = null;
         Books.Clear();
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
     }
 
     [RelayCommand]
@@ -696,7 +649,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedReadList = null;
         Books.Clear();
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
     }
 
     #region Read Lists
@@ -821,7 +774,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedLibrary = null;
         SelectedSeries = null;
         _currentPage = 0;
-        _hasMoreBooks = true;
+        HasMoreBooks = true;
         Books.Clear();
         
         if (SelectedReadList is not null)
@@ -833,7 +786,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadBooksForReadListAsync()
     {
-        if (!_komgaApiService.IsConfigured || SelectedReadList is null || !_hasMoreBooks)
+        if (!_komgaApiService.IsConfigured || SelectedReadList is null || !HasMoreBooks)
         {
             return;
         }
@@ -846,7 +799,7 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: 20);
 
-            _hasMoreBooks = !result.Last;
+            HasMoreBooks = !result.Last;
             _currentPage++;
             
             // Load thumbnails in background and add items progressively
