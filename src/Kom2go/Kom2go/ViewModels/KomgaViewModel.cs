@@ -69,6 +69,12 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedLetterFilter;
 
+    [ObservableProperty]
+    private ObservableCollection<KomgaReadListDisplay> _readLists = [];
+
+    [ObservableProperty]
+    private KomgaReadList? _selectedReadList;
+
     /// <summary>
     /// Available letter filters for A-Z browsing
     /// </summary>
@@ -81,6 +87,8 @@ public partial class KomgaViewModel : ViewModelBase
     private int _currentPage;
     private bool _hasMoreSeries = true;
     private bool _hasMoreBooks = true;
+    private bool _hasMoreReadLists = true;
+    private int _currentReadListPage;
 
     /// <summary>
     /// Username for the active server (used for authenticated image loading)
@@ -276,6 +284,7 @@ public partial class KomgaViewModel : ViewModelBase
                 if (IsConnected)
                 {
                     await LoadLibrariesAsync();
+                    await LoadReadListsAsync();
                 }
             }
         }
@@ -659,10 +668,12 @@ public partial class KomgaViewModel : ViewModelBase
     {
         SelectedSeries = null;
         SelectedLibrary = null;
+        SelectedReadList = null;
         Books.Clear();
         Series.Clear();
         _currentPage = 0;
         _hasMoreSeries = true;
+        _hasMoreBooks = true;
     }
 
     [RelayCommand]
@@ -673,4 +684,192 @@ public partial class KomgaViewModel : ViewModelBase
         _currentPage = 0;
         _hasMoreBooks = true;
     }
+
+    [RelayCommand]
+    private void GoBackToReadLists()
+    {
+        SelectedReadList = null;
+        Books.Clear();
+        _currentPage = 0;
+        _hasMoreBooks = true;
+    }
+
+    #region Read Lists
+
+    [RelayCommand]
+    private async Task LoadReadListsAsync()
+    {
+        if (!_komgaApiService.IsConfigured || !_hasMoreReadLists)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            
+            var result = await _komgaApiService.GetReadListsAsync(
+                page: _currentReadListPage,
+                size: 20);
+
+            _hasMoreReadLists = !result.Last;
+            _currentReadListPage++;
+            
+            // Load thumbnails in background and add items progressively
+            var ct = _loadingCts?.Token ?? CancellationToken.None;
+            foreach (var rl in result.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                
+                // Start background thumbnail loading
+                _ = LoadReadListThumbnailAsync(rl, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load read lists: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error loading read lists: {ex}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Loads a read list thumbnail in the background and adds it to the collection
+    /// </summary>
+    private async Task LoadReadListThumbnailAsync(KomgaReadList readList, CancellationToken ct)
+    {
+        try
+        {
+            Bitmap? thumbnail = null;
+            
+            // Try to load the thumbnail
+            var thumbnailBytes = await _komgaApiService.GetReadListThumbnailAsync(readList.Id);
+            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            {
+                using var stream = new MemoryStream(thumbnailBytes);
+                thumbnail = new Bitmap(stream);
+            }
+            
+            if (ct.IsCancellationRequested)
+            {
+                thumbnail?.Dispose();
+                return;
+            }
+            
+            // Add to collection on UI thread
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    ReadLists.Add(new KomgaReadListDisplay
+                    {
+                        ReadList = readList,
+                        Thumbnail = thumbnail
+                    });
+                }
+                else
+                {
+                    thumbnail?.Dispose();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading thumbnail for read list '{readList.Name}': {ex.Message}");
+            
+            // Add without thumbnail
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        ReadLists.Add(new KomgaReadListDisplay
+                        {
+                            ReadList = readList,
+                            Thumbnail = null
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadMoreReadListsAsync()
+    {
+        await LoadReadListsAsync();
+    }
+
+    [RelayCommand]
+    private async Task SelectReadListAsync(KomgaReadListDisplay? readListDisplay)
+    {
+        // Cancel any ongoing loading
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+        
+        SelectedReadList = readListDisplay?.ReadList;
+        SelectedLibrary = null;
+        SelectedSeries = null;
+        _currentPage = 0;
+        _hasMoreBooks = true;
+        Books.Clear();
+        
+        if (SelectedReadList is not null)
+        {
+            await LoadBooksForReadListAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadBooksForReadListAsync()
+    {
+        if (!_komgaApiService.IsConfigured || SelectedReadList is null || !_hasMoreBooks)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var result = await _komgaApiService.GetBooksForReadListAsync(
+                SelectedReadList.Id,
+                page: _currentPage,
+                size: 20);
+
+            _hasMoreBooks = !result.Last;
+            _currentPage++;
+            
+            // Load thumbnails in background and add items progressively
+            var ct = _loadingCts?.Token ?? CancellationToken.None;
+            foreach (var b in result.Content)
+            {
+                if (ct.IsCancellationRequested) break;
+                
+                // Start background thumbnail loading
+                _ = LoadBookThumbnailAsync(b, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load books for read list: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Error loading books for read list: {ex}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadMoreBooksForReadListAsync()
+    {
+        await LoadBooksForReadListAsync();
+    }
+
+    #endregion
 }

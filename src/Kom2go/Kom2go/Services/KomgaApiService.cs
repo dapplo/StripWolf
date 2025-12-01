@@ -433,6 +433,89 @@ public class KomgaApiService : IDisposable
 
     #endregion
 
+    #region Read Lists
+
+    /// <summary>
+    /// Gets all read lists with pagination
+    /// </summary>
+    public async Task<KomgaPage<KomgaReadList>> GetReadListsAsync(int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var url = $"api/v1/readlists?page={page}&size={size}";
+        
+        var response = await _httpClient!.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaReadList>>(json, _jsonOptions) ?? new KomgaPage<KomgaReadList>();
+    }
+
+    /// <summary>
+    /// Gets a specific read list by ID
+    /// </summary>
+    public async Task<KomgaReadList?> GetReadListAsync(string readListId)
+    {
+        EnsureConfigured();
+        
+        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}");
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaReadList>(json, _jsonOptions);
+    }
+
+    /// <summary>
+    /// Gets read list thumbnail
+    /// </summary>
+    public async Task<byte[]?> GetReadListThumbnailAsync(string readListId)
+    {
+        EnsureConfigured();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/readlists/{readListId}/thumbnail");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+        
+        return await response.Content.ReadAsByteArrayAsync();
+    }
+
+    /// <summary>
+    /// Gets books for a read list with pagination
+    /// </summary>
+    public async Task<KomgaPage<KomgaBook>> GetBooksForReadListAsync(string readListId, int page = 0, int size = 20)
+    {
+        EnsureConfigured();
+        
+        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}");
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+    }
+
+    /// <summary>
+    /// Gets the thumbnail URL for a read list
+    /// </summary>
+    public string GetReadListThumbnailUrl(string readListId)
+    {
+        if (_currentServer is null)
+        {
+            return string.Empty;
+        }
+        return $"{_currentServer.BaseUrl}/api/v1/readlists/{readListId}/thumbnail";
+    }
+
+    #endregion
+
     private void EnsureConfigured()
     {
         if (!IsConfigured)
