@@ -169,6 +169,37 @@
                       IsVisible="{Binding SelectedLibrary, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
               <TextBlock Text="Series" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+              
+              <!-- A-Z Letter Filter -->
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                <ItemsControl ItemsSource="{x:Static vm:KomgaViewModel.LetterFilters}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="4"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Button Content="{Binding}" MinWidth="36" Padding="8,6"
+                              Command="{Binding DataContext.SelectLetterFilterCommand, ElementName=Root}"
+                              CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              
+              <!-- Selected Letter Filter Indicator -->
+              <TextBlock Margin="0,0,0,8" FontSize="14" Foreground="Gray">
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="Showing series starting with: {0}">
+                    <Binding Path="SelectedLetterFilter" FallbackValue="All"/>
+                  </MultiBinding>
+                </TextBlock.Text>
+                <TextBlock.IsVisible>
+                  <Binding Path="SelectedLetterFilter" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                </TextBlock.IsVisible>
+              </TextBlock>
+              
               <ItemsControl ItemsSource="{Binding Series}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>

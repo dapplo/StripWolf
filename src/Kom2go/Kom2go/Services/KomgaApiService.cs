@@ -129,7 +129,7 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Gets all series with pagination
     /// </summary>
-    public async Task<KomgaPage<KomgaSeries>> GetSeriesAsync(int page = 0, int size = 20, string? libraryId = null)
+    public async Task<KomgaPage<KomgaSeries>> GetSeriesAsync(int page = 0, int size = 20, string? libraryId = null, string? searchPrefix = null)
     {
         EnsureConfigured();
         
@@ -137,6 +137,11 @@ public class KomgaApiService : IDisposable
         if (!string.IsNullOrEmpty(libraryId))
         {
             url += $"&library_id={libraryId}";
+        }
+        if (!string.IsNullOrEmpty(searchPrefix))
+        {
+            var encodedPrefix = Uri.EscapeDataString(searchPrefix);
+            url += $"&search={encodedPrefix}";
         }
         
         var response = await _httpClient!.GetAsync(url);
