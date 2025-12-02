@@ -1010,11 +1010,14 @@ public partial class ReaderView : UserControl
         else if (vm.ReadingMode == ReadingMode.Zoomed)
         {
             // In zoomed mode, use the zoom region bounds
-            var bounds = vm.ZoomRegion.GetBounds();
-            regionX = bounds.Left;
-            regionY = bounds.Top;
-            regionWidth = bounds.Right - bounds.Left;
-            regionHeight = bounds.Bottom - bounds.Top;
+            // Calculate the effective bounds that account for aspect ratio fitting
+            // This must match what the rectangle shows on the overview
+            var originalBounds = vm.ZoomRegion.GetBounds();
+            var effectiveBounds = CalculateEffectiveDisplayBounds(vm, originalBounds);
+            regionX = effectiveBounds.Left;
+            regionY = effectiveBounds.Top;
+            regionWidth = effectiveBounds.Right - effectiveBounds.Left;
+            regionHeight = effectiveBounds.Bottom - effectiveBounds.Top;
         }
         else
         {
