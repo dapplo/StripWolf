@@ -58,6 +58,25 @@ public partial class SettingsViewModel : ViewModelBase
     /// Available languages for selection
     /// </summary>
     public IReadOnlyList<LanguageOption> AvailableLanguages => LocalizationService.AvailableLanguages;
+    
+    // Reading mode settings
+    [ObservableProperty]
+    private ReadingMode _selectedReadingMode = ReadingMode.Normal;
+    
+    [ObservableProperty]
+    private Handedness _selectedHandedness = Handedness.RightHanded;
+    
+    /// <summary>
+    /// Available reading modes
+    /// </summary>
+    public IReadOnlyList<ReadingMode> AvailableReadingModes { get; } = 
+        [ReadingMode.Normal, ReadingMode.Zoomed, ReadingMode.Guided];
+    
+    /// <summary>
+    /// Available handedness options
+    /// </summary>
+    public IReadOnlyList<Handedness> AvailableHandednessOptions { get; } = 
+        [Handedness.RightHanded, Handedness.LeftHanded];
 
     private KomgaServer? _editingServer;
 
@@ -115,6 +134,10 @@ public partial class SettingsViewModel : ViewModelBase
                 SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
                                    ?? AvailableLanguages[0];
             }
+            
+            // Load reading mode settings
+            SelectedReadingMode = _appSettings.PreferredReadingMode;
+            SelectedHandedness = _appSettings.Handedness;
         });
     }
 
@@ -128,6 +151,26 @@ public partial class SettingsViewModel : ViewModelBase
         {
             _appSettings.LanguageCode = value.CultureCode;
             _appSettings.UseSystemLanguage = value.CultureCode is null;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+    
+    partial void OnSelectedReadingModeChanged(ReadingMode value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.PreferredReadingMode = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+    
+    partial void OnSelectedHandednessChanged(Handedness value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.Handedness = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

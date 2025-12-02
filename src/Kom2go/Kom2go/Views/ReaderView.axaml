@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Kom2go.ViewModels"
+             xmlns:models="using:Kom2go.Models"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.ReaderView"
              x:DataType="vm:ReaderViewModel"
@@ -11,14 +12,15 @@
              Focusable="True">
   
   <Grid>
-    <!-- Main Image View with scroll support -->
+    <!-- Normal Reading Mode: Main Image View with scroll support -->
     <ScrollViewer x:Name="ImageScroller" 
                   HorizontalScrollBarVisibility="Auto" 
                   VerticalScrollBarVisibility="Auto"
                   PointerWheelChanged="OnPointerWheelChanged"
                   PointerPressed="OnZoomPointerPressed"
                   PointerMoved="OnZoomPointerMoved"
-                  PointerReleased="OnZoomPointerReleased">
+                  PointerReleased="OnZoomPointerReleased"
+                  IsVisible="{Binding !IsZoomedOrGuidedMode}">
       <!-- Container for zoomed content - allows full screen viewing -->
       <Canvas x:Name="ZoomCanvas" ClipToBounds="False">
         <Grid x:Name="ImageContainer" Canvas.Left="0" Canvas.Top="0">
@@ -42,13 +44,93 @@
         </Grid>
       </Canvas>
     </ScrollViewer>
+    
+    <!-- Zoomed/Guided Reading Mode: Split view with overview and zoomed area -->
+    <Grid x:Name="ZoomedGuidedGrid" 
+          IsVisible="{Binding IsZoomedOrGuidedMode}"
+          ColumnDefinitions="*,*">
+      
+      <!-- Left Panel: Changes based on handedness -->
+      <Grid Grid.Column="0" x:Name="LeftPanel">
+        <!-- Overview (for right-handed) or Zoom Area (for left-handed) -->
+        <Grid IsVisible="{Binding IsOverviewOnLeft}">
+          <!-- Page Overview with panel boxes -->
+          <Border Background="#1A1A1A" Margin="4">
+            <Grid>
+              <Image x:Name="OverviewImage"
+                     Source="{Binding CurrentPageImage}"
+                     Stretch="Uniform"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"/>
+              
+              <!-- Canvas for panel detection boxes and zoom region indicator -->
+              <Canvas x:Name="OverviewCanvas" 
+                      PointerPressed="OnOverviewPointerPressed"
+                      PointerMoved="OnOverviewPointerMoved"
+                      PointerReleased="OnOverviewPointerReleased"
+                      Background="Transparent"/>
+            </Grid>
+          </Border>
+        </Grid>
+        
+        <!-- Zoomed Area (for left-handed) -->
+        <Grid IsVisible="{Binding !IsOverviewOnLeft}">
+          <Border Background="#0A0A0A" Margin="4">
+            <Image x:Name="ZoomedAreaLeftImage"
+                   Source="{Binding CurrentPageImage}"
+                   Stretch="Uniform"
+                   ClipToBounds="True"
+                   PointerPressed="OnZoomedAreaPointerPressed"
+                   PointerMoved="OnZoomedAreaPointerMoved"
+                   PointerReleased="OnZoomedAreaPointerReleased"/>
+          </Border>
+        </Grid>
+      </Grid>
+      
+      <!-- Right Panel: Changes based on handedness -->
+      <Grid Grid.Column="1" x:Name="RightPanel">
+        <!-- Zoomed Area (for right-handed) -->
+        <Grid IsVisible="{Binding IsOverviewOnLeft}">
+          <Border Background="#0A0A0A" Margin="4">
+            <Image x:Name="ZoomedAreaRightImage"
+                   Source="{Binding CurrentPageImage}"
+                   Stretch="Uniform"
+                   ClipToBounds="True"
+                   PointerPressed="OnZoomedAreaPointerPressed"
+                   PointerMoved="OnZoomedAreaPointerMoved"
+                   PointerReleased="OnZoomedAreaPointerReleased"/>
+          </Border>
+        </Grid>
+        
+        <!-- Overview (for left-handed) -->
+        <Grid IsVisible="{Binding !IsOverviewOnLeft}">
+          <Border Background="#1A1A1A" Margin="4">
+            <Grid>
+              <Image x:Name="OverviewImageRight"
+                     Source="{Binding CurrentPageImage}"
+                     Stretch="Uniform"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"/>
+              
+              <!-- Canvas for panel detection boxes and zoom region indicator -->
+              <Canvas x:Name="OverviewCanvasRight" 
+                      PointerPressed="OnOverviewPointerPressed"
+                      PointerMoved="OnOverviewPointerMoved"
+                      PointerReleased="OnOverviewPointerReleased"
+                      Background="Transparent"/>
+            </Grid>
+          </Border>
+        </Grid>
+      </Grid>
+    </Grid>
 
-    <!-- Overlay for tap/swipe/pinch zones - handles both gestures and taps -->
+    <!-- Overlay for tap/swipe/pinch zones - handles both gestures and taps (normal mode only) -->
     <Grid x:Name="TapZoneGrid" ColumnDefinitions="*,2*,*" Background="Transparent"
           PointerWheelChanged="OnPointerWheelChanged"
           PointerPressed="OnGesturePointerPressed"
           PointerMoved="OnGesturePointerMoved"
-          PointerReleased="OnGesturePointerReleased">
+          PointerReleased="OnGesturePointerReleased"
+          IsVisible="{Binding !IsZoomedOrGuidedMode}">
       <!-- Left tap zone (25% width) - previous page (handled via swipe or press detection in code) -->
       <Border Grid.Column="0" x:Name="LeftZone" Background="Transparent" Cursor="Hand"/>
       
@@ -73,7 +155,7 @@
     <!-- Top Controls - animated visibility -->
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
         <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" 
                 Background="Transparent" Foreground="White"/>
         <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
@@ -85,19 +167,33 @@
                 ToolTip.Tip="Show comic info (I)">
           <TextBlock Text="ℹ"/>
         </Button>
-        <!-- Two-page mode toggle -->
-        <Button Grid.Column="3" Command="{Binding ToggleTwoPageModeCommand}"
+        <!-- Reading mode toggle button -->
+        <Button Grid.Column="3" Command="{Binding CycleReadingModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" 
-                ToolTip.Tip="Toggle two-page mode (2)">
+                ToolTip.Tip="Change reading mode (M): Normal / Zoomed / Guided">
+          <TextBlock Text="{Binding ReadingModeIcon}"/>
+        </Button>
+        <!-- Handedness toggle (only visible in zoomed/guided modes) -->
+        <Button Grid.Column="4" Command="{Binding ToggleHandednessCommand}"
+                Background="Transparent" Foreground="White" Margin="8,0" 
+                ToolTip.Tip="Swap overview and zoom positions"
+                IsVisible="{Binding IsZoomedOrGuidedMode}">
+          <TextBlock Text="⇄"/>
+        </Button>
+        <!-- Two-page mode toggle (disabled in zoomed/guided modes) -->
+        <Button Grid.Column="5" Command="{Binding ToggleTwoPageModeCommand}"
+                Background="Transparent" Foreground="White" Margin="8,0" 
+                ToolTip.Tip="Toggle two-page mode (2)"
+                IsEnabled="{Binding CanUseTwoPageMode}">
           <TextBlock Text="{Binding TwoPageModeIcon}"/>
         </Button>
         <!-- Stretch mode button -->
-        <Button Grid.Column="4" Command="{Binding CycleStretchModeCommand}"
+        <Button Grid.Column="6" Command="{Binding CycleStretchModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode">
           <TextBlock Text="{Binding StretchModeIcon}"/>
         </Button>
         <!-- Fullscreen button -->
-        <Button Grid.Column="5" Command="{Binding ToggleFullScreenCommand}"
+        <Button Grid.Column="7" Command="{Binding ToggleFullScreenCommand}"
                 Background="Transparent" Foreground="White" FontSize="18" ToolTip.Tip="Toggle fullscreen (F)">
           <TextBlock Text="⛶"/>
         </Button>
@@ -107,36 +203,104 @@
     <!-- Bottom Controls -->
     <Border VerticalAlignment="Bottom" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto">
-        <!-- Previous Button -->
-        <Button Grid.Column="0" Content="◀" Command="{Binding GoToPreviousPageCommand}"
-                IsEnabled="{Binding HasPreviousPage}" Background="Transparent" Foreground="White" FontSize="20"/>
-        
-        <!-- Page Slider -->
-        <Slider Grid.Column="1" Minimum="0" Maximum="{Binding MaxSliderValue, FallbackValue=0}"
-                Value="{Binding CurrentPage}" Margin="8,0"/>
-        
-        <!-- Next Button -->
-        <Button Grid.Column="2" Content="▶" Command="{Binding GoToNextPageCommand}"
-                IsEnabled="{Binding HasNextPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+      <Grid RowDefinitions="Auto,Auto">
+        <!-- Standard controls row -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto">
+          <!-- Previous Button -->
+          <Button Grid.Column="0" Content="◀" Command="{Binding GoToPreviousPageCommand}"
+                  IsEnabled="{Binding HasPreviousPage}" Background="Transparent" Foreground="White" FontSize="20"/>
+          
+          <!-- Page Slider -->
+          <Slider Grid.Column="1" Minimum="0" Maximum="{Binding MaxSliderValue, FallbackValue=0}"
+                  Value="{Binding CurrentPage}" Margin="8,0"/>
+          
+          <!-- Next Button -->
+          <Button Grid.Column="2" Content="▶" Command="{Binding GoToNextPageCommand}"
+                  IsEnabled="{Binding HasNextPage}" Background="Transparent" Foreground="White" FontSize="20"/>
 
-        <!-- Page Display -->
-        <TextBlock Grid.Column="3" Text="{Binding PageDisplay}" Foreground="White"
-                   VerticalAlignment="Center" Margin="16,0"/>
+          <!-- Page Display -->
+          <TextBlock Grid.Column="3" Text="{Binding PageDisplay}" Foreground="White"
+                     VerticalAlignment="Center" Margin="16,0"/>
 
-        <!-- Zoom Controls -->
-        <Button Grid.Column="4" Content="−" Command="{Binding ZoomOutCommand}"
-                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
-        
-        <TextBlock Grid.Column="5" Text="{Binding ZoomDisplay}" Foreground="White"
-                   VerticalAlignment="Center" Width="60" TextAlignment="Center"/>
-        
-        <Button Grid.Column="6" Content="+" Command="{Binding ZoomInCommand}"
-                Background="Transparent" Foreground="White" FontSize="20" Width="40"/>
+          <!-- Zoom Controls (hidden in zoomed/guided modes where they're redundant) -->
+          <Button Grid.Column="4" Content="−" Command="{Binding ZoomOutCommand}"
+                  Background="Transparent" Foreground="White" FontSize="20" Width="40"
+                  IsVisible="{Binding !IsZoomedOrGuidedMode}"/>
+          
+          <TextBlock Grid.Column="5" Text="{Binding ZoomDisplay}" Foreground="White"
+                     VerticalAlignment="Center" Width="60" TextAlignment="Center"
+                     IsVisible="{Binding !IsZoomedOrGuidedMode}"/>
+          
+          <Button Grid.Column="6" Content="+" Command="{Binding ZoomInCommand}"
+                  Background="Transparent" Foreground="White" FontSize="20" Width="40"
+                  IsVisible="{Binding !IsZoomedOrGuidedMode}"/>
 
-        <Button Grid.Column="7" Content="⟲" Command="{Binding ResetZoomCommand}"
-                Background="Transparent" Foreground="White" FontSize="16" Width="40"
-                ToolTip.Tip="Reset zoom"/>
+          <Button Grid.Column="7" Content="⟲" Command="{Binding ResetZoomCommand}"
+                  Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                  ToolTip.Tip="Reset zoom"
+                  IsVisible="{Binding !IsZoomedOrGuidedMode}"/>
+        </Grid>
+        
+        <!-- Guided mode panel navigation row -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,8,0,0"
+              IsVisible="{Binding IsGuidedMode}">
+          <!-- Previous Panel Button -->
+          <Button Grid.Column="0" Content="◂" Command="{Binding GoToPreviousPanelCommand}"
+                  IsEnabled="{Binding HasPreviousPanel}" Background="Transparent" Foreground="#64B5F6" FontSize="20"
+                  ToolTip.Tip="Previous panel"/>
+          
+          <!-- Panel info -->
+          <TextBlock Grid.Column="1" Text="{Binding CurrentPanelDisplay}" Foreground="#64B5F6"
+                     VerticalAlignment="Center" HorizontalAlignment="Center" Margin="8,0"/>
+          
+          <!-- Next Panel Button -->
+          <Button Grid.Column="2" Content="▸" Command="{Binding GoToNextPanelCommand}"
+                  IsEnabled="{Binding HasNextPanel}" Background="Transparent" Foreground="#64B5F6" FontSize="20"
+                  ToolTip.Tip="Next panel"/>
+          
+          <!-- Panel detecting indicator -->
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="16,0,0,0" 
+                      IsVisible="{Binding IsDetectingPanels}">
+            <ProgressBar IsIndeterminate="True" Width="50" Height="4"/>
+            <TextBlock Text="Detecting panels..." Foreground="Gray" FontSize="12" Margin="8,0,0,0"
+                       VerticalAlignment="Center"/>
+          </StackPanel>
+          
+          <!-- Zoom region size controls (for zoomed mode) -->
+          <Button Grid.Column="4" Content="−" Command="{Binding DecreaseZoomRegionSizeCommand}"
+                  Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                  ToolTip.Tip="Smaller zoom area"
+                  IsVisible="{Binding !IsGuidedMode}"/>
+          
+          <Button Grid.Column="5" Content="+" Command="{Binding IncreaseZoomRegionSizeCommand}"
+                  Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                  ToolTip.Tip="Larger zoom area"
+                  IsVisible="{Binding !IsGuidedMode}"/>
+        </Grid>
+        
+        <!-- Zoomed mode controls row (shown when in zoomed mode but not guided) -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,8,0,0"
+              IsVisible="{Binding ReadingMode, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:ReadingMode.Zoomed}}">
+          <!-- Zoom region size label -->
+          <TextBlock Grid.Column="0" Text="Zoom region size:" Foreground="Gray" FontSize="12"
+                     VerticalAlignment="Center"/>
+          
+          <!-- Zoom region size controls -->
+          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Content="−" Command="{Binding DecreaseZoomRegionSizeCommand}"
+                    Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                    ToolTip.Tip="Smaller zoom area"/>
+            <TextBlock Text="Drag on overview to move" Foreground="Gray" FontSize="12"
+                       VerticalAlignment="Center" Margin="16,0"/>
+            <Button Content="+" Command="{Binding IncreaseZoomRegionSizeCommand}"
+                    Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                    ToolTip.Tip="Larger zoom area"/>
+          </StackPanel>
+          
+          <Button Grid.Column="2" Content="⟲" Command="{Binding ResetZoomRegionCommand}"
+                  Background="Transparent" Foreground="White" FontSize="16" Width="40"
+                  ToolTip.Tip="Reset zoom region"/>
+        </Grid>
       </Grid>
     </Border>
 

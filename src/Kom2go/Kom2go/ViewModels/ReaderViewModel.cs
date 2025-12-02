@@ -14,6 +14,8 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly PanelDetectionService _panelDetectionService;
+    private readonly SettingsService _settingsService;
 
     [ObservableProperty]
     private int _comicId;
@@ -67,6 +69,87 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isInfoPanelVisible;
     
+    // Reading mode properties
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReadingModeIcon))]
+    [NotifyPropertyChangedFor(nameof(IsZoomedOrGuidedMode))]
+    [NotifyPropertyChangedFor(nameof(IsGuidedMode))]
+    [NotifyPropertyChangedFor(nameof(CanUseTwoPageMode))]
+    private ReadingMode _readingMode = ReadingMode.Normal;
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
+    private Handedness _handedness = Handedness.RightHanded;
+    
+    [ObservableProperty]
+    private ZoomRegion _zoomRegion = new();
+    
+    [ObservableProperty]
+    private PagePanelInfo? _currentPagePanels;
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPreviousPanel))]
+    [NotifyPropertyChangedFor(nameof(HasNextPanel))]
+    [NotifyPropertyChangedFor(nameof(CurrentPanelDisplay))]
+    private int _currentPanelIndex;
+    
+    [ObservableProperty]
+    private ComicPanel? _currentPanel;
+    
+    [ObservableProperty]
+    private bool _isDetectingPanels;
+    
+    /// <summary>
+    /// Whether the current reading mode is zoomed or guided
+    /// </summary>
+    public bool IsZoomedOrGuidedMode => ReadingMode is ReadingMode.Zoomed or ReadingMode.Guided;
+    
+    /// <summary>
+    /// Whether the current reading mode is guided
+    /// </summary>
+    public bool IsGuidedMode => ReadingMode == ReadingMode.Guided;
+    
+    /// <summary>
+    /// Whether two-page mode can be used (not available in zoomed/guided modes)
+    /// </summary>
+    public bool CanUseTwoPageMode => ReadingMode == ReadingMode.Normal;
+    
+    /// <summary>
+    /// Whether the page overview should be on the left side
+    /// </summary>
+    public bool IsOverviewOnLeft => Handedness == Handedness.RightHanded;
+    
+    /// <summary>
+    /// Whether there's a previous panel to navigate to
+    /// </summary>
+    public bool HasPreviousPanel => CurrentPanelIndex > 0 || HasPreviousPage;
+    
+    /// <summary>
+    /// Whether there's a next panel to navigate to
+    /// </summary>
+    public bool HasNextPanel => 
+        (CurrentPagePanels is not null && CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1) || 
+        HasNextPage;
+    
+    /// <summary>
+    /// Display string for current panel
+    /// </summary>
+    public string CurrentPanelDisplay => 
+        CurrentPagePanels is not null && CurrentPagePanels.Panels.Count > 0
+            ? $"Panel {CurrentPanelIndex + 1}/{CurrentPagePanels.Panels.Count}"
+            : "";
+    
+    /// <summary>
+    /// Icon for the current reading mode
+    /// </summary>
+    public string ReadingModeIcon => ReadingMode switch
+    {
+        ReadingMode.Normal => "📄",
+        ReadingMode.Zoomed => "🔍",
+        ReadingMode.Guided => "🎯",
+        _ => "📄"
+    };
+    
     public string PageDisplay
     {
         get
@@ -103,11 +186,15 @@ public partial class ReaderViewModel : ViewModelBase
     public ReaderViewModel(
         LibraryService libraryService, 
         ComicReaderService comicReaderService,
-        KomgaApiService komgaApiService)
+        KomgaApiService komgaApiService,
+        PanelDetectionService panelDetectionService,
+        SettingsService settingsService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
+        _panelDetectionService = panelDetectionService;
+        _settingsService = settingsService;
         Title = "Reader";
     }
 
@@ -118,6 +205,12 @@ public partial class ReaderViewModel : ViewModelBase
         {
             IsBusy = true;
             ErrorMessage = null;
+            
+            // Load reading mode preferences
+            var settings = await _settingsService.LoadSettingsAsync();
+            ReadingMode = settings.PreferredReadingMode;
+            Handedness = settings.Handedness;
+            ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
             
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
@@ -203,6 +296,9 @@ public partial class ReaderViewModel : ViewModelBase
         IsBusy = true;
         try
         {
+            // Store page data for panel detection in guided mode
+            byte[]? pageData = null;
+            
             if (IsTwoPageMode)
             {
                 // Load two pages for two-page mode
@@ -215,6 +311,7 @@ public partial class ReaderViewModel : ViewModelBase
                 
                 // Also update the single page image for consistency
                 CurrentPageImage = LeftPageImage;
+                pageData = leftPageData;
                 
                 // Load right page if available
                 if (CurrentPage + 1 < Comic.PageCount)
@@ -236,7 +333,7 @@ public partial class ReaderViewModel : ViewModelBase
             else
             {
                 // Single page mode
-                var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+                pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
                 using var stream = new MemoryStream(pageData);
                 
                 // Create new bitmap first, then dispose old one to avoid memory leak
@@ -244,6 +341,18 @@ public partial class ReaderViewModel : ViewModelBase
                 var oldBitmap = CurrentPageImage;
                 CurrentPageImage = newBitmap;
                 oldBitmap?.Dispose();
+            }
+            
+            // If in guided mode, detect panels
+            if (ReadingMode == ReadingMode.Guided && pageData is not null)
+            {
+                await DetectPanelsForCurrentPageAsync(pageData);
+            }
+            
+            // Pre-detect panels for next page in background if in guided mode
+            if (ReadingMode == ReadingMode.Guided && CurrentPage + 1 < Comic.PageCount)
+            {
+                _ = PreDetectNextPagePanelsAsync();
             }
         }
         catch (Exception ex)
@@ -336,6 +445,11 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleTwoPageMode()
     {
+        // Two-page mode is not available in zoomed or guided modes
+        if (IsZoomedOrGuidedMode)
+        {
+            return;
+        }
         IsTwoPageMode = !IsTwoPageMode;
     }
 
@@ -438,6 +552,319 @@ public partial class ReaderViewModel : ViewModelBase
             // Silently fail - don't interrupt reading
         }
     }
+    
+    #region Reading Mode Methods
+    
+    /// <summary>
+    /// Cycle through reading modes (Normal -> Zoomed -> Guided -> Normal)
+    /// </summary>
+    [RelayCommand]
+    private async Task CycleReadingModeAsync()
+    {
+        ReadingMode = ReadingMode switch
+        {
+            ReadingMode.Normal => ReadingMode.Zoomed,
+            ReadingMode.Zoomed => ReadingMode.Guided,
+            ReadingMode.Guided => ReadingMode.Normal,
+            _ => ReadingMode.Normal
+        };
+        
+        // Disable two-page mode when switching to zoomed or guided
+        if (IsZoomedOrGuidedMode && IsTwoPageMode)
+        {
+            IsTwoPageMode = false;
+        }
+        
+        // If switching to guided mode, detect panels
+        if (ReadingMode == ReadingMode.Guided && Comic is not null)
+        {
+            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            await DetectPanelsForCurrentPageAsync(pageData);
+        }
+        
+        // Notify properties that depend on reading mode
+        OnPropertyChanged(nameof(HasPreviousPanel));
+        OnPropertyChanged(nameof(HasNextPanel));
+        OnPropertyChanged(nameof(CurrentPanelDisplay));
+    }
+    
+    /// <summary>
+    /// Set reading mode directly
+    /// </summary>
+    [RelayCommand]
+    private async Task SetReadingModeAsync(ReadingMode mode)
+    {
+        if (ReadingMode == mode)
+        {
+            return;
+        }
+        
+        ReadingMode = mode;
+        
+        // Disable two-page mode when switching to zoomed or guided
+        if (IsZoomedOrGuidedMode && IsTwoPageMode)
+        {
+            IsTwoPageMode = false;
+        }
+        
+        // If switching to guided mode, detect panels
+        if (mode == ReadingMode.Guided && Comic is not null)
+        {
+            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            await DetectPanelsForCurrentPageAsync(pageData);
+        }
+    }
+    
+    /// <summary>
+    /// Toggle handedness (swap overview and zoom areas)
+    /// </summary>
+    [RelayCommand]
+    private void ToggleHandedness()
+    {
+        Handedness = Handedness == Handedness.RightHanded 
+            ? Handedness.LeftHanded 
+            : Handedness.RightHanded;
+    }
+    
+    partial void OnReadingModeChanged(ReadingMode value)
+    {
+        // Clear panel info when leaving guided mode
+        if (value != ReadingMode.Guided)
+        {
+            CurrentPagePanels = null;
+            CurrentPanel = null;
+            CurrentPanelIndex = 0;
+        }
+    }
+    
+    #endregion
+    
+    #region Panel Detection Methods
+    
+    /// <summary>
+    /// Detect panels for the current page
+    /// </summary>
+    private async Task DetectPanelsForCurrentPageAsync(byte[] pageData)
+    {
+        if (Comic is null)
+        {
+            return;
+        }
+        
+        IsDetectingPanels = true;
+        try
+        {
+            CurrentPagePanels = await _panelDetectionService.DetectPanelsAsync(
+                Comic.FilePath, 
+                CurrentPage, 
+                pageData);
+            
+            // Reset to first panel
+            CurrentPanelIndex = 0;
+            if (CurrentPagePanels.Panels.Count > 0)
+            {
+                CurrentPanel = CurrentPagePanels.Panels[0];
+            }
+            else
+            {
+                CurrentPanel = null;
+            }
+            
+            OnPropertyChanged(nameof(HasPreviousPanel));
+            OnPropertyChanged(nameof(HasNextPanel));
+            OnPropertyChanged(nameof(CurrentPanelDisplay));
+        }
+        finally
+        {
+            IsDetectingPanels = false;
+        }
+    }
+    
+    /// <summary>
+    /// Pre-detect panels for the next page in background
+    /// </summary>
+    private async Task PreDetectNextPagePanelsAsync()
+    {
+        if (Comic is null || CurrentPage + 1 >= Comic.PageCount)
+        {
+            return;
+        }
+        
+        // Check if already cached
+        if (_panelDetectionService.IsCached(Comic.FilePath, CurrentPage + 1))
+        {
+            return;
+        }
+        
+        try
+        {
+            var nextPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage + 1);
+            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, CurrentPage + 1, nextPageData);
+        }
+        catch
+        {
+            // Silently fail - this is just pre-caching
+        }
+    }
+    
+    #endregion
+    
+    #region Panel Navigation Methods
+    
+    /// <summary>
+    /// Navigate to the next panel (or next page if at last panel)
+    /// </summary>
+    [RelayCommand]
+    private async Task GoToNextPanelAsync()
+    {
+        if (CurrentPagePanels is null || CurrentPagePanels.Panels.Count == 0)
+        {
+            // No panels, just go to next page
+            await GoToNextPageAsync();
+            return;
+        }
+        
+        if (CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1)
+        {
+            // Go to next panel on same page
+            CurrentPanelIndex++;
+            CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
+            OnPropertyChanged(nameof(HasPreviousPanel));
+            OnPropertyChanged(nameof(HasNextPanel));
+            OnPropertyChanged(nameof(CurrentPanelDisplay));
+        }
+        else if (HasNextPage)
+        {
+            // Go to first panel of next page
+            await GoToNextPageAsync();
+            CurrentPanelIndex = 0;
+            if (CurrentPagePanels?.Panels.Count > 0)
+            {
+                CurrentPanel = CurrentPagePanels.Panels[0];
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Navigate to the previous panel (or previous page if at first panel)
+    /// </summary>
+    [RelayCommand]
+    private async Task GoToPreviousPanelAsync()
+    {
+        if (CurrentPagePanels is null || CurrentPagePanels.Panels.Count == 0)
+        {
+            // No panels, just go to previous page
+            await GoToPreviousPageAsync();
+            return;
+        }
+        
+        if (CurrentPanelIndex > 0)
+        {
+            // Go to previous panel on same page
+            CurrentPanelIndex--;
+            CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
+            OnPropertyChanged(nameof(HasPreviousPanel));
+            OnPropertyChanged(nameof(HasNextPanel));
+            OnPropertyChanged(nameof(CurrentPanelDisplay));
+        }
+        else if (HasPreviousPage)
+        {
+            // Go to last panel of previous page
+            await GoToPreviousPageAsync();
+            if (CurrentPagePanels?.Panels.Count > 0)
+            {
+                CurrentPanelIndex = CurrentPagePanels.Panels.Count - 1;
+                CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Select a specific panel by index
+    /// </summary>
+    [RelayCommand]
+    private void SelectPanel(int panelIndex)
+    {
+        if (CurrentPagePanels is null || panelIndex < 0 || panelIndex >= CurrentPagePanels.Panels.Count)
+        {
+            return;
+        }
+        
+        CurrentPanelIndex = panelIndex;
+        CurrentPanel = CurrentPagePanels.Panels[panelIndex];
+        OnPropertyChanged(nameof(HasPreviousPanel));
+        OnPropertyChanged(nameof(HasNextPanel));
+        OnPropertyChanged(nameof(CurrentPanelDisplay));
+    }
+    
+    #endregion
+    
+    #region Zoom Region Methods
+    
+    /// <summary>
+    /// Move the zoom region by delta amounts
+    /// </summary>
+    public void MoveZoomRegion(double deltaX, double deltaY)
+    {
+        ZoomRegion.Move(deltaX, deltaY);
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    /// <summary>
+    /// Resize the zoom region
+    /// </summary>
+    [RelayCommand]
+    private void ResizeZoomRegion(double sizeDelta)
+    {
+        ZoomRegion.Resize(sizeDelta);
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    /// <summary>
+    /// Increase zoom region size
+    /// </summary>
+    [RelayCommand]
+    private void IncreaseZoomRegionSize()
+    {
+        ZoomRegion.Resize(0.05);
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    /// <summary>
+    /// Decrease zoom region size
+    /// </summary>
+    [RelayCommand]
+    private void DecreaseZoomRegionSize()
+    {
+        ZoomRegion.Resize(-0.05);
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    /// <summary>
+    /// Reset zoom region to center with default size
+    /// </summary>
+    [RelayCommand]
+    private void ResetZoomRegion()
+    {
+        ZoomRegion = new ZoomRegion();
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    /// <summary>
+    /// Set zoom region to match a panel's bounds
+    /// </summary>
+    public void SetZoomRegionToPanel(ComicPanel panel)
+    {
+        ZoomRegion = new ZoomRegion
+        {
+            CenterX = panel.X + panel.Width / 2,
+            CenterY = panel.Y + panel.Height / 2,
+            Size = Math.Max(panel.Width, panel.Height)
+        };
+        OnPropertyChanged(nameof(ZoomRegion));
+    }
+    
+    #endregion
 
     [RelayCommand]
     private async Task GoBackAsync()

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Kom2go.Models;
 
 namespace Kom2go.Services;
@@ -277,6 +278,23 @@ public class AppSettings
     /// Whether to use the system language setting
     /// </summary>
     public bool UseSystemLanguage { get; set; } = true;
+    
+    /// <summary>
+    /// Preferred reading mode for the comic reader
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ReadingMode PreferredReadingMode { get; set; } = ReadingMode.Normal;
+    
+    /// <summary>
+    /// Handedness preference for zoomed/guided reading layout
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Handedness Handedness { get; set; } = Handedness.RightHanded;
+    
+    /// <summary>
+    /// Default zoom region size for zoomed reading mode (0.1 to 0.8)
+    /// </summary>
+    public double DefaultZoomRegionSize { get; set; } = 0.3;
 
     /// <summary>
     /// Creates a deep copy of the settings
@@ -300,7 +318,10 @@ public class AppSettings
             LastOpenedComicPath = LastOpenedComicPath,
             ComicsDirectory = ComicsDirectory,
             LanguageCode = LanguageCode,
-            UseSystemLanguage = UseSystemLanguage
+            UseSystemLanguage = UseSystemLanguage,
+            PreferredReadingMode = PreferredReadingMode,
+            Handedness = Handedness,
+            DefaultZoomRegionSize = DefaultZoomRegionSize
         };
     }
 }
