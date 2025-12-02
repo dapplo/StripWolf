@@ -223,12 +223,7 @@ public class PanelDetectionService
     private List<(int start, int end)> FindHorizontalGutters(byte[,] grayImage, int width, int height)
     {
         var gutters = new List<(int start, int end)>();
-        var minGutterHeight = (int)(height * MinGutterRatio);
-        var maxGutterHeight = (int)(height * MaxGutterRatio);
-        
-        // Check for the minimum gutter size to be at least 2 pixels
-        if (minGutterHeight < 2) minGutterHeight = 2;
-        if (maxGutterHeight < minGutterHeight) maxGutterHeight = minGutterHeight + 1;
+        var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(height);
         
         // Sample columns to check (avoid edge artifacts)
         var sampleStartX = width / 10;
@@ -261,7 +256,7 @@ public class PanelDetectionService
             else if (!isLightRow && inGutter)
             {
                 var gutterHeight = y - gutterStart;
-                if (gutterHeight >= minGutterHeight && gutterHeight <= maxGutterHeight)
+                if (gutterHeight >= minGutterSize && gutterHeight <= maxGutterSize)
                 {
                     gutters.Add((gutterStart, y));
                 }
@@ -278,12 +273,7 @@ public class PanelDetectionService
     private List<(int start, int end)> FindVerticalGutters(byte[,] grayImage, int width, int height)
     {
         var gutters = new List<(int start, int end)>();
-        var minGutterWidth = (int)(width * MinGutterRatio);
-        var maxGutterWidth = (int)(width * MaxGutterRatio);
-        
-        // Check for the minimum gutter size to be at least 2 pixels
-        if (minGutterWidth < 2) minGutterWidth = 2;
-        if (maxGutterWidth < minGutterWidth) maxGutterWidth = minGutterWidth + 1;
+        var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(width);
         
         // Sample rows to check (avoid edge artifacts)
         var sampleStartY = height / 10;
@@ -316,7 +306,7 @@ public class PanelDetectionService
             else if (!isLightColumn && inGutter)
             {
                 var gutterWidth = x - gutterStart;
-                if (gutterWidth >= minGutterWidth && gutterWidth <= maxGutterWidth)
+                if (gutterWidth >= minGutterSize && gutterWidth <= maxGutterSize)
                 {
                     gutters.Add((gutterStart, x));
                 }
@@ -325,6 +315,21 @@ public class PanelDetectionService
         }
         
         return gutters;
+    }
+    
+    /// <summary>
+    /// Calculate min and max gutter size bounds for a given dimension
+    /// </summary>
+    private (int min, int max) CalculateGutterSizeBounds(int dimension)
+    {
+        var min = (int)(dimension * MinGutterRatio);
+        var max = (int)(dimension * MaxGutterRatio);
+        
+        // Ensure minimum gutter size is at least 2 pixels
+        if (min < 2) min = 2;
+        if (max < min) max = min + 1;
+        
+        return (min, max);
     }
     
     /// <summary>
