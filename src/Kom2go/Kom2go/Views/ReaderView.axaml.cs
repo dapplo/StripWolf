@@ -965,28 +965,21 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Calculate how the image with Stretch="Uniform" fits in the container (before any transform)
-        var imageAspect = imagePixelWidth / imagePixelHeight;
+        // Calculate container aspect ratio for scale calculation
         var containerAspect = containerWidth / containerHeight;
         
-        double baseImageWidth, baseImageHeight, baseImageOffsetX, baseImageOffsetY;
-        
-        if (imageAspect > containerAspect)
-        {
-            // Image is wider relative to container - fit to width
-            baseImageWidth = containerWidth;
-            baseImageHeight = containerWidth / imageAspect;
-            baseImageOffsetX = 0;
-            baseImageOffsetY = (containerHeight - baseImageHeight) / 2;
-        }
-        else
-        {
-            // Image is taller relative to container - fit to height
-            baseImageHeight = containerHeight;
-            baseImageWidth = containerHeight * imageAspect;
-            baseImageOffsetX = (containerWidth - baseImageWidth) / 2;
-            baseImageOffsetY = 0;
-        }
+        // Get the image bounds using the same calculation as the overview
+        // This ensures consistent coordinate mapping between overview rectangle and zoomed view
+        var zoomedImageBounds = GetImageBoundsInContainer(zoomedImage);
+        var baseImageWidth = zoomedImageBounds.Width;
+        var baseImageHeight = zoomedImageBounds.Height;
+        // Calculate the internal offset within the Image element:
+        // - zoomedImageBounds.X/Y are in parent coordinate space (includes element position + internal offset)
+        // - zoomedImage.Bounds.X/Y represent the Image element's position in its parent
+        // - The difference gives the internal offset where image content is positioned within the element
+        //   due to Stretch="Uniform" centering
+        var baseImageOffsetX = zoomedImageBounds.X - zoomedImage.Bounds.X;
+        var baseImageOffsetY = zoomedImageBounds.Y - zoomedImage.Bounds.Y;
         
         // Validate base image dimensions
         if (baseImageWidth <= 0 || baseImageHeight <= 0)
