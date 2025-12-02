@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Xml.Serialization;
+using Kom2go.Models;
 
 namespace Kom2go.Services;
 
@@ -66,10 +68,20 @@ public class PdfToCbzConverterService
 
         try
         {
+            // Extract PDF metadata before rendering pages
+            var pdfMetadata = _pdfRenderer.GetMetadata(pdfFilePath);
+            
             // Render PDF pages to JPG files
             await RenderPdfPagesToJpgAsync(pdfFilePath, tempDir, progress);
 
-            // Create CBZ file from the JPG files
+            // Generate ComicInfo.xml from PDF metadata if available
+            if (pdfMetadata is not null)
+            {
+                var comicInfo = CreateComicInfoFromPdfMetadata(pdfMetadata, pdfFileName);
+                await WriteComicInfoAsync(comicInfo, tempDir);
+            }
+
+            // Create CBZ file from the JPG files and ComicInfo.xml
             await CreateCbzFromImagesAsync(tempDir, cbzFilePath);
 
             return cbzFilePath;
@@ -111,6 +123,61 @@ public class PdfToCbzConverterService
         return Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Creates a ComicInfo object from PDF metadata
+    /// </summary>
+    private static ComicInfo CreateComicInfoFromPdfMetadata(PdfMetadata pdfMetadata, string fallbackTitle)
+    {
+        var comicInfo = new ComicInfo
+        {
+            Title = !string.IsNullOrEmpty(pdfMetadata.Title) ? pdfMetadata.Title : fallbackTitle,
+            Writer = pdfMetadata.Author,
+            Summary = pdfMetadata.Subject,
+            Tags = pdfMetadata.Keywords,
+            Notes = !string.IsNullOrEmpty(pdfMetadata.Creator) 
+                ? $"Created with: {pdfMetadata.Creator}" 
+                : null
+        };
+
+        // Set year/month/day from creation date
+        if (pdfMetadata.CreationDate.HasValue)
+        {
+            comicInfo.Year = pdfMetadata.CreationDate.Value.Year;
+            comicInfo.Month = pdfMetadata.CreationDate.Value.Month;
+            comicInfo.Day = pdfMetadata.CreationDate.Value.Day;
+        }
+
+        return comicInfo;
+    }
+
+    /// <summary>
+    /// Writes a ComicInfo.xml file to the specified directory
+    /// </summary>
+    private static async Task WriteComicInfoAsync(ComicInfo comicInfo, string directory)
+    {
+        var comicInfoPath = Path.Combine(directory, "ComicInfo.xml");
+        
+        await Task.Run(() =>
+        {
+            // Configure XmlSerializer to not emit null elements
+            var serializer = new XmlSerializer(typeof(ComicInfo));
+            
+            // Create namespaces without xsi to avoid xsi:nil attributes
+            var namespaces = new System.Xml.Serialization.XmlSerializerNamespaces();
+            namespaces.Add("", ""); // Removes default xsi and xsd namespaces
+            
+            var settings = new System.Xml.XmlWriterSettings
+            {
+                Indent = true,
+                Encoding = System.Text.Encoding.UTF8,
+                OmitXmlDeclaration = false
+            };
+            
+            using var writer = System.Xml.XmlWriter.Create(comicInfoPath, settings);
+            serializer.Serialize(writer, comicInfo, namespaces);
+        });
+    }
+
     private async Task RenderPdfPagesToJpgAsync(
         string pdfFilePath, 
         string outputDir,
@@ -131,6 +198,14 @@ public class PdfToCbzConverterService
         {
             using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
             
+            // First add ComicInfo.xml if it exists
+            var comicInfoPath = Path.Combine(sourceDir, "ComicInfo.xml");
+            if (File.Exists(comicInfoPath))
+            {
+                archive.CreateEntryFromFile(comicInfoPath, "ComicInfo.xml", CompressionLevel.Optimal);
+            }
+            
+            // Then add all image files
             var imageFiles = Directory.GetFiles(sourceDir, "*.jpg")
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
 
