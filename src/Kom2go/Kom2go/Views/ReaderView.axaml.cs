@@ -911,7 +911,7 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Get the region to display (normalized 0-1 coordinates)
+        // Get the region to display (normalized 0-1 coordinates relative to the image)
         double regionX, regionY, regionWidth, regionHeight;
         
         if (vm.IsGuidedMode && vm.CurrentPanel is not null)
@@ -947,11 +947,11 @@ public partial class ReaderView : UserControl
         }
         
         // Get actual image pixel dimensions
-        var imageWidth = (double)vm.CurrentPageImage.PixelSize.Width;
-        var imageHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
+        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
         
         // Validate image dimensions
-        if (imageWidth <= 0 || imageHeight <= 0)
+        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
         {
             return;
         }
@@ -965,80 +965,77 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Calculate the aspect ratios
-        var regionAspect = (regionWidth * imageWidth) / (regionHeight * imageHeight);
+        // Calculate how the image with Stretch="Uniform" fits in the container (before any transform)
+        var imageAspect = imagePixelWidth / imagePixelHeight;
         var containerAspect = containerWidth / containerHeight;
         
-        // Calculate how the image with Stretch="Uniform" fits in container
-        var imageAspect = imageWidth / imageHeight;
-        double displayedImageWidth, displayedImageHeight;
+        double baseImageWidth, baseImageHeight, baseImageOffsetX, baseImageOffsetY;
         
         if (imageAspect > containerAspect)
         {
-            // Image is wider relative to container
-            displayedImageWidth = containerWidth;
-            displayedImageHeight = containerWidth / imageAspect;
+            // Image is wider relative to container - fit to width
+            baseImageWidth = containerWidth;
+            baseImageHeight = containerWidth / imageAspect;
+            baseImageOffsetX = 0;
+            baseImageOffsetY = (containerHeight - baseImageHeight) / 2;
         }
         else
         {
-            // Image is taller relative to container
-            displayedImageHeight = containerHeight;
-            displayedImageWidth = containerHeight * imageAspect;
+            // Image is taller relative to container - fit to height
+            baseImageHeight = containerHeight;
+            baseImageWidth = containerHeight * imageAspect;
+            baseImageOffsetX = (containerWidth - baseImageWidth) / 2;
+            baseImageOffsetY = 0;
         }
         
-        // Validate displayed dimensions
-        if (displayedImageWidth <= 0 || displayedImageHeight <= 0)
+        // Validate base image dimensions
+        if (baseImageWidth <= 0 || baseImageHeight <= 0)
         {
             return;
         }
         
-        // Calculate scale factor to enlarge the region to fill the container
-        // We need to scale so the region fills the container (maintaining region aspect ratio)
-        double scaleX, scaleY, scale;
+        // Calculate the aspect ratio of the region (in actual pixels)
+        var regionPixelWidth = regionWidth * imagePixelWidth;
+        var regionPixelHeight = regionHeight * imagePixelHeight;
+        var regionAspect = regionPixelWidth / regionPixelHeight;
         
+        // Calculate scale factor to enlarge the region to fill the container
+        double scale;
         if (regionAspect > containerAspect)
         {
             // Region is wider than container - fit to width
-            scale = containerWidth / (regionWidth * displayedImageWidth);
+            scale = containerWidth / (regionWidth * baseImageWidth);
         }
         else
         {
             // Region is taller than container - fit to height
-            scale = containerHeight / (regionHeight * displayedImageHeight);
+            scale = containerHeight / (regionHeight * baseImageHeight);
         }
         
-        scaleX = scale;
-        scaleY = scale;
+        // Calculate the region position in the base image coordinate space
+        // The region is at (regionX, regionY) normalized, which maps to:
+        var regionLeftInImage = regionX * baseImageWidth;
+        var regionTopInImage = regionY * baseImageHeight;
+        var regionDisplayWidth = regionWidth * baseImageWidth;
+        var regionDisplayHeight = regionHeight * baseImageHeight;
         
-        // Calculate translation to center the region
-        // First, scale from 0,0, then translate to center the region
-        var scaledWidth = displayedImageWidth * scale;
-        var scaledHeight = displayedImageHeight * scale;
+        // Calculate the center of the region in the base image (relative to image top-left, not container)
+        var regionCenterInImageX = regionLeftInImage + regionDisplayWidth / 2;
+        var regionCenterInImageY = regionTopInImage + regionDisplayHeight / 2;
         
-        // Calculate offset to center the image first
-        var imageCenterOffsetX = (containerWidth - displayedImageWidth) / 2;
-        var imageCenterOffsetY = (containerHeight - displayedImageHeight) / 2;
+        // After scaling around origin (0,0), the image offset and region center both scale
+        var scaledImageOffsetX = baseImageOffsetX * scale;
+        var scaledImageOffsetY = baseImageOffsetY * scale;
+        var scaledRegionCenterX = regionCenterInImageX * scale + scaledImageOffsetX;
+        var scaledRegionCenterY = regionCenterInImageY * scale + scaledImageOffsetY;
         
-        // Calculate translation to put the region in view
-        // The region starts at regionX * displayedImageWidth from the left of the image
-        var regionLeftInDisplay = regionX * displayedImageWidth + imageCenterOffsetX;
-        var regionTopInDisplay = regionY * displayedImageHeight + imageCenterOffsetY;
-        
-        // After scaling, we need to translate so the region center is at container center
-        var regionCenterX = regionLeftInDisplay + (regionWidth * displayedImageWidth) / 2;
-        var regionCenterY = regionTopInDisplay + (regionHeight * displayedImageHeight) / 2;
-        
-        // The scaled region center after scaling from origin
-        var scaledRegionCenterX = regionCenterX * scale;
-        var scaledRegionCenterY = regionCenterY * scale;
-        
-        // Translate to put scaled region center at container center
+        // Translate to put the scaled region center at the container center
         var translateX = (containerWidth / 2) - scaledRegionCenterX;
         var translateY = (containerHeight / 2) - scaledRegionCenterY;
         
         // Apply the combined transform
         var transformGroup = new TransformGroup();
-        transformGroup.Children.Add(new ScaleTransform(scaleX, scaleY));
+        transformGroup.Children.Add(new ScaleTransform(scale, scale));
         transformGroup.Children.Add(new TranslateTransform(translateX, translateY));
         
         zoomedImage.RenderTransform = transformGroup;
