@@ -92,7 +92,7 @@ public class SettingsService
     /// <summary>
     /// Load settings from disk
     /// </summary>
-    public async Task<AppSettings> LoadSettingsAsync()
+    public AppSettings LoadSettings()
     {
         if (_cachedSettings is not null)
         {
@@ -105,7 +105,7 @@ public class SettingsService
         {
             try
             {
-                var json = await File.ReadAllTextAsync(_settingsPath);
+                var json = File.ReadAllText(_settingsPath);
                 _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
             }
             catch (IOException)
@@ -121,7 +121,7 @@ public class SettingsService
         }
 
         // Load passwords separately and decrypt them
-        await LoadPasswordsAsync(_cachedSettings);
+        LoadPasswords(_cachedSettings);
 
         return _cachedSettings;
     }
@@ -172,7 +172,7 @@ public class SettingsService
     /// <summary>
     /// Loads and decrypts passwords from the separate file
     /// </summary>
-    private async Task LoadPasswordsAsync(AppSettings settings)
+    private void LoadPasswords(AppSettings settings)
     {
         if (!File.Exists(_passwordsPath))
         {
@@ -181,7 +181,7 @@ public class SettingsService
 
         try
         {
-            var encrypted = await File.ReadAllBytesAsync(_passwordsPath);
+            var encrypted = File.ReadAllBytes(_passwordsPath);
             var json = Decrypt(encrypted);
             var passwords = JsonSerializer.Deserialize<Dictionary<int, string>>(json);
 

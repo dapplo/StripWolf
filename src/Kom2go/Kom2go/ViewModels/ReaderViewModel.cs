@@ -207,7 +207,7 @@ public partial class ReaderViewModel : ViewModelBase
             ErrorMessage = null;
             
             // Load reading mode preferences
-            var settings = await _settingsService.LoadSettingsAsync();
+            var settings = _settingsService.LoadSettings();
             ReadingMode = settings.PreferredReadingMode;
             Handedness = settings.Handedness;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };

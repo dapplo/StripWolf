@@ -107,38 +107,35 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task LoadServersAsync()
+    private void LoadServers()
     {
-        await ExecuteAsync(async () =>
+        _appSettings = _settingsService.LoadSettings();
+        Servers.Clear();
+        foreach (var server in _appSettings.Servers)
         {
-            _appSettings = await _settingsService.LoadSettingsAsync();
-            Servers.Clear();
-            foreach (var server in _appSettings.Servers)
-            {
-                Servers.Add(server);
-            }
+            Servers.Add(server);
+        }
             
-            // Track the next available ID
-            if (_appSettings.Servers.Count > 0)
-            {
-                _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
-            }
+        // Track the next available ID
+        if (_appSettings.Servers.Count > 0)
+        {
+            _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
+        }
             
-            // Load language setting
-            if (_appSettings.UseSystemLanguage)
-            {
-                SelectedLanguage = AvailableLanguages[0]; // System Default
-            }
-            else
-            {
-                SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
-                                   ?? AvailableLanguages[0];
-            }
+        // Load language setting
+        if (_appSettings.UseSystemLanguage)
+        {
+            SelectedLanguage = AvailableLanguages[0]; // System Default
+        }
+        else
+        {
+            SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
+                                ?? AvailableLanguages[0];
+        }
             
-            // Load reading mode settings
-            SelectedReadingMode = _appSettings.PreferredReadingMode;
-            SelectedHandedness = _appSettings.Handedness;
-        });
+        // Load reading mode settings
+        SelectedReadingMode = _appSettings.PreferredReadingMode;
+        SelectedHandedness = _appSettings.Handedness;
     }
 
     partial void OnSelectedLanguageChanged(LanguageOption value)
@@ -346,7 +343,7 @@ public partial class SettingsViewModel : ViewModelBase
             await _settingsService.SaveSettingsAsync(_appSettings);
 
             // Refresh the list
-            await LoadServersAsync();
+            LoadServers();
         }, "Failed to set active server");
     }
 

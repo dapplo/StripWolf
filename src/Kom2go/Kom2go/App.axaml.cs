@@ -75,7 +75,7 @@ public partial class App : Application
         try
         {
             var settingsService = Services!.GetRequiredService<SettingsService>();
-            var settings = settingsService.LoadSettingsAsync().GetAwaiter().GetResult();
+            var settings = settingsService.LoadSettings();
             
             if (!settings.UseSystemLanguage && !string.IsNullOrEmpty(settings.LanguageCode))
             {
