@@ -1046,38 +1046,48 @@ public partial class ReaderView : UserControl
     }
     
     /// <summary>
-    /// Get the bounds of the image within its container
+    /// Get the bounds of the image content within its container (in parent coordinate space).
+    /// This assumes the Image has Stretch="Uniform" which centers the content.
+    /// Returns where the actual image pixels are displayed, accounting for:
+    /// - The Image control's position within its parent (image.Bounds.X/Y)
+    /// - The image content centering due to uniform stretching (internal offset)
     /// </summary>
     private static Rect GetImageBoundsInContainer(Image image)
     {
-        var containerBounds = image.Bounds;
+        var controlBounds = image.Bounds;
         if (image.Source is not Avalonia.Media.Imaging.Bitmap bitmap)
         {
-            return containerBounds;
+            return controlBounds;
         }
         
         var imageAspect = (double)bitmap.PixelSize.Width / bitmap.PixelSize.Height;
-        var containerAspect = containerBounds.Width / containerBounds.Height;
+        var controlAspect = controlBounds.Width / controlBounds.Height;
         
         double displayWidth, displayHeight;
         
-        if (imageAspect > containerAspect)
+        if (imageAspect > controlAspect)
         {
-            // Image is wider than container
-            displayWidth = containerBounds.Width;
+            // Image is wider than control - fit to width
+            displayWidth = controlBounds.Width;
             displayHeight = displayWidth / imageAspect;
         }
         else
         {
-            // Image is taller than container
-            displayHeight = containerBounds.Height;
+            // Image is taller than control - fit to height
+            displayHeight = controlBounds.Height;
             displayWidth = displayHeight * imageAspect;
         }
         
-        var x = (containerBounds.Width - displayWidth) / 2;
-        var y = (containerBounds.Height - displayHeight) / 2;
+        // Calculate the offset within the Image control where the image content is centered
+        var internalOffsetX = (controlBounds.Width - displayWidth) / 2;
+        var internalOffsetY = (controlBounds.Height - displayHeight) / 2;
         
-        return new Rect(x, y, displayWidth, displayHeight);
+        // Return bounds in parent coordinate space: control position + internal offset
+        return new Rect(
+            controlBounds.X + internalOffsetX, 
+            controlBounds.Y + internalOffsetY, 
+            displayWidth, 
+            displayHeight);
     }
     
     /// <summary>
