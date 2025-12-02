@@ -96,6 +96,39 @@
           </StackPanel>
         </Border>
 
+        <!-- Reading Mode Settings Section -->
+        <TextBlock Text="Reading Settings" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="16">
+            <!-- Reading Mode Selection -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Default Reading Mode" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableReadingModes}" 
+                        SelectedItem="{Binding SelectedReadingMode}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Foreground="Gray" FontSize="12" TextWrapping="Wrap">
+                <Run Text="• Normal: Standard full-page reading"/>
+                <LineBreak/>
+                <Run Text="• Zoomed: Split view with overview and magnified area"/>
+                <LineBreak/>
+                <Run Text="• Guided: Automatic panel detection for scene-by-scene reading"/>
+              </TextBlock>
+            </StackPanel>
+            
+            <!-- Handedness Selection -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Handedness (for Zoomed/Guided modes)" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableHandednessOptions}" 
+                        SelectedItem="{Binding SelectedHandedness}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Text="Right-handed: Overview on left, zoom on right. Left-handed: Overview on right, zoom on left."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <!-- About Section -->
         <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
         <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
@@ -117,7 +150,19 @@
               <Button Grid.Column="1" Content="✕" Padding="4,2" Background="Transparent"
                       Command="{Binding HideReleaseNotesCommand}"/>
             </Grid>
-            <TextBlock Text="Version 1.0.0" FontWeight="SemiBold" Margin="0,4,0,0"/>
+            <TextBlock Text="Version 1.1.0" FontWeight="SemiBold" Margin="0,4,0,0"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
+              <Run Text="• NEW: Zoomed reading mode - split view with page overview and magnified area"/>
+              <LineBreak/>
+              <Run Text="• NEW: Guided reading mode - automatic panel detection for scene-by-scene navigation"/>
+              <LineBreak/>
+              <Run Text="• NEW: Left/right-handed layout options for zoomed and guided modes"/>
+              <LineBreak/>
+              <Run Text="• NEW: Panel navigation with keyboard (M to cycle modes, H to toggle handedness)"/>
+              <LineBreak/>
+              <Run Text="• NEW: Background pre-caching of panel detection for smoother reading"/>
+            </TextBlock>
+            <TextBlock Text="Version 1.0.0" FontWeight="SemiBold" Margin="0,8,0,0"/>
             <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
               <Run Text="• Initial release with Komga integration"/>
               <LineBreak/>

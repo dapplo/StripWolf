@@ -10,7 +10,7 @@ public partial class SettingsView : UserControl
         InitializeComponent();
     }
 
-    protected override async void OnDataContextChanged(EventArgs e)
+    protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
         
@@ -19,7 +19,7 @@ public partial class SettingsView : UserControl
         {
             try
             {
-                await viewModel.LoadServersCommand.ExecuteAsync(null);
+                viewModel.LoadServersCommand.Execute(null);
             }
             catch (Exception ex)
             {

@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
+using Kom2go.Models;
 using Kom2go.ViewModels;
 
 namespace Kom2go.Views;
@@ -12,6 +14,21 @@ public partial class ReaderView : UserControl
     private ScrollViewer? _imageScroller;
     private Canvas? _zoomCanvas;
     private Grid? _imageContainer;
+    
+    // Overview canvas references for zoomed/guided mode
+    private Canvas? _overviewCanvas;
+    private Canvas? _overviewCanvasRight;
+    private Image? _overviewImage;
+    private Image? _overviewImageRight;
+    private Image? _zoomedAreaLeftImage;
+    private Image? _zoomedAreaRightImage;
+    private Border? _zoomedBorderLeft;
+    private Border? _zoomedBorderRight;
+    
+    // Zoom region tracking
+    private Rectangle? _zoomRegionRect;
+    private bool _isDraggingZoomRegion;
+    private Point _zoomRegionDragStart;
     
     // Swipe gesture tracking
     private Point? _swipeStartPoint;
@@ -70,6 +87,61 @@ public partial class ReaderView : UserControl
             }
         }
     }
+    
+    /// <summary>
+    /// Handle scroll wheel events in zoomed/guided mode
+    /// </summary>
+    private void OnZoomedGuidedPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (DataContext is ReaderViewModel vm)
+        {
+            if (vm.IsGuidedMode)
+            {
+                // In guided mode, scroll through panels
+                if (e.Delta.Y > 0 && vm.HasPreviousPanel)
+                {
+                    vm.GoToPreviousPanelCommand.Execute(null);
+                    e.Handled = true;
+                }
+                else if (e.Delta.Y < 0 && vm.HasNextPanel)
+                {
+                    vm.GoToNextPanelCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+            else if (vm.ReadingMode == ReadingMode.Zoomed)
+            {
+                // In zoomed mode, use Ctrl+scroll to change zoom region size,
+                // otherwise change pages
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                {
+                    if (e.Delta.Y > 0)
+                    {
+                        vm.DecreaseZoomRegionSizeCommand.Execute(null);
+                    }
+                    else
+                    {
+                        vm.IncreaseZoomRegionSizeCommand.Execute(null);
+                    }
+                    e.Handled = true;
+                }
+                else
+                {
+                    // Scroll through pages
+                    if (e.Delta.Y > 0 && vm.HasPreviousPage)
+                    {
+                        vm.GoToPreviousPageCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                    else if (e.Delta.Y < 0 && vm.HasNextPage)
+                    {
+                        vm.GoToNextPageCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+    }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -82,14 +154,30 @@ public partial class ReaderView : UserControl
         {
             case Key.Left:
             case Key.PageUp:
-                vm.GoToPreviousPageCommand.Execute(null);
+                // In guided mode, navigate panels instead of pages
+                if (vm.IsGuidedMode)
+                {
+                    vm.GoToPreviousPanelCommand.Execute(null);
+                }
+                else
+                {
+                    vm.GoToPreviousPageCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
             case Key.Right:
             case Key.PageDown:
             case Key.Space:
-                vm.GoToNextPageCommand.Execute(null);
+                // In guided mode, navigate panels instead of pages
+                if (vm.IsGuidedMode)
+                {
+                    vm.GoToNextPanelCommand.Execute(null);
+                }
+                else
+                {
+                    vm.GoToNextPageCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
@@ -108,26 +196,65 @@ public partial class ReaderView : UserControl
                 
             case Key.Add:
             case Key.OemPlus:
-                vm.ZoomInCommand.Execute(null);
+                if (vm.IsZoomedOrGuidedMode)
+                {
+                    vm.IncreaseZoomRegionSizeCommand.Execute(null);
+                }
+                else
+                {
+                    vm.ZoomInCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
             case Key.Subtract:
             case Key.OemMinus:
-                vm.ZoomOutCommand.Execute(null);
+                if (vm.IsZoomedOrGuidedMode)
+                {
+                    vm.DecreaseZoomRegionSizeCommand.Execute(null);
+                }
+                else
+                {
+                    vm.ZoomOutCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
             case Key.D0:
             case Key.NumPad0:
-                vm.ResetZoomCommand.Execute(null);
+                if (vm.IsZoomedOrGuidedMode)
+                {
+                    vm.ResetZoomRegionCommand.Execute(null);
+                }
+                else
+                {
+                    vm.ResetZoomCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
             case Key.D2:
             case Key.NumPad2:
-                // Toggle two-page mode with "2" key
-                vm.ToggleTwoPageModeCommand.Execute(null);
+                // Toggle two-page mode with "2" key (only in normal mode)
+                if (vm.CanUseTwoPageMode)
+                {
+                    vm.ToggleTwoPageModeCommand.Execute(null);
+                }
+                e.Handled = true;
+                break;
+                
+            case Key.M:
+                // Cycle reading mode with "M" key
+                vm.CycleReadingModeCommand.Execute(null);
+                e.Handled = true;
+                break;
+                
+            case Key.H:
+                // Toggle handedness with "H" key
+                if (vm.IsZoomedOrGuidedMode)
+                {
+                    vm.ToggleHandednessCommand.Execute(null);
+                }
                 e.Handled = true;
                 break;
                 
@@ -135,6 +262,11 @@ public partial class ReaderView : UserControl
             case Key.F11:
                 vm.ToggleFullScreenCommand.Execute(null);
                 ToggleWindowFullScreen();
+                e.Handled = true;
+                break;
+                
+            case Key.I:
+                vm.ToggleInfoPanelCommand.Execute(null);
                 e.Handled = true;
                 break;
                 
@@ -183,6 +315,16 @@ public partial class ReaderView : UserControl
         _zoomCanvas = this.FindControl<Canvas>("ZoomCanvas");
         _imageContainer = this.FindControl<Grid>("ImageContainer");
         
+        // Cache zoomed/guided mode control references
+        _overviewCanvas = this.FindControl<Canvas>("OverviewCanvas");
+        _overviewCanvasRight = this.FindControl<Canvas>("OverviewCanvasRight");
+        _overviewImage = this.FindControl<Image>("OverviewImage");
+        _overviewImageRight = this.FindControl<Image>("OverviewImageRight");
+        _zoomedAreaLeftImage = this.FindControl<Image>("ZoomedAreaLeftImage");
+        _zoomedAreaRightImage = this.FindControl<Image>("ZoomedAreaRightImage");
+        _zoomedBorderLeft = this.FindControl<Border>("ZoomedBorderLeft");
+        _zoomedBorderRight = this.FindControl<Border>("ZoomedBorderRight");
+        
         // Focus this control to receive keyboard events
         Focus();
         
@@ -199,6 +341,14 @@ public partial class ReaderView : UserControl
         _imageScroller = null;
         _zoomCanvas = null;
         _imageContainer = null;
+        _overviewCanvas = null;
+        _overviewCanvasRight = null;
+        _overviewImage = null;
+        _overviewImageRight = null;
+        _zoomedAreaLeftImage = null;
+        _zoomedAreaRightImage = null;
+        _zoomedBorderLeft = null;
+        _zoomedBorderRight = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -215,8 +365,37 @@ public partial class ReaderView : UserControl
                 {
                     UpdateImageSizing();
                 }
+                
+                // Update overlay when in zoomed/guided mode
+                if (args.PropertyName == nameof(ReaderViewModel.ReadingMode) ||
+                    args.PropertyName == nameof(ReaderViewModel.ZoomRegion) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPagePanels) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPanel) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPanelIndex) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
+                    args.PropertyName == nameof(ReaderViewModel.Handedness))
+                {
+                    // Use Dispatcher to ensure layout is complete before updating overlay
+                    // Check if still attached to visual tree before updating
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (IsAttachedToVisualTree())
+                        {
+                            UpdateOverviewOverlay();
+                            UpdateZoomedAreaClip();
+                        }
+                    });
+                }
             };
         }
+    }
+    
+    /// <summary>
+    /// Check if this control is still attached to the visual tree
+    /// </summary>
+    private bool IsAttachedToVisualTree()
+    {
+        return _pageImage is not null || _imageScroller is not null;
     }
 
     /// <summary>
@@ -364,6 +543,19 @@ public partial class ReaderView : UserControl
         base.OnSizeChanged(e);
         // Re-apply sizing when size changes
         UpdateImageSizing();
+        
+        // Also update zoomed/guided mode overlays
+        if (DataContext is ReaderViewModel vm && vm.IsZoomedOrGuidedMode)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (IsAttachedToVisualTree())
+                {
+                    UpdateOverviewOverlay();
+                    UpdateZoomedAreaClip();
+                }
+            });
+        }
     }
     
     #region Zoom Pointer Handling (for pinch zoom on image location)
@@ -624,6 +816,442 @@ public partial class ReaderView : UserControl
         var dx = p2.X - p1.X;
         var dy = p2.Y - p1.Y;
         return Math.Sqrt(dx * dx + dy * dy);
+    }
+    
+    #endregion
+    
+    #region Zoomed/Guided Mode Methods
+    
+    /// <summary>
+    /// Update the overlay on the overview image showing panels and zoom region
+    /// </summary>
+    private void UpdateOverviewOverlay()
+    {
+        if (DataContext is not ReaderViewModel vm)
+        {
+            return;
+        }
+        
+        var canvas = vm.IsOverviewOnLeft ? _overviewCanvas : _overviewCanvasRight;
+        var image = vm.IsOverviewOnLeft ? _overviewImage : _overviewImageRight;
+        
+        if (canvas is null || image is null)
+        {
+            return;
+        }
+        
+        // Clear existing shapes
+        canvas.Children.Clear();
+        
+        // Get image bounds within the canvas
+        var imageBounds = GetImageBoundsInContainer(image);
+        if (imageBounds.Width <= 0 || imageBounds.Height <= 0)
+        {
+            return;
+        }
+        
+        // In guided mode, draw panel boxes
+        if (vm.IsGuidedMode && vm.CurrentPagePanels is not null)
+        {
+            foreach (var panel in vm.CurrentPagePanels.Panels)
+            {
+                var isCurrentPanel = panel.PanelIndex == vm.CurrentPanelIndex;
+                var rect = new Rectangle
+                {
+                    Width = panel.Width * imageBounds.Width,
+                    Height = panel.Height * imageBounds.Height,
+                    Stroke = isCurrentPanel ? Brushes.Cyan : Brushes.Yellow,
+                    StrokeThickness = isCurrentPanel ? 3 : 1,
+                    Fill = isCurrentPanel ? new SolidColorBrush(Color.FromArgb(40, 0, 255, 255)) : null,
+                    Opacity = isCurrentPanel ? 1 : 0.7
+                };
+                Canvas.SetLeft(rect, imageBounds.X + panel.X * imageBounds.Width);
+                Canvas.SetTop(rect, imageBounds.Y + panel.Y * imageBounds.Height);
+                canvas.Children.Add(rect);
+            }
+        }
+        
+        // In zoomed mode, draw the zoom region box
+        if (vm.ReadingMode == ReadingMode.Zoomed)
+        {
+            var bounds = vm.ZoomRegion.GetBounds();
+            var rect = new Rectangle
+            {
+                Width = (bounds.Right - bounds.Left) * imageBounds.Width,
+                Height = (bounds.Bottom - bounds.Top) * imageBounds.Height,
+                Stroke = Brushes.Cyan,
+                StrokeThickness = 2,
+                Fill = new SolidColorBrush(Color.FromArgb(30, 0, 255, 255))
+            };
+            Canvas.SetLeft(rect, imageBounds.X + bounds.Left * imageBounds.Width);
+            Canvas.SetTop(rect, imageBounds.Y + bounds.Top * imageBounds.Height);
+            canvas.Children.Add(rect);
+            
+            // Store reference for dragging
+            _zoomRegionRect = rect;
+        }
+    }
+    
+    /// <summary>
+    /// Update the zoomed area display using scale and translate transforms
+    /// to show the selected region enlarged to fill the container
+    /// </summary>
+    private void UpdateZoomedAreaClip()
+    {
+        if (DataContext is not ReaderViewModel vm)
+        {
+            return;
+        }
+        
+        var zoomedImage = vm.IsOverviewOnLeft ? _zoomedAreaRightImage : _zoomedAreaLeftImage;
+        var zoomedBorder = vm.IsOverviewOnLeft ? _zoomedBorderRight : _zoomedBorderLeft;
+        
+        if (zoomedImage is null || zoomedBorder is null || vm.CurrentPageImage is null)
+        {
+            return;
+        }
+        
+        // Get the region to display (normalized 0-1 coordinates relative to the image)
+        double regionX, regionY, regionWidth, regionHeight;
+        
+        if (vm.IsGuidedMode && vm.CurrentPanel is not null)
+        {
+            // In guided mode, use the current panel bounds
+            var panel = vm.CurrentPanel;
+            regionX = panel.X;
+            regionY = panel.Y;
+            regionWidth = panel.Width;
+            regionHeight = panel.Height;
+        }
+        else if (vm.ReadingMode == ReadingMode.Zoomed)
+        {
+            // In zoomed mode, use the zoom region bounds
+            var bounds = vm.ZoomRegion.GetBounds();
+            regionX = bounds.Left;
+            regionY = bounds.Top;
+            regionWidth = bounds.Right - bounds.Left;
+            regionHeight = bounds.Bottom - bounds.Top;
+        }
+        else
+        {
+            // Normal mode - show full image
+            zoomedImage.RenderTransform = null;
+            zoomedImage.Clip = null;
+            return;
+        }
+        
+        // Ensure we have valid region dimensions
+        if (regionWidth <= 0 || regionHeight <= 0)
+        {
+            return;
+        }
+        
+        // Get actual image pixel dimensions
+        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
+        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        
+        // Validate image dimensions
+        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
+        {
+            return;
+        }
+        
+        // Get the container (border) dimensions
+        var containerWidth = zoomedBorder.Bounds.Width;
+        var containerHeight = zoomedBorder.Bounds.Height;
+        
+        if (containerWidth <= 0 || containerHeight <= 0)
+        {
+            return;
+        }
+        
+        // Calculate how the image with Stretch="Uniform" fits in the container (before any transform)
+        var imageAspect = imagePixelWidth / imagePixelHeight;
+        var containerAspect = containerWidth / containerHeight;
+        
+        double baseImageWidth, baseImageHeight, baseImageOffsetX, baseImageOffsetY;
+        
+        if (imageAspect > containerAspect)
+        {
+            // Image is wider relative to container - fit to width
+            baseImageWidth = containerWidth;
+            baseImageHeight = containerWidth / imageAspect;
+            baseImageOffsetX = 0;
+            baseImageOffsetY = (containerHeight - baseImageHeight) / 2;
+        }
+        else
+        {
+            // Image is taller relative to container - fit to height
+            baseImageHeight = containerHeight;
+            baseImageWidth = containerHeight * imageAspect;
+            baseImageOffsetX = (containerWidth - baseImageWidth) / 2;
+            baseImageOffsetY = 0;
+        }
+        
+        // Validate base image dimensions
+        if (baseImageWidth <= 0 || baseImageHeight <= 0)
+        {
+            return;
+        }
+        
+        // Calculate the aspect ratio of the region (in actual pixels)
+        var regionPixelWidth = regionWidth * imagePixelWidth;
+        var regionPixelHeight = regionHeight * imagePixelHeight;
+        var regionAspect = regionPixelWidth / regionPixelHeight;
+        
+        // Calculate scale factor to enlarge the region to fill the container
+        double scale;
+        if (regionAspect > containerAspect)
+        {
+            // Region is wider than container - fit to width
+            scale = containerWidth / (regionWidth * baseImageWidth);
+        }
+        else
+        {
+            // Region is taller than container - fit to height
+            scale = containerHeight / (regionHeight * baseImageHeight);
+        }
+        
+        // Calculate the region position in the base image coordinate space
+        // The region is at (regionX, regionY) normalized, which maps to:
+        var regionLeftInImage = regionX * baseImageWidth;
+        var regionTopInImage = regionY * baseImageHeight;
+        var regionDisplayWidth = regionWidth * baseImageWidth;
+        var regionDisplayHeight = regionHeight * baseImageHeight;
+        
+        // Calculate the center of the region in the base image (relative to image top-left, not container)
+        var regionCenterInImageX = regionLeftInImage + regionDisplayWidth / 2;
+        var regionCenterInImageY = regionTopInImage + regionDisplayHeight / 2;
+        
+        // After scaling around origin (0,0), the image offset and region center both scale
+        var scaledImageOffsetX = baseImageOffsetX * scale;
+        var scaledImageOffsetY = baseImageOffsetY * scale;
+        var scaledRegionCenterX = regionCenterInImageX * scale + scaledImageOffsetX;
+        var scaledRegionCenterY = regionCenterInImageY * scale + scaledImageOffsetY;
+        
+        // Translate to put the scaled region center at the container center
+        var translateX = (containerWidth / 2) - scaledRegionCenterX;
+        var translateY = (containerHeight / 2) - scaledRegionCenterY;
+        
+        // Apply the combined transform
+        var transformGroup = new TransformGroup();
+        transformGroup.Children.Add(new ScaleTransform(scale, scale));
+        transformGroup.Children.Add(new TranslateTransform(translateX, translateY));
+        
+        zoomedImage.RenderTransform = transformGroup;
+        zoomedImage.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
+        
+        // Don't use clip - the border's ClipToBounds handles clipping
+        zoomedImage.Clip = null;
+    }
+    
+    /// <summary>
+    /// Get the bounds of the image within its container
+    /// </summary>
+    private static Rect GetImageBoundsInContainer(Image image)
+    {
+        var containerBounds = image.Bounds;
+        if (image.Source is not Avalonia.Media.Imaging.Bitmap bitmap)
+        {
+            return containerBounds;
+        }
+        
+        var imageAspect = (double)bitmap.PixelSize.Width / bitmap.PixelSize.Height;
+        var containerAspect = containerBounds.Width / containerBounds.Height;
+        
+        double displayWidth, displayHeight;
+        
+        if (imageAspect > containerAspect)
+        {
+            // Image is wider than container
+            displayWidth = containerBounds.Width;
+            displayHeight = displayWidth / imageAspect;
+        }
+        else
+        {
+            // Image is taller than container
+            displayHeight = containerBounds.Height;
+            displayWidth = displayHeight * imageAspect;
+        }
+        
+        var x = (containerBounds.Width - displayWidth) / 2;
+        var y = (containerBounds.Height - displayHeight) / 2;
+        
+        return new Rect(x, y, displayWidth, displayHeight);
+    }
+    
+    /// <summary>
+    /// Handle pointer pressed on overview image for zoom region dragging
+    /// </summary>
+    private void OnOverviewPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not ReaderViewModel vm)
+        {
+            return;
+        }
+        
+        var position = e.GetPosition(sender as Control);
+        var image = vm.IsOverviewOnLeft ? _overviewImage : _overviewImageRight;
+        if (image is null)
+        {
+            return;
+        }
+        
+        var imageBounds = GetImageBoundsInContainer(image);
+        
+        // Convert to normalized coordinates
+        var normalizedX = (position.X - imageBounds.X) / imageBounds.Width;
+        var normalizedY = (position.Y - imageBounds.Y) / imageBounds.Height;
+        
+        // Clamp to valid range
+        normalizedX = Math.Max(0, Math.Min(1, normalizedX));
+        normalizedY = Math.Max(0, Math.Min(1, normalizedY));
+        
+        // In guided mode, check if a panel was clicked
+        if (vm.IsGuidedMode && vm.CurrentPagePanels is not null)
+        {
+            for (var i = 0; i < vm.CurrentPagePanels.Panels.Count; i++)
+            {
+                var panel = vm.CurrentPagePanels.Panels[i];
+                if (normalizedX >= panel.X && normalizedX <= panel.X + panel.Width &&
+                    normalizedY >= panel.Y && normalizedY <= panel.Y + panel.Height)
+                {
+                    vm.SelectPanelCommand.Execute(i);
+                    return;
+                }
+            }
+        }
+        
+        // In zoomed mode, start dragging zoom region
+        if (vm.ReadingMode == ReadingMode.Zoomed)
+        {
+            _isDraggingZoomRegion = true;
+            _zoomRegionDragStart = position;
+            
+            // Move zoom region center to click position
+            vm.ZoomRegion.CenterX = normalizedX;
+            vm.ZoomRegion.CenterY = normalizedY;
+            vm.MoveZoomRegion(0, 0); // Trigger update
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer moved on overview image for zoom region dragging
+    /// </summary>
+    private void OnOverviewPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is not ReaderViewModel vm || !_isDraggingZoomRegion)
+        {
+            return;
+        }
+        
+        if (vm.ReadingMode != ReadingMode.Zoomed)
+        {
+            return;
+        }
+        
+        var position = e.GetPosition(sender as Control);
+        var image = vm.IsOverviewOnLeft ? _overviewImage : _overviewImageRight;
+        if (image is null)
+        {
+            return;
+        }
+        
+        var imageBounds = GetImageBoundsInContainer(image);
+        
+        // Convert to normalized coordinates
+        var normalizedX = (position.X - imageBounds.X) / imageBounds.Width;
+        var normalizedY = (position.Y - imageBounds.Y) / imageBounds.Height;
+        
+        // Clamp to valid range
+        normalizedX = Math.Max(0, Math.Min(1, normalizedX));
+        normalizedY = Math.Max(0, Math.Min(1, normalizedY));
+        
+        // Update zoom region center
+        vm.ZoomRegion.CenterX = normalizedX;
+        vm.ZoomRegion.CenterY = normalizedY;
+        vm.MoveZoomRegion(0, 0); // Trigger update
+    }
+    
+    /// <summary>
+    /// Handle pointer released on overview image
+    /// </summary>
+    private void OnOverviewPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _isDraggingZoomRegion = false;
+    }
+    
+    /// <summary>
+    /// Handle pointer pressed on zoomed area for navigation
+    /// </summary>
+    private void OnZoomedAreaPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // Currently just storing the start point for potential swipe
+        if (DataContext is ReaderViewModel vm)
+        {
+            _swipeStartPoint = e.GetPosition(sender as Control);
+            _swipeStartTime = DateTime.UtcNow;
+        }
+    }
+    
+    /// <summary>
+    /// Handle pointer moved on zoomed area
+    /// </summary>
+    private void OnZoomedAreaPointerMoved(object? sender, PointerEventArgs e)
+    {
+        // Could be used for panning within the zoomed area
+    }
+    
+    /// <summary>
+    /// Handle pointer released on zoomed area for tap/swipe handling
+    /// </summary>
+    private void OnZoomedAreaPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue)
+        {
+            return;
+        }
+        
+        var position = e.GetPosition(sender as Control);
+        var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
+        var deltaX = position.X - _swipeStartPoint.Value.X;
+        var deltaY = position.Y - _swipeStartPoint.Value.Y;
+        
+        // Check for swipe
+        if (elapsed < SwipeMaxTimeMs && 
+            Math.Abs(deltaX) > SwipeThreshold && 
+            Math.Abs(deltaY) < SwipeMaxVerticalDeviation)
+        {
+            if (vm.IsGuidedMode)
+            {
+                if (deltaX > 0)
+                {
+                    vm.GoToPreviousPanelCommand.Execute(null);
+                }
+                else
+                {
+                    vm.GoToNextPanelCommand.Execute(null);
+                }
+            }
+            else
+            {
+                if (deltaX > 0)
+                {
+                    vm.GoToPreviousPageCommand.Execute(null);
+                }
+                else
+                {
+                    vm.GoToNextPageCommand.Execute(null);
+                }
+            }
+        }
+        else
+        {
+            // Tap - toggle controls
+            vm.ToggleControlsCommand.Execute(null);
+        }
+        
+        _swipeStartPoint = null;
     }
     
     #endregion

@@ -297,7 +297,7 @@ public partial class KomgaViewModel : ViewModelBase
     {
         try
         {
-            var settings = await _settingsService.LoadSettingsAsync();
+            var settings = _settingsService.LoadSettings();
             _activeServer = settings.Servers.FirstOrDefault(s => s.IsActive);
             
             OnPropertyChanged(nameof(ServerUsername));

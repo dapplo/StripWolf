@@ -75,7 +75,7 @@ public partial class App : Application
         try
         {
             var settingsService = Services!.GetRequiredService<SettingsService>();
-            var settings = settingsService.LoadSettingsAsync().GetAwaiter().GetResult();
+            var settings = settingsService.LoadSettings();
             
             if (!settings.UseSystemLanguage && !string.IsNullOrEmpty(settings.LanguageCode))
             {
@@ -99,6 +99,7 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<ComicReaderService>();
+        services.AddSingleton<PanelDetectionService>();
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<ComicConverterService>();
         

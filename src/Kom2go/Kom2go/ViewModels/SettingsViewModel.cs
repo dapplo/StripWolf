@@ -58,6 +58,25 @@ public partial class SettingsViewModel : ViewModelBase
     /// Available languages for selection
     /// </summary>
     public IReadOnlyList<LanguageOption> AvailableLanguages => LocalizationService.AvailableLanguages;
+    
+    // Reading mode settings
+    [ObservableProperty]
+    private ReadingMode _selectedReadingMode = ReadingMode.Normal;
+    
+    [ObservableProperty]
+    private Handedness _selectedHandedness = Handedness.RightHanded;
+    
+    /// <summary>
+    /// Available reading modes
+    /// </summary>
+    public IReadOnlyList<ReadingMode> AvailableReadingModes { get; } = 
+        [ReadingMode.Normal, ReadingMode.Zoomed, ReadingMode.Guided];
+    
+    /// <summary>
+    /// Available handedness options
+    /// </summary>
+    public IReadOnlyList<Handedness> AvailableHandednessOptions { get; } = 
+        [Handedness.RightHanded, Handedness.LeftHanded];
 
     private KomgaServer? _editingServer;
 
@@ -88,34 +107,35 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task LoadServersAsync()
+    private void LoadServers()
     {
-        await ExecuteAsync(async () =>
+        _appSettings = _settingsService.LoadSettings();
+        Servers.Clear();
+        foreach (var server in _appSettings.Servers)
         {
-            _appSettings = await _settingsService.LoadSettingsAsync();
-            Servers.Clear();
-            foreach (var server in _appSettings.Servers)
-            {
-                Servers.Add(server);
-            }
+            Servers.Add(server);
+        }
             
-            // Track the next available ID
-            if (_appSettings.Servers.Count > 0)
-            {
-                _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
-            }
+        // Track the next available ID
+        if (_appSettings.Servers.Count > 0)
+        {
+            _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
+        }
             
-            // Load language setting
-            if (_appSettings.UseSystemLanguage)
-            {
-                SelectedLanguage = AvailableLanguages[0]; // System Default
-            }
-            else
-            {
-                SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
-                                   ?? AvailableLanguages[0];
-            }
-        });
+        // Load language setting
+        if (_appSettings.UseSystemLanguage)
+        {
+            SelectedLanguage = AvailableLanguages[0]; // System Default
+        }
+        else
+        {
+            SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.CultureCode == _appSettings.LanguageCode) 
+                                ?? AvailableLanguages[0];
+        }
+            
+        // Load reading mode settings
+        SelectedReadingMode = _appSettings.PreferredReadingMode;
+        SelectedHandedness = _appSettings.Handedness;
     }
 
     partial void OnSelectedLanguageChanged(LanguageOption value)
@@ -128,6 +148,26 @@ public partial class SettingsViewModel : ViewModelBase
         {
             _appSettings.LanguageCode = value.CultureCode;
             _appSettings.UseSystemLanguage = value.CultureCode is null;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+    
+    partial void OnSelectedReadingModeChanged(ReadingMode value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.PreferredReadingMode = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+    
+    partial void OnSelectedHandednessChanged(Handedness value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.Handedness = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
@@ -303,7 +343,7 @@ public partial class SettingsViewModel : ViewModelBase
             await _settingsService.SaveSettingsAsync(_appSettings);
 
             // Refresh the list
-            await LoadServersAsync();
+            LoadServers();
         }, "Failed to set active server");
     }
 

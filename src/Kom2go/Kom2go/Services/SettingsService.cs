@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Kom2go.Models;
 
 namespace Kom2go.Services;
@@ -91,7 +92,7 @@ public class SettingsService
     /// <summary>
     /// Load settings from disk
     /// </summary>
-    public async Task<AppSettings> LoadSettingsAsync()
+    public AppSettings LoadSettings()
     {
         if (_cachedSettings is not null)
         {
@@ -104,7 +105,7 @@ public class SettingsService
         {
             try
             {
-                var json = await File.ReadAllTextAsync(_settingsPath);
+                var json = File.ReadAllText(_settingsPath);
                 _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
             }
             catch (IOException)
@@ -120,7 +121,7 @@ public class SettingsService
         }
 
         // Load passwords separately and decrypt them
-        await LoadPasswordsAsync(_cachedSettings);
+        LoadPasswords(_cachedSettings);
 
         return _cachedSettings;
     }
@@ -171,7 +172,7 @@ public class SettingsService
     /// <summary>
     /// Loads and decrypts passwords from the separate file
     /// </summary>
-    private async Task LoadPasswordsAsync(AppSettings settings)
+    private void LoadPasswords(AppSettings settings)
     {
         if (!File.Exists(_passwordsPath))
         {
@@ -180,7 +181,7 @@ public class SettingsService
 
         try
         {
-            var encrypted = await File.ReadAllBytesAsync(_passwordsPath);
+            var encrypted = File.ReadAllBytes(_passwordsPath);
             var json = Decrypt(encrypted);
             var passwords = JsonSerializer.Deserialize<Dictionary<int, string>>(json);
 
@@ -277,6 +278,23 @@ public class AppSettings
     /// Whether to use the system language setting
     /// </summary>
     public bool UseSystemLanguage { get; set; } = true;
+    
+    /// <summary>
+    /// Preferred reading mode for the comic reader
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ReadingMode PreferredReadingMode { get; set; } = ReadingMode.Normal;
+    
+    /// <summary>
+    /// Handedness preference for zoomed/guided reading layout
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Handedness Handedness { get; set; } = Handedness.RightHanded;
+    
+    /// <summary>
+    /// Default zoom region size for zoomed reading mode (0.1 to 0.8)
+    /// </summary>
+    public double DefaultZoomRegionSize { get; set; } = 0.3;
 
     /// <summary>
     /// Creates a deep copy of the settings
@@ -300,7 +318,10 @@ public class AppSettings
             LastOpenedComicPath = LastOpenedComicPath,
             ComicsDirectory = ComicsDirectory,
             LanguageCode = LanguageCode,
-            UseSystemLanguage = UseSystemLanguage
+            UseSystemLanguage = UseSystemLanguage,
+            PreferredReadingMode = PreferredReadingMode,
+            Handedness = Handedness,
+            DefaultZoomRegionSize = DefaultZoomRegionSize
         };
     }
 }
