@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  
+  <!-- Common UI Strings -->
+  <data name="Settings" xml:space="preserve">
+    <value>Instellingen</value>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>Bibliotheek</value>
+  </data>
+  <data name="Reader" xml:space="preserve">
+    <value>Lezer</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Terug</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Vernieuwen</value>
+  </data>
+  <data name="AllComics" xml:space="preserve">
+    <value>Alle Strips</value>
+  </data>
+  <data name="ReadingNow" xml:space="preserve">
+    <value>Nu aan het lezen</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>Voltooid</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>Favorieten</value>
+  </data>
+  <data name="ImportComic" xml:space="preserve">
+    <value>Strip importeren</value>
+  </data>
+  <data name="NoComicsFound" xml:space="preserve">
+    <value>Geen strips gevonden</value>
+  </data>
+  <data name="NoComicsInLibrary" xml:space="preserve">
+    <value>Je bibliotheek is leeg. Importeer strips of download ze van Komga.</value>
+  </data>
+  <data name="Pages" xml:space="preserve">
+    <value>pagina's</value>
+  </data>
+  <data name="NotConnected" xml:space="preserve">
+    <value>Niet verbonden</value>
+  </data>
+  <data name="ConfigureServer" xml:space="preserve">
+    <value>Configureer een Komga-server in de instellingen om strips te bladeren en te downloaden</value>
+  </data>
+  <data name="SearchOnKomga" xml:space="preserve">
+    <value>Zoeken op Komga...</value>
+  </data>
+  <data name="KeepReading" xml:space="preserve">
+    <value>Verder lezen</value>
+  </data>
+  <data name="OnDeck" xml:space="preserve">
+    <value>Volgende</value>
+  </data>
+  <data name="RecentlyAddedBooks" xml:space="preserve">
+    <value>Recent toegevoegde boeken</value>
+  </data>
+  <data name="RecentlyAddedSeries" xml:space="preserve">
+    <value>Recent toegevoegde series</value>
+  </data>
+  <data name="Libraries" xml:space="preserve">
+    <value>Bibliotheken</value>
+  </data>
+  <data name="ReadLists" xml:space="preserve">
+    <value>Leeslijsten</value>
+  </data>
+  <data name="Series" xml:space="preserve">
+    <value>Series</value>
+  </data>
+  <data name="Books" xml:space="preserve">
+    <value>Boeken</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Downloaden</value>
+  </data>
+  <data name="Downloading" xml:space="preserve">
+    <value>Downloaden...</value>
+  </data>
+  <data name="LoadMore" xml:space="preserve">
+    <value>Meer laden</value>
+  </data>
+  <data name="NoResults" xml:space="preserve">
+    <value>Geen resultaten gevonden</value>
+  </data>
+  <data name="KomgaServers" xml:space="preserve">
+    <value>Komga-servers</value>
+  </data>
+  <data name="AddServer" xml:space="preserve">
+    <value>Server toevoegen</value>
+  </data>
+  <data name="Active" xml:space="preserve">
+    <value>Actief</value>
+  </data>
+  <data name="NoServersConfigured" xml:space="preserve">
+    <value>Geen servers geconfigureerd</value>
+  </data>
+  <data name="ServerConfiguration" xml:space="preserve">
+    <value>Serverconfiguratie</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Naam</value>
+  </data>
+  <data name="ServerUrl" xml:space="preserve">
+    <value>Server-URL</value>
+  </data>
+  <data name="Username" xml:space="preserve">
+    <value>Gebruikersnaam</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Wachtwoord</value>
+  </data>
+  <data name="TestConnection" xml:space="preserve">
+    <value>Verbinding testen</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Opslaan</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+  </data>
+  <data name="ConnectionSuccessful" xml:space="preserve">
+    <value>Verbinding geslaagd!</value>
+  </data>
+  <data name="ConnectionFailed" xml:space="preserve">
+    <value>Verbinding mislukt</value>
+  </data>
+  <data name="LanguageSettings" xml:space="preserve">
+    <value>Taalinstellingen</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Taal</value>
+  </data>
+  <data name="UseSystemLanguage" xml:space="preserve">
+    <value>Systeemtaal gebruiken</value>
+  </data>
+  <data name="SystemDefault" xml:space="preserve">
+    <value>Systeemstandaard</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>Over</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Een striplezer met Komga-integratie</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Versie</value>
+  </data>
+  <data name="ViewReleaseNotes" xml:space="preserve">
+    <value>Release-opmerkingen bekijken</value>
+  </data>
+  <data name="ReleaseNotes" xml:space="preserve">
+    <value>Release-opmerkingen</value>
+  </data>
+  <data name="ComicInformation" xml:space="preserve">
+    <value>Stripinformatie</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Titel</value>
+  </data>
+  <data name="IssueNumber" xml:space="preserve">
+    <value>Uitgavenummer</value>
+  </data>
+  <data name="Authors" xml:space="preserve">
+    <value>Auteurs</value>
+  </data>
+  <data name="Publisher" xml:space="preserve">
+    <value>Uitgever</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>Uitgavedatum</value>
+  </data>
+  <data name="Summary" xml:space="preserve">
+    <value>Samenvatting</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>Fout</value>
+  </data>
+</root>

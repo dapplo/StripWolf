@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
+using System.Globalization;
 using System.Linq;
 using Avalonia.Markup.Xaml;
 using Kom2go.Data;
@@ -33,6 +34,9 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
+        
+        // Apply saved language settings before creating any UI
+        ApplyLanguageSettings();
 
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
 
@@ -62,12 +66,38 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+    
+    /// <summary>
+    /// Apply saved language settings before UI creation
+    /// </summary>
+    private void ApplyLanguageSettings()
+    {
+        try
+        {
+            var settingsService = Services!.GetRequiredService<SettingsService>();
+            var settings = settingsService.LoadSettingsAsync().GetAwaiter().GetResult();
+            
+            if (!settings.UseSystemLanguage && !string.IsNullOrEmpty(settings.LanguageCode))
+            {
+                var culture = new CultureInfo(settings.LanguageCode);
+                CultureInfo.DefaultThreadCurrentUICulture = culture;
+                CultureInfo.DefaultThreadCurrentCulture = culture;
+                Thread.CurrentThread.CurrentUICulture = culture;
+                Thread.CurrentThread.CurrentCulture = culture;
+            }
+        }
+        catch
+        {
+            // If settings fail to load, use system default
+        }
+    }
 
     private static void ConfigureServices(IServiceCollection services)
     {
         // Register services
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<SettingsService>();
+        services.AddSingleton<LocalizationService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<ComicConverterService>();

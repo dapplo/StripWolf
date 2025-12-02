@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  
+  <!-- Common UI Strings -->
+  <data name="Settings" xml:space="preserve">
+    <value>Paramètres</value>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>Bibliothèque</value>
+  </data>
+  <data name="Reader" xml:space="preserve">
+    <value>Lecteur</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Retour</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>Accueil</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Actualiser</value>
+  </data>
+  <data name="AllComics" xml:space="preserve">
+    <value>Tous les Comics</value>
+  </data>
+  <data name="ReadingNow" xml:space="preserve">
+    <value>En cours de lecture</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>Terminé</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>Favoris</value>
+  </data>
+  <data name="ImportComic" xml:space="preserve">
+    <value>Importer un Comic</value>
+  </data>
+  <data name="NoComicsFound" xml:space="preserve">
+    <value>Aucun comic trouvé</value>
+  </data>
+  <data name="NoComicsInLibrary" xml:space="preserve">
+    <value>Votre bibliothèque est vide. Importez des comics ou téléchargez-les depuis Komga.</value>
+  </data>
+  <data name="Pages" xml:space="preserve">
+    <value>pages</value>
+  </data>
+  <data name="NotConnected" xml:space="preserve">
+    <value>Non connecté</value>
+  </data>
+  <data name="ConfigureServer" xml:space="preserve">
+    <value>Configurez un serveur Komga dans les paramètres pour parcourir et télécharger des comics</value>
+  </data>
+  <data name="SearchOnKomga" xml:space="preserve">
+    <value>Rechercher sur Komga...</value>
+  </data>
+  <data name="KeepReading" xml:space="preserve">
+    <value>Continuer la lecture</value>
+  </data>
+  <data name="OnDeck" xml:space="preserve">
+    <value>À suivre</value>
+  </data>
+  <data name="RecentlyAddedBooks" xml:space="preserve">
+    <value>Livres récemment ajoutés</value>
+  </data>
+  <data name="RecentlyAddedSeries" xml:space="preserve">
+    <value>Séries récemment ajoutées</value>
+  </data>
+  <data name="Libraries" xml:space="preserve">
+    <value>Bibliothèques</value>
+  </data>
+  <data name="ReadLists" xml:space="preserve">
+    <value>Listes de lecture</value>
+  </data>
+  <data name="Series" xml:space="preserve">
+    <value>Séries</value>
+  </data>
+  <data name="Books" xml:space="preserve">
+    <value>Livres</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Télécharger</value>
+  </data>
+  <data name="Downloading" xml:space="preserve">
+    <value>Téléchargement...</value>
+  </data>
+  <data name="LoadMore" xml:space="preserve">
+    <value>Charger plus</value>
+  </data>
+  <data name="NoResults" xml:space="preserve">
+    <value>Aucun résultat trouvé</value>
+  </data>
+  <data name="KomgaServers" xml:space="preserve">
+    <value>Serveurs Komga</value>
+  </data>
+  <data name="AddServer" xml:space="preserve">
+    <value>Ajouter un serveur</value>
+  </data>
+  <data name="Active" xml:space="preserve">
+    <value>Actif</value>
+  </data>
+  <data name="NoServersConfigured" xml:space="preserve">
+    <value>Aucun serveur configuré</value>
+  </data>
+  <data name="ServerConfiguration" xml:space="preserve">
+    <value>Configuration du serveur</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Nom</value>
+  </data>
+  <data name="ServerUrl" xml:space="preserve">
+    <value>URL du serveur</value>
+  </data>
+  <data name="Username" xml:space="preserve">
+    <value>Nom d'utilisateur</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Mot de passe</value>
+  </data>
+  <data name="TestConnection" xml:space="preserve">
+    <value>Tester la connexion</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Enregistrer</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="ConnectionSuccessful" xml:space="preserve">
+    <value>Connexion réussie!</value>
+  </data>
+  <data name="ConnectionFailed" xml:space="preserve">
+    <value>Échec de la connexion</value>
+  </data>
+  <data name="LanguageSettings" xml:space="preserve">
+    <value>Paramètres de langue</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Langue</value>
+  </data>
+  <data name="UseSystemLanguage" xml:space="preserve">
+    <value>Utiliser la langue du système</value>
+  </data>
+  <data name="SystemDefault" xml:space="preserve">
+    <value>Par défaut du système</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>À propos</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Un lecteur de bandes dessinées avec intégration Komga</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="ViewReleaseNotes" xml:space="preserve">
+    <value>Voir les notes de version</value>
+  </data>
+  <data name="ReleaseNotes" xml:space="preserve">
+    <value>Notes de version</value>
+  </data>
+  <data name="ComicInformation" xml:space="preserve">
+    <value>Informations sur le comic</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Titre</value>
+  </data>
+  <data name="IssueNumber" xml:space="preserve">
+    <value>Numéro de parution</value>
+  </data>
+  <data name="Authors" xml:space="preserve">
+    <value>Auteurs</value>
+  </data>
+  <data name="Publisher" xml:space="preserve">
+    <value>Éditeur</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>Date de sortie</value>
+  </data>
+  <data name="Summary" xml:space="preserve">
+    <value>Résumé</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>Erreur</value>
+  </data>
+</root>
