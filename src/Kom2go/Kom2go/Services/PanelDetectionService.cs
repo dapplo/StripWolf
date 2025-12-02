@@ -23,17 +23,22 @@ public class PanelDetectionService
     /// <summary>
     /// Minimum gutter width to consider as separation between panels (as ratio of page width)
     /// </summary>
-    private const double MinGutterRatio = 0.005;
+    private const double MinGutterRatio = 0.003;
     
     /// <summary>
     /// Maximum gutter width (as ratio of page width)
     /// </summary>
-    private const double MaxGutterRatio = 0.05;
+    private const double MaxGutterRatio = 0.08;
     
     /// <summary>
     /// Brightness threshold for detecting white/light gutters (0-255)
     /// </summary>
-    private const byte GutterBrightnessThreshold = 230;
+    private const byte GutterBrightnessThreshold = 220;
+    
+    /// <summary>
+    /// Minimum percentage of light pixels in a line to be considered a gutter
+    /// </summary>
+    private const double GutterLightPixelThreshold = 0.80;
     
     /// <summary>
     /// Detect panels on a comic page
@@ -134,27 +139,102 @@ public class PanelDetectionService
             // Convert to grayscale for processing
             var grayImage = ConvertToGrayscale(image);
             
-            // Find horizontal and vertical gutters (white/light lines)
+            // First, find horizontal gutters to identify rows
             var horizontalGutters = FindHorizontalGutters(grayImage, imageWidth, imageHeight);
-            var verticalGutters = FindVerticalGutters(grayImage, imageWidth, imageHeight);
             
-            // If we found meaningful gutters, extract panels
-            if (horizontalGutters.Count > 0 || verticalGutters.Count > 0)
+            // Get row boundaries
+            var rowBoundaries = new List<(int top, int bottom)>();
+            var prevY = 0;
+            foreach (var (start, end) in horizontalGutters)
             {
-                var panels = ExtractPanelsFromGutters(
-                    horizontalGutters, 
-                    verticalGutters, 
-                    imageWidth, 
-                    imageHeight,
-                    pageIndex);
-                
-                if (panels.Count > 0)
+                var gutterMiddle = (start + end) / 2;
+                if (gutterMiddle > prevY + imageHeight * MinPanelSizeRatio)
                 {
-                    result.Panels = panels;
-                    result.DetectionSuccessful = true;
-                    result.IsSplashPage = panels.Count == 1;
-                    return result;
+                    rowBoundaries.Add((prevY, start));
                 }
+                prevY = end;
+            }
+            // Add the last row
+            if (imageHeight > prevY + imageHeight * MinPanelSizeRatio)
+            {
+                rowBoundaries.Add((prevY, imageHeight));
+            }
+            
+            // If no rows found, treat entire page as one row
+            if (rowBoundaries.Count == 0)
+            {
+                rowBoundaries.Add((0, imageHeight));
+            }
+            
+            // For each row, find vertical gutters within that row
+            var panels = new List<ComicPanel>();
+            var panelIndex = 0;
+            
+            foreach (var (rowTop, rowBottom) in rowBoundaries)
+            {
+                // Find vertical gutters within this row
+                var verticalGuttersInRow = FindVerticalGuttersInRow(grayImage, imageWidth, rowTop, rowBottom);
+                
+                // Get column boundaries within this row
+                var colBoundaries = new List<(int left, int right)>();
+                var prevX = 0;
+                foreach (var (start, end) in verticalGuttersInRow)
+                {
+                    var gutterMiddle = (start + end) / 2;
+                    if (gutterMiddle > prevX + imageWidth * MinPanelSizeRatio)
+                    {
+                        colBoundaries.Add((prevX, start));
+                    }
+                    prevX = end;
+                }
+                // Add the last column
+                if (imageWidth > prevX + imageWidth * MinPanelSizeRatio)
+                {
+                    colBoundaries.Add((prevX, imageWidth));
+                }
+                
+                // If no columns found, treat entire row as one panel
+                if (colBoundaries.Count == 0)
+                {
+                    colBoundaries.Add((0, imageWidth));
+                }
+                
+                // Create panels for each cell in this row
+                foreach (var (colLeft, colRight) in colBoundaries)
+                {
+                    var panelWidth = colRight - colLeft;
+                    var panelHeight = rowBottom - rowTop;
+                    
+                    // Skip if panel is too small
+                    if (panelWidth < imageWidth * MinPanelSizeRatio || 
+                        panelHeight < imageHeight * MinPanelSizeRatio)
+                    {
+                        continue;
+                    }
+                    
+                    // Trim the panel boundaries slightly to exclude gutter white space
+                    var trimX = Math.Min(5, panelWidth / 20);
+                    var trimY = Math.Min(5, panelHeight / 20);
+                    
+                    panels.Add(new ComicPanel
+                    {
+                        PageIndex = pageIndex,
+                        PanelIndex = panelIndex++,
+                        X = (double)(colLeft + trimX) / imageWidth,
+                        Y = (double)(rowTop + trimY) / imageHeight,
+                        Width = (double)(panelWidth - 2 * trimX) / imageWidth,
+                        Height = (double)(panelHeight - 2 * trimY) / imageHeight,
+                        Confidence = CalculateConfidence(horizontalGutters.Count, verticalGuttersInRow.Count)
+                    });
+                }
+            }
+            
+            if (panels.Count > 0)
+            {
+                result.Panels = panels;
+                result.DetectionSuccessful = true;
+                result.IsSplashPage = panels.Count == 1;
+                return result;
             }
             
             // Fallback: if no panels detected, treat entire page as one panel
@@ -246,7 +326,7 @@ public class PanelDetectionService
             }
             
             // If most of the row is light, it's part of a gutter
-            var isLightRow = lightPixelCount > sampleWidth * 0.85;
+            var isLightRow = lightPixelCount > sampleWidth * GutterLightPixelThreshold;
             
             if (isLightRow && !inGutter)
             {
@@ -268,24 +348,29 @@ public class PanelDetectionService
     }
     
     /// <summary>
-    /// Find vertical gutters (white/light vertical bands)
+    /// Find vertical gutters within a specific row (white/light vertical bands)
     /// </summary>
-    private List<(int start, int end)> FindVerticalGutters(byte[,] grayImage, int width, int height)
+    private List<(int start, int end)> FindVerticalGuttersInRow(byte[,] grayImage, int width, int rowTop, int rowBottom)
     {
         var gutters = new List<(int start, int end)>();
         var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(width);
         
-        // Sample rows to check (avoid edge artifacts)
-        var sampleStartY = height / 10;
-        var sampleEndY = height - height / 10;
+        var rowHeight = rowBottom - rowTop;
+        if (rowHeight <= 0) return gutters;
+        
+        // Sample most of the row height (avoid edge artifacts)
+        var sampleStartY = rowTop + rowHeight / 10;
+        var sampleEndY = rowBottom - rowHeight / 10;
         var sampleHeight = sampleEndY - sampleStartY;
+        
+        if (sampleHeight <= 0) return gutters;
         
         var inGutter = false;
         var gutterStart = 0;
         
         for (var x = 0; x < width; x++)
         {
-            // Count light pixels in this column
+            // Count light pixels in this column within the row
             var lightPixelCount = 0;
             for (var y = sampleStartY; y < sampleEndY; y++)
             {
@@ -295,8 +380,8 @@ public class PanelDetectionService
                 }
             }
             
-            // If most of the column is light, it's part of a gutter
-            var isLightColumn = lightPixelCount > sampleHeight * 0.85;
+            // If most of the column (within this row) is light, it's part of a gutter
+            var isLightColumn = lightPixelCount > sampleHeight * GutterLightPixelThreshold;
             
             if (isLightColumn && !inGutter)
             {
@@ -330,69 +415,6 @@ public class PanelDetectionService
         if (max < min) max = min + 1;
         
         return (min, max);
-    }
-    
-    /// <summary>
-    /// Extract panel regions from detected gutters
-    /// </summary>
-    private List<ComicPanel> ExtractPanelsFromGutters(
-        List<(int start, int end)> horizontalGutters,
-        List<(int start, int end)> verticalGutters,
-        int imageWidth,
-        int imageHeight,
-        int pageIndex)
-    {
-        var panels = new List<ComicPanel>();
-        
-        // Add image edges as implicit gutters
-        var hBoundaries = new List<int> { 0 };
-        foreach (var (start, end) in horizontalGutters)
-        {
-            hBoundaries.Add((start + end) / 2);
-        }
-        hBoundaries.Add(imageHeight);
-        
-        var vBoundaries = new List<int> { 0 };
-        foreach (var (start, end) in verticalGutters)
-        {
-            vBoundaries.Add((start + end) / 2);
-        }
-        vBoundaries.Add(imageWidth);
-        
-        // Create panels from grid cells
-        var panelIndex = 0;
-        var minPanelWidth = imageWidth * MinPanelSizeRatio;
-        var minPanelHeight = imageHeight * MinPanelSizeRatio;
-        
-        for (var row = 0; row < hBoundaries.Count - 1; row++)
-        {
-            for (var col = 0; col < vBoundaries.Count - 1; col++)
-            {
-                var x = vBoundaries[col];
-                var y = hBoundaries[row];
-                var w = vBoundaries[col + 1] - x;
-                var h = hBoundaries[row + 1] - y;
-                
-                // Skip if panel is too small
-                if (w < minPanelWidth || h < minPanelHeight)
-                {
-                    continue;
-                }
-                
-                panels.Add(new ComicPanel
-                {
-                    PageIndex = pageIndex,
-                    PanelIndex = panelIndex++,
-                    X = (double)x / imageWidth,
-                    Y = (double)y / imageHeight,
-                    Width = (double)w / imageWidth,
-                    Height = (double)h / imageHeight,
-                    Confidence = CalculateConfidence(horizontalGutters.Count, verticalGutters.Count)
-                });
-            }
-        }
-        
-        return panels;
     }
     
     /// <summary>

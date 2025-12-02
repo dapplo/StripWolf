@@ -22,6 +22,8 @@ public partial class ReaderView : UserControl
     private Image? _overviewImageRight;
     private Image? _zoomedAreaLeftImage;
     private Image? _zoomedAreaRightImage;
+    private Border? _zoomedBorderLeft;
+    private Border? _zoomedBorderRight;
     
     // Zoom region tracking
     private Rectangle? _zoomRegionRect;
@@ -81,6 +83,61 @@ public partial class ReaderView : UserControl
                 {
                     vm.GoToNextPageCommand.Execute(null);
                     e.Handled = true;
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Handle scroll wheel events in zoomed/guided mode
+    /// </summary>
+    private void OnZoomedGuidedPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (DataContext is ReaderViewModel vm)
+        {
+            if (vm.IsGuidedMode)
+            {
+                // In guided mode, scroll through panels
+                if (e.Delta.Y > 0 && vm.HasPreviousPanel)
+                {
+                    vm.GoToPreviousPanelCommand.Execute(null);
+                    e.Handled = true;
+                }
+                else if (e.Delta.Y < 0 && vm.HasNextPanel)
+                {
+                    vm.GoToNextPanelCommand.Execute(null);
+                    e.Handled = true;
+                }
+            }
+            else if (vm.ReadingMode == ReadingMode.Zoomed)
+            {
+                // In zoomed mode, use Ctrl+scroll to change zoom region size,
+                // otherwise change pages
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                {
+                    if (e.Delta.Y > 0)
+                    {
+                        vm.DecreaseZoomRegionSizeCommand.Execute(null);
+                    }
+                    else
+                    {
+                        vm.IncreaseZoomRegionSizeCommand.Execute(null);
+                    }
+                    e.Handled = true;
+                }
+                else
+                {
+                    // Scroll through pages
+                    if (e.Delta.Y > 0 && vm.HasPreviousPage)
+                    {
+                        vm.GoToPreviousPageCommand.Execute(null);
+                        e.Handled = true;
+                    }
+                    else if (e.Delta.Y < 0 && vm.HasNextPage)
+                    {
+                        vm.GoToNextPageCommand.Execute(null);
+                        e.Handled = true;
+                    }
                 }
             }
         }
@@ -265,6 +322,8 @@ public partial class ReaderView : UserControl
         _overviewImageRight = this.FindControl<Image>("OverviewImageRight");
         _zoomedAreaLeftImage = this.FindControl<Image>("ZoomedAreaLeftImage");
         _zoomedAreaRightImage = this.FindControl<Image>("ZoomedAreaRightImage");
+        _zoomedBorderLeft = this.FindControl<Border>("ZoomedBorderLeft");
+        _zoomedBorderRight = this.FindControl<Border>("ZoomedBorderRight");
         
         // Focus this control to receive keyboard events
         Focus();
@@ -288,6 +347,8 @@ public partial class ReaderView : UserControl
         _overviewImageRight = null;
         _zoomedAreaLeftImage = null;
         _zoomedAreaRightImage = null;
+        _zoomedBorderLeft = null;
+        _zoomedBorderRight = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -310,10 +371,16 @@ public partial class ReaderView : UserControl
                     args.PropertyName == nameof(ReaderViewModel.ZoomRegion) ||
                     args.PropertyName == nameof(ReaderViewModel.CurrentPagePanels) ||
                     args.PropertyName == nameof(ReaderViewModel.CurrentPanel) ||
-                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage))
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPanelIndex) ||
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
+                    args.PropertyName == nameof(ReaderViewModel.Handedness))
                 {
-                    UpdateOverviewOverlay();
-                    UpdateZoomedAreaClip();
+                    // Use Dispatcher to ensure layout is complete before updating overlay
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        UpdateOverviewOverlay();
+                        UpdateZoomedAreaClip();
+                    });
                 }
             };
         }
@@ -464,6 +531,16 @@ public partial class ReaderView : UserControl
         base.OnSizeChanged(e);
         // Re-apply sizing when size changes
         UpdateImageSizing();
+        
+        // Also update zoomed/guided mode overlays
+        if (DataContext is ReaderViewModel vm && vm.IsZoomedOrGuidedMode)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                UpdateOverviewOverlay();
+                UpdateZoomedAreaClip();
+            });
+        }
     }
     
     #region Zoom Pointer Handling (for pinch zoom on image location)
@@ -801,7 +878,8 @@ public partial class ReaderView : UserControl
     }
     
     /// <summary>
-    /// Update the clipping on the zoomed area image
+    /// Update the zoomed area display using scale and translate transforms
+    /// to show the selected region enlarged to fill the container
     /// </summary>
     private void UpdateZoomedAreaClip()
     {
@@ -811,37 +889,136 @@ public partial class ReaderView : UserControl
         }
         
         var zoomedImage = vm.IsOverviewOnLeft ? _zoomedAreaRightImage : _zoomedAreaLeftImage;
-        if (zoomedImage is null || vm.CurrentPageImage is null)
+        var zoomedBorder = vm.IsOverviewOnLeft ? _zoomedBorderRight : _zoomedBorderLeft;
+        
+        if (zoomedImage is null || zoomedBorder is null || vm.CurrentPageImage is null)
         {
             return;
         }
         
-        // For guided mode, clip to current panel
+        // Get the region to display (normalized 0-1 coordinates)
+        double regionX, regionY, regionWidth, regionHeight;
+        
         if (vm.IsGuidedMode && vm.CurrentPanel is not null)
         {
+            // In guided mode, use the current panel bounds
             var panel = vm.CurrentPanel;
-            var clipRect = new Rect(
-                panel.X * vm.CurrentPageImage.PixelSize.Width,
-                panel.Y * vm.CurrentPageImage.PixelSize.Height,
-                panel.Width * vm.CurrentPageImage.PixelSize.Width,
-                panel.Height * vm.CurrentPageImage.PixelSize.Height);
-            
-            // Apply clipping geometry
-            zoomedImage.Clip = new RectangleGeometry(clipRect);
+            regionX = panel.X;
+            regionY = panel.Y;
+            regionWidth = panel.Width;
+            regionHeight = panel.Height;
         }
-        // For zoomed mode, clip to zoom region
         else if (vm.ReadingMode == ReadingMode.Zoomed)
         {
+            // In zoomed mode, use the zoom region bounds
             var bounds = vm.ZoomRegion.GetBounds();
-            var clipRect = new Rect(
-                bounds.Left * vm.CurrentPageImage.PixelSize.Width,
-                bounds.Top * vm.CurrentPageImage.PixelSize.Height,
-                (bounds.Right - bounds.Left) * vm.CurrentPageImage.PixelSize.Width,
-                (bounds.Bottom - bounds.Top) * vm.CurrentPageImage.PixelSize.Height);
-            
-            // Apply clipping geometry
-            zoomedImage.Clip = new RectangleGeometry(clipRect);
+            regionX = bounds.Left;
+            regionY = bounds.Top;
+            regionWidth = bounds.Right - bounds.Left;
+            regionHeight = bounds.Bottom - bounds.Top;
         }
+        else
+        {
+            // Normal mode - show full image
+            zoomedImage.RenderTransform = null;
+            zoomedImage.Clip = null;
+            return;
+        }
+        
+        // Ensure we have valid region dimensions
+        if (regionWidth <= 0 || regionHeight <= 0)
+        {
+            return;
+        }
+        
+        // Get actual image pixel dimensions
+        var imageWidth = (double)vm.CurrentPageImage.PixelSize.Width;
+        var imageHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        
+        // Get the container (border) dimensions
+        var containerWidth = zoomedBorder.Bounds.Width;
+        var containerHeight = zoomedBorder.Bounds.Height;
+        
+        if (containerWidth <= 0 || containerHeight <= 0)
+        {
+            return;
+        }
+        
+        // Calculate the aspect ratios
+        var regionAspect = (regionWidth * imageWidth) / (regionHeight * imageHeight);
+        var containerAspect = containerWidth / containerHeight;
+        
+        // Calculate how the image with Stretch="Uniform" fits in container
+        var imageAspect = imageWidth / imageHeight;
+        double displayedImageWidth, displayedImageHeight;
+        
+        if (imageAspect > containerAspect)
+        {
+            // Image is wider relative to container
+            displayedImageWidth = containerWidth;
+            displayedImageHeight = containerWidth / imageAspect;
+        }
+        else
+        {
+            // Image is taller relative to container
+            displayedImageHeight = containerHeight;
+            displayedImageWidth = containerHeight * imageAspect;
+        }
+        
+        // Calculate scale factor to enlarge the region to fill the container
+        // We need to scale so the region fills the container (maintaining region aspect ratio)
+        double scaleX, scaleY, scale;
+        
+        if (regionAspect > containerAspect)
+        {
+            // Region is wider than container - fit to width
+            scale = containerWidth / (regionWidth * displayedImageWidth);
+        }
+        else
+        {
+            // Region is taller than container - fit to height
+            scale = containerHeight / (regionHeight * displayedImageHeight);
+        }
+        
+        scaleX = scale;
+        scaleY = scale;
+        
+        // Calculate translation to center the region
+        // First, scale from 0,0, then translate to center the region
+        var scaledWidth = displayedImageWidth * scale;
+        var scaledHeight = displayedImageHeight * scale;
+        
+        // Calculate offset to center the image first
+        var imageCenterOffsetX = (containerWidth - displayedImageWidth) / 2;
+        var imageCenterOffsetY = (containerHeight - displayedImageHeight) / 2;
+        
+        // Calculate translation to put the region in view
+        // The region starts at regionX * displayedImageWidth from the left of the image
+        var regionLeftInDisplay = regionX * displayedImageWidth + imageCenterOffsetX;
+        var regionTopInDisplay = regionY * displayedImageHeight + imageCenterOffsetY;
+        
+        // After scaling, we need to translate so the region center is at container center
+        var regionCenterX = regionLeftInDisplay + (regionWidth * displayedImageWidth) / 2;
+        var regionCenterY = regionTopInDisplay + (regionHeight * displayedImageHeight) / 2;
+        
+        // The scaled region center after scaling from origin
+        var scaledRegionCenterX = regionCenterX * scale;
+        var scaledRegionCenterY = regionCenterY * scale;
+        
+        // Translate to put scaled region center at container center
+        var translateX = (containerWidth / 2) - scaledRegionCenterX;
+        var translateY = (containerHeight / 2) - scaledRegionCenterY;
+        
+        // Apply the combined transform
+        var transformGroup = new TransformGroup();
+        transformGroup.Children.Add(new ScaleTransform(scaleX, scaleY));
+        transformGroup.Children.Add(new TranslateTransform(translateX, translateY));
+        
+        zoomedImage.RenderTransform = transformGroup;
+        zoomedImage.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
+        
+        // Don't use clip - the border's ClipToBounds handles clipping
+        zoomedImage.Clip = null;
     }
     
     /// <summary>

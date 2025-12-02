@@ -48,14 +48,15 @@
     <!-- Zoomed/Guided Reading Mode: Split view with overview and zoomed area -->
     <Grid x:Name="ZoomedGuidedGrid" 
           IsVisible="{Binding IsZoomedOrGuidedMode}"
-          ColumnDefinitions="*,*">
+          ColumnDefinitions="*,*"
+          PointerWheelChanged="OnZoomedGuidedPointerWheelChanged">
       
       <!-- Left Panel: Changes based on handedness -->
       <Grid Grid.Column="0" x:Name="LeftPanel">
         <!-- Overview (for right-handed) or Zoom Area (for left-handed) -->
         <Grid IsVisible="{Binding IsOverviewOnLeft}">
           <!-- Page Overview with panel boxes -->
-          <Border Background="#1A1A1A" Margin="4">
+          <Border Background="#1A1A1A" Margin="4" x:Name="OverviewBorderLeft">
             <Grid>
               <Image x:Name="OverviewImage"
                      Source="{Binding CurrentPageImage}"
@@ -75,14 +76,14 @@
         
         <!-- Zoomed Area (for left-handed) -->
         <Grid IsVisible="{Binding !IsOverviewOnLeft}">
-          <Border Background="#0A0A0A" Margin="4">
+          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderLeft"
+                  PointerPressed="OnZoomedAreaPointerPressed"
+                  PointerMoved="OnZoomedAreaPointerMoved"
+                  PointerReleased="OnZoomedAreaPointerReleased">
             <Image x:Name="ZoomedAreaLeftImage"
                    Source="{Binding CurrentPageImage}"
                    Stretch="Uniform"
-                   ClipToBounds="True"
-                   PointerPressed="OnZoomedAreaPointerPressed"
-                   PointerMoved="OnZoomedAreaPointerMoved"
-                   PointerReleased="OnZoomedAreaPointerReleased"/>
+                   RenderTransformOrigin="0,0"/>
           </Border>
         </Grid>
       </Grid>
@@ -91,20 +92,20 @@
       <Grid Grid.Column="1" x:Name="RightPanel">
         <!-- Zoomed Area (for right-handed) -->
         <Grid IsVisible="{Binding IsOverviewOnLeft}">
-          <Border Background="#0A0A0A" Margin="4">
+          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderRight"
+                  PointerPressed="OnZoomedAreaPointerPressed"
+                  PointerMoved="OnZoomedAreaPointerMoved"
+                  PointerReleased="OnZoomedAreaPointerReleased">
             <Image x:Name="ZoomedAreaRightImage"
                    Source="{Binding CurrentPageImage}"
                    Stretch="Uniform"
-                   ClipToBounds="True"
-                   PointerPressed="OnZoomedAreaPointerPressed"
-                   PointerMoved="OnZoomedAreaPointerMoved"
-                   PointerReleased="OnZoomedAreaPointerReleased"/>
+                   RenderTransformOrigin="0,0"/>
           </Border>
         </Grid>
         
         <!-- Overview (for left-handed) -->
         <Grid IsVisible="{Binding !IsOverviewOnLeft}">
-          <Border Background="#1A1A1A" Margin="4">
+          <Border Background="#1A1A1A" Margin="4" x:Name="OverviewBorderRight">
             <Grid>
               <Image x:Name="OverviewImageRight"
                      Source="{Binding CurrentPageImage}"
@@ -187,14 +188,17 @@
                 IsEnabled="{Binding CanUseTwoPageMode}">
           <TextBlock Text="{Binding TwoPageModeIcon}"/>
         </Button>
-        <!-- Stretch mode button -->
+        <!-- Stretch mode button (disabled in zoomed/guided modes) -->
         <Button Grid.Column="6" Command="{Binding CycleStretchModeCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode">
+                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode"
+                IsEnabled="{Binding !IsZoomedOrGuidedMode}"
+                IsVisible="{Binding !IsZoomedOrGuidedMode}">
           <TextBlock Text="{Binding StretchModeIcon}"/>
         </Button>
-        <!-- Fullscreen button -->
+        <!-- Fullscreen button (always visible but disabled in zoomed/guided modes) -->
         <Button Grid.Column="7" Command="{Binding ToggleFullScreenCommand}"
-                Background="Transparent" Foreground="White" FontSize="18" ToolTip.Tip="Toggle fullscreen (F)">
+                Background="Transparent" Foreground="White" FontSize="18" ToolTip.Tip="Toggle fullscreen (F)"
+                IsEnabled="{Binding !IsZoomedOrGuidedMode}">
           <TextBlock Text="⛶"/>
         </Button>
       </Grid>
