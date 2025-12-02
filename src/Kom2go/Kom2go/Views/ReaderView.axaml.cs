@@ -376,14 +376,26 @@ public partial class ReaderView : UserControl
                     args.PropertyName == nameof(ReaderViewModel.Handedness))
                 {
                     // Use Dispatcher to ensure layout is complete before updating overlay
+                    // Check if still attached to visual tree before updating
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
-                        UpdateOverviewOverlay();
-                        UpdateZoomedAreaClip();
+                        if (IsAttachedToVisualTree())
+                        {
+                            UpdateOverviewOverlay();
+                            UpdateZoomedAreaClip();
+                        }
                     });
                 }
             };
         }
+    }
+    
+    /// <summary>
+    /// Check if this control is still attached to the visual tree
+    /// </summary>
+    private bool IsAttachedToVisualTree()
+    {
+        return _pageImage is not null || _imageScroller is not null;
     }
 
     /// <summary>
@@ -537,8 +549,11 @@ public partial class ReaderView : UserControl
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                UpdateOverviewOverlay();
-                UpdateZoomedAreaClip();
+                if (IsAttachedToVisualTree())
+                {
+                    UpdateOverviewOverlay();
+                    UpdateZoomedAreaClip();
+                }
             });
         }
     }
@@ -935,6 +950,12 @@ public partial class ReaderView : UserControl
         var imageWidth = (double)vm.CurrentPageImage.PixelSize.Width;
         var imageHeight = (double)vm.CurrentPageImage.PixelSize.Height;
         
+        // Validate image dimensions
+        if (imageWidth <= 0 || imageHeight <= 0)
+        {
+            return;
+        }
+        
         // Get the container (border) dimensions
         var containerWidth = zoomedBorder.Bounds.Width;
         var containerHeight = zoomedBorder.Bounds.Height;
@@ -963,6 +984,12 @@ public partial class ReaderView : UserControl
             // Image is taller relative to container
             displayedImageHeight = containerHeight;
             displayedImageWidth = containerHeight * imageAspect;
+        }
+        
+        // Validate displayed dimensions
+        if (displayedImageWidth <= 0 || displayedImageHeight <= 0)
+        {
+            return;
         }
         
         // Calculate scale factor to enlarge the region to fill the container

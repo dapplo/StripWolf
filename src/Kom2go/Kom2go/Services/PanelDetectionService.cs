@@ -41,6 +41,16 @@ public class PanelDetectionService
     private const double GutterLightPixelThreshold = 0.80;
     
     /// <summary>
+    /// Maximum trim size in pixels to exclude gutter white space from panel boundaries
+    /// </summary>
+    private const int MaxPanelTrimPixels = 5;
+    
+    /// <summary>
+    /// Panel trim ratio (trim size as fraction of panel dimension)
+    /// </summary>
+    private const int PanelTrimDivisor = 20;
+    
+    /// <summary>
     /// Detect panels on a comic page
     /// </summary>
     /// <param name="comicFilePath">Path to the comic file (used for caching)</param>
@@ -213,8 +223,8 @@ public class PanelDetectionService
                     }
                     
                     // Trim the panel boundaries slightly to exclude gutter white space
-                    var trimX = Math.Min(5, panelWidth / 20);
-                    var trimY = Math.Min(5, panelHeight / 20);
+                    var trimX = Math.Min(MaxPanelTrimPixels, panelWidth / PanelTrimDivisor);
+                    var trimY = Math.Min(MaxPanelTrimPixels, panelHeight / PanelTrimDivisor);
                     
                     panels.Add(new ComicPanel
                     {

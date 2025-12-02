@@ -75,11 +75,12 @@
         </Grid>
         
         <!-- Zoomed Area (for left-handed) -->
-        <Grid IsVisible="{Binding !IsOverviewOnLeft}">
-          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderLeft"
-                  PointerPressed="OnZoomedAreaPointerPressed"
-                  PointerMoved="OnZoomedAreaPointerMoved"
-                  PointerReleased="OnZoomedAreaPointerReleased">
+        <Grid IsVisible="{Binding !IsOverviewOnLeft}"
+              PointerPressed="OnZoomedAreaPointerPressed"
+              PointerMoved="OnZoomedAreaPointerMoved"
+              PointerReleased="OnZoomedAreaPointerReleased"
+              Background="Transparent">
+          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderLeft">
             <Image x:Name="ZoomedAreaLeftImage"
                    Source="{Binding CurrentPageImage}"
                    Stretch="Uniform"
@@ -91,11 +92,12 @@
       <!-- Right Panel: Changes based on handedness -->
       <Grid Grid.Column="1" x:Name="RightPanel">
         <!-- Zoomed Area (for right-handed) -->
-        <Grid IsVisible="{Binding IsOverviewOnLeft}">
-          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderRight"
-                  PointerPressed="OnZoomedAreaPointerPressed"
-                  PointerMoved="OnZoomedAreaPointerMoved"
-                  PointerReleased="OnZoomedAreaPointerReleased">
+        <Grid IsVisible="{Binding IsOverviewOnLeft}"
+              PointerPressed="OnZoomedAreaPointerPressed"
+              PointerMoved="OnZoomedAreaPointerMoved"
+              PointerReleased="OnZoomedAreaPointerReleased"
+              Background="Transparent">
+          <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderRight">
             <Image x:Name="ZoomedAreaRightImage"
                    Source="{Binding CurrentPageImage}"
                    Stretch="Uniform"
