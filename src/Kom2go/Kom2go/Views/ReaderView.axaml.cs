@@ -871,25 +871,109 @@ public partial class ReaderView : UserControl
             }
         }
         
-        // In zoomed mode, draw the zoom region box
+        // In zoomed mode, draw the zoom region box that matches what's actually displayed
         if (vm.ReadingMode == ReadingMode.Zoomed)
         {
             var bounds = vm.ZoomRegion.GetBounds();
+            
+            // Calculate the effective displayed region accounting for aspect ratio fitting
+            // in the zoomed container
+            var effectiveBounds = CalculateEffectiveDisplayBounds(vm, bounds);
+            
             var rect = new Rectangle
             {
-                Width = (bounds.Right - bounds.Left) * imageBounds.Width,
-                Height = (bounds.Bottom - bounds.Top) * imageBounds.Height,
+                Width = (effectiveBounds.Right - effectiveBounds.Left) * imageBounds.Width,
+                Height = (effectiveBounds.Bottom - effectiveBounds.Top) * imageBounds.Height,
                 Stroke = Brushes.Cyan,
                 StrokeThickness = 2,
                 Fill = new SolidColorBrush(Color.FromArgb(30, 0, 255, 255))
             };
-            Canvas.SetLeft(rect, imageBounds.X + bounds.Left * imageBounds.Width);
-            Canvas.SetTop(rect, imageBounds.Y + bounds.Top * imageBounds.Height);
+            Canvas.SetLeft(rect, imageBounds.X + effectiveBounds.Left * imageBounds.Width);
+            Canvas.SetTop(rect, imageBounds.Y + effectiveBounds.Top * imageBounds.Height);
             canvas.Children.Add(rect);
             
             // Store reference for dragging
             _zoomRegionRect = rect;
         }
+    }
+    
+    /// <summary>
+    /// Calculate the effective bounds that are actually displayed in the zoomed area,
+    /// accounting for aspect ratio fitting. When the region is scaled to fit the container,
+    /// more content may be shown if the aspect ratios don't match.
+    /// </summary>
+    private (double Left, double Top, double Right, double Bottom) CalculateEffectiveDisplayBounds(
+        ReaderViewModel vm,
+        (double Left, double Top, double Right, double Bottom) regionBounds)
+    {
+        var zoomedBorder = vm.IsOverviewOnLeft ? _zoomedBorderRight : _zoomedBorderLeft;
+        if (zoomedBorder is null || vm.CurrentPageImage is null)
+        {
+            return regionBounds;
+        }
+        
+        var containerWidth = zoomedBorder.Bounds.Width;
+        var containerHeight = zoomedBorder.Bounds.Height;
+        
+        if (containerWidth <= 0 || containerHeight <= 0)
+        {
+            return regionBounds;
+        }
+        
+        var containerAspect = containerWidth / containerHeight;
+        
+        // Get the image's pixel dimensions to calculate the actual region aspect ratio
+        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
+        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        
+        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
+        {
+            return regionBounds;
+        }
+        
+        var regionWidth = regionBounds.Right - regionBounds.Left;
+        var regionHeight = regionBounds.Bottom - regionBounds.Top;
+        
+        // Calculate the region's aspect ratio in actual pixels
+        var regionPixelWidth = regionWidth * imagePixelWidth;
+        var regionPixelHeight = regionHeight * imagePixelHeight;
+        var regionAspect = regionPixelWidth / regionPixelHeight;
+        
+        // Calculate the center of the original region
+        var centerX = (regionBounds.Left + regionBounds.Right) / 2;
+        var centerY = (regionBounds.Top + regionBounds.Bottom) / 2;
+        
+        double effectiveWidth, effectiveHeight;
+        
+        if (regionAspect > containerAspect)
+        {
+            // Region is wider than container - fit to width, height is expanded
+            // The width stays the same, but height needs to be expanded to match container aspect
+            effectiveWidth = regionWidth;
+            // Convert to normalized height: effective pixel height = regionPixelWidth / containerAspect
+            // Then normalize: effectiveHeight = effectivePixelHeight / imagePixelHeight
+            effectiveHeight = (regionPixelWidth / containerAspect) / imagePixelHeight;
+        }
+        else
+        {
+            // Region is taller than container - fit to height, width is expanded
+            // The height stays the same, but width needs to be expanded to match container aspect
+            effectiveHeight = regionHeight;
+            // Convert to normalized width: effective pixel width = regionPixelHeight * containerAspect
+            // Then normalize: effectiveWidth = effectivePixelWidth / imagePixelWidth
+            effectiveWidth = (regionPixelHeight * containerAspect) / imagePixelWidth;
+        }
+        
+        // Calculate the effective bounds centered on the original center
+        var halfWidth = effectiveWidth / 2;
+        var halfHeight = effectiveHeight / 2;
+        
+        return (
+            Math.Max(0, centerX - halfWidth),
+            Math.Max(0, centerY - halfHeight),
+            Math.Min(1, centerX + halfWidth),
+            Math.Min(1, centerY + halfHeight)
+        );
     }
     
     /// <summary>
