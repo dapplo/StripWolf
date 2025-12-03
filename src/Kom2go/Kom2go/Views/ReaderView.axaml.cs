@@ -24,6 +24,10 @@ public partial class ReaderView : UserControl
     private Image? _zoomedAreaRightImage;
     private Border? _zoomedBorderLeft;
     private Border? _zoomedBorderRight;
+    private Viewbox? _zoomedViewboxLeft;
+    private Viewbox? _zoomedViewboxRight;
+    private Canvas? _zoomedCanvasLeft;
+    private Canvas? _zoomedCanvasRight;
     
     // Zoom region tracking
     private Rectangle? _zoomRegionRect;
@@ -324,6 +328,10 @@ public partial class ReaderView : UserControl
         _zoomedAreaRightImage = this.FindControl<Image>("ZoomedAreaRightImage");
         _zoomedBorderLeft = this.FindControl<Border>("ZoomedBorderLeft");
         _zoomedBorderRight = this.FindControl<Border>("ZoomedBorderRight");
+        _zoomedViewboxLeft = this.FindControl<Viewbox>("ZoomedViewboxLeft");
+        _zoomedViewboxRight = this.FindControl<Viewbox>("ZoomedViewboxRight");
+        _zoomedCanvasLeft = this.FindControl<Canvas>("ZoomedCanvasLeft");
+        _zoomedCanvasRight = this.FindControl<Canvas>("ZoomedCanvasRight");
         
         // Focus this control to receive keyboard events
         Focus();
@@ -872,13 +880,17 @@ public partial class ReaderView : UserControl
         }
         
         // In zoomed mode, draw the zoom region box
+        // The rectangle shows exactly the region that will be displayed in the zoomed view
         if (vm.ReadingMode == ReadingMode.Zoomed)
         {
             var bounds = vm.ZoomRegion.GetBounds();
+            var regionWidth = bounds.Right - bounds.Left;
+            var regionHeight = bounds.Bottom - bounds.Top;
+            
             var rect = new Rectangle
             {
-                Width = (bounds.Right - bounds.Left) * imageBounds.Width,
-                Height = (bounds.Bottom - bounds.Top) * imageBounds.Height,
+                Width = regionWidth * imageBounds.Width,
+                Height = regionHeight * imageBounds.Height,
                 Stroke = Brushes.Cyan,
                 StrokeThickness = 2,
                 Fill = new SolidColorBrush(Color.FromArgb(30, 0, 255, 255))
@@ -893,8 +905,11 @@ public partial class ReaderView : UserControl
     }
     
     /// <summary>
-    /// Update the zoomed area display using scale and translate transforms
-    /// to show the selected region enlarged to fill the container
+    /// Update the zoomed area display using Viewbox/Canvas approach.
+    /// This lets Avalonia handle the scaling/cropping by:
+    /// 1. Setting the Canvas size to match the region we want to display
+    /// 2. Positioning the Image inside the Canvas so only the region is visible
+    /// 3. The Viewbox automatically scales the Canvas content to fill the container
     /// </summary>
     private void UpdateZoomedAreaClip()
     {
@@ -904,9 +919,18 @@ public partial class ReaderView : UserControl
         }
         
         var zoomedImage = vm.IsOverviewOnLeft ? _zoomedAreaRightImage : _zoomedAreaLeftImage;
-        var zoomedBorder = vm.IsOverviewOnLeft ? _zoomedBorderRight : _zoomedBorderLeft;
+        var zoomedCanvas = vm.IsOverviewOnLeft ? _zoomedCanvasRight : _zoomedCanvasLeft;
         
-        if (zoomedImage is null || zoomedBorder is null || vm.CurrentPageImage is null)
+        if (zoomedImage is null || zoomedCanvas is null || vm.CurrentPageImage is null)
+        {
+            return;
+        }
+        
+        // Get image pixel dimensions
+        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
+        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        
+        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
         {
             return;
         }
@@ -916,7 +940,7 @@ public partial class ReaderView : UserControl
         
         if (vm.IsGuidedMode && vm.CurrentPanel is not null)
         {
-            // In guided mode, use the current panel bounds
+            // In guided mode, use the current panel bounds directly
             var panel = vm.CurrentPanel;
             regionX = panel.X;
             regionY = panel.Y;
@@ -925,7 +949,7 @@ public partial class ReaderView : UserControl
         }
         else if (vm.ReadingMode == ReadingMode.Zoomed)
         {
-            // In zoomed mode, use the zoom region bounds
+            // In zoomed mode, use the original zoom region bounds
             var bounds = vm.ZoomRegion.GetBounds();
             regionX = bounds.Left;
             regionY = bounds.Top;
@@ -935,9 +959,10 @@ public partial class ReaderView : UserControl
         else
         {
             // Normal mode - show full image
-            zoomedImage.RenderTransform = null;
-            zoomedImage.Clip = null;
-            return;
+            regionX = 0;
+            regionY = 0;
+            regionWidth = 1;
+            regionHeight = 1;
         }
         
         // Ensure we have valid region dimensions
@@ -946,138 +971,69 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Get actual image pixel dimensions
-        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
-        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
+        // Convert normalized region to pixel coordinates
+        var regionLeftPx = regionX * imagePixelWidth;
+        var regionTopPx = regionY * imagePixelHeight;
+        var regionWidthPx = regionWidth * imagePixelWidth;
+        var regionHeightPx = regionHeight * imagePixelHeight;
         
-        // Validate image dimensions
-        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
-        {
-            return;
-        }
+        // Set the Canvas size to the region size - this is what the Viewbox will scale
+        zoomedCanvas.Width = regionWidthPx;
+        zoomedCanvas.Height = regionHeightPx;
         
-        // Get the container (border) dimensions
-        var containerWidth = zoomedBorder.Bounds.Width;
-        var containerHeight = zoomedBorder.Bounds.Height;
+        // Position the Image so the region's top-left is at the Canvas origin
+        // The Image is positioned at negative offset to bring the region into view
+        Canvas.SetLeft(zoomedImage, -regionLeftPx);
+        Canvas.SetTop(zoomedImage, -regionTopPx);
         
-        if (containerWidth <= 0 || containerHeight <= 0)
-        {
-            return;
-        }
-        
-        // Calculate how the image with Stretch="Uniform" fits in the container (before any transform)
-        var imageAspect = imagePixelWidth / imagePixelHeight;
-        var containerAspect = containerWidth / containerHeight;
-        
-        double baseImageWidth, baseImageHeight, baseImageOffsetX, baseImageOffsetY;
-        
-        if (imageAspect > containerAspect)
-        {
-            // Image is wider relative to container - fit to width
-            baseImageWidth = containerWidth;
-            baseImageHeight = containerWidth / imageAspect;
-            baseImageOffsetX = 0;
-            baseImageOffsetY = (containerHeight - baseImageHeight) / 2;
-        }
-        else
-        {
-            // Image is taller relative to container - fit to height
-            baseImageHeight = containerHeight;
-            baseImageWidth = containerHeight * imageAspect;
-            baseImageOffsetX = (containerWidth - baseImageWidth) / 2;
-            baseImageOffsetY = 0;
-        }
-        
-        // Validate base image dimensions
-        if (baseImageWidth <= 0 || baseImageHeight <= 0)
-        {
-            return;
-        }
-        
-        // Calculate the aspect ratio of the region (in actual pixels)
-        var regionPixelWidth = regionWidth * imagePixelWidth;
-        var regionPixelHeight = regionHeight * imagePixelHeight;
-        var regionAspect = regionPixelWidth / regionPixelHeight;
-        
-        // Calculate scale factor to enlarge the region to fill the container
-        double scale;
-        if (regionAspect > containerAspect)
-        {
-            // Region is wider than container - fit to width
-            scale = containerWidth / (regionWidth * baseImageWidth);
-        }
-        else
-        {
-            // Region is taller than container - fit to height
-            scale = containerHeight / (regionHeight * baseImageHeight);
-        }
-        
-        // Calculate the region position in the base image coordinate space
-        // The region is at (regionX, regionY) normalized, which maps to:
-        var regionLeftInImage = regionX * baseImageWidth;
-        var regionTopInImage = regionY * baseImageHeight;
-        var regionDisplayWidth = regionWidth * baseImageWidth;
-        var regionDisplayHeight = regionHeight * baseImageHeight;
-        
-        // Calculate the center of the region in the base image (relative to image top-left, not container)
-        var regionCenterInImageX = regionLeftInImage + regionDisplayWidth / 2;
-        var regionCenterInImageY = regionTopInImage + regionDisplayHeight / 2;
-        
-        // After scaling around origin (0,0), the image offset and region center both scale
-        var scaledImageOffsetX = baseImageOffsetX * scale;
-        var scaledImageOffsetY = baseImageOffsetY * scale;
-        var scaledRegionCenterX = regionCenterInImageX * scale + scaledImageOffsetX;
-        var scaledRegionCenterY = regionCenterInImageY * scale + scaledImageOffsetY;
-        
-        // Translate to put the scaled region center at the container center
-        var translateX = (containerWidth / 2) - scaledRegionCenterX;
-        var translateY = (containerHeight / 2) - scaledRegionCenterY;
-        
-        // Apply the combined transform
-        var transformGroup = new TransformGroup();
-        transformGroup.Children.Add(new ScaleTransform(scale, scale));
-        transformGroup.Children.Add(new TranslateTransform(translateX, translateY));
-        
-        zoomedImage.RenderTransform = transformGroup;
-        zoomedImage.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
-        
-        // Don't use clip - the border's ClipToBounds handles clipping
-        zoomedImage.Clip = null;
+        // Set the Image to its natural pixel size (no stretching by the Image control)
+        zoomedImage.Width = imagePixelWidth;
+        zoomedImage.Height = imagePixelHeight;
     }
     
     /// <summary>
-    /// Get the bounds of the image within its container
+    /// Get the bounds of the image content within its container (in parent coordinate space).
+    /// This assumes the Image has Stretch="Uniform" which centers the content.
+    /// Returns where the actual image pixels are displayed, accounting for:
+    /// - The Image control's position within its parent (image.Bounds.X/Y)
+    /// - The image content centering due to uniform stretching (internal offset)
     /// </summary>
     private static Rect GetImageBoundsInContainer(Image image)
     {
-        var containerBounds = image.Bounds;
+        var controlBounds = image.Bounds;
         if (image.Source is not Avalonia.Media.Imaging.Bitmap bitmap)
         {
-            return containerBounds;
+            return controlBounds;
         }
         
         var imageAspect = (double)bitmap.PixelSize.Width / bitmap.PixelSize.Height;
-        var containerAspect = containerBounds.Width / containerBounds.Height;
+        var controlAspect = controlBounds.Width / controlBounds.Height;
         
         double displayWidth, displayHeight;
         
-        if (imageAspect > containerAspect)
+        if (imageAspect > controlAspect)
         {
-            // Image is wider than container
-            displayWidth = containerBounds.Width;
+            // Image is wider than control - fit to width
+            displayWidth = controlBounds.Width;
             displayHeight = displayWidth / imageAspect;
         }
         else
         {
-            // Image is taller than container
-            displayHeight = containerBounds.Height;
+            // Image is taller than control - fit to height
+            displayHeight = controlBounds.Height;
             displayWidth = displayHeight * imageAspect;
         }
         
-        var x = (containerBounds.Width - displayWidth) / 2;
-        var y = (containerBounds.Height - displayHeight) / 2;
+        // Calculate the offset within the Image control where the image content is centered
+        var internalOffsetX = (controlBounds.Width - displayWidth) / 2;
+        var internalOffsetY = (controlBounds.Height - displayHeight) / 2;
         
-        return new Rect(x, y, displayWidth, displayHeight);
+        // Return bounds in parent coordinate space: control position + internal offset
+        return new Rect(
+            controlBounds.X + internalOffsetX, 
+            controlBounds.Y + internalOffsetY, 
+            displayWidth, 
+            displayHeight);
     }
     
     /// <summary>

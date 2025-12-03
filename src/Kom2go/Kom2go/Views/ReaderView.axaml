@@ -74,34 +74,38 @@
           </Border>
         </Grid>
         
-        <!-- Zoomed Area (for left-handed) -->
+        <!-- Zoomed Area (for left-handed) - uses Viewbox for cropping -->
         <Grid IsVisible="{Binding !IsOverviewOnLeft}"
               PointerPressed="OnZoomedAreaPointerPressed"
               PointerMoved="OnZoomedAreaPointerMoved"
               PointerReleased="OnZoomedAreaPointerReleased"
               Background="Transparent">
           <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderLeft">
-            <Image x:Name="ZoomedAreaLeftImage"
-                   Source="{Binding CurrentPageImage}"
-                   Stretch="Uniform"
-                   RenderTransformOrigin="0,0"/>
+            <Viewbox x:Name="ZoomedViewboxLeft" Stretch="Uniform">
+              <Canvas x:Name="ZoomedCanvasLeft">
+                <Image x:Name="ZoomedAreaLeftImage"
+                       Source="{Binding CurrentPageImage}"/>
+              </Canvas>
+            </Viewbox>
           </Border>
         </Grid>
       </Grid>
       
       <!-- Right Panel: Changes based on handedness -->
       <Grid Grid.Column="1" x:Name="RightPanel">
-        <!-- Zoomed Area (for right-handed) -->
+        <!-- Zoomed Area (for right-handed) - uses Viewbox for cropping -->
         <Grid IsVisible="{Binding IsOverviewOnLeft}"
               PointerPressed="OnZoomedAreaPointerPressed"
               PointerMoved="OnZoomedAreaPointerMoved"
               PointerReleased="OnZoomedAreaPointerReleased"
               Background="Transparent">
           <Border Background="#0A0A0A" Margin="4" ClipToBounds="True" x:Name="ZoomedBorderRight">
-            <Image x:Name="ZoomedAreaRightImage"
-                   Source="{Binding CurrentPageImage}"
-                   Stretch="Uniform"
-                   RenderTransformOrigin="0,0"/>
+            <Viewbox x:Name="ZoomedViewboxRight" Stretch="Uniform">
+              <Canvas x:Name="ZoomedCanvasRight">
+                <Image x:Name="ZoomedAreaRightImage"
+                       Source="{Binding CurrentPageImage}"/>
+              </Canvas>
+            </Viewbox>
           </Border>
         </Grid>
         
