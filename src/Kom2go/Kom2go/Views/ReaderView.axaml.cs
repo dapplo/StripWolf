@@ -11,6 +11,8 @@ namespace Kom2go.Views;
 public partial class ReaderView : UserControl
 {
     private Image? _pageImage;
+    private Image? _leftPageImage;
+    private Image? _rightPageImage;
     private ScrollViewer? _imageScroller;
     private Canvas? _zoomCanvas;
     private Grid? _imageContainer;
@@ -315,6 +317,8 @@ public partial class ReaderView : UserControl
         
         // Cache control references to avoid repeated FindControl calls
         _pageImage = this.FindControl<Image>("PageImage");
+        _leftPageImage = this.FindControl<Image>("LeftPageImage");
+        _rightPageImage = this.FindControl<Image>("RightPageImage");
         _imageScroller = this.FindControl<ScrollViewer>("ImageScroller");
         _zoomCanvas = this.FindControl<Canvas>("ZoomCanvas");
         _imageContainer = this.FindControl<Grid>("ImageContainer");
@@ -346,6 +350,8 @@ public partial class ReaderView : UserControl
         
         // Clear cached references
         _pageImage = null;
+        _leftPageImage = null;
+        _rightPageImage = null;
         _imageScroller = null;
         _zoomCanvas = null;
         _imageContainer = null;
@@ -369,7 +375,10 @@ public partial class ReaderView : UserControl
             {
                 if (args.PropertyName == nameof(ReaderViewModel.StretchMode) ||
                     args.PropertyName == nameof(ReaderViewModel.ZoomLevel) ||
-                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage))
+                    args.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
+                    args.PropertyName == nameof(ReaderViewModel.IsTwoPageMode) ||
+                    args.PropertyName == nameof(ReaderViewModel.LeftPageImage) ||
+                    args.PropertyName == nameof(ReaderViewModel.RightPageImage))
                 {
                     UpdateImageSizing();
                 }
@@ -467,10 +476,39 @@ public partial class ReaderView : UserControl
         double imageWidth = 800;  // Default fallback
         double imageHeight = 600; // Default fallback
         
-        if (_pageImage?.Source is Avalonia.Media.Imaging.Bitmap bitmap)
+        if (vm.IsTwoPageMode)
         {
-            imageWidth = bitmap.PixelSize.Width;
-            imageHeight = bitmap.PixelSize.Height;
+            // In two-page mode, calculate combined width and max height of both pages
+            double leftWidth = 0, leftHeight = 0, rightWidth = 0, rightHeight = 0;
+            
+            if (_leftPageImage?.Source is Avalonia.Media.Imaging.Bitmap leftBitmap)
+            {
+                leftWidth = leftBitmap.PixelSize.Width;
+                leftHeight = leftBitmap.PixelSize.Height;
+            }
+            
+            if (_rightPageImage?.Source is Avalonia.Media.Imaging.Bitmap rightBitmap)
+            {
+                rightWidth = rightBitmap.PixelSize.Width;
+                rightHeight = rightBitmap.PixelSize.Height;
+            }
+            
+            // Use left page dimensions if available, or fallback
+            if (leftWidth > 0 && leftHeight > 0)
+            {
+                // Combined width (with 4px margin between pages), max height
+                imageWidth = leftWidth + rightWidth + (rightWidth > 0 ? 4 : 0);
+                imageHeight = Math.Max(leftHeight, rightHeight > 0 ? rightHeight : leftHeight);
+            }
+        }
+        else
+        {
+            // Single page mode
+            if (_pageImage?.Source is Avalonia.Media.Imaging.Bitmap bitmap)
+            {
+                imageWidth = bitmap.PixelSize.Width;
+                imageHeight = bitmap.PixelSize.Height;
+            }
         }
         
         // Calculate base size based on stretch mode
