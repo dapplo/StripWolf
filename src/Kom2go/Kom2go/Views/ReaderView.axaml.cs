@@ -43,6 +43,9 @@ public partial class ReaderView : UserControl
     private const double SwipeMaxTimeMs = 500; // Maximum time in milliseconds for a swipe
     private const double SwipeMaxVerticalDeviation = 100; // Maximum vertical deviation allowed
     
+    // Two-page mode constants
+    private const double TwoPageMargin = 4; // Margin between pages in two-page mode (matches XAML)
+    
     // Pinch zoom tracking (for multi-touch)
     private readonly Dictionary<long, Point> _activeZoomPointers = new();
     private double _initialPinchDistance;
@@ -496,9 +499,9 @@ public partial class ReaderView : UserControl
             // Use left page dimensions if available, or fallback
             if (leftWidth > 0 && leftHeight > 0)
             {
-                // Combined width (with 4px margin between pages), max height
-                imageWidth = leftWidth + rightWidth + (rightWidth > 0 ? 4 : 0);
-                imageHeight = Math.Max(leftHeight, rightHeight > 0 ? rightHeight : leftHeight);
+                // Combined width (with margin between pages), max height
+                imageWidth = leftWidth + rightWidth + (rightWidth > 0 ? TwoPageMargin : 0);
+                imageHeight = Math.Max(leftHeight, rightHeight);
             }
         }
         else
