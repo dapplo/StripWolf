@@ -56,6 +56,7 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(TwoPageModeIcon))]
     [NotifyPropertyChangedFor(nameof(PageDisplay))]
     [NotifyPropertyChangedFor(nameof(MaxSliderValue))]
+    [NotifyPropertyChangedFor(nameof(CanUseStretchMode))]
     private bool _isTwoPageMode;
 
     private bool _isLoadingPage;
@@ -113,6 +114,11 @@ public partial class ReaderViewModel : ViewModelBase
     /// Whether two-page mode can be used (not available in zoomed/guided modes)
     /// </summary>
     public bool CanUseTwoPageMode => ReadingMode == ReadingMode.Normal;
+    
+    /// <summary>
+    /// Whether stretch mode can be changed (not available in two-page mode)
+    /// </summary>
+    public bool CanUseStretchMode => !IsTwoPageMode && !IsZoomedOrGuidedMode;
     
     /// <summary>
     /// Whether the page overview should be on the left side
@@ -451,6 +457,12 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
         IsTwoPageMode = !IsTwoPageMode;
+        
+        // Force FitHeight mode when enabling two-page mode to avoid sizing issues
+        if (IsTwoPageMode)
+        {
+            StretchMode = StretchMode.FitHeight;
+        }
     }
 
     [RelayCommand]

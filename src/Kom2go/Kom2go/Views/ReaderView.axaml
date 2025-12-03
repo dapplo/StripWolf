@@ -194,11 +194,11 @@
                 IsEnabled="{Binding CanUseTwoPageMode}">
           <TextBlock Text="{Binding TwoPageModeIcon}"/>
         </Button>
-        <!-- Stretch mode button (disabled in zoomed/guided modes) -->
+        <!-- Stretch mode button (disabled in zoomed/guided modes and two-page mode) -->
         <Button Grid.Column="6" Command="{Binding CycleStretchModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Change fit mode"
-                IsEnabled="{Binding !IsZoomedOrGuidedMode}"
-                IsVisible="{Binding !IsZoomedOrGuidedMode}">
+                IsEnabled="{Binding CanUseStretchMode}"
+                IsVisible="{Binding CanUseStretchMode}">
           <TextBlock Text="{Binding StretchModeIcon}"/>
         </Button>
         <!-- Fullscreen button (always visible but disabled in zoomed/guided modes) -->
