@@ -871,13 +871,15 @@ public partial class ReaderView : UserControl
             }
         }
         
-        // In zoomed mode, draw the zoom region box that matches what's actually displayed
+        // In zoomed mode, draw the zoom region box that shows what will be displayed
+        // When the region is displayed, it's scaled to fit the container while maintaining
+        // aspect ratio, so more content may be shown. We need to calculate and show that.
         if (vm.ReadingMode == ReadingMode.Zoomed)
         {
             var bounds = vm.ZoomRegion.GetBounds();
             
             // Calculate the effective displayed region accounting for aspect ratio fitting
-            // in the zoomed container
+            // in the zoomed container - this shows what will actually be visible
             var effectiveBounds = CalculateEffectiveDisplayBounds(vm, bounds);
             
             var rect = new Rectangle
@@ -978,7 +980,11 @@ public partial class ReaderView : UserControl
     
     /// <summary>
     /// Update the zoomed area display using scale and translate transforms
-    /// to show the selected region enlarged to fill the container
+    /// to show the selected region enlarged to fill the container.
+    /// 
+    /// The approach is:
+    /// 1. Calculate the effective bounds (accounting for aspect ratio fitting)
+    /// 2. Scale and translate so the effective region appears in the container
     /// </summary>
     private void UpdateZoomedAreaClip()
     {
@@ -1000,7 +1006,7 @@ public partial class ReaderView : UserControl
         
         if (vm.IsGuidedMode && vm.CurrentPanel is not null)
         {
-            // In guided mode, use the current panel bounds
+            // In guided mode, use the current panel bounds directly
             var panel = vm.CurrentPanel;
             regionX = panel.X;
             regionY = panel.Y;
@@ -1009,8 +1015,7 @@ public partial class ReaderView : UserControl
         }
         else if (vm.ReadingMode == ReadingMode.Zoomed)
         {
-            // In zoomed mode, use the zoom region bounds
-            // Calculate the effective bounds that account for aspect ratio fitting
+            // In zoomed mode, calculate effective bounds that account for aspect ratio fitting
             // This must match what the rectangle shows on the overview
             var originalBounds = vm.ZoomRegion.GetBounds();
             var effectiveBounds = CalculateEffectiveDisplayBounds(vm, originalBounds);
@@ -1033,17 +1038,7 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Get actual image pixel dimensions
-        var imagePixelWidth = (double)vm.CurrentPageImage.PixelSize.Width;
-        var imagePixelHeight = (double)vm.CurrentPageImage.PixelSize.Height;
-        
-        // Validate image dimensions
-        if (imagePixelWidth <= 0 || imagePixelHeight <= 0)
-        {
-            return;
-        }
-        
-        // Get the container (border) dimensions
+        // Get the container dimensions
         var containerWidth = zoomedBorder.Bounds.Width;
         var containerHeight = zoomedBorder.Bounds.Height;
         
@@ -1052,76 +1047,57 @@ public partial class ReaderView : UserControl
             return;
         }
         
-        // Calculate container aspect ratio for scale calculation
-        var containerAspect = containerWidth / containerHeight;
+        // The zoomed image is displayed with Stretch="Uniform", which means it's scaled
+        // to fit within the Border while maintaining aspect ratio. We need to know the
+        // actual displayed size of the image within the Border.
+        var imageBounds = GetImageBoundsInContainer(zoomedImage);
+        var displayedImageWidth = imageBounds.Width;
+        var displayedImageHeight = imageBounds.Height;
         
-        // Get the image bounds using the same calculation as the overview
-        // This ensures consistent coordinate mapping between overview rectangle and zoomed view
-        var zoomedImageBounds = GetImageBoundsInContainer(zoomedImage);
-        var baseImageWidth = zoomedImageBounds.Width;
-        var baseImageHeight = zoomedImageBounds.Height;
-        // Calculate the internal offset within the Image element:
-        // - zoomedImageBounds.X/Y are in parent coordinate space (includes element position + internal offset)
-        // - zoomedImage.Bounds.X/Y represent the Image element's position in its parent
-        // - The difference gives the internal offset where image content is positioned within the element
-        //   due to Stretch="Uniform" centering
-        var baseImageOffsetX = zoomedImageBounds.X - zoomedImage.Bounds.X;
-        var baseImageOffsetY = zoomedImageBounds.Y - zoomedImage.Bounds.Y;
-        
-        // Validate base image dimensions
-        if (baseImageWidth <= 0 || baseImageHeight <= 0)
+        if (displayedImageWidth <= 0 || displayedImageHeight <= 0)
         {
             return;
         }
         
-        // Calculate the aspect ratio of the region (in actual pixels)
-        var regionPixelWidth = regionWidth * imagePixelWidth;
-        var regionPixelHeight = regionHeight * imagePixelHeight;
-        var regionAspect = regionPixelWidth / regionPixelHeight;
+        // Calculate where the image content actually starts within the Image control
+        // (due to Stretch="Uniform" centering)
+        var imageOffsetX = imageBounds.X - zoomedImage.Bounds.X;
+        var imageOffsetY = imageBounds.Y - zoomedImage.Bounds.Y;
         
-        // Calculate scale factor to enlarge the region to fill the container
-        double scale;
-        if (regionAspect > containerAspect)
-        {
-            // Region is wider than container - fit to width
-            scale = containerWidth / (regionWidth * baseImageWidth);
-        }
-        else
-        {
-            // Region is taller than container - fit to height
-            scale = containerHeight / (regionHeight * baseImageHeight);
-        }
+        // Calculate the region's position and size in displayed pixels
+        var regionLeftPx = regionX * displayedImageWidth;
+        var regionTopPx = regionY * displayedImageHeight;
+        var regionWidthPx = regionWidth * displayedImageWidth;
+        var regionHeightPx = regionHeight * displayedImageHeight;
         
-        // Calculate the region position in the base image coordinate space
-        // The region is at (regionX, regionY) normalized, which maps to:
-        var regionLeftInImage = regionX * baseImageWidth;
-        var regionTopInImage = regionY * baseImageHeight;
-        var regionDisplayWidth = regionWidth * baseImageWidth;
-        var regionDisplayHeight = regionHeight * baseImageHeight;
+        // Calculate the center of the region in displayed image coordinates
+        var regionCenterX = regionLeftPx + regionWidthPx / 2;
+        var regionCenterY = regionTopPx + regionHeightPx / 2;
         
-        // Calculate the center of the region in the base image (relative to image top-left, not container)
-        var regionCenterInImageX = regionLeftInImage + regionDisplayWidth / 2;
-        var regionCenterInImageY = regionTopInImage + regionDisplayHeight / 2;
+        // Calculate scale to fit the region in the container while maintaining aspect ratio
+        var scaleX = containerWidth / regionWidthPx;
+        var scaleY = containerHeight / regionHeightPx;
+        var scale = Math.Min(scaleX, scaleY);
         
-        // After scaling around origin (0,0), the image offset and region center both scale
-        var scaledImageOffsetX = baseImageOffsetX * scale;
-        var scaledImageOffsetY = baseImageOffsetY * scale;
-        var scaledRegionCenterX = regionCenterInImageX * scale + scaledImageOffsetX;
-        var scaledRegionCenterY = regionCenterInImageY * scale + scaledImageOffsetY;
+        // After scaling, calculate where we need to translate:
+        // The region center (in image coordinates) will move to (regionCenterX * scale, regionCenterY * scale)
+        // relative to where the image starts (imageOffsetX, imageOffsetY)
+        // We want it to be at the container center
+        var scaledImageOffsetX = imageOffsetX * scale;
+        var scaledImageOffsetY = imageOffsetY * scale;
+        var scaledRegionCenterX = scaledImageOffsetX + regionCenterX * scale;
+        var scaledRegionCenterY = scaledImageOffsetY + regionCenterY * scale;
         
-        // Translate to put the scaled region center at the container center
         var translateX = (containerWidth / 2) - scaledRegionCenterX;
         var translateY = (containerHeight / 2) - scaledRegionCenterY;
         
-        // Apply the combined transform
+        // Apply the transform
         var transformGroup = new TransformGroup();
         transformGroup.Children.Add(new ScaleTransform(scale, scale));
         transformGroup.Children.Add(new TranslateTransform(translateX, translateY));
         
         zoomedImage.RenderTransform = transformGroup;
         zoomedImage.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
-        
-        // Don't use clip - the border's ClipToBounds handles clipping
         zoomedImage.Clip = null;
     }
     
