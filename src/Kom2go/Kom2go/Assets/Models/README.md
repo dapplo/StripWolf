@@ -2,11 +2,13 @@
 
 This directory should contain the YOLO ONNX model file for comic panel detection.
 
+**Note**: The issue mentioned "YOLOv12x" but as of this implementation, the latest stable YOLO versions are YOLOv8, YOLOv9, YOLOv10, and YOLOv11. This implementation supports any YOLO version that exports to ONNX format. YOLOv8 and YOLOv11 (from Ultralytics) are recommended for their ease of use and good performance.
+
 ## Model Setup
 
 ### Option 1: Use a Pre-trained YOLO Model
 
-If you have a YOLOv10, YOLOv11, or similar YOLO model already trained for comic panel detection:
+If you have a YOLOv8, YOLOv10, YOLOv11, or similar YOLO model already trained for comic panel detection:
 
 1. Export your model to ONNX format:
    ```bash

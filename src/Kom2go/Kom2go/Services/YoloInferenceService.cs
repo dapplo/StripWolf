@@ -21,6 +21,14 @@ public class YoloInferenceService : IDisposable
     private const float ConfidenceThreshold = 0.25f;
     private const float IouThreshold = 0.45f;
     
+    // Model configuration - adjust based on your YOLO model
+    // Common input names: "images" (YOLOv8/v10/v11), "input" (some models)
+    private const string InputTensorName = "images";
+    
+    // Padding color for image preprocessing
+    // Use gray for most comics, adjust if needed (white, black, etc.)
+    private static readonly Color PaddingColor = Color.Gray;
+    
     /// <summary>
     /// Initialize YOLO inference service with a model file
     /// </summary>
@@ -74,7 +82,7 @@ public class YoloInferenceService : IDisposable
         // Create input container
         var inputs = new List<NamedOnnxValue>
         {
-            NamedOnnxValue.CreateFromTensor("images", inputTensor)
+            NamedOnnxValue.CreateFromTensor(InputTensorName, inputTensor)
         };
         
         // Run inference
@@ -103,7 +111,7 @@ public class YoloInferenceService : IDisposable
         {
             Size = new Size(ModelInputWidth, ModelInputHeight),
             Mode = ResizeMode.Pad,
-            PadColor = Color.Gray
+            PadColor = PaddingColor
         }));
         
         // Create tensor with shape [1, 3, height, width]
@@ -132,19 +140,25 @@ public class YoloInferenceService : IDisposable
     /// <summary>
     /// Post-process YOLO model output to extract detections
     /// </summary>
+    /// <remarks>
+    /// This method supports two common YOLO output formats:
+    /// 1. [1, num_predictions, features] - Standard format used by YOLOv8/v10/v11
+    /// 2. [1, features, num_predictions] - Transposed format used by some models
+    /// 
+    /// Where features typically contains: [x_center, y_center, width, height, confidence, class_id]
+    /// 
+    /// If your model uses a different format, adjust the parsing logic accordingly.
+    /// </remarks>
     private List<YoloDetection> PostprocessOutput(Tensor<float> output, int originalWidth, int originalHeight)
     {
         var detections = new List<YoloDetection>();
-        
-        // YOLO output format varies by version, this handles common YOLOv8/v11 format
-        // Output shape: [1, num_predictions, 6] where 6 = [x, y, w, h, confidence, class]
-        // or [1, 6, num_predictions] depending on the model
         
         var dimensions = output.Dimensions.ToArray();
         int numPredictions;
         int stride;
         
-        // Determine output format
+        // Determine output format based on dimension sizes
+        // Note: This assumes the predictions dimension is larger than the features dimension
         if (dimensions[1] > dimensions[2])
         {
             // Format: [1, num_predictions, 6]

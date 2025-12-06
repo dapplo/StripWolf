@@ -28,9 +28,10 @@ public partial class PanelDetectionService
             {
                 _yoloService = new YoloInferenceService(_yoloModelPath);
             }
-            catch
+            catch (Exception ex)
             {
                 // Fall back to traditional algorithm if YOLO initialization fails
+                System.Diagnostics.Debug.WriteLine($"Failed to initialize YOLO service: {ex.Message}");
                 _useYolo = false;
                 _yoloService = null;
             }
@@ -127,9 +128,10 @@ public partial class PanelDetectionService
                 result.Panels.Add(CreateFullPagePanel(pageIndex));
             }
         }
-        catch
+        catch (Exception ex)
         {
             // On error, treat page as splash page
+            System.Diagnostics.Debug.WriteLine($"YOLO panel detection failed for page {pageIndex}: {ex.Message}");
             result.DetectionSuccessful = false;
             result.IsSplashPage = true;
             result.Panels.Add(CreateFullPagePanel(pageIndex, 0.5));
