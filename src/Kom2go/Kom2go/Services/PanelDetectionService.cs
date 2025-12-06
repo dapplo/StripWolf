@@ -7,9 +7,9 @@ namespace Kom2go.Services;
 
 /// <summary>
 /// Service for detecting comic panels (scenes) on comic pages.
-/// Uses image processing to find rectangular regions separated by gutters.
+/// Uses YOLO model for detection if available, otherwise falls back to image processing algorithm.
 /// </summary>
-public class PanelDetectionService
+public partial class PanelDetectionService : IDisposable
 {
     // Cache for detected panels per comic file
     private readonly Dictionary<string, Dictionary<int, PagePanelInfo>> _cache = new();
@@ -69,8 +69,10 @@ public class PanelDetectionService
             }
         }
         
-        // Perform detection
-        var result = await Task.Run(() => DetectPanelsInternal(pageIndex, pageData));
+        // Perform detection using YOLO if available, otherwise use traditional algorithm
+        var result = await Task.Run(() => _useYolo 
+            ? DetectPanelsWithYolo(pageIndex, pageData) 
+            : DetectPanelsInternal(pageIndex, pageData));
         
         // Cache result
         lock (_cacheLock)

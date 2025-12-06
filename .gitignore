@@ -53,3 +53,8 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 /.vs
+
+# YOLO/ML model files (too large for git)
+*.onnx
+*.pt
+*.weights

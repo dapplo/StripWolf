@@ -99,7 +99,7 @@ public partial class App : Application
         services.AddSingleton<SettingsService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<ComicReaderService>();
-        services.AddSingleton<PanelDetectionService>();
+        services.AddSingleton<PanelDetectionService>(provider => new PanelDetectionService());
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<ComicConverterService>();
         
