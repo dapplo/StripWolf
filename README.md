@@ -11,6 +11,7 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 - **Komga Integration**: Connect to your Komga server to browse and download comics
 - **Offline Reading**: Download comics from Komga for offline access
 - **Reading Progress**: Automatically tracks your reading progress
+- **AI-Powered Panel Detection**: Optional YOLO-based machine learning model for accurate comic panel detection (guided reading mode)
 - **Cross-Platform**: Works on Windows, Linux, macOS, and Android
 
 ## Supported Formats
@@ -136,6 +137,32 @@ Configure your server URL and credentials in the Settings page to:
 - **Storage**: SQLite via sqlite-net-pcl
 - **CBR Support**: SharpCompress
 - **PDF Support**: PDFiumCore for PDF rendering, SixLabors.ImageSharp for image processing
+- **ML/AI**: ONNX Runtime for YOLO-based panel detection (optional)
+
+## Panel Detection (Guided Reading Mode)
+
+Kom2go supports advanced comic panel detection for guided reading mode. Two methods are available:
+
+### 1. YOLO-Based Detection (Recommended)
+
+Uses a YOLO machine learning model for accurate panel detection. This method provides:
+- Higher accuracy in detecting panel boundaries
+- Better handling of complex panel layouts
+- Support for various comic styles
+
+**Setup**: Place a trained YOLO ONNX model at `Assets/Models/panel_detection.onnx`. See [Panel Detection Model README](src/Kom2go/Kom2go/Assets/Models/README.md) for detailed instructions on:
+- Training your own YOLO model for comic panels
+- Exporting pre-trained models to ONNX format
+- Optimal model configurations
+
+### 2. Traditional Algorithm (Fallback)
+
+If no YOLO model is available, the app automatically falls back to an image processing algorithm that:
+- Detects white gutters between panels
+- Works reasonably well for standard comic layouts
+- Requires no additional setup
+
+**Note**: The traditional algorithm is always available as a fallback, ensuring the app works even without a YOLO model.
 
 ## Publishing to Google Play Store
 
