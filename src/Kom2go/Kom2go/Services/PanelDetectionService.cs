@@ -153,7 +153,7 @@ public class PanelDetectionService
             using var blurred = new Mat();
             Cv2.GaussianBlur(gray, blurred, new OpenCvSharp.Size(5, 5), 0);
             
-            // Apply adaptive thresholding to detect gutters (white areas)
+            // Apply thresholding to detect gutters (white areas)
             using var thresh = new Mat();
             Cv2.Threshold(blurred, thresh, GutterBrightnessThreshold, 255, ThresholdTypes.Binary);
             
