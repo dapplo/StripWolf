@@ -158,8 +158,6 @@ public class PanelDetectionService
             Cv2.Threshold(blurred, thresh, GutterBrightnessThreshold, 255, ThresholdTypes.Binary);
             
             // Detect contours
-            using var contours = new Mat();
-            using var hierarchy = new Mat();
             Cv2.FindContours(thresh, out var contoursArray, out var hierarchyArray, 
                 RetrievalModes.External, ContourApproximationModes.ApproxSimple);
             
@@ -469,8 +467,7 @@ public class PanelDetectionService
             1 => 0.5,
             2 => 0.7,
             3 => 0.85,
-            >= 4 => 0.95,
-            _ => 0.3
+            _ => 0.95
         };
     }
 }
