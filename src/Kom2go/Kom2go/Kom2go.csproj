@@ -28,6 +28,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="OpenCvSharp4" />
     <!-- For SQLite local storage -->
     <PackageReference Include="sqlite-net-pcl" />
     <PackageReference Include="SQLitePCLRaw.bundle_green" />
@@ -44,5 +45,17 @@
   <!-- Exclude PdfiumPdfRenderer.cs when building for Android -->
   <ItemGroup Condition="'$(ExcludePdfium)' == 'true'">
     <Compile Remove="Services\PdfiumPdfRenderer.cs" />
+  </ItemGroup>
+
+  <!-- OpenCV runtime packages for desktop platforms -->
+  <ItemGroup Condition="'$(ExcludePdfium)' != 'true'">
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="OpenCvSharp4.official.runtime.linux-x64" />
+    <PackageReference Include="OpenCvSharp4.runtime.osx.10.15-universal" />
+  </ItemGroup>
+
+  <!-- OpenCV runtime package for Android -->
+  <ItemGroup Condition="'$(ExcludePdfium)' == 'true'">
+    <PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" />
   </ItemGroup>
 </Project>

@@ -19,6 +19,12 @@
     <PackageVersion Include="PDFiumCore" Version="133.0.6844" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
+    <!-- For OpenCV panel detection -->
+    <PackageVersion Include="OpenCvSharp4" Version="4.11.0.20250507" />
+    <PackageVersion Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
+    <PackageVersion Include="OpenCvSharp4.official.runtime.linux-x64" Version="4.11.0.20250507" />
+    <PackageVersion Include="OpenCvSharp4.runtime.osx.10.15-universal" Version="4.7.0.20230224" />
+    <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" Version="4.11.0.35" />
     <!-- For SQLite local storage -->
     <PackageVersion Include="sqlite-net-pcl" Version="1.9.172" />
     <PackageVersion Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />

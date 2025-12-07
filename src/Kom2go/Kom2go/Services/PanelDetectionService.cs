@@ -1,7 +1,5 @@
 using Kom2go.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using OpenCvSharp;
 
 namespace Kom2go.Services;
 
@@ -130,7 +128,7 @@ public class PanelDetectionService
     }
     
     /// <summary>
-    /// Internal panel detection implementation
+    /// Internal panel detection implementation using OpenCV
     /// </summary>
     private PagePanelInfo DetectPanelsInternal(int pageIndex, byte[] pageData)
     {
@@ -141,102 +139,78 @@ public class PanelDetectionService
         
         try
         {
-            using var image = Image.Load<Rgba32>(pageData);
+            // Decode image from byte array using OpenCV
+            using var mat = Mat.FromImageData(pageData, ImreadModes.Color);
             
-            var imageWidth = image.Width;
-            var imageHeight = image.Height;
+            var imageWidth = mat.Width;
+            var imageHeight = mat.Height;
             
-            // Convert to grayscale for processing
-            var grayImage = ConvertToGrayscale(image);
+            // Convert to grayscale
+            using var gray = new Mat();
+            Cv2.CvtColor(mat, gray, ColorConversionCodes.BGR2GRAY);
             
-            // First, find horizontal gutters to identify rows
-            var horizontalGutters = FindHorizontalGutters(grayImage, imageWidth, imageHeight);
+            // Apply Gaussian blur to reduce noise
+            using var blurred = new Mat();
+            Cv2.GaussianBlur(gray, blurred, new OpenCvSharp.Size(5, 5), 0);
             
-            // Get row boundaries
-            var rowBoundaries = new List<(int top, int bottom)>();
-            var prevY = 0;
-            foreach (var (start, end) in horizontalGutters)
-            {
-                var gutterMiddle = (start + end) / 2;
-                if (gutterMiddle > prevY + imageHeight * MinPanelSizeRatio)
-                {
-                    rowBoundaries.Add((prevY, start));
-                }
-                prevY = end;
-            }
-            // Add the last row
-            if (imageHeight > prevY + imageHeight * MinPanelSizeRatio)
-            {
-                rowBoundaries.Add((prevY, imageHeight));
-            }
+            // Apply adaptive thresholding to detect gutters (white areas)
+            using var thresh = new Mat();
+            Cv2.Threshold(blurred, thresh, GutterBrightnessThreshold, 255, ThresholdTypes.Binary);
             
-            // If no rows found, treat entire page as one row
-            if (rowBoundaries.Count == 0)
-            {
-                rowBoundaries.Add((0, imageHeight));
-            }
+            // Detect contours
+            using var contours = new Mat();
+            using var hierarchy = new Mat();
+            Cv2.FindContours(thresh, out var contoursArray, out var hierarchyArray, 
+                RetrievalModes.External, ContourApproximationModes.ApproxSimple);
             
-            // For each row, find vertical gutters within that row
+            // Find rectangular panels by analyzing contours
             var panels = new List<ComicPanel>();
             var panelIndex = 0;
+            var minPanelWidth = imageWidth * MinPanelSizeRatio;
+            var minPanelHeight = imageHeight * MinPanelSizeRatio;
             
-            foreach (var (rowTop, rowBottom) in rowBoundaries)
+            // Try contour-based detection first
+            var detectedRects = new List<Rect>();
+            foreach (var contour in contoursArray)
             {
-                // Find vertical gutters within this row
-                var verticalGuttersInRow = FindVerticalGuttersInRow(grayImage, imageWidth, rowTop, rowBottom);
+                var rect = Cv2.BoundingRect(contour);
                 
-                // Get column boundaries within this row
-                var colBoundaries = new List<(int left, int right)>();
-                var prevX = 0;
-                foreach (var (start, end) in verticalGuttersInRow)
+                // Filter out panels that are too small
+                if (rect.Width >= minPanelWidth && rect.Height >= minPanelHeight)
                 {
-                    var gutterMiddle = (start + end) / 2;
-                    if (gutterMiddle > prevX + imageWidth * MinPanelSizeRatio)
-                    {
-                        colBoundaries.Add((prevX, start));
-                    }
-                    prevX = end;
+                    detectedRects.Add(rect);
                 }
-                // Add the last column
-                if (imageWidth > prevX + imageWidth * MinPanelSizeRatio)
-                {
-                    colBoundaries.Add((prevX, imageWidth));
-                }
+            }
+            
+            // If contour detection didn't find enough panels, try gutter-based detection
+            if (detectedRects.Count == 0)
+            {
+                detectedRects = DetectPanelsViaGutters(blurred, imageWidth, imageHeight);
+            }
+            
+            // Sort rectangles by position (top to bottom, left to right)
+            detectedRects = detectedRects
+                .OrderBy(r => r.Y)
+                .ThenBy(r => r.X)
+                .ToList();
+            
+            // Create panels from detected rectangles
+            foreach (var rect in detectedRects)
+            {
+                // Trim the panel boundaries slightly to exclude gutter white space
+                var trimX = Math.Min(MaxPanelTrimPixels, rect.Width / PanelTrimDivisor);
+                var trimY = Math.Min(MaxPanelTrimPixels, rect.Height / PanelTrimDivisor);
                 
-                // If no columns found, treat entire row as one panel
-                if (colBoundaries.Count == 0)
+                panels.Add(new ComicPanel
                 {
-                    colBoundaries.Add((0, imageWidth));
-                }
-                
-                // Create panels for each cell in this row
-                foreach (var (colLeft, colRight) in colBoundaries)
-                {
-                    var panelWidth = colRight - colLeft;
-                    var panelHeight = rowBottom - rowTop;
-                    
-                    // Skip if panel is too small
-                    if (panelWidth < imageWidth * MinPanelSizeRatio || 
-                        panelHeight < imageHeight * MinPanelSizeRatio)
-                    {
-                        continue;
-                    }
-                    
-                    // Trim the panel boundaries slightly to exclude gutter white space
-                    var trimX = Math.Min(MaxPanelTrimPixels, panelWidth / PanelTrimDivisor);
-                    var trimY = Math.Min(MaxPanelTrimPixels, panelHeight / PanelTrimDivisor);
-                    
-                    panels.Add(new ComicPanel
-                    {
-                        PageIndex = pageIndex,
-                        PanelIndex = panelIndex++,
-                        X = (double)(colLeft + trimX) / imageWidth,
-                        Y = (double)(rowTop + trimY) / imageHeight,
-                        Width = (double)(panelWidth - 2 * trimX) / imageWidth,
-                        Height = (double)(panelHeight - 2 * trimY) / imageHeight,
-                        Confidence = CalculateConfidence(horizontalGutters.Count, verticalGuttersInRow.Count)
-                    });
-                }
+                    PageIndex = pageIndex,
+                    PanelIndex = panelIndex++,
+                    X = (double)(rect.X + trimX) / imageWidth,
+                    Y = (double)(rect.Y + trimY) / imageHeight,
+                    Width = (double)(rect.Width - 2 * trimX) / imageWidth,
+                    Height = (double)(rect.Height - 2 * trimY) / imageHeight,
+                    Confidence = CalculateConfidence(detectedRects.Count)
+                });
             }
             
             if (panels.Count > 0)
@@ -282,35 +256,91 @@ public class PanelDetectionService
     }
     
     /// <summary>
-    /// Convert image to grayscale byte array
+    /// Detect panels via gutter-based approach (fallback method)
     /// </summary>
-    private byte[,] ConvertToGrayscale(Image<Rgba32> image)
+    private List<Rect> DetectPanelsViaGutters(Mat grayImage, int width, int height)
     {
-        var width = image.Width;
-        var height = image.Height;
-        var gray = new byte[height, width];
+        var panels = new List<Rect>();
         
-        image.ProcessPixelRows(accessor =>
+        // Find horizontal gutters to identify rows
+        var horizontalGutters = FindHorizontalGutters(grayImage, width, height);
+        
+        // Get row boundaries
+        var rowBoundaries = new List<(int top, int bottom)>();
+        var prevY = 0;
+        foreach (var (start, end) in horizontalGutters)
         {
-            for (var y = 0; y < height; y++)
+            var gutterMiddle = (start + end) / 2;
+            if (gutterMiddle > prevY + height * MinPanelSizeRatio)
             {
-                var row = accessor.GetRowSpan(y);
-                for (var x = 0; x < width; x++)
+                rowBoundaries.Add((prevY, start));
+            }
+            prevY = end;
+        }
+        // Add the last row
+        if (height > prevY + height * MinPanelSizeRatio)
+        {
+            rowBoundaries.Add((prevY, height));
+        }
+        
+        // If no rows found, treat entire page as one row
+        if (rowBoundaries.Count == 0)
+        {
+            rowBoundaries.Add((0, height));
+        }
+        
+        // For each row, find vertical gutters within that row
+        foreach (var (rowTop, rowBottom) in rowBoundaries)
+        {
+            // Find vertical gutters within this row
+            var verticalGuttersInRow = FindVerticalGuttersInRow(grayImage, width, rowTop, rowBottom);
+            
+            // Get column boundaries within this row
+            var colBoundaries = new List<(int left, int right)>();
+            var prevX = 0;
+            foreach (var (start, end) in verticalGuttersInRow)
+            {
+                var gutterMiddle = (start + end) / 2;
+                if (gutterMiddle > prevX + width * MinPanelSizeRatio)
                 {
-                    var pixel = row[x];
-                    // Standard grayscale conversion
-                    gray[y, x] = (byte)(0.299 * pixel.R + 0.587 * pixel.G + 0.114 * pixel.B);
+                    colBoundaries.Add((prevX, start));
+                }
+                prevX = end;
+            }
+            // Add the last column
+            if (width > prevX + width * MinPanelSizeRatio)
+            {
+                colBoundaries.Add((prevX, width));
+            }
+            
+            // If no columns found, treat entire row as one panel
+            if (colBoundaries.Count == 0)
+            {
+                colBoundaries.Add((0, width));
+            }
+            
+            // Create rectangles for each cell in this row
+            foreach (var (colLeft, colRight) in colBoundaries)
+            {
+                var panelWidth = colRight - colLeft;
+                var panelHeight = rowBottom - rowTop;
+                
+                // Skip if panel is too small
+                if (panelWidth >= width * MinPanelSizeRatio && 
+                    panelHeight >= height * MinPanelSizeRatio)
+                {
+                    panels.Add(new Rect(colLeft, rowTop, panelWidth, panelHeight));
                 }
             }
-        });
+        }
         
-        return gray;
+        return panels;
     }
     
     /// <summary>
     /// Find horizontal gutters (white/light horizontal bands)
     /// </summary>
-    private List<(int start, int end)> FindHorizontalGutters(byte[,] grayImage, int width, int height)
+    private List<(int start, int end)> FindHorizontalGutters(Mat grayImage, int width, int height)
     {
         var gutters = new List<(int start, int end)>();
         var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(height);
@@ -329,7 +359,7 @@ public class PanelDetectionService
             var lightPixelCount = 0;
             for (var x = sampleStartX; x < sampleEndX; x++)
             {
-                if (grayImage[y, x] >= GutterBrightnessThreshold)
+                if (grayImage.At<byte>(y, x) >= GutterBrightnessThreshold)
                 {
                     lightPixelCount++;
                 }
@@ -360,7 +390,7 @@ public class PanelDetectionService
     /// <summary>
     /// Find vertical gutters within a specific row (white/light vertical bands)
     /// </summary>
-    private List<(int start, int end)> FindVerticalGuttersInRow(byte[,] grayImage, int width, int rowTop, int rowBottom)
+    private List<(int start, int end)> FindVerticalGuttersInRow(Mat grayImage, int width, int rowTop, int rowBottom)
     {
         var gutters = new List<(int start, int end)>();
         var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(width);
@@ -384,7 +414,7 @@ public class PanelDetectionService
             var lightPixelCount = 0;
             for (var y = sampleStartY; y < sampleEndY; y++)
             {
-                if (grayImage[y, x] >= GutterBrightnessThreshold)
+                if (grayImage.At<byte>(y, x) >= GutterBrightnessThreshold)
                 {
                     lightPixelCount++;
                 }
@@ -428,19 +458,19 @@ public class PanelDetectionService
     }
     
     /// <summary>
-    /// Calculate confidence score based on gutter detection
+    /// Calculate confidence score based on number of detected panels
     /// </summary>
-    private static double CalculateConfidence(int hGutterCount, int vGutterCount)
+    private static double CalculateConfidence(int panelCount)
     {
-        // More gutters found = higher confidence, up to a point
-        var totalGutters = hGutterCount + vGutterCount;
-        return totalGutters switch
+        // More panels found = higher confidence, up to a point
+        return panelCount switch
         {
             0 => 0.3,
             1 => 0.5,
             2 => 0.7,
             3 => 0.85,
-            _ => 0.95
+            >= 4 => 0.95,
+            _ => 0.3
         };
     }
 }
