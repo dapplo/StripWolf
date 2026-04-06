@@ -55,7 +55,7 @@ public class ComicConverterService
 
         try
         {
-            using var archive = RarArchive.Open(filePath);
+            using var archive = RarArchive.OpenArchive(filePath);
             return archive.IsSolid;
         }
         catch
@@ -235,7 +235,7 @@ public class ComicConverterService
     {
         // For solid RAR archives, we must use the Reader interface (forward-only stream)
         // For non-solid archives, we can use the Archive interface (random access)
-        using var archive = RarArchive.Open(inputPath);
+        using var archive = RarArchive.OpenArchive(inputPath);
         
         if (archive.IsSolid)
         {
@@ -292,7 +292,7 @@ public class ComicConverterService
 
     private static void ExtractSevenZip(string inputPath, string outputDir, IProgress<double>? progress)
     {
-        using var archive = SevenZipArchive.Open(inputPath);
+        using var archive = SevenZipArchive.OpenArchive(inputPath);
         // 7z archives may be solid, so use ExtractAllEntries which handles this
         using var reader = archive.ExtractAllEntries();
         var totalEntries = archive.Entries.Count(e => !e.IsDirectory);
@@ -321,7 +321,7 @@ public class ComicConverterService
 
     private static void ExtractTar(string inputPath, string outputDir, IProgress<double>? progress)
     {
-        using var archive = TarArchive.Open(inputPath);
+        using var archive = TarArchive.OpenArchive(inputPath);
         var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
         var totalEntries = entries.Count;
         var processedEntries = 0;
@@ -425,7 +425,7 @@ public class ComicConverterService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.Open(filePath);
+            using var archive = RarArchive.OpenArchive(filePath);
             
             if (archive.IsSolid)
             {
@@ -465,7 +465,7 @@ public class ComicConverterService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.Open(filePath);
+            using var archive = SevenZipArchive.OpenArchive(filePath);
             using var reader = archive.ExtractAllEntries();
             
             while (reader.MoveToNextEntry())
@@ -488,7 +488,7 @@ public class ComicConverterService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.Open(filePath);
+            using var archive = TarArchive.OpenArchive(filePath);
             var entry = archive.Entries.FirstOrDefault(e => 
                 !e.IsDirectory && Path.GetFileName(e.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
             

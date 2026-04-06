@@ -171,7 +171,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.Open(filePath);
+            using var archive = RarArchive.OpenArchive(filePath);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -181,7 +181,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.Open(filePath);
+            using var archive = RarArchive.OpenArchive(filePath);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -194,7 +194,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.Open(filePath);
+            using var archive = RarArchive.OpenArchive(filePath);
             
             // Check if this is a solid archive
             if (archive.IsSolid)
@@ -235,7 +235,7 @@ public class ComicReaderService
         });
     }
 
-    private static byte[] GetPageFromSolidRar(RarArchive archive, int pageIndex)
+    private static byte[] GetPageFromSolidRar(IRarArchive archive, int pageIndex)
     {
         // Build sorted list of image entry names
         var sortedNames = archive.Entries
@@ -275,7 +275,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.Open(filePath);
+            using var archive = SevenZipArchive.OpenArchive(filePath);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -285,7 +285,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.Open(filePath);
+            using var archive = SevenZipArchive.OpenArchive(filePath);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -298,7 +298,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.Open(filePath);
+            using var archive = SevenZipArchive.OpenArchive(filePath);
             var sortedNames = archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -337,7 +337,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.Open(filePath);
+            using var archive = TarArchive.OpenArchive(filePath);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -347,7 +347,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.Open(filePath);
+            using var archive = TarArchive.OpenArchive(filePath);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -360,7 +360,7 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.Open(filePath);
+            using var archive = TarArchive.OpenArchive(filePath);
             var entries = archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .ToList();
