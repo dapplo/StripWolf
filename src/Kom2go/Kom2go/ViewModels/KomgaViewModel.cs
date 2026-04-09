@@ -63,6 +63,15 @@ public partial class KomgaViewModel : ViewModelBase
     private string _downloadingBookName = string.Empty;
 
     [ObservableProperty]
+    private int _queuedDownloadsCount;
+
+    [ObservableProperty]
+    private bool _isDownloadQueueActive;
+
+    private readonly Queue<KomgaBookDisplay> _downloadQueue = new();
+    private bool _isProcessingQueue;
+
+    [ObservableProperty]
     private string _searchText = string.Empty;
 
     [ObservableProperty]
@@ -286,10 +295,17 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    private async Task<bool> CheckIfDownloadedAsync(KomgaBook book)
+    {
+        var comic = await _libraryService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
+        return comic is not null;
+    }
+
     private async Task LoadSearchBookThumbnailAsync(KomgaBook book, CancellationToken ct)
     {
         try
         {
+            var isDownloaded = await CheckIfDownloadedAsync(book);
             Bitmap? thumbnail = null;
             var thumbnailBytes = await _komgaApiService.GetBookThumbnailAsync(book.Id);
             if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
@@ -308,7 +324,12 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    SearchBookResults.Add(new KomgaBookDisplay { Book = book, Thumbnail = thumbnail });
+                    SearchBookResults.Add(new KomgaBookDisplay 
+                    { 
+                        Book = book, 
+                        Thumbnail = thumbnail,
+                        IsDownloaded = isDownloaded
+                    });
                 }
                 else
                 {
@@ -320,11 +341,17 @@ public partial class KomgaViewModel : ViewModelBase
         {
             if (!ct.IsCancellationRequested)
             {
+                var isDownloaded = await CheckIfDownloadedAsync(book);
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        SearchBookResults.Add(new KomgaBookDisplay { Book = book, Thumbnail = null });
+                        SearchBookResults.Add(new KomgaBookDisplay 
+                        { 
+                            Book = book, 
+                            Thumbnail = null,
+                            IsDownloaded = isDownloaded
+                        });
                     }
                 });
             }
@@ -520,6 +547,7 @@ public partial class KomgaViewModel : ViewModelBase
     {
         try
         {
+            var isDownloaded = await CheckIfDownloadedAsync(book);
             Bitmap? thumbnail = null;
             var thumbnailBytes = await _komgaApiService.GetBookThumbnailAsync(book.Id);
             if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
@@ -538,7 +566,12 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    collection.Add(new KomgaBookDisplay { Book = book, Thumbnail = thumbnail });
+                    collection.Add(new KomgaBookDisplay 
+                    { 
+                        Book = book, 
+                        Thumbnail = thumbnail,
+                        IsDownloaded = isDownloaded
+                    });
                 }
                 else
                 {
@@ -550,11 +583,17 @@ public partial class KomgaViewModel : ViewModelBase
         {
             if (!ct.IsCancellationRequested)
             {
+                var isDownloaded = await CheckIfDownloadedAsync(book);
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        collection.Add(new KomgaBookDisplay { Book = book, Thumbnail = null });
+                        collection.Add(new KomgaBookDisplay 
+                        { 
+                            Book = book, 
+                            Thumbnail = null,
+                            IsDownloaded = isDownloaded
+                        });
                     }
                 });
             }
@@ -850,6 +889,7 @@ public partial class KomgaViewModel : ViewModelBase
     {
         try
         {
+            var isDownloaded = await CheckIfDownloadedAsync(book);
             Bitmap? thumbnail = null;
             
             // Try to load the thumbnail
@@ -874,7 +914,8 @@ public partial class KomgaViewModel : ViewModelBase
                     Books.Add(new KomgaBookDisplay
                     {
                         Book = book,
-                        Thumbnail = thumbnail
+                        Thumbnail = thumbnail,
+                        IsDownloaded = isDownloaded
                     });
                     ApplyLocalSorting();
                 }
@@ -891,6 +932,7 @@ public partial class KomgaViewModel : ViewModelBase
             // Add without thumbnail
             if (!ct.IsCancellationRequested)
             {
+                var isDownloaded = await CheckIfDownloadedAsync(book);
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!ct.IsCancellationRequested)
@@ -898,7 +940,8 @@ public partial class KomgaViewModel : ViewModelBase
                         Books.Add(new KomgaBookDisplay
                         {
                             Book = book,
-                            Thumbnail = null
+                            Thumbnail = null,
+                            IsDownloaded = isDownloaded
                         });
                         ApplyLocalSorting();
                     }
@@ -916,31 +959,70 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task DownloadBookAsync(KomgaBookDisplay? bookDisplay)
     {
-        var book = bookDisplay?.Book;
-        if (book is null || IsDownloading)
+        if (bookDisplay?.Book is null || bookDisplay.IsQueued || bookDisplay.IsDownloading || bookDisplay.IsDownloaded)
         {
             return;
         }
 
-        IsDownloading = true;
-        DownloadingBookName = book.Name;
-        DownloadProgress = 0;
+        bookDisplay.IsQueued = true;
+        _downloadQueue.Enqueue(bookDisplay);
+        QueuedDownloadsCount = _downloadQueue.Count;
+        
+        if (!_isProcessingQueue)
+        {
+            _isProcessingQueue = true;
+            _ = ProcessDownloadQueueAsync();
+        }
+    }
 
-        try
+    private async Task ProcessDownloadQueueAsync()
+    {
+        while (_downloadQueue.Count > 0)
         {
-            var progress = new Progress<double>(p => DownloadProgress = p);
-            await _libraryService.DownloadFromKomgaAsync(book, progress);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Failed to download '{book.Name}': {ex.Message}";
-        }
-        finally
-        {
-            IsDownloading = false;
-            DownloadingBookName = string.Empty;
+            var bookDisplay = _downloadQueue.Dequeue();
+            QueuedDownloadsCount = _downloadQueue.Count;
+            
+            bookDisplay.IsQueued = false;
+            bookDisplay.IsDownloading = true;
+            
+            IsDownloading = true;
+            IsDownloadQueueActive = true;
+            DownloadingBookName = bookDisplay.Name;
             DownloadProgress = 0;
+
+            try
+            {
+                var progress = new Progress<double>(p => 
+                {
+                    DownloadProgress = p;
+                    bookDisplay.DownloadProgress = p;
+                });
+                await _libraryService.DownloadFromKomgaAsync(bookDisplay.Book, progress);
+                bookDisplay.IsDownloaded = true;
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Failed to download '{bookDisplay.Name}': {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
+            }
+            finally
+            {
+                bookDisplay.IsDownloading = false;
+                DownloadingBookName = string.Empty;
+                DownloadProgress = 0;
+                
+                if (_downloadQueue.Count == 0)
+                {
+                    IsDownloading = false;
+                    IsDownloadQueueActive = false;
+                }
+            }
+            
+            // Wait a short bit between downloads
+            await Task.Delay(100);
         }
+        
+        _isProcessingQueue = false;
     }
 
     [RelayCommand]

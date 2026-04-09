@@ -1,4 +1,5 @@
 using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Kom2go.Models.Komga;
 
@@ -24,9 +25,9 @@ public class KomgaSeriesDisplay
 }
 
 /// <summary>
-/// Display model for a Komga book with pre-loaded thumbnail
+/// Display model for a Komga book with pre-loaded thumbnail and download status
 /// </summary>
-public class KomgaBookDisplay
+public partial class KomgaBookDisplay : ObservableObject
 {
     /// <summary>
     /// The underlying Komga book data
@@ -37,6 +38,18 @@ public class KomgaBookDisplay
     /// Pre-loaded thumbnail bitmap
     /// </summary>
     public Bitmap? Thumbnail { get; set; }
+
+    [ObservableProperty]
+    private bool _isQueued;
+
+    [ObservableProperty]
+    private bool _isDownloading;
+
+    [ObservableProperty]
+    private bool _isDownloaded;
+
+    [ObservableProperty]
+    private double _downloadProgress;
 
     // Convenience properties for binding
     public string Id => Book.Id;

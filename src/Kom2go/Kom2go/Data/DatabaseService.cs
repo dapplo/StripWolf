@@ -99,6 +99,26 @@ public class DatabaseService : IAsyncDisposable
         return await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaId == komgaId);
     }
 
+    public async Task<Comic?> GetComicByKomgaHashAsync(string fileHash)
+    {
+        if (string.IsNullOrEmpty(fileHash)) return null;
+        var db = await GetDatabaseAsync();
+        return await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaHash == fileHash);
+    }
+
+    public async Task<Comic?> GetComicByKomgaIdOrHashAsync(string komgaId, string? fileHash)
+    {
+        var db = await GetDatabaseAsync();
+        var comic = await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaId == komgaId);
+        
+        if (comic is null && !string.IsNullOrEmpty(fileHash))
+        {
+            comic = await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaHash == fileHash);
+        }
+        
+        return comic;
+    }
+
     public async Task<Comic?> GetComicByFilePathAsync(string filePath)
     {
         var db = await GetDatabaseAsync();

@@ -73,8 +73,11 @@
                             <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           </Border>
-                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <Border Grid.Row="1" Height="34" Margin="8,4">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                       VerticalAlignment="Center"/>
+                          </Border>
                           <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
                                      FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
                         </Grid>
@@ -104,13 +107,36 @@
                           <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <Border Grid.Row="1" Height="34" Margin="8,4">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                     VerticalAlignment="Center"/>
+                        </Border>
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}"/>
+                        <Panel Grid.Row="3" Margin="8,0,8,8">
+                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                  CommandParameter="{Binding}">
+                            <Button.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsQueued"/>
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="!IsDownloaded"/>
+                              </MultiBinding>
+                            </Button.IsVisible>
+                          </Button>
+                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                          </StackPanel>
+                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                        </Panel>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -204,13 +230,36 @@
                           <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <Border Grid.Row="1" Height="34" Margin="8,4">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                     VerticalAlignment="Center"/>
+                        </Border>
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}"/>
+                        <Panel Grid.Row="3" Margin="8,0,8,8">
+                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                  CommandParameter="{Binding}">
+                            <Button.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsQueued"/>
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="!IsDownloaded"/>
+                              </MultiBinding>
+                            </Button.IsVisible>
+                          </Button>
+                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                          </StackPanel>
+                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                        </Panel>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -237,13 +286,36 @@
                           <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <Border Grid.Row="1" Height="34" Margin="8,4">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                     VerticalAlignment="Center"/>
+                        </Border>
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}"/>
+                        <Panel Grid.Row="3" Margin="8,0,8,8">
+                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                  CommandParameter="{Binding}">
+                            <Button.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsQueued"/>
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="!IsDownloaded"/>
+                              </MultiBinding>
+                            </Button.IsVisible>
+                          </Button>
+                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                          </StackPanel>
+                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                        </Panel>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -270,13 +342,36 @@
                           <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                        <Border Grid.Row="1" Height="34" Margin="8,4">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                     VerticalAlignment="Center"/>
+                        </Border>
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}"/>
+                        <Panel Grid.Row="3" Margin="8,0,8,8">
+                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                  CommandParameter="{Binding}">
+                            <Button.IsVisible>
+                              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsQueued"/>
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="!IsDownloaded"/>
+                              </MultiBinding>
+                            </Button.IsVisible>
+                          </Button>
+                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                          </StackPanel>
+                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                          </Border>
+                        </Panel>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -305,8 +400,11 @@
                             <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           </Border>
-                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <Border Grid.Row="1" Height="34" Margin="8,4">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                       VerticalAlignment="Center"/>
+                          </Border>
                           <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
                                      FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
                         </Grid>
@@ -361,8 +459,11 @@
                             <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                           </Border>
-                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <Border Grid.Row="1" Height="34" Margin="8,4">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                       VerticalAlignment="Center"/>
+                          </Border>
                           <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
                                      FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
                         </Grid>
@@ -396,13 +497,36 @@
                         <Image Source="{Binding Thumbnail}" Stretch="Uniform"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                       </Border>
-                      <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                 TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                      <Border Grid.Row="1" Height="34" Margin="8,4">
+                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                   VerticalAlignment="Center"/>
+                      </Border>
                       <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                      <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                              CommandParameter="{Binding}"/>
+                      <Panel Grid.Row="3" Margin="8,0,8,8">
+                        <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                CommandParameter="{Binding}">
+                          <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                              <Binding Path="!IsQueued"/>
+                              <Binding Path="!IsDownloading"/>
+                              <Binding Path="!IsDownloaded"/>
+                            </MultiBinding>
+                          </Button.IsVisible>
+                        </Button>
+                        <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                          <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                          <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                        </StackPanel>
+                        <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                          <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                        </Border>
+                      </Panel>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -442,8 +566,11 @@
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
                           </Border>
-                          <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                          <Border Grid.Row="1" Height="34" Margin="8,4">
+                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                       VerticalAlignment="Center"/>
+                          </Border>
                           <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
                                      FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
                         </Grid>
@@ -502,13 +629,36 @@
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
                       </Border>
-                      <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                 TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                      <Border Grid.Row="1" Height="34" Margin="8,4">
+                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                   VerticalAlignment="Center"/>
+                      </Border>
                       <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                      <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                              CommandParameter="{Binding}"/>
+                      <Panel Grid.Row="3" Margin="8,0,8,8">
+                        <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                                CommandParameter="{Binding}">
+                          <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                              <Binding Path="!IsQueued"/>
+                              <Binding Path="!IsDownloading"/>
+                              <Binding Path="!IsDownloaded"/>
+                            </MultiBinding>
+                          </Button.IsVisible>
+                        </Button>
+                        <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+                          <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                        </Border>
+                        <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+                          <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+                          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+                        </StackPanel>
+                        <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+                          <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                        </Border>
+                      </Panel>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -571,18 +721,23 @@
                 Command="{Binding LoadMoreBooksForReadListCommand}"/>
       </Border>
 
-      <!-- Download Progress Overlay -->
-      <Border Background="#80000000" IsVisible="{Binding IsDownloading}">
-        <Border VerticalAlignment="Center" HorizontalAlignment="Center" 
-                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                CornerRadius="12" Padding="24" Width="300">
-          <StackPanel Spacing="16">
-            <TextBlock Text="Downloading..." FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding DownloadingBookName}" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1"/>
-            <TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:P0}'}" HorizontalAlignment="Center"/>
+      <!-- Download Progress Floating Indicator -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" 
+              Margin="16" Padding="12" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+              BoxShadow="0 4 12 0 #40000000"
+              IsVisible="{Binding IsDownloadQueueActive}">
+        <StackPanel Spacing="8" Width="200">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="📥" FontSize="16" VerticalAlignment="Center"/>
+            <TextBlock Text="Downloading..." FontWeight="Bold" VerticalAlignment="Center"/>
+            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="10" Padding="6,2" VerticalAlignment="Center">
+              <TextBlock Text="{Binding QueuedDownloadsCount}" FontSize="10" Foreground="White"/>
+            </Border>
           </StackPanel>
-        </Border>
+          <TextBlock Text="{Binding DownloadingBookName}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="6"/>
+        </StackPanel>
       </Border>
     </Grid>
   </Grid>

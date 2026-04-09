@@ -125,6 +125,14 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets a comic by Komga ID or hash
+    /// </summary>
+    public Task<Comic?> GetComicByKomgaIdOrHashAsync(string komgaId, string? fileHash)
+    {
+        return _databaseService.GetComicByKomgaIdOrHashAsync(komgaId, fileHash);
+    }
+
+    /// <summary>
     /// Gets a comic by ID
     /// </summary>
     public Task<Comic?> GetComicAsync(int id)
@@ -301,8 +309,8 @@ public class LibraryService
     /// </summary>
     public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, IProgress<double>? progress = null)
     {
-        // Check if already downloaded
-        var existing = await _databaseService.GetComicByKomgaIdAsync(book.Id);
+        // Check if already downloaded by ID or Hash
+        var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
         if (existing is not null)
         {
             return existing;
@@ -414,6 +422,7 @@ public class LibraryService
         var comic = new Comic
         {
             KomgaId = book.Id,
+            KomgaHash = book.FileHash,
             Title = book.Metadata?.Title ?? book.Name,
             SeriesName = book.SeriesTitle,
             Number = book.Number,
