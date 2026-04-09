@@ -404,12 +404,34 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Removes a comic from the library database but keeps the physical file
+    /// </summary>
+    public async Task RemoveComicFromLibraryAsync(Comic comic)
+    {
+        // Delete cover (now just a single file in unified covers directory)
+        if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
+        {
+            try
+            {
+                File.Delete(comic.CoverPath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+
+        await _databaseService.DeleteComicAsync(comic);
+    }
+
+    /// <summary>
     /// Deletes a comic from the library
     /// </summary>
     public async Task DeleteComicAsync(Comic comic)
     {
-        // Delete the file if it's in our managed directory
-        if (comic.FilePath.StartsWith(_comicsDirectory) && File.Exists(comic.FilePath))
+        // If we want to protect the file, e.g. only delete if file is in our managed directory, add this: comic.FilePath.StartsWith(_comicsDirectory)
+
+        if (File.Exists(comic.FilePath))
         {
             File.Delete(comic.FilePath);
         }

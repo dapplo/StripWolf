@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Kom2go.ViewModels"
+             x:Class="Kom2go.Views.GuidedReadingView"
+             x:DataType="vm:ReaderViewModel">
+    <Grid ColumnDefinitions="*,*">
+        <!-- Left Panel -->
+        <Grid Grid.Column="0">
+            <!-- Overview if Right-Handed -->
+            <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#1A1A1A" Margin="4">
+                <Viewbox Stretch="Uniform">
+                    <Canvas x:Name="OverviewContainerLeft">
+                        <Image x:Name="OverviewImageLeft" 
+                               Source="{Binding CurrentPageImage}" 
+                               Stretch="None"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"/>
+                        <Canvas x:Name="OverviewCanvasLeft" Background="Transparent"/>
+                    </Canvas>
+                </Viewbox>
+            </Border>
+            <!-- Zoom Area if Left-Handed -->
+            <Border IsVisible="{Binding !IsOverviewOnLeft}" Background="#0A0A0A" Margin="4" ClipToBounds="True">
+                <Viewbox x:Name="ZoomedViewboxLeft" Stretch="Uniform">
+                    <Canvas x:Name="ZoomedCanvasLeft">
+                        <Image x:Name="ZoomedAreaImageLeft" 
+                               Source="{Binding CurrentPageImage}"
+                               Stretch="None"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"/>
+                    </Canvas>
+                </Viewbox>
+            </Border>
+        </Grid>
+
+        <!-- Right Panel -->
+        <Grid Grid.Column="1">
+            <!-- Zoom Area if Right-Handed -->
+            <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#0A0A0A" Margin="4" ClipToBounds="True">
+                <Viewbox x:Name="ZoomedViewboxRight" Stretch="Uniform">
+                    <Canvas x:Name="ZoomedCanvasRight">
+                        <Image x:Name="ZoomedAreaImageRight" 
+                               Source="{Binding CurrentPageImage}"
+                               Stretch="None"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"/>
+                    </Canvas>
+                </Viewbox>
+            </Border>
+            <!-- Overview if Left-Handed -->
+            <Border IsVisible="{Binding !IsOverviewOnLeft}" Background="#1A1A1A" Margin="4">
+                <Viewbox Stretch="Uniform">
+                    <Canvas x:Name="OverviewContainerRight">
+                        <Image x:Name="OverviewImageRight" 
+                               Source="{Binding CurrentPageImage}" 
+                               Stretch="None"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"/>
+                        <Canvas x:Name="OverviewCanvasRight" Background="Transparent"/>
+                    </Canvas>
+                </Viewbox>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

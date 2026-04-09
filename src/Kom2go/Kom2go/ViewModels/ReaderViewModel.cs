@@ -27,6 +27,8 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
     [NotifyPropertyChangedFor(nameof(HasNextPage))]
     [NotifyPropertyChangedFor(nameof(PageDisplay))]
+    [NotifyPropertyChangedFor(nameof(IsFirstPage))]
+    [NotifyPropertyChangedFor(nameof(IsLastPage))]
     private int _currentPage;
 
     [ObservableProperty]
@@ -62,6 +64,8 @@ public partial class ReaderViewModel : ViewModelBase
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
+    public bool IsFirstPage => CurrentPage == 0;
+    public bool IsLastPage => Comic is not null && CurrentPage == Comic.PageCount - 1;
 
     [ObservableProperty]
     private ComicInfo? _comicInfo;
@@ -72,8 +76,9 @@ public partial class ReaderViewModel : ViewModelBase
     // Reading mode properties
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ReadingModeIcon))]
-    [NotifyPropertyChangedFor(nameof(IsZoomedOrGuidedMode))]
+    [NotifyPropertyChangedFor(nameof(IsZoomedMode))]
     [NotifyPropertyChangedFor(nameof(IsGuidedMode))]
+    [NotifyPropertyChangedFor(nameof(IsNormalMode))]
     [NotifyPropertyChangedFor(nameof(CanUseTwoPageMode))]
     private ReadingMode _readingMode = ReadingMode.Normal;
     
@@ -96,58 +101,40 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private ComicPanel? _currentPanel;
     
+    partial void OnCurrentPanelChanged(ComicPanel? value)
+    {
+        if (value != null && ReadingMode == ReadingMode.Guided)
+        {
+            SetZoomRegionToPanel(value);
+        }
+    }
+    
     [ObservableProperty]
     private bool _isDetectingPanels;
     
-    /// <summary>
-    /// Whether the current reading mode is zoomed or guided
-    /// </summary>
-    public bool IsZoomedOrGuidedMode => ReadingMode is ReadingMode.Zoomed or ReadingMode.Guided;
-    
-    /// <summary>
-    /// Whether the current reading mode is guided
-    /// </summary>
+    public bool IsNormalMode => ReadingMode == ReadingMode.Normal;
+    public bool IsZoomedMode => ReadingMode == ReadingMode.Zoomed;
     public bool IsGuidedMode => ReadingMode == ReadingMode.Guided;
     
-    /// <summary>
-    /// Whether two-page mode can be used (not available in zoomed/guided modes)
-    /// </summary>
     public bool CanUseTwoPageMode => ReadingMode == ReadingMode.Normal;
-    
-    /// <summary>
-    /// Whether the page overview should be on the left side
-    /// </summary>
     public bool IsOverviewOnLeft => Handedness == Handedness.RightHanded;
     
-    /// <summary>
-    /// Whether there's a previous panel to navigate to
-    /// </summary>
     public bool HasPreviousPanel => CurrentPanelIndex > 0 || HasPreviousPage;
-    
-    /// <summary>
-    /// Whether there's a next panel to navigate to
-    /// </summary>
     public bool HasNextPanel => 
         (CurrentPagePanels is not null && CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1) || 
         HasNextPage;
     
-    /// <summary>
-    /// Display string for current panel
-    /// </summary>
     public string CurrentPanelDisplay => 
         CurrentPagePanels is not null && CurrentPagePanels.Panels.Count > 0
             ? $"Panel {CurrentPanelIndex + 1}/{CurrentPagePanels.Panels.Count}"
             : "";
     
-    /// <summary>
-    /// Icon for the current reading mode
-    /// </summary>
     public string ReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "📄",
+        ReadingMode.Normal => "▯",
         ReadingMode.Zoomed => "🔍",
-        ReadingMode.Guided => "🎯",
-        _ => "📄"
+        ReadingMode.Guided => "⊞",
+        _ => "▯"
     };
     
     public string PageDisplay
@@ -167,16 +154,17 @@ public partial class ReaderViewModel : ViewModelBase
     
     public string StretchModeIcon => StretchMode switch
     {
-        StretchMode.FitPage => "⊡",   // Fit page icon
-        StretchMode.FitWidth => "↔",  // Fit width icon  
-        StretchMode.FitHeight => "↕", // Fit height icon
-        StretchMode.Original => "⊟",  // Original size icon
-        _ => "⊡"
+        StretchMode.FitPage => "▣",
+        StretchMode.FitWidth => "↔",
+        StretchMode.FitHeight => "↕",
+        StretchMode.Original => "1:1",
+        _ => "▣"
     };
     
-    public string TwoPageModeIcon => IsTwoPageMode ? "📖" : "📄";
+    public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "📖";
     
     public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
+
 
     /// <summary>
     /// Event raised when the reader should be closed
@@ -446,7 +434,7 @@ public partial class ReaderViewModel : ViewModelBase
     private void ToggleTwoPageMode()
     {
         // Two-page mode is not available in zoomed or guided modes
-        if (IsZoomedOrGuidedMode)
+        if (!IsNormalMode)
         {
             return;
         }
@@ -570,7 +558,7 @@ public partial class ReaderViewModel : ViewModelBase
         };
         
         // Disable two-page mode when switching to zoomed or guided
-        if (IsZoomedOrGuidedMode && IsTwoPageMode)
+        if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
@@ -602,7 +590,7 @@ public partial class ReaderViewModel : ViewModelBase
         ReadingMode = mode;
         
         // Disable two-page mode when switching to zoomed or guided
-        if (IsZoomedOrGuidedMode && IsTwoPageMode)
+        if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }

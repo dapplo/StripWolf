@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Kom2go.ViewModels"
+             xmlns:views="using:Kom2go.Views"
              xmlns:komga="using:Kom2go.Models.Komga"
              xmlns:res="using:Kom2go.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
@@ -41,7 +42,7 @@
         <StackPanel Spacing="16" Margin="0,0,0,60">
           <!-- Search Box -->
           <Grid ColumnDefinitions="*,Auto">
-            <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="{Binding SearchOnKomga, Source={x:Static res:Loc.Instance}}"
+            <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="{Binding SearchOnKomga, Source={x:Static res:Loc.Instance}}"
                      VerticalContentAlignment="Center"/>
             <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
                     Padding="8,6" Margin="4,0,0,0"
@@ -62,7 +63,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding DataContext.SelectSeriesCommand, ElementName=Root}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
@@ -107,7 +108,7 @@
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                         <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                                 CommandParameter="{Binding}"/>
                       </Grid>
                     </Border>
@@ -207,7 +208,7 @@
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                         <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                                 CommandParameter="{Binding}"/>
                       </Grid>
                     </Border>
@@ -240,7 +241,7 @@
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                         <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                                 CommandParameter="{Binding}"/>
                       </Grid>
                     </Border>
@@ -273,7 +274,7 @@
                         <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                    FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                         <Button Grid.Row="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                                Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                                 CommandParameter="{Binding}"/>
                       </Grid>
                     </Border>
@@ -294,7 +295,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding DataContext.SelectSeriesCommand, ElementName=Root}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
@@ -322,7 +323,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaLibrary">
                     <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
-                            Command="{Binding DataContext.SelectLibraryCommand, ElementName=Root}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
@@ -350,7 +351,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaReadListDisplay">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding DataContext.SelectReadListCommand, ElementName=Root}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectReadListCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
@@ -399,7 +400,7 @@
                       <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                       <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                               CommandParameter="{Binding}"/>
                     </Grid>
                   </Border>
@@ -428,7 +429,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
                     <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
-                            Command="{Binding DataContext.SelectSeriesCommand, ElementName=Root}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
                               Width="150" ClipToBounds="True">
@@ -486,7 +487,7 @@
                       <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
                                  FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                       <Button Grid.Row="3" Content="Download" FontSize="10" Padding="8,4" Margin="8,0,8,8"
-                              Command="{Binding DataContext.DownloadBookCommand, ElementName=Root}"
+                              Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                               CommandParameter="{Binding}"/>
                     </Grid>
                   </Border>

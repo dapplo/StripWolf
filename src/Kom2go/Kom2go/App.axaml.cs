@@ -1,9 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Globalization;
-using System.Linq;
 using Avalonia.Markup.Xaml;
 using Kom2go.Data;
 using Kom2go.Services;
@@ -42,9 +40,6 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
-            // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
-            DisableAvaloniaDataAnnotationValidation();
             desktop.MainWindow = new MainWindow
             {
                 DataContext = mainViewModel
@@ -54,6 +49,13 @@ public partial class App : Application
             desktop.ShutdownRequested += async (sender, args) =>
             {
                 await mainViewModel.OnShutdownAsync();
+            };
+        }
+        else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
+        {
+            activityLifetime.MainViewFactory = () => new MainView
+            {
+                DataContext = mainViewModel
             };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
@@ -102,20 +104,20 @@ public partial class App : Application
         services.AddSingleton<PanelDetectionService>();
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<ComicConverterService>();
-        
+
         // Register platform-specific PDF renderer
         // Use the custom registration action if set (e.g., for Android), otherwise default to PDFium
         if (RegisterPdfRenderer != null)
         {
             RegisterPdfRenderer(services);
         }
-#if !EXCLUDE_PDFIUM
+    #if !EXCLUDE_PDFIUM
         else
         {
             services.AddSingleton<IPdfRenderer, PdfiumPdfRenderer>();
         }
-#endif
-        
+    #endif
+
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<LibraryService>();
 
@@ -126,17 +128,4 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
     }
-
-    private void DisableAvaloniaDataAnnotationValidation()
-    {
-        // Get an array of plugins to remove
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        // remove each entry found
-        foreach (var plugin in dataValidationPluginsToRemove)
-        {
-            BindingPlugins.DataValidators.Remove(plugin);
-        }
     }
-}

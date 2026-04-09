@@ -192,23 +192,23 @@
         
         <StackPanel Spacing="4">
           <TextBlock Text="{Binding Name, Source={x:Static res:Loc.Instance}}"/>
-          <TextBox Text="{Binding ServerName}" Watermark="My Komga Server"/>
+          <TextBox Text="{Binding ServerName}" PlaceholderText="My Komga Server"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
           <TextBlock Text="{Binding ServerUrl, Source={x:Static res:Loc.Instance}}"/>
-          <TextBox Text="{Binding ServerUrl}" Watermark="https://komga.example.com"/>
+          <TextBox Text="{Binding ServerUrl}" PlaceholderText="https://komga.example.com"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
           <TextBlock Text="{Binding Username, Source={x:Static res:Loc.Instance}}"/>
-          <TextBox Text="{Binding Username}" Watermark="username"/>
+          <TextBox Text="{Binding Username}" PlaceholderText="username"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
           <TextBlock Text="{Binding Password, Source={x:Static res:Loc.Instance}}"/>
           <Grid ColumnDefinitions="*,Auto">
-            <TextBox Grid.Column="0" Text="{Binding Password}" Watermark="password" 
+            <TextBox Grid.Column="0" Text="{Binding Password}" PlaceholderText="password" 
                      PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
             <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
                     Margin="4,0,0,0" ToolTip.Tip="Show/Hide Password" Padding="8,6">
