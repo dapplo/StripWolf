@@ -115,7 +115,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = ZipFile.OpenRead(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             return archive.Entries
                 .Count(e => IsImageFile(e.FullName));
         });
@@ -125,7 +126,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = ZipFile.OpenRead(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             return archive.Entries
                 .Where(e => IsImageFile(e.FullName))
                 .Select(e => e.FullName)
@@ -138,7 +140,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = ZipFile.OpenRead(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var sortedNames = archive.Entries
                 .Where(e => IsImageFile(e.FullName))
                 .Select(e => e.FullName)
@@ -156,9 +159,9 @@ public class ComicReaderService
                 throw new InvalidOperationException($"Could not find page {pageIndex} in archive");
             }
             
-            using var stream = entry.Open();
+            using var entryStream = entry.Open();
             using var memoryStream = new MemoryStream();
-            stream.CopyTo(memoryStream);
+            entryStream.CopyTo(memoryStream);
             return memoryStream.ToArray();
         });
     }
@@ -171,7 +174,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = RarArchive.OpenArchive(stream);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -181,7 +185,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = RarArchive.OpenArchive(stream);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -194,7 +199,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = RarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = RarArchive.OpenArchive(stream);
             
             // Check if this is a solid archive
             if (archive.IsSolid)
@@ -223,14 +229,14 @@ public class ComicReaderService
             }
             
             // Handle entries that may not be extractable
-            using var stream = entry.OpenEntryStream();
-            if (stream is null)
+            using var entryStream = entry.OpenEntryStream();
+            if (entryStream is null)
             {
                 throw new InvalidOperationException($"Could not extract page {pageIndex} from CBR archive. The entry may be corrupted or use an unsupported compression method.");
             }
             
             using var memoryStream = new MemoryStream();
-            stream.CopyTo(memoryStream);
+            entryStream.CopyTo(memoryStream);
             return memoryStream.ToArray();
         });
     }
@@ -275,7 +281,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(stream);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -285,7 +292,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(stream);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -298,7 +306,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = SevenZipArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(stream);
             var sortedNames = archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -337,7 +346,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = TarArchive.OpenArchive(stream);
             return archive.Entries
                 .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
         });
@@ -347,7 +357,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = TarArchive.OpenArchive(stream);
             return archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
@@ -360,7 +371,8 @@ public class ComicReaderService
     {
         return await Task.Run(() =>
         {
-            using var archive = TarArchive.OpenArchive(filePath);
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = TarArchive.OpenArchive(stream);
             var entries = archive.Entries
                 .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
                 .ToList();
@@ -383,9 +395,9 @@ public class ComicReaderService
                 throw new InvalidOperationException($"Could not find page {pageIndex} in CBT archive");
             }
             
-            using var stream = entry.OpenEntryStream();
+            using var entryStream = entry.OpenEntryStream();
             using var memoryStream = new MemoryStream();
-            stream.CopyTo(memoryStream);
+            entryStream.CopyTo(memoryStream);
             return memoryStream.ToArray();
         });
     }

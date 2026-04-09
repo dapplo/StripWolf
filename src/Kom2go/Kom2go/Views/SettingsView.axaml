@@ -204,7 +204,7 @@
           <TextBlock Text="Authentication (Choose one)" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,4"/>
 
           <!-- API Key Section (Preferred) -->
-          <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="12" CornerRadius="4">
             <StackPanel Spacing="4">
               <TextBlock Text="API Key (Preferred)" FontSize="12" FontWeight="Bold"/>
               <TextBox Text="{Binding ApiKey}" PlaceholderText="Enter your Komga API key"/>
@@ -215,7 +215,7 @@
           <TextBlock Text="OR" HorizontalAlignment="Center" FontSize="10" Foreground="Gray" FontWeight="Bold"/>
 
           <!-- Username/Password Section -->
-          <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="12" CornerRadius="4">
             <StackPanel Spacing="8">
               <TextBlock Text="Username &amp; Password" FontSize="12" FontWeight="Bold"/>
               <StackPanel Spacing="4">

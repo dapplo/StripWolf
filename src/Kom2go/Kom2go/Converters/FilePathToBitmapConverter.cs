@@ -43,4 +43,10 @@ public class FilePathToBitmapConverter : IValueConverter
     {
         throw new NotImplementedException();
     }
+
+    /// <summary>
+    /// Converts a boolean (IsDescending) to a sort direction icon (↑/↓)
+    /// </summary>
+    public static readonly IValueConverter SortDirectionIconConverter = 
+        new FuncValueConverter<bool, string>(isDescending => isDescending ? "↓" : "↑");
 }

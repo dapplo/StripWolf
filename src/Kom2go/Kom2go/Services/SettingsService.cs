@@ -133,11 +133,12 @@ public class SettingsService
     {
         _cachedSettings = settings;
 
-        // Save settings without passwords
+        // Save settings without sensitive data
         var settingsToSave = settings.Clone();
         foreach (var server in settingsToSave.Servers)
         {
-            server.Password = string.Empty; // Don't save password in plain text
+            server.Password = string.Empty; 
+            server.ApiKey = string.Empty;
         }
 
         var json = JsonSerializer.Serialize(settingsToSave, new JsonSerializerOptions 
@@ -146,7 +147,7 @@ public class SettingsService
         });
         await File.WriteAllTextAsync(_settingsPath, json);
 
-        // Save passwords separately encrypted
+        // Save sensitive data separately encrypted
         await SavePasswordsAsync(settings);
     }
 
@@ -155,22 +156,22 @@ public class SettingsService
     /// </summary>
     private async Task SavePasswordsAsync(AppSettings settings)
     {
-        var passwords = new Dictionary<int, string>();
+        var sensitiveData = new Dictionary<int, (string? Password, string? ApiKey)>();
         foreach (var server in settings.Servers)
         {
-            if (!string.IsNullOrEmpty(server.Password))
+            if (!string.IsNullOrEmpty(server.Password) || !string.IsNullOrEmpty(server.ApiKey))
             {
-                passwords[server.Id] = server.Password;
+                sensitiveData[server.Id] = (server.Password, server.ApiKey);
             }
         }
 
-        var json = JsonSerializer.Serialize(passwords);
+        var json = JsonSerializer.Serialize(sensitiveData, new JsonSerializerOptions { IncludeFields = true });
         var encrypted = Encrypt(json);
         await File.WriteAllBytesAsync(_passwordsPath, encrypted);
     }
 
     /// <summary>
-    /// Loads and decrypts passwords from the separate file
+    /// Loads and decrypts sensitive data from the separate file
     /// </summary>
     private void LoadPasswords(AppSettings settings)
     {
@@ -183,8 +184,28 @@ public class SettingsService
         {
             var encrypted = File.ReadAllBytes(_passwordsPath);
             var json = Decrypt(encrypted);
-            var passwords = JsonSerializer.Deserialize<Dictionary<int, string>>(json);
+            
+            // Try new format first (tuple)
+            try 
+            {
+                var sensitiveData = JsonSerializer.Deserialize<Dictionary<int, (string? Password, string? ApiKey)>>(json, new JsonSerializerOptions { IncludeFields = true });
+                if (sensitiveData is not null)
+                {
+                    foreach (var server in settings.Servers)
+                    {
+                        if (sensitiveData.TryGetValue(server.Id, out var data))
+                        {
+                            server.Password = data.Password ?? string.Empty;
+                            server.ApiKey = data.ApiKey ?? string.Empty;
+                        }
+                    }
+                    return;
+                }
+            }
+            catch { /* fallback to old format */ }
 
+            // Fallback to old format (string password only)
+            var passwords = JsonSerializer.Deserialize<Dictionary<int, string>>(json);
             if (passwords is not null)
             {
                 foreach (var server in settings.Servers)
@@ -310,6 +331,7 @@ public class AppSettings
                 BaseUrl = s.BaseUrl,
                 Username = s.Username,
                 Password = s.Password,
+                ApiKey = s.ApiKey,
                 IsActive = s.IsActive,
                 AddedDate = s.AddedDate,
                 LastConnected = s.LastConnected

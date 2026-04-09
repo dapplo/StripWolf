@@ -79,20 +79,24 @@ public class KomgaApiService : IDisposable
             Timeout = TimeSpan.FromSeconds(30)
         };
         
+        _httpClient.DefaultRequestHeaders.Accept.Clear();
+        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
         // Set up authentication
         if (!string.IsNullOrEmpty(server.ApiKey))
         {
             // API Key authentication (preferred)
+            _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
             _httpClient.DefaultRequestHeaders.Add("X-API-Key", server.ApiKey);
+            _httpClient.DefaultRequestHeaders.Authorization = null;
         }
-        else
+        else if (!string.IsNullOrEmpty(server.Username))
         {
             // Fallback to Basic authentication
             var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{server.Username}:{server.Password}"));
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            _httpClient.DefaultRequestHeaders.Remove("X-API-Key");
         }
-        
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     /// <summary>
@@ -366,7 +370,7 @@ public class KomgaApiService : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return false;
@@ -375,21 +379,25 @@ public class KomgaApiService : IDisposable
         var totalBytes = response.Content.Headers.ContentLength ?? 0;
         var bytesRead = 0L;
         
-        await using var contentStream = await response.Content.ReadAsStreamAsync();
-        await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-        
-        var buffer = new byte[8192];
-        int read;
-        
-        while ((read = await contentStream.ReadAsync(buffer)) > 0)
         {
-            await fileStream.WriteAsync(buffer.AsMemory(0, read));
-            bytesRead += read;
+            await using var contentStream = await response.Content.ReadAsStreamAsync();
+            await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
             
-            if (totalBytes > 0)
+            var buffer = new byte[8192];
+            int read;
+            
+            while ((read = await contentStream.ReadAsync(buffer)) > 0)
             {
-                progress?.Report((double)bytesRead / totalBytes);
+                await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                bytesRead += read;
+                
+                if (totalBytes > 0)
+                {
+                    progress?.Report((double)bytesRead / totalBytes);
+                }
             }
+            
+            await fileStream.FlushAsync();
         }
         
         return true;

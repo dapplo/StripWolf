@@ -266,13 +266,13 @@ public partial class SettingsViewModel : ViewModelBase
             server.Password = Password;
             server.ApiKey = ApiKey;
             
-            // Make the first server active by default
-            if (_appSettings.Servers.Count == 0 && _editingServer is null)
+            // Ensure we have an active server ID set if this is the only server or if none is active
+            if (_appSettings.ActiveServerId == null || _appSettings.Servers.Count == 0)
             {
                 server.IsActive = true;
                 _appSettings.ActiveServerId = server.Id;
             }
-
+            
             if (_editingServer is null)
             {
                 _appSettings.Servers.Add(server);

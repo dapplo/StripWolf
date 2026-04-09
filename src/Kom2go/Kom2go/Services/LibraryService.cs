@@ -199,15 +199,43 @@ public class LibraryService
                               format == ComicFormat.Cbt ||
                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
 
-        if (format == ComicFormat.Pdf)
+        if (needsConversion)
         {
-            // PDF conversion
-            actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
-        }
-        else if (needsConversion)
-        {
-            // Convert CB7, CBT, or solid CBR to CBZ
-            actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, progress);
+            if (format == ComicFormat.Pdf)
+            {
+                // PDF conversion
+                actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+            }
+            else
+            {
+                // Convert CB7, CBT, or solid CBR to CBZ
+                actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, progress);
+            }
+            
+            // Delete original file if it was converted and moved to comics directory
+            if (actualFilePath != filePath && File.Exists(filePath))
+            {
+                // Add a small delay and retry to allow system to release locks
+                bool deleted = false;
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        File.Delete(filePath);
+                        deleted = true;
+                        break;
+                    }
+                    catch
+                    {
+                        await Task.Delay(500);
+                    }
+                }
+                
+                if (!deleted)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
+                }
+            }
         }
 
         // Extract ComicInfo.xml metadata if available
@@ -302,21 +330,50 @@ public class LibraryService
             throw new Exception("Failed to download comic from Komga");
         }
 
-        // Check if downloaded file needs conversion (solid RAR, CB7, CBT)
+        // Check if downloaded file needs conversion (solid RAR, CB7, CBT, PDF)
         var format = ComicReaderService.GetComicFormat(filePath);
         string actualFilePath = filePath;
-        var needsConversion = format == ComicFormat.Cb7 || 
+        var needsConversion = format == ComicFormat.Pdf ||
+                              format == ComicFormat.Cb7 || 
                               format == ComicFormat.Cbt ||
                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
         var pageCount = book.Media?.PagesCount ?? 0;
         var fileSize = book.SizeBytes;
+
         if (needsConversion)
         {
-            actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
+            if (format == ComicFormat.Pdf)
+            {
+                actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+            }
+            else
+            {
+                actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
+            }
+
             // Delete original file after successful conversion
             if (actualFilePath != filePath && File.Exists(filePath))
             {
-                File.Delete(filePath);
+                // Add a small delay and retry to allow system to release locks
+                bool deleted = false;
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        File.Delete(filePath);
+                        deleted = true;
+                        break;
+                    }
+                    catch
+                    {
+                        await Task.Delay(500);
+                    }
+                }
+                
+                if (!deleted)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
+                }
             }
             // update the pagecount and filesize after conversion
             (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);

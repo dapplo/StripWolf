@@ -118,6 +118,54 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasRecentSeries;
 
+    // Sorting settings
+    public enum BookSortOrder
+    {
+        Number,
+        Title
+    }
+
+    [ObservableProperty]
+    private BookSortOrder _selectedBookSortOrder = BookSortOrder.Number;
+
+    [ObservableProperty]
+    private bool _isSortDescending;
+
+    partial void OnSelectedBookSortOrderChanged(BookSortOrder value)
+    {
+        ApplyLocalSorting();
+    }
+
+    partial void OnIsSortDescendingChanged(bool value)
+    {
+        ApplyLocalSorting();
+    }
+
+    private void ApplyLocalSorting()
+    {
+        if (Books.Count <= 1) return;
+
+        var sorted = SelectedBookSortOrder switch
+        {
+            BookSortOrder.Number => IsSortDescending 
+                ? Books.OrderByDescending(b => b.Book.Metadata?.NumberSort ?? b.Book.Number).ToList()
+                : Books.OrderBy(b => b.Book.Metadata?.NumberSort ?? b.Book.Number).ToList(),
+            BookSortOrder.Title => IsSortDescending
+                ? Books.OrderByDescending(b => b.Book.Metadata?.Title ?? b.Book.Name).ToList()
+                : Books.OrderBy(b => b.Book.Metadata?.Title ?? b.Book.Name).ToList(),
+            _ => Books.ToList()
+        };
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var currentIndex = Books.IndexOf(sorted[i]);
+            if (currentIndex != i)
+            {
+                Books.Move(currentIndex, i);
+            }
+        }
+    }
+
     /// <summary>
     /// Username for the active server (used for authenticated image loading)
     /// </summary>
@@ -298,7 +346,10 @@ public partial class KomgaViewModel : ViewModelBase
         try
         {
             var settings = _settingsService.LoadSettings();
-            _activeServer = settings.Servers.FirstOrDefault(s => s.IsActive);
+            
+            // Try to find the active server by ID first, then fallback to IsActive flag
+            _activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId) 
+                            ?? settings.Servers.FirstOrDefault(s => s.IsActive);
             
             OnPropertyChanged(nameof(ServerUsername));
             OnPropertyChanged(nameof(ServerPassword));
@@ -780,6 +831,18 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand]
+    private void CycleSortOrder()
+    {
+        SelectedBookSortOrder = SelectedBookSortOrder == BookSortOrder.Number ? BookSortOrder.Title : BookSortOrder.Number;
+    }
+
+    [RelayCommand]
+    private void ToggleSortDirection()
+    {
+        IsSortDescending = !IsSortDescending;
+    }
+
     /// <summary>
     /// Loads a book thumbnail in the background and adds it to the collection
     /// </summary>
@@ -813,6 +876,7 @@ public partial class KomgaViewModel : ViewModelBase
                         Book = book,
                         Thumbnail = thumbnail
                     });
+                    ApplyLocalSorting();
                 }
                 else
                 {
@@ -836,6 +900,7 @@ public partial class KomgaViewModel : ViewModelBase
                             Book = book,
                             Thumbnail = null
                         });
+                        ApplyLocalSorting();
                     }
                 });
             }

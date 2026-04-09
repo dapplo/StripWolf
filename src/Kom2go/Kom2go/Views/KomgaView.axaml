@@ -5,6 +5,7 @@
              xmlns:vm="using:Kom2go.ViewModels"
              xmlns:views="using:Kom2go.Views"
              xmlns:komga="using:Kom2go.Models.Komga"
+             xmlns:converters="using:Kom2go.Converters"
              xmlns:res="using:Kom2go.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="Kom2go.Views.KomgaView"
@@ -462,7 +463,26 @@
                 <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
               </MultiBinding>
             </StackPanel.IsVisible>
-            <TextBlock Text="Books" FontSize="18" FontWeight="Bold"/>
+            
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Grid.Column="0" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+              
+              <!-- Sort Order Toggle -->
+              <Button Grid.Column="1" Command="{Binding CycleSortOrderCommand}"
+                      Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="Sort:"/>
+                  <TextBlock Text="{Binding SelectedBookSortOrder}"/>
+                </StackPanel>
+              </Button>
+              
+              <!-- Sort Direction Toggle -->
+              <Button Grid.Column="2" Command="{Binding ToggleSortDirectionCommand}"
+                      Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+                <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
+              </Button>
+            </Grid>
+
             <ItemsControl ItemsSource="{Binding Books}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
