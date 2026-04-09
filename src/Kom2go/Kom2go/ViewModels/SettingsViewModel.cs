@@ -37,6 +37,9 @@ public partial class SettingsViewModel : ViewModelBase
     private string _password = string.Empty;
 
     [ObservableProperty]
+    private string _apiKey = string.Empty;
+
+    [ObservableProperty]
     private bool _isEditing;
 
     [ObservableProperty]
@@ -180,6 +183,7 @@ public partial class SettingsViewModel : ViewModelBase
         ServerUrl = string.Empty;
         Username = string.Empty;
         Password = string.Empty;
+        ApiKey = string.Empty;
         ConnectionStatus = null;
         IsPasswordVisible = false;
         IsEditing = true;
@@ -198,6 +202,7 @@ public partial class SettingsViewModel : ViewModelBase
         ServerUrl = server.BaseUrl;
         Username = server.Username;
         Password = server.Password;
+        ApiKey = server.ApiKey;
         ConnectionStatus = null;
         IsPasswordVisible = false;
         IsEditing = true;
@@ -215,11 +220,18 @@ public partial class SettingsViewModel : ViewModelBase
     private async Task SaveServerAsync()
     {
         if (string.IsNullOrWhiteSpace(ServerName) ||
-            string.IsNullOrWhiteSpace(ServerUrl) ||
-            string.IsNullOrWhiteSpace(Username) ||
-            string.IsNullOrWhiteSpace(Password))
+            string.IsNullOrWhiteSpace(ServerUrl))
         {
-            ErrorMessage = "All fields are required.";
+            ErrorMessage = "Server Name and URL are required.";
+            return;
+        }
+
+        bool hasAuth = !string.IsNullOrWhiteSpace(ApiKey) || 
+                       (!string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password));
+
+        if (!hasAuth)
+        {
+            ErrorMessage = "Either API Key OR Username and Password are required.";
             return;
         }
 
@@ -252,6 +264,7 @@ public partial class SettingsViewModel : ViewModelBase
             server.BaseUrl = ServerUrl.TrimEnd('/');
             server.Username = Username;
             server.Password = Password;
+            server.ApiKey = ApiKey;
             
             // Make the first server active by default
             if (_appSettings.Servers.Count == 0 && _editingServer is null)
@@ -350,11 +363,18 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task TestConnectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(ServerUrl) ||
-            string.IsNullOrWhiteSpace(Username) ||
-            string.IsNullOrWhiteSpace(Password))
+        if (string.IsNullOrWhiteSpace(ServerUrl))
         {
-            ConnectionStatus = "Please fill in all fields";
+            ConnectionStatus = "URL is required";
+            return;
+        }
+
+        bool hasAuth = !string.IsNullOrWhiteSpace(ApiKey) || 
+                       (!string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password));
+
+        if (!hasAuth)
+        {
+            ConnectionStatus = "Credentials or API Key required";
             return;
         }
 
@@ -367,7 +387,8 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 BaseUrl = ServerUrl.TrimEnd('/'),
                 Username = Username,
-                Password = Password
+                Password = Password,
+                ApiKey = ApiKey
             };
 
             _komgaApiService.Configure(testServer);

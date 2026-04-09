@@ -31,6 +31,11 @@ public class KomgaServer
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
+    /// API Key for authentication (preferred over username/password)
+    /// </summary>
+    public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// Whether this is the active/default server
     /// </summary>
     public bool IsActive { get; set; }

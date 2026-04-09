@@ -78,7 +78,9 @@
                       </Border>
                     </Button>
                     <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                               TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding Title}"
+                               Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                     <!-- Delete/Undo Section -->
@@ -202,7 +204,9 @@
                       </Border>
                     </Button>
                     <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                               TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding Title}"
+                               Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                     <!-- Favorite Toggle Button -->
@@ -263,7 +267,9 @@
                       </Border>
                     </Button>
                     <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                               TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding Title}"
+                               Margin="8,4"/>
                     <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
                                  Height="4" Margin="8,2"/>
                     <TextBlock Grid.Row="3" FontSize="10" Foreground="Gray" Margin="8,2,8,4">
@@ -352,7 +358,9 @@
                       </Border>
                     </Button>
                     <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                               TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding Title}"
+                               Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                     <!-- Favorite Toggle Button -->
@@ -445,7 +453,9 @@
                       </Border>
                     </Button>
                     <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis" Margin="8,4"/>
+                               TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                               ToolTip.Tip="{Binding Title}"
+                               Margin="8,4"/>
                     <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
                                FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
                     <!-- Favorite Toggle Button -->

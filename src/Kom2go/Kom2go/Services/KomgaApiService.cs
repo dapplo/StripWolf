@@ -79,9 +79,19 @@ public class KomgaApiService : IDisposable
             Timeout = TimeSpan.FromSeconds(30)
         };
         
-        // Set up Basic authentication
-        var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{server.Username}:{server.Password}"));
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        // Set up authentication
+        if (!string.IsNullOrEmpty(server.ApiKey))
+        {
+            // API Key authentication (preferred)
+            _httpClient.DefaultRequestHeaders.Add("X-API-Key", server.ApiKey);
+        }
+        else
+        {
+            // Fallback to Basic authentication
+            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{server.Username}:{server.Password}"));
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        }
+        
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 

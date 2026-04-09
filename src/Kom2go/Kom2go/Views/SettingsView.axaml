@@ -200,25 +200,47 @@
           <TextBox Text="{Binding ServerUrl}" PlaceholderText="https://komga.example.com"/>
         </StackPanel>
 
-        <StackPanel Spacing="4">
-          <TextBlock Text="{Binding Username, Source={x:Static res:Loc.Instance}}"/>
-          <TextBox Text="{Binding Username}" PlaceholderText="username"/>
+        <StackPanel Spacing="12">
+          <TextBlock Text="Authentication (Choose one)" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,4"/>
+
+          <!-- API Key Section (Preferred) -->
+          <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
+            <StackPanel Spacing="4">
+              <TextBlock Text="API Key (Preferred)" FontSize="12" FontWeight="Bold"/>
+              <TextBox Text="{Binding ApiKey}" PlaceholderText="Enter your Komga API key"/>
+              <TextBlock Text="Using an API key is more secure than credentials." FontSize="10" Foreground="Gray"/>
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="OR" HorizontalAlignment="Center" FontSize="10" Foreground="Gray" FontWeight="Bold"/>
+
+          <!-- Username/Password Section -->
+          <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Username &amp; Password" FontSize="12" FontWeight="Bold"/>
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding Username, Source={x:Static res:Loc.Instance}}" FontSize="11"/>
+                <TextBox Text="{Binding Username}" PlaceholderText="username"/>
+              </StackPanel>
+
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding Password, Source={x:Static res:Loc.Instance}}" FontSize="11"/>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0" Text="{Binding Password}" PlaceholderText="password" 
+                           PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
+                  <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
+                          Margin="4,0,0,0" ToolTip.Tip="Show/Hide Password" Padding="8,6">
+                    <Panel>
+                      <TextBlock Text="👁" FontSize="14" IsVisible="{Binding !IsPasswordVisible}"/>
+                      <TextBlock Text="🙈" FontSize="14" IsVisible="{Binding IsPasswordVisible}"/>
+                    </Panel>
+                  </Button>
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
 
-        <StackPanel Spacing="4">
-          <TextBlock Text="{Binding Password, Source={x:Static res:Loc.Instance}}"/>
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBox Grid.Column="0" Text="{Binding Password}" PlaceholderText="password" 
-                     PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
-            <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
-                    Margin="4,0,0,0" ToolTip.Tip="Show/Hide Password" Padding="8,6">
-              <Panel>
-                <TextBlock Text="👁" FontSize="14" IsVisible="{Binding !IsPasswordVisible}"/>
-                <TextBlock Text="👁‍🗨" FontSize="14" IsVisible="{Binding IsPasswordVisible}"/>
-              </Panel>
-            </Button>
-          </Grid>
-        </StackPanel>
 
         <!-- Connection Status -->
         <TextBlock Text="{Binding ConnectionStatus}" HorizontalAlignment="Center"
