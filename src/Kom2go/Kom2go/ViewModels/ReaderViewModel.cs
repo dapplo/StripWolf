@@ -61,6 +61,7 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isTwoPageMode;
 
     private bool _isLoadingPage;
+    private bool _shouldSelectLastPanel;
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
@@ -675,11 +676,20 @@ public partial class ReaderViewModel : ViewModelBase
                 pageData,
                 isManga);
             
-            // Reset to first panel
-            CurrentPanelIndex = 0;
+            // Reset to correct panel
+            if (_shouldSelectLastPanel && CurrentPagePanels.Panels.Count > 0)
+            {
+                CurrentPanelIndex = CurrentPagePanels.Panels.Count - 1;
+            }
+            else
+            {
+                CurrentPanelIndex = 0;
+            }
+            _shouldSelectLastPanel = false;
+
             if (CurrentPagePanels.Panels.Count > 0)
             {
-                CurrentPanel = CurrentPagePanels.Panels[0];
+                CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
             }
             else
             {
@@ -771,6 +781,7 @@ public partial class ReaderViewModel : ViewModelBase
         if (CurrentPagePanels is null || CurrentPagePanels.Panels.Count == 0)
         {
             // No panels, just go to previous page
+            _shouldSelectLastPanel = true;
             await GoToPreviousPageAsync();
             return;
         }
@@ -787,12 +798,8 @@ public partial class ReaderViewModel : ViewModelBase
         else if (HasPreviousPage)
         {
             // Go to last panel of previous page
+            _shouldSelectLastPanel = true;
             await GoToPreviousPageAsync();
-            if (CurrentPagePanels?.Panels.Count > 0)
-            {
-                CurrentPanelIndex = CurrentPagePanels.Panels.Count - 1;
-                CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
-            }
         }
     }
     
