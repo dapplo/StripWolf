@@ -97,6 +97,7 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsGuidedMode))]
     [NotifyPropertyChangedFor(nameof(IsNormalMode))]
     [NotifyPropertyChangedFor(nameof(CanUseTwoPageMode))]
+    [NotifyPropertyChangedFor(nameof(NextReadingModeIcon))]
     private ReadingMode _readingMode = ReadingMode.Normal;
     
     [ObservableProperty]
@@ -153,6 +154,14 @@ public partial class ReaderViewModel : ViewModelBase
         ReadingMode.Guided => "⊞",
         _ => "▯"
     };
+
+    public string NextReadingModeIcon => ReadingMode switch
+    {
+        ReadingMode.Normal => "🔍",
+        ReadingMode.Zoomed => "⊞",
+        ReadingMode.Guided => "▯",
+        _ => "🔍"
+    };
     
     public string PageDisplay
     {
@@ -168,16 +177,16 @@ public partial class ReaderViewModel : ViewModelBase
     }
     
     public string ZoomDisplay => $"{ZoomLevel:P0}";
-    
+
     public string StretchModeIcon => StretchMode switch
     {
-        StretchMode.FitPage => "▣",
-        StretchMode.FitWidth => "↔",
-        StretchMode.FitHeight => "↕",
-        StretchMode.Original => "1:1",
+        StretchMode.FitPage => "↔",
+        StretchMode.FitWidth => "↕",
+        StretchMode.FitHeight => "1:1",
+        StretchMode.Original => "▣",
         _ => "▣"
     };
-    
+
     public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "📖";
     
     public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
@@ -867,7 +876,8 @@ public partial class ReaderViewModel : ViewModelBase
         {
             CenterX = panel.X + panel.Width / 2,
             CenterY = panel.Y + panel.Height / 2,
-            Size = Math.Max(panel.Width, panel.Height)
+            Width = panel.Width,
+            Height = panel.Height
         };
         OnPropertyChanged(nameof(ZoomRegion));
     }

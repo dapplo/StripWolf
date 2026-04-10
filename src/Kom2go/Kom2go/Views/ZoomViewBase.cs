@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Kom2go.ViewModels;
+using Kom2go.Models;
 
 namespace Kom2go.Views;
 
@@ -35,6 +36,10 @@ public abstract class ZoomViewBase : UserControl
     private double _initialDistance = 0;
     private double _initialZoomRegionSize = 1.0;
 
+    // Track the actually displayed area for RedrawOverview
+    protected double _actualDisplayWidthNormalized = 0.4;
+    protected double _actualDisplayHeightNormalized = 0.4;
+
     public ZoomViewBase()
     {
         SizeChanged += (s, e) => UpdateZoomRegion();
@@ -51,7 +56,6 @@ public abstract class ZoomViewBase : UserControl
                 canvas.PointerMoved += OnOverviewPointerMoved;
                 canvas.PointerReleased += OnOverviewPointerReleased;
                 canvas.PointerCaptureLost += OnPointerCaptureLost;
-                // Tunneling event to intercept before children/scrollers
                 canvas.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
             }
         }
@@ -65,7 +69,6 @@ public abstract class ZoomViewBase : UserControl
                 viewbox.PointerMoved += OnZoomedAreaPointerMoved;
                 viewbox.PointerReleased += OnZoomedAreaPointerReleased;
                 viewbox.PointerCaptureLost += OnPointerCaptureLost;
-                // Tunneling event to intercept before children/scrollers
                 viewbox.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
             }
         }
@@ -87,7 +90,6 @@ public abstract class ZoomViewBase : UserControl
             e.Handled = true;
             if (e.Delta.Y == 0) return;
 
-            // Zooming (resizing the rectangle)
             if (e.Delta.Y > 0) vm.DecreaseZoomRegionSizeCommand.Execute(null);
             else vm.IncreaseZoomRegionSizeCommand.Execute(null);
         }
@@ -96,7 +98,6 @@ public abstract class ZoomViewBase : UserControl
             if (e.Delta.Y == 0) return;
             e.Handled = true;
             
-            // Navigation
             if (vm.IsGuidedMode)
             {
                 if (e.Delta.Y > 0 && vm.HasPreviousPanel) vm.GoToPreviousPanelCommand.Execute(null);
@@ -139,7 +140,6 @@ public abstract class ZoomViewBase : UserControl
         var image = vm.CurrentPageImage;
         if (image == null) return;
 
-        // Update Overview containers to match bitmap size
         var overviewContainers = new[] { OverviewContainerLeftControl, OverviewContainerRightControl };
         var overviewImages = new[] { OverviewImageLeftControl, OverviewImageRightControl };
         var overviewCanvases = new[] { OverviewCanvasLeftControl, OverviewCanvasRightControl };
@@ -169,16 +169,54 @@ public abstract class ZoomViewBase : UserControl
         
         if (viewbox != null && canvas != null && areaImage != null)
         {
-            double regionWidth = image.Size.Width * region.Size;
-            double regionHeight = image.Size.Height * region.Size;
+            double targetWidth = viewbox.Bounds.Width;
+            double targetHeight = viewbox.Bounds.Height;
             
-            canvas.Width = regionWidth;
-            canvas.Height = regionHeight;
-            areaImage.Width = image.Size.Width;
-            areaImage.Height = image.Size.Height;
+            if (targetWidth <= 0 || targetHeight <= 0)
+            {
+                targetWidth = Bounds.Width / 2;
+                targetHeight = Bounds.Height;
+            }
 
-            Canvas.SetLeft(areaImage, (regionWidth / 2) - (region.CenterX * image.Size.Width));
-            Canvas.SetTop(areaImage, (regionHeight / 2) - (region.CenterY * image.Size.Height));
+            if (targetWidth > 0 && targetHeight > 0)
+            {
+                double targetAspect = targetWidth / targetHeight;
+                
+                // Pixel size of the requested region
+                double wantPixelWidth = region.Width * image.Size.Width;
+                double wantPixelHeight = region.Height * image.Size.Height;
+                
+                // Ensure non-zero
+                wantPixelWidth = Math.Max(1, wantPixelWidth);
+                wantPixelHeight = Math.Max(1, wantPixelHeight);
+                
+                double wantAspect = wantPixelWidth / wantPixelHeight;
+                double displayPixelWidth, displayPixelHeight;
+
+                if (wantAspect < targetAspect)
+                {
+                    // Panel is narrower than the display area -> expand width to fill
+                    displayPixelHeight = wantPixelHeight;
+                    displayPixelWidth = wantPixelHeight * targetAspect;
+                }
+                else
+                {
+                    // Panel is wider than the display area -> expand height to fill
+                    displayPixelWidth = wantPixelWidth;
+                    displayPixelHeight = wantPixelWidth / targetAspect;
+                }
+
+                _actualDisplayWidthNormalized = displayPixelWidth / image.Size.Width;
+                _actualDisplayHeightNormalized = displayPixelHeight / image.Size.Height;
+
+                canvas.Width = displayPixelWidth;
+                canvas.Height = displayPixelHeight;
+                areaImage.Width = image.Size.Width;
+                areaImage.Height = image.Size.Height;
+
+                Canvas.SetLeft(areaImage, (displayPixelWidth / 2) - (region.CenterX * image.Size.Width));
+                Canvas.SetTop(areaImage, (displayPixelHeight / 2) - (region.CenterY * image.Size.Height));
+            }
         }
         
         RedrawOverview();
@@ -193,7 +231,6 @@ public abstract class ZoomViewBase : UserControl
         var canvas = sender as Canvas;
         if (canvas == null) return;
 
-        // Position is now naturally in bitmap DIPs because the canvas size matches the bitmap size
         var position = e.GetPosition(canvas);
         
         var normalizedX = position.X / canvas.Width;
@@ -240,7 +277,6 @@ public abstract class ZoomViewBase : UserControl
             _touchPoints[e.Pointer.Id] = e.GetPosition(this);
             if (_touchPoints.Count == 2)
             {
-                // Start pinch
                 var points = _touchPoints.Values.ToArray();
                 _initialDistance = GetDistance(points[0], points[1]);
                 _initialZoomRegionSize = vm.ZoomRegion.Size;
@@ -261,17 +297,14 @@ public abstract class ZoomViewBase : UserControl
             _touchPoints[e.Pointer.Id] = e.GetPosition(this);
             if (_touchPoints.Count == 2)
             {
-                // Update pinch
                 var points = _touchPoints.Values.ToArray();
                 double currentDistance = GetDistance(points[0], points[1]);
                 if (_initialDistance > 0)
                 {
                     double scale = currentDistance / _initialDistance;
-                    // Increasing scale means zooming IN, which means DECREASING the ZoomRegion.Size
                     double targetSize = _initialZoomRegionSize / scale;
-                    
-                    vm.ZoomRegion.Size = Math.Max(0.1, Math.Min(1.0, targetSize));
-                    vm.MoveZoomRegion(0, 0); // Trigger update
+                    vm.ZoomRegion.Size = Math.Max(0.05, Math.Min(1.0, targetSize));
+                    vm.MoveZoomRegion(0, 0);
                 }
                 return;
             }
@@ -296,13 +329,11 @@ public abstract class ZoomViewBase : UserControl
         {
             if (deltaX > 0)
             {
-                // Left-to-right swipe -> Previous
                 if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
                 else vm.GoToPreviousPageCommand.Execute(null);
             }
             else
             {
-                // Right-to-left swipe -> Next
                 if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
                 else vm.GoToNextPageCommand.Execute(null);
             }

@@ -43,12 +43,12 @@ public partial class ZoomedReadingView : ZoomViewBase
         {
             Stroke = Brushes.Red,
             StrokeThickness = 2,
-            Width = region.Size * canvas.Width,
-            Height = region.Size * canvas.Height
+            Width = _actualDisplayWidthNormalized * canvas.Width,
+            Height = _actualDisplayHeightNormalized * canvas.Height
         };
 
-        Canvas.SetLeft(rect, (region.CenterX - region.Size / 2) * canvas.Width);
-        Canvas.SetTop(rect, (region.CenterY - region.Size / 2) * canvas.Height);
+        Canvas.SetLeft(rect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
+        Canvas.SetTop(rect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
         canvas.Children.Add(rect);
     }
 }

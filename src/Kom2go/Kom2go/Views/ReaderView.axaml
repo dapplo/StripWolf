@@ -38,12 +38,12 @@
         
         <Button Grid.Column="3" Command="{Binding CycleReadingModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Mode (M)">
-          <TextBlock Text="{Binding ReadingModeIcon}" FontSize="24"/>
+          <TextBlock Text="{Binding NextReadingModeIcon}" FontSize="24"/>
         </Button>
         
         <Button Grid.Column="4" Command="{Binding ToggleHandednessCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Handedness"
-                IsVisible="{Binding !IsNormalMode}">
+                IsEnabled="{Binding !IsNormalMode}">
           <TextBlock Text="🤚" FontSize="24"/>
         </Button>
         
