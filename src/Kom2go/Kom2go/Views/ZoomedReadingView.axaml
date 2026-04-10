@@ -4,7 +4,12 @@
              x:Class="Kom2go.Views.ZoomedReadingView"
              x:DataType="vm:ReaderViewModel">
     <Grid ColumnDefinitions="*,*">
-        <!-- Left Panel -->
+        <Grid.GestureRecognizers>
+            <ScrollGestureRecognizer CanHorizontallyScroll="True" CanVerticallyScroll="True" />
+        </Grid.GestureRecognizers>
+
+        <!-- Left Side -->
+
         <Grid Grid.Column="0">
             <!-- Overview if Right-Handed -->
             <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#1A1A1A" Margin="4">

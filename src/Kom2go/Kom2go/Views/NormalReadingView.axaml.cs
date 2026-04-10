@@ -27,6 +27,11 @@ public partial class NormalReadingView : UserControl
     private const double SwipeMaxTimeMs = 500;
     private const double SwipeMaxVerticalDeviation = 100;
 
+    // Manual Pinch tracking
+    private readonly Dictionary<long, Point> _touchPoints = new();
+    private double _initialDistance = 0;
+    private double _initialZoom = 1.0;
+
     public NormalReadingView()
     {
         InitializeComponent();
@@ -44,6 +49,7 @@ public partial class NormalReadingView : UserControl
             _imageScroller.PointerPressed += OnPointerPressed;
             _imageScroller.PointerMoved += OnPointerMoved;
             _imageScroller.PointerReleased += OnPointerReleased;
+            _imageScroller.PointerCaptureLost += OnPointerCaptureLost;
             _imageScroller.PropertyChanged += (s, e) =>
             {
                 if (e.Property == ScrollViewer.ViewportProperty) UpdateImageSize();
@@ -51,6 +57,12 @@ public partial class NormalReadingView : UserControl
         }
     }
 
+    private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        _isPanning = false;
+        _touchPoints.Clear();
+        _initialDistance = 0;
+    }
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -196,7 +208,21 @@ public partial class NormalReadingView : UserControl
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is not ReaderViewModel vm) return;
+        if (DataContext is not ReaderViewModel vm || _imageScroller == null) return;
+
+        if (e.Pointer.Type == PointerType.Touch)
+        {
+            _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
+            if (_touchPoints.Count == 2)
+            {
+                // Start pinch
+                var points = _touchPoints.Values.ToArray();
+                _initialDistance = GetDistance(points[0], points[1]);
+                _initialZoom = vm.ZoomLevel;
+                _isPanning = false; // Disable panning during pinch
+                return;
+            }
+        }
 
         var position = e.GetPosition(_imageScroller);
         _swipeStartPoint = position;
@@ -213,6 +239,50 @@ public partial class NormalReadingView : UserControl
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (DataContext is not ReaderViewModel vm || _imageScroller == null) return;
+
+        if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
+        {
+            _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
+            if (_touchPoints.Count == 2)
+            {
+                // Update pinch
+                var points = _touchPoints.Values.ToArray();
+                double currentDistance = GetDistance(points[0], points[1]);
+                if (_initialDistance > 0)
+                {
+                    double scale = currentDistance / _initialDistance;
+                    double targetZoom = _initialZoom * scale;
+                    
+                    // Center point of the two fingers
+                    var center = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
+                    
+                    // Apply zoom (manually instead of AdjustZoom to have smooth target)
+                    double oldZoom = vm.ZoomLevel;
+                    vm.ZoomLevel = Math.Max(0.5, Math.Min(5.0, targetZoom));
+                    
+                    if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.001)
+                    {
+                        var scrollOffset = _imageScroller.Offset;
+                        var relativeX = (center.X + scrollOffset.X) / oldZoom;
+                        var relativeY = (center.Y + scrollOffset.Y) / oldZoom;
+
+                        UpdateImageSize();
+                        UpdateLayout();
+
+                        var newOffsetX = relativeX * vm.ZoomLevel - center.X;
+                        var newOffsetY = relativeY * vm.ZoomLevel - center.Y;
+
+                        _imageScroller.Offset = new Vector(
+                            Math.Max(0, Math.Min(_imageScroller.Extent.Width - _imageScroller.Viewport.Width, newOffsetX)),
+                            Math.Max(0, Math.Min(_imageScroller.Extent.Height - _imageScroller.Viewport.Height, newOffsetY))
+                        );
+                    }
+                }
+                return;
+            }
+        }
+
         if (_isPanning && _imageScroller != null)
         {
             var currentPoint = e.GetPosition(this);
@@ -223,13 +293,19 @@ public partial class NormalReadingView : UserControl
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        _touchPoints.Remove(e.Pointer.Id);
+        if (_touchPoints.Count < 2)
+        {
+            _initialDistance = 0;
+        }
+
         if (_isPanning)
         {
             _isPanning = false;
             e.Pointer.Capture(null);
         }
 
-        if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue) return;
+        if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
 
         var position = e.GetPosition(_imageScroller);
         var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
@@ -250,5 +326,10 @@ public partial class NormalReadingView : UserControl
         }
 
         _swipeStartPoint = null;
+    }
+
+    private double GetDistance(Point p1, Point p2)
+    {
+        return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
     }
 }

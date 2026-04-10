@@ -68,10 +68,27 @@ public partial class ReaderViewModel : ViewModelBase
     public bool IsLastPage => Comic is not null && CurrentPage == Comic.PageCount - 1;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AuthorsDisplay))]
     private ComicInfo? _comicInfo;
 
     [ObservableProperty]
     private bool _isInfoPanelVisible;
+
+    public string FormattedFileSize => Comic is null ? "" : FormatBytes(Comic.FileSize);
+    public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
+    public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
+    public string Location => Comic?.FilePath ?? "";
+
+    public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffix = { "B", "KB", "MB", "GB", "TB" };
+        if (bytes == 0) return "0 B";
+        int i = (int)Math.Floor(Math.Log(bytes, 1024));
+        if (i >= suffix.Length) i = suffix.Length - 1;
+        return $"{bytes / Math.Pow(1024, i):0.##} {suffix[i]}";
+    }
     
     // Reading mode properties
     [ObservableProperty]

@@ -30,6 +30,11 @@ public abstract class ZoomViewBase : UserControl
     private const double SwipeThreshold = 80;
     private const double SwipeMaxTimeMs = 500;
 
+    // Manual Pinch tracking
+    private readonly Dictionary<long, Point> _touchPoints = new();
+    private double _initialDistance = 0;
+    private double _initialZoomRegionSize = 1.0;
+
     public ZoomViewBase()
     {
         SizeChanged += (s, e) => UpdateZoomRegion();
@@ -45,6 +50,7 @@ public abstract class ZoomViewBase : UserControl
                 canvas.PointerPressed += OnOverviewPointerPressed;
                 canvas.PointerMoved += OnOverviewPointerMoved;
                 canvas.PointerReleased += OnOverviewPointerReleased;
+                canvas.PointerCaptureLost += OnPointerCaptureLost;
                 // Tunneling event to intercept before children/scrollers
                 canvas.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
             }
@@ -56,11 +62,20 @@ public abstract class ZoomViewBase : UserControl
             if (viewbox != null)
             {
                 viewbox.PointerPressed += OnZoomedAreaPointerPressed;
+                viewbox.PointerMoved += OnZoomedAreaPointerMoved;
                 viewbox.PointerReleased += OnZoomedAreaPointerReleased;
+                viewbox.PointerCaptureLost += OnPointerCaptureLost;
                 // Tunneling event to intercept before children/scrollers
                 viewbox.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
             }
         }
+    }
+
+    private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        _isDraggingZoomRegion = false;
+        _touchPoints.Clear();
+        _initialDistance = 0;
     }
 
     private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
@@ -218,13 +233,60 @@ public abstract class ZoomViewBase : UserControl
 
     private void OnZoomedAreaPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (DataContext is not ReaderViewModel vm) return;
+
+        if (e.Pointer.Type == PointerType.Touch)
+        {
+            _touchPoints[e.Pointer.Id] = e.GetPosition(this);
+            if (_touchPoints.Count == 2)
+            {
+                // Start pinch
+                var points = _touchPoints.Values.ToArray();
+                _initialDistance = GetDistance(points[0], points[1]);
+                _initialZoomRegionSize = vm.ZoomRegion.Size;
+                return;
+            }
+        }
+
         _swipeStartPoint = e.GetPosition(this);
         _swipeStartTime = DateTime.UtcNow;
     }
 
+    private void OnZoomedAreaPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is not ReaderViewModel vm) return;
+
+        if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
+        {
+            _touchPoints[e.Pointer.Id] = e.GetPosition(this);
+            if (_touchPoints.Count == 2)
+            {
+                // Update pinch
+                var points = _touchPoints.Values.ToArray();
+                double currentDistance = GetDistance(points[0], points[1]);
+                if (_initialDistance > 0)
+                {
+                    double scale = currentDistance / _initialDistance;
+                    // Increasing scale means zooming IN, which means DECREASING the ZoomRegion.Size
+                    double targetSize = _initialZoomRegionSize / scale;
+                    
+                    vm.ZoomRegion.Size = Math.Max(0.1, Math.Min(1.0, targetSize));
+                    vm.MoveZoomRegion(0, 0); // Trigger update
+                }
+                return;
+            }
+        }
+    }
+
     private void OnZoomedAreaPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue) return;
+        _touchPoints.Remove(e.Pointer.Id);
+        if (_touchPoints.Count < 2)
+        {
+            _initialDistance = 0;
+        }
+
+        if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
         
         var position = e.GetPosition(this);
         var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
@@ -232,8 +294,18 @@ public abstract class ZoomViewBase : UserControl
         
         if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) > SwipeThreshold)
         {
-            if (deltaX > 0) vm.GoToPreviousPageCommand.Execute(null);
-            else vm.GoToNextPageCommand.Execute(null);
+            if (deltaX > 0)
+            {
+                // Left-to-right swipe -> Previous
+                if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
+                else vm.GoToPreviousPageCommand.Execute(null);
+            }
+            else
+            {
+                // Right-to-left swipe -> Next
+                if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
+                else vm.GoToNextPageCommand.Execute(null);
+            }
         }
         else if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < 10)
         {
@@ -242,9 +314,8 @@ public abstract class ZoomViewBase : UserControl
         _swipeStartPoint = null;
     }
 
-    protected Rect GetImageContentBounds(Image image)
+    private double GetDistance(Point p1, Point p2)
     {
-        // Now simple because we set Width/Height explicitly to match bitmap
-        return new Rect(0, 0, image.Width, image.Height);
+        return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
     }
 }
