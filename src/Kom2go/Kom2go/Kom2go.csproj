@@ -33,6 +33,8 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" />
     <!-- For CBR (RAR) file support -->
     <PackageReference Include="SharpCompress" />
+    <!-- For Panel Detection -->
+    <PackageReference Include="OpenCvSharp4" />
   </ItemGroup>
 
   <!-- PDFium is only needed on desktop platforms (Windows, macOS, Linux) -->

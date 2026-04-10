@@ -659,10 +659,12 @@ public partial class ReaderViewModel : ViewModelBase
         IsDetectingPanels = true;
         try
         {
+            var isManga = ComicInfo?.Manga == YesNo.Yes;
             CurrentPagePanels = await _panelDetectionService.DetectPanelsAsync(
                 Comic.FilePath, 
                 CurrentPage, 
-                pageData);
+                pageData,
+                isManga);
             
             // Reset to first panel
             CurrentPanelIndex = 0;
@@ -703,8 +705,9 @@ public partial class ReaderViewModel : ViewModelBase
         
         try
         {
+            var isManga = ComicInfo?.Manga == YesNo.Yes;
             var nextPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage + 1);
-            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, CurrentPage + 1, nextPageData);
+            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, CurrentPage + 1, nextPageData, isManga);
         }
         catch
         {

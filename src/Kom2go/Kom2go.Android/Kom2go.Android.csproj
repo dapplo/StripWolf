@@ -31,6 +31,8 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Android" />
     <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" />
+    <PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" />
+    <PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.android-x64" />
   </ItemGroup>
 
   <ItemGroup>

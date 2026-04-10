@@ -19,6 +19,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Tmds.DBus.Protocol" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,13 +1,12 @@
 using Kom2go.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using OpenCvSharp;
+using System.Runtime.InteropServices;
 
 namespace Kom2go.Services;
 
 /// <summary>
 /// Service for detecting comic panels (scenes) on comic pages.
-/// Uses image processing to find rectangular regions separated by gutters.
+/// Uses OpenCV for advanced image processing to find panels.
 /// </summary>
 public class PanelDetectionService
 {
@@ -18,46 +17,17 @@ public class PanelDetectionService
     /// <summary>
     /// Minimum panel width/height ratio relative to page size
     /// </summary>
-    private const double MinPanelSizeRatio = 0.08;
-    
-    /// <summary>
-    /// Minimum gutter width to consider as separation between panels (as ratio of page width)
-    /// </summary>
-    private const double MinGutterRatio = 0.003;
-    
-    /// <summary>
-    /// Maximum gutter width (as ratio of page width)
-    /// </summary>
-    private const double MaxGutterRatio = 0.08;
-    
-    /// <summary>
-    /// Brightness threshold for detecting white/light gutters (0-255)
-    /// </summary>
-    private const byte GutterBrightnessThreshold = 220;
-    
-    /// <summary>
-    /// Minimum percentage of light pixels in a line to be considered a gutter
-    /// </summary>
-    private const double GutterLightPixelThreshold = 0.80;
-    
-    /// <summary>
-    /// Maximum trim size in pixels to exclude gutter white space from panel boundaries
-    /// </summary>
-    private const int MaxPanelTrimPixels = 5;
-    
-    /// <summary>
-    /// Panel trim ratio (trim size as fraction of panel dimension)
-    /// </summary>
-    private const int PanelTrimDivisor = 20;
-    
+    private const double MinPanelSizeRatio = 0.04; // Slightly more lenient
+
     /// <summary>
     /// Detect panels on a comic page
     /// </summary>
     /// <param name="comicFilePath">Path to the comic file (used for caching)</param>
     /// <param name="pageIndex">Page index</param>
     /// <param name="pageData">Raw image data for the page</param>
+    /// <param name="isManga">True if the comic should be read from right-to-left</param>
     /// <returns>Panel detection results</returns>
-    public async Task<PagePanelInfo> DetectPanelsAsync(string comicFilePath, int pageIndex, byte[] pageData)
+    public async Task<PagePanelInfo> DetectPanelsAsync(string comicFilePath, int pageIndex, byte[] pageData, bool isManga = false)
     {
         // Check cache first
         lock (_cacheLock)
@@ -70,7 +40,7 @@ public class PanelDetectionService
         }
         
         // Perform detection
-        var result = await Task.Run(() => DetectPanelsInternal(pageIndex, pageData));
+        var result = await Task.Run(() => DetectPanelsInternal(pageIndex, pageData, isManga));
         
         // Cache result
         lock (_cacheLock)
@@ -89,9 +59,9 @@ public class PanelDetectionService
     /// <summary>
     /// Pre-detect panels for multiple pages (for background processing)
     /// </summary>
-    public async Task PreDetectPagesAsync(string comicFilePath, IEnumerable<(int pageIndex, byte[] pageData)> pages)
+    public async Task PreDetectPagesAsync(string comicFilePath, IEnumerable<(int pageIndex, byte[] pageData)> pages, bool isManga = false)
     {
-        var tasks = pages.Select(p => DetectPanelsAsync(comicFilePath, p.pageIndex, p.pageData));
+        var tasks = pages.Select(p => DetectPanelsAsync(comicFilePath, p.pageIndex, p.pageData, isManga));
         await Task.WhenAll(tasks);
     }
     
@@ -130,9 +100,9 @@ public class PanelDetectionService
     }
     
     /// <summary>
-    /// Internal panel detection implementation
+    /// Internal panel detection implementation using OpenCV
     /// </summary>
-    private PagePanelInfo DetectPanelsInternal(int pageIndex, byte[] pageData)
+    private PagePanelInfo DetectPanelsInternal(int pageIndex, byte[] pageData, bool isManga)
     {
         var result = new PagePanelInfo
         {
@@ -141,306 +111,194 @@ public class PanelDetectionService
         
         try
         {
-            using var image = Image.Load<Rgba32>(pageData);
-            
-            var imageWidth = image.Width;
-            var imageHeight = image.Height;
-            
-            // Convert to grayscale for processing
-            var grayImage = ConvertToGrayscale(image);
-            
-            // First, find horizontal gutters to identify rows
-            var horizontalGutters = FindHorizontalGutters(grayImage, imageWidth, imageHeight);
-            
-            // Get row boundaries
-            var rowBoundaries = new List<(int top, int bottom)>();
-            var prevY = 0;
-            foreach (var (start, end) in horizontalGutters)
+            using var src = Mat.FromImageData(pageData, ImreadModes.Color);
+            if (src.Empty()) throw new Exception("Failed to load image");
+
+            var imageWidth = src.Width;
+            var imageHeight = src.Height;
+
+            // 1. Grayscale
+            using var gray = new Mat();
+            Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+
+            // 2. Bilateral Filter to smooth noise while keeping edges sharp
+            using var blurred = new Mat();
+            Cv2.BilateralFilter(gray, blurred, 9, 75, 75);
+
+            // 3. Adaptive Thresholding to find structural lines (gutters/borders)
+            // We use a larger block size to be more robust to internal panel detail
+            using var binary = new Mat();
+            Cv2.AdaptiveThreshold(blurred, binary, 255, AdaptiveThresholdTypes.MeanC, ThresholdTypes.BinaryInv, 15, 3);
+
+            // 4. Morphological Closing to fill gaps in panel borders
+            using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));
+            using var closed = new Mat();
+            Cv2.MorphologyEx(binary, closed, MorphTypes.Close, kernel, iterations: 2);
+
+            // 5. Morphological Dilation to further ensure borders are connected
+            using var dilated = new Mat();
+            Cv2.Dilate(closed, dilated, kernel, iterations: 1);
+
+            // 6. Find contours
+            // We use List mode to get all contours, then filter
+            Cv2.FindContours(dilated, out var contours, out _, RetrievalModes.List, ContourApproximationModes.ApproxSimple);
+
+            var candidatePanels = new List<ComicPanel>();
+            var minWidth = imageWidth * MinPanelSizeRatio;
+            var minHeight = imageHeight * MinPanelSizeRatio;
+            var pageArea = imageWidth * imageHeight;
+
+            foreach (var contour in contours)
             {
-                var gutterMiddle = (start + end) / 2;
-                if (gutterMiddle > prevY + imageHeight * MinPanelSizeRatio)
+                var rect = Cv2.BoundingRect(contour);
+                var area = rect.Width * rect.Height;
+
+                // Basic size filtering
+                if (rect.Width < minWidth || rect.Height < minHeight) continue;
+                if (area < pageArea * 0.01) continue; // Skip very small things
+
+                // Filter out panels that are basically the whole page (border or background)
+                if (rect.Width > imageWidth * 0.95 && rect.Height > imageHeight * 0.95) continue;
+
+                candidatePanels.Add(new ComicPanel
                 {
-                    rowBoundaries.Add((prevY, start));
-                }
-                prevY = end;
+                    PageIndex = pageIndex,
+                    X = (double)rect.X / imageWidth,
+                    Y = (double)rect.Y / imageHeight,
+                    Width = (double)rect.Width / imageWidth,
+                    Height = (double)rect.Height / imageHeight,
+                    Confidence = 0.8
+                });
             }
-            // Add the last row
-            if (imageHeight > prevY + imageHeight * MinPanelSizeRatio)
+
+            // 7. Remove overlapping candidates (keep the largest ones that don't fully contain others)
+            var panels = FilterOverlappingPanels(candidatePanels);
+
+            // 8. Advanced Sorting: Reading Order
+            var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
+
+            // Re-index
+            for (int i = 0; i < sortedPanels.Count; i++)
             {
-                rowBoundaries.Add((prevY, imageHeight));
+                sortedPanels[i].PanelIndex = i;
             }
-            
-            // If no rows found, treat entire page as one row
-            if (rowBoundaries.Count == 0)
+
+            if (sortedPanels.Count > 0)
             {
-                rowBoundaries.Add((0, imageHeight));
-            }
-            
-            // For each row, find vertical gutters within that row
-            var panels = new List<ComicPanel>();
-            var panelIndex = 0;
-            
-            foreach (var (rowTop, rowBottom) in rowBoundaries)
-            {
-                // Find vertical gutters within this row
-                var verticalGuttersInRow = FindVerticalGuttersInRow(grayImage, imageWidth, rowTop, rowBottom);
-                
-                // Get column boundaries within this row
-                var colBoundaries = new List<(int left, int right)>();
-                var prevX = 0;
-                foreach (var (start, end) in verticalGuttersInRow)
-                {
-                    var gutterMiddle = (start + end) / 2;
-                    if (gutterMiddle > prevX + imageWidth * MinPanelSizeRatio)
-                    {
-                        colBoundaries.Add((prevX, start));
-                    }
-                    prevX = end;
-                }
-                // Add the last column
-                if (imageWidth > prevX + imageWidth * MinPanelSizeRatio)
-                {
-                    colBoundaries.Add((prevX, imageWidth));
-                }
-                
-                // If no columns found, treat entire row as one panel
-                if (colBoundaries.Count == 0)
-                {
-                    colBoundaries.Add((0, imageWidth));
-                }
-                
-                // Create panels for each cell in this row
-                foreach (var (colLeft, colRight) in colBoundaries)
-                {
-                    var panelWidth = colRight - colLeft;
-                    var panelHeight = rowBottom - rowTop;
-                    
-                    // Skip if panel is too small
-                    if (panelWidth < imageWidth * MinPanelSizeRatio || 
-                        panelHeight < imageHeight * MinPanelSizeRatio)
-                    {
-                        continue;
-                    }
-                    
-                    // Trim the panel boundaries slightly to exclude gutter white space
-                    var trimX = Math.Min(MaxPanelTrimPixels, panelWidth / PanelTrimDivisor);
-                    var trimY = Math.Min(MaxPanelTrimPixels, panelHeight / PanelTrimDivisor);
-                    
-                    panels.Add(new ComicPanel
-                    {
-                        PageIndex = pageIndex,
-                        PanelIndex = panelIndex++,
-                        X = (double)(colLeft + trimX) / imageWidth,
-                        Y = (double)(rowTop + trimY) / imageHeight,
-                        Width = (double)(panelWidth - 2 * trimX) / imageWidth,
-                        Height = (double)(panelHeight - 2 * trimY) / imageHeight,
-                        Confidence = CalculateConfidence(horizontalGutters.Count, verticalGuttersInRow.Count)
-                    });
-                }
-            }
-            
-            if (panels.Count > 0)
-            {
-                result.Panels = panels;
+                result.Panels = sortedPanels;
                 result.DetectionSuccessful = true;
-                result.IsSplashPage = panels.Count == 1;
+                result.IsSplashPage = sortedPanels.Count == 1;
                 return result;
             }
-            
-            // Fallback: if no panels detected, treat entire page as one panel
-            result.IsSplashPage = true;
-            result.DetectionSuccessful = true;
-            result.Panels.Add(new ComicPanel
-            {
-                PageIndex = pageIndex,
-                PanelIndex = 0,
-                X = 0,
-                Y = 0,
-                Width = 1,
-                Height = 1,
-                Confidence = 1.0
-            });
+
+            // Fallback: entire page
+            return CreateSplashPageResult(pageIndex);
         }
         catch
         {
-            // On error, treat page as splash page
-            result.DetectionSuccessful = false;
-            result.IsSplashPage = true;
-            result.Panels.Add(new ComicPanel
-            {
-                PageIndex = pageIndex,
-                PanelIndex = 0,
-                X = 0,
-                Y = 0,
-                Width = 1,
-                Height = 1,
-                Confidence = 0.5
-            });
+            return CreateSplashPageResult(pageIndex, 0.5);
         }
-        
+    }
+
+    private List<ComicPanel> FilterOverlappingPanels(List<ComicPanel> candidates)
+    {
+        if (candidates.Count <= 1) return candidates;
+
+        // Sort by area descending to process larger ones first
+        var sorted = candidates.OrderByDescending(p => p.Width * p.Height).ToList();
+        var result = new List<ComicPanel>();
+
+        foreach (var p in sorted)
+        {
+            bool isDuplicate = false;
+            foreach (var existing in result)
+            {
+                // Check if p is almost the same as existing (within 5%)
+                if (Math.Abs(p.X - existing.X) < 0.05 &&
+                    Math.Abs(p.Y - existing.Y) < 0.05 &&
+                    Math.Abs(p.Width - existing.Width) < 0.05 &&
+                    Math.Abs(p.Height - existing.Height) < 0.05)
+                {
+                    isDuplicate = true;
+                    break;
+                }
+                
+                // Check if p is inside existing
+                if (p.X >= existing.X - 0.01 && 
+                    p.Y >= existing.Y - 0.01 && 
+                    p.X + p.Width <= existing.X + existing.Width + 0.01 && 
+                    p.Y + p.Height <= existing.Y + existing.Height + 0.01)
+                {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+
+            if (!isDuplicate)
+            {
+                result.Add(p);
+            }
+        }
+
         return result;
     }
-    
-    /// <summary>
-    /// Convert image to grayscale byte array
-    /// </summary>
-    private byte[,] ConvertToGrayscale(Image<Rgba32> image)
+
+    private List<ComicPanel> SortPanelsByReadingOrder(List<ComicPanel> panels, bool isManga)
     {
-        var width = image.Width;
-        var height = image.Height;
-        var gray = new byte[height, width];
-        
-        image.ProcessPixelRows(accessor =>
+        if (panels.Count <= 1) return panels;
+
+        var result = new List<ComicPanel>();
+        var remaining = panels.OrderBy(p => p.Y).ToList();
+
+        while (remaining.Count > 0)
         {
-            for (var y = 0; y < height; y++)
-            {
-                var row = accessor.GetRowSpan(y);
-                for (var x = 0; x < width; x++)
-                {
-                    var pixel = row[x];
-                    // Standard grayscale conversion
-                    gray[y, x] = (byte)(0.299 * pixel.R + 0.587 * pixel.G + 0.114 * pixel.B);
-                }
-            }
-        });
-        
-        return gray;
-    }
-    
-    /// <summary>
-    /// Find horizontal gutters (white/light horizontal bands)
-    /// </summary>
-    private List<(int start, int end)> FindHorizontalGutters(byte[,] grayImage, int width, int height)
-    {
-        var gutters = new List<(int start, int end)>();
-        var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(height);
-        
-        // Sample columns to check (avoid edge artifacts)
-        var sampleStartX = width / 10;
-        var sampleEndX = width - width / 10;
-        var sampleWidth = sampleEndX - sampleStartX;
-        
-        var inGutter = false;
-        var gutterStart = 0;
-        
-        for (var y = 0; y < height; y++)
-        {
-            // Count light pixels in this row
-            var lightPixelCount = 0;
-            for (var x = sampleStartX; x < sampleEndX; x++)
-            {
-                if (grayImage[y, x] >= GutterBrightnessThreshold)
-                {
-                    lightPixelCount++;
-                }
-            }
+            // Take the top-most panel
+            var topPanel = remaining[0];
             
-            // If most of the row is light, it's part of a gutter
-            var isLightRow = lightPixelCount > sampleWidth * GutterLightPixelThreshold;
+            // Find all panels that are in the "same row" as this one
+            // A row is defined by vertical overlap or proximity
+            var row = remaining.Where(p => 
+                Math.Abs(p.Y - topPanel.Y) < 0.08 || // Close Y
+                (p.Y < topPanel.Y + topPanel.Height * 0.5 && p.Y + p.Height > topPanel.Y + topPanel.Height * 0.5) // Center overlap
+            ).ToList();
+
+            // Sort row by X (Left-to-Right or Right-to-Left)
+            var sortedRow = isManga 
+                ? row.OrderByDescending(p => p.X).ToList() 
+                : row.OrderBy(p => p.X).ToList();
+
+            result.AddRange(sortedRow);
             
-            if (isLightRow && !inGutter)
+            // Remove processed panels
+            foreach (var p in sortedRow)
             {
-                gutterStart = y;
-                inGutter = true;
-            }
-            else if (!isLightRow && inGutter)
-            {
-                var gutterHeight = y - gutterStart;
-                if (gutterHeight >= minGutterSize && gutterHeight <= maxGutterSize)
-                {
-                    gutters.Add((gutterStart, y));
-                }
-                inGutter = false;
+                remaining.Remove(p);
             }
         }
-        
-        return gutters;
+
+        return result;
     }
-    
-    /// <summary>
-    /// Find vertical gutters within a specific row (white/light vertical bands)
-    /// </summary>
-    private List<(int start, int end)> FindVerticalGuttersInRow(byte[,] grayImage, int width, int rowTop, int rowBottom)
+
+    private static PagePanelInfo CreateSplashPageResult(int pageIndex, double confidence = 1.0)
     {
-        var gutters = new List<(int start, int end)>();
-        var (minGutterSize, maxGutterSize) = CalculateGutterSizeBounds(width);
-        
-        var rowHeight = rowBottom - rowTop;
-        if (rowHeight <= 0) return gutters;
-        
-        // Sample most of the row height (avoid edge artifacts)
-        var sampleStartY = rowTop + rowHeight / 10;
-        var sampleEndY = rowBottom - rowHeight / 10;
-        var sampleHeight = sampleEndY - sampleStartY;
-        
-        if (sampleHeight <= 0) return gutters;
-        
-        var inGutter = false;
-        var gutterStart = 0;
-        
-        for (var x = 0; x < width; x++)
+        return new PagePanelInfo
         {
-            // Count light pixels in this column within the row
-            var lightPixelCount = 0;
-            for (var y = sampleStartY; y < sampleEndY; y++)
+            PageIndex = pageIndex,
+            DetectionSuccessful = true,
+            IsSplashPage = true,
+            Panels = new List<ComicPanel>
             {
-                if (grayImage[y, x] >= GutterBrightnessThreshold)
+                new ComicPanel
                 {
-                    lightPixelCount++;
+                    PageIndex = pageIndex,
+                    PanelIndex = 0,
+                    X = 0,
+                    Y = 0,
+                    Width = 1,
+                    Height = 1,
+                    Confidence = confidence
                 }
             }
-            
-            // If most of the column (within this row) is light, it's part of a gutter
-            var isLightColumn = lightPixelCount > sampleHeight * GutterLightPixelThreshold;
-            
-            if (isLightColumn && !inGutter)
-            {
-                gutterStart = x;
-                inGutter = true;
-            }
-            else if (!isLightColumn && inGutter)
-            {
-                var gutterWidth = x - gutterStart;
-                if (gutterWidth >= minGutterSize && gutterWidth <= maxGutterSize)
-                {
-                    gutters.Add((gutterStart, x));
-                }
-                inGutter = false;
-            }
-        }
-        
-        return gutters;
-    }
-    
-    /// <summary>
-    /// Calculate min and max gutter size bounds for a given dimension
-    /// </summary>
-    private (int min, int max) CalculateGutterSizeBounds(int dimension)
-    {
-        var min = (int)(dimension * MinGutterRatio);
-        var max = (int)(dimension * MaxGutterRatio);
-        
-        // Ensure minimum gutter size is at least 2 pixels
-        if (min < 2) min = 2;
-        if (max < min) max = min + 1;
-        
-        return (min, max);
-    }
-    
-    /// <summary>
-    /// Calculate confidence score based on gutter detection
-    /// </summary>
-    private static double CalculateConfidence(int hGutterCount, int vGutterCount)
-    {
-        // More gutters found = higher confidence, up to a point
-        var totalGutters = hGutterCount + vGutterCount;
-        return totalGutters switch
-        {
-            0 => 0.3,
-            1 => 0.5,
-            2 => 0.7,
-            3 => 0.85,
-            _ => 0.95
         };
     }
 }
