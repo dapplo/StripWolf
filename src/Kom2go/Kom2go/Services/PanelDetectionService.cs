@@ -123,14 +123,17 @@ public class PanelDetectionService
             Cv2.Dilate(morph, dilated, kernel, iterations: 1);
 
             // 4. Contour Analysis
-            Cv2.FindContours(dilated, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+            // Use CComp to get all contours, then filter by size and solidity. 
+            // This is more robust against edge-touching panels that might be wrapped in a page-level contour.
+            Cv2.FindContours(dilated, out var contours, out var hierarchy, RetrievalModes.CComp, ContourApproximationModes.ApproxSimple);
 
             var candidates = new List<ComicPanel>();
             double minW = imageWidth * MinPanelSizeRatio;
             double minH = imageHeight * MinPanelSizeRatio;
 
-            foreach (var contour in contours)
+            for (int i = 0; i < contours.Length; i++)
             {
+                var contour = contours[i];
                 var rect = Cv2.BoundingRect(contour);
                 
                 // Adjust for padding
@@ -151,11 +154,14 @@ public class PanelDetectionService
                 // Filtering
                 if (adjW < minW || adjH < minH) continue;
                 if (rectArea < pageArea * 0.01) continue;
+                
+                // Filter out panels that are basically the whole page
                 if (adjW > imageWidth * 0.98 && adjH > imageHeight * 0.98) continue;
 
-                // Solidity Check
+                // Solidity Check: Panels are rectangular. 
+                // We use a slightly lower threshold (0.65) to be inclusive of stylized panels.
                 double solidity = area / rectArea;
-                if (solidity < 0.70) continue; 
+                if (solidity < 0.65) continue; 
 
                 candidates.Add(new ComicPanel
                 {

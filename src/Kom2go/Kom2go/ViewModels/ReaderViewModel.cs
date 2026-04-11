@@ -294,6 +294,9 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
+        // Capture current index to ensure panel detection is tied to the correct page
+        int pageIndex = CurrentPage;
+
         // Validate page index is within range
         if (Comic.PageCount == 0)
         {
@@ -302,9 +305,10 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         // Ensure CurrentPage is within valid bounds
-        if (CurrentPage < 0 || CurrentPage >= Comic.PageCount)
+        if (pageIndex < 0 || pageIndex >= Comic.PageCount)
         {
-            CurrentPage = Math.Max(0, Math.Min(CurrentPage, Comic.PageCount - 1));
+            pageIndex = Math.Max(0, Math.Min(pageIndex, Comic.PageCount - 1));
+            CurrentPage = pageIndex;
         }
 
         _isLoadingPage = true;
@@ -317,7 +321,7 @@ public partial class ReaderViewModel : ViewModelBase
             if (IsTwoPageMode)
             {
                 // Load two pages for two-page mode
-                var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+                var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
                 using var leftStream = new MemoryStream(leftPageData);
                 var newLeftBitmap = new Bitmap(leftStream);
                 var oldLeftBitmap = LeftPageImage;
@@ -329,9 +333,9 @@ public partial class ReaderViewModel : ViewModelBase
                 pageData = leftPageData;
                 
                 // Load right page if available
-                if (CurrentPage + 1 < Comic.PageCount)
+                if (pageIndex + 1 < Comic.PageCount)
                 {
-                    var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage + 1);
+                    var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex + 1);
                     using var rightStream = new MemoryStream(rightPageData);
                     var newRightBitmap = new Bitmap(rightStream);
                     var oldRightBitmap = RightPageImage;
@@ -348,7 +352,7 @@ public partial class ReaderViewModel : ViewModelBase
             else
             {
                 // Single page mode
-                pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+                pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
                 using var stream = new MemoryStream(pageData);
                 
                 // Create new bitmap first, then dispose old one to avoid memory leak
@@ -361,13 +365,13 @@ public partial class ReaderViewModel : ViewModelBase
             // If in guided mode, detect panels
             if (ReadingMode == ReadingMode.Guided && pageData is not null)
             {
-                await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
+                await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
             }
             
             // Pre-detect panels for next page in background if in guided mode
-            if (ReadingMode == ReadingMode.Guided && CurrentPage + 1 < Comic.PageCount)
+            if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
             {
-                _ = PreDetectNextPagePanelsAsync();
+                _ = PreDetectNextPagePanelsAsync(pageIndex + 1);
             }
         }
         catch (Exception ex)
@@ -719,15 +723,15 @@ public partial class ReaderViewModel : ViewModelBase
     /// <summary>
     /// Pre-detect panels for the next page in background
     /// </summary>
-    private async Task PreDetectNextPagePanelsAsync()
+    private async Task PreDetectNextPagePanelsAsync(int nextPageIndex)
     {
-        if (Comic is null || CurrentPage + 1 >= Comic.PageCount)
+        if (Comic is null || nextPageIndex >= Comic.PageCount)
         {
             return;
         }
         
         // Check if already cached
-        if (_panelDetectionService.IsCached(Comic.FilePath, CurrentPage + 1))
+        if (_panelDetectionService.IsCached(Comic.FilePath, nextPageIndex))
         {
             return;
         }
@@ -735,8 +739,8 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
-            var nextPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage + 1);
-            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, CurrentPage + 1, nextPageData, isManga);
+            var nextPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, nextPageIndex);
+            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, nextPageIndex, nextPageData, isManga);
         }
         catch
         {
