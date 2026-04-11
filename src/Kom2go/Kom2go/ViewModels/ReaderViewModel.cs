@@ -361,7 +361,7 @@ public partial class ReaderViewModel : ViewModelBase
             // If in guided mode, detect panels
             if (ReadingMode == ReadingMode.Guided && pageData is not null)
             {
-                await DetectPanelsForCurrentPageAsync(pageData);
+                await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
             }
             
             // Pre-detect panels for next page in background if in guided mode
@@ -594,7 +594,7 @@ public partial class ReaderViewModel : ViewModelBase
         if (ReadingMode == ReadingMode.Guided && Comic is not null)
         {
             var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
-            await DetectPanelsForCurrentPageAsync(pageData);
+            await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
         
         // Notify properties that depend on reading mode
@@ -626,7 +626,7 @@ public partial class ReaderViewModel : ViewModelBase
         if (mode == ReadingMode.Guided && Comic is not null)
         {
             var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
-            await DetectPanelsForCurrentPageAsync(pageData);
+            await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
     }
     
@@ -659,7 +659,7 @@ public partial class ReaderViewModel : ViewModelBase
     /// <summary>
     /// Detect panels for the current page
     /// </summary>
-    private async Task DetectPanelsForCurrentPageAsync(byte[] pageData)
+    private async Task DetectPanelsForCurrentPageAsync(byte[] pageData, int pageIndex)
     {
         if (Comic is null)
         {
@@ -670,39 +670,49 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
-            CurrentPagePanels = await _panelDetectionService.DetectPanelsAsync(
+            var result = await _panelDetectionService.DetectPanelsAsync(
                 Comic.FilePath, 
-                CurrentPage, 
+                pageIndex, 
                 pageData,
                 isManga);
             
-            // Reset to correct panel
-            if (_shouldSelectLastPanel && CurrentPagePanels.Panels.Count > 0)
+            // Only apply if the page hasn't changed since we started detection
+            if (pageIndex == CurrentPage)
             {
-                CurrentPanelIndex = CurrentPagePanels.Panels.Count - 1;
-            }
-            else
-            {
-                CurrentPanelIndex = 0;
-            }
-            _shouldSelectLastPanel = false;
+                CurrentPagePanels = result;
+                
+                // Reset to correct panel
+                if (_shouldSelectLastPanel && CurrentPagePanels.Panels.Count > 0)
+                {
+                    CurrentPanelIndex = CurrentPagePanels.Panels.Count - 1;
+                }
+                else
+                {
+                    CurrentPanelIndex = 0;
+                }
+                _shouldSelectLastPanel = false;
 
-            if (CurrentPagePanels.Panels.Count > 0)
-            {
-                CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
+                if (CurrentPagePanels.Panels.Count > 0)
+                {
+                    CurrentPanel = CurrentPagePanels.Panels[CurrentPanelIndex];
+                }
+                else
+                {
+                    CurrentPanel = null;
+                }
+                
+                OnPropertyChanged(nameof(HasPreviousPanel));
+                OnPropertyChanged(nameof(HasNextPanel));
+                OnPropertyChanged(nameof(CurrentPanelDisplay));
             }
-            else
-            {
-                CurrentPanel = null;
-            }
-            
-            OnPropertyChanged(nameof(HasPreviousPanel));
-            OnPropertyChanged(nameof(HasNextPanel));
-            OnPropertyChanged(nameof(CurrentPanelDisplay));
         }
         finally
         {
-            IsDetectingPanels = false;
+            // Only reset IsDetectingPanels if we are still on that page
+            if (pageIndex == CurrentPage)
+            {
+                IsDetectingPanels = false;
+            }
         }
     }
     
