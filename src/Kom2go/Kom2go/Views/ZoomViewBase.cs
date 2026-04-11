@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Kom2go.ViewModels;
 using Kom2go.Models;
 
@@ -25,18 +26,22 @@ public abstract class ZoomViewBase : UserControl
     protected abstract Canvas? ZoomedCanvasRightControl { get; }
     protected abstract Image? ZoomedAreaImageRightControl { get; }
 
-    private bool _isDraggingZoomRegion;
+    private bool _isDraggingOverview;
+    private bool _isDrawingManualRegion;
+    private Point _manualDrawStart;
+    
+    private bool _isPanningZoomArea;
+    private Point _lastPointerPosition;
+    
     private Point? _swipeStartPoint;
     private DateTime _swipeStartTime;
     private const double SwipeThreshold = 80;
     private const double SwipeMaxTimeMs = 500;
 
-    // Manual Pinch tracking
     private readonly Dictionary<long, Point> _touchPoints = new();
     private double _initialDistance = 0;
     private double _initialZoomRegionSize = 1.0;
 
-    // Track the actually displayed area for RedrawOverview
     protected double _actualDisplayWidthNormalized = 0.4;
     protected double _actualDisplayHeightNormalized = 0.4;
 
@@ -76,7 +81,9 @@ public abstract class ZoomViewBase : UserControl
 
     private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        _isDraggingZoomRegion = false;
+        _isDraggingOverview = false;
+        _isDrawingManualRegion = false;
+        _isPanningZoomArea = false;
         _touchPoints.Clear();
         _initialDistance = 0;
     }
@@ -92,22 +99,6 @@ public abstract class ZoomViewBase : UserControl
 
             if (e.Delta.Y > 0) vm.DecreaseZoomRegionSizeCommand.Execute(null);
             else vm.IncreaseZoomRegionSizeCommand.Execute(null);
-        }
-        else
-        {
-            if (e.Delta.Y == 0) return;
-            e.Handled = true;
-            
-            if (vm.IsGuidedMode)
-            {
-                if (e.Delta.Y > 0 && vm.HasPreviousPanel) vm.GoToPreviousPanelCommand.Execute(null);
-                else if (e.Delta.Y < 0 && vm.HasNextPanel) vm.GoToNextPanelCommand.Execute(null);
-            }
-            else
-            {
-                if (e.Delta.Y > 0 && vm.HasPreviousPage) vm.GoToPreviousPageCommand.Execute(null);
-                else if (e.Delta.Y < 0 && vm.HasNextPage) vm.GoToNextPageCommand.Execute(null);
-            }
         }
     }
 
@@ -126,9 +117,10 @@ public abstract class ZoomViewBase : UserControl
         if (e.PropertyName == nameof(ReaderViewModel.ZoomRegion) || 
             e.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
             e.PropertyName == nameof(ReaderViewModel.CurrentPanel) ||
-            e.PropertyName == nameof(ReaderViewModel.Handedness))
+            e.PropertyName == nameof(ReaderViewModel.Handedness) ||
+            e.PropertyName == nameof(ReaderViewModel.CompactOverview))
         {
-            UpdateZoomRegion();
+            Dispatcher.UIThread.Post(UpdateZoomRegion, DispatcherPriority.Render);
         }
     }
 
@@ -138,85 +130,81 @@ public abstract class ZoomViewBase : UserControl
 
         var region = vm.ZoomRegion;
         var image = vm.CurrentPageImage;
-        if (image == null) return;
+        if (image == null || image.Size.Width <= 0) return;
 
-        var overviewContainers = new[] { OverviewContainerLeftControl, OverviewContainerRightControl };
-        var overviewImages = new[] { OverviewImageLeftControl, OverviewImageRightControl };
-        var overviewCanvases = new[] { OverviewCanvasLeftControl, OverviewCanvasRightControl };
+        // 1. Manage Overview Column Layout
+        var overviewCanvas = vm.IsOverviewOnLeft ? OverviewContainerLeftControl : OverviewContainerRightControl;
+        var overviewBorder = overviewCanvas?.Parent?.Parent as Control;
+        var columnWrapper = overviewBorder?.Parent as Control;
 
-        for (int i = 0; i < 2; i++)
+        if (columnWrapper != null)
         {
-            if (overviewContainers[i] != null)
+            if (vm.CompactOverview)
             {
-                overviewContainers[i]!.Width = image.Size.Width;
-                overviewContainers[i]!.Height = image.Size.Height;
+                double aspect = image.Size.Width / image.Size.Height;
+                double availableHeight = Bounds.Height;
+                if (availableHeight > 0)
+                {
+                    columnWrapper.Width = availableHeight * aspect;
+                }
             }
-            if (overviewImages[i] != null)
+            else
             {
-                overviewImages[i]!.Width = image.Size.Width;
-                overviewImages[i]!.Height = image.Size.Height;
-            }
-            if (overviewCanvases[i] != null)
-            {
-                overviewCanvases[i]!.Width = image.Size.Width;
-                overviewCanvases[i]!.Height = image.Size.Height;
+                columnWrapper.ClearValue(WidthProperty);
             }
         }
 
+        // 2. Set Canvas sizes to image pixels
+        var overviewContainers = new[] { OverviewContainerLeftControl, OverviewContainerRightControl };
+        var overviewCanvases = new[] { OverviewCanvasLeftControl, OverviewCanvasRightControl };
+        for (int i = 0; i < 2; i++)
+        {
+            if (overviewContainers[i] != null) { overviewContainers[i]!.Width = image.Size.Width; overviewContainers[i]!.Height = image.Size.Height; }
+            if (overviewCanvases[i] != null) { overviewCanvases[i]!.Width = image.Size.Width; overviewCanvases[i]!.Height = image.Size.Height; }
+        }
+
+        // 3. Robust Zoom Math using Fixed Virtual Viewport
         var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
         var canvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
         var areaImage = vm.IsOverviewOnLeft ? ZoomedAreaImageRightControl : ZoomedAreaImageLeftControl;
         
         if (viewbox != null && canvas != null && areaImage != null)
         {
-            double targetWidth = viewbox.Bounds.Width;
-            double targetHeight = viewbox.Bounds.Height;
+            // Use the parent border for more stable bounds
+            var zoomBorder = viewbox.Parent as Control;
+            double targetWidth = zoomBorder?.Bounds.Width ?? (Bounds.Width / 2);
+            double targetHeight = zoomBorder?.Bounds.Height ?? Bounds.Height;
             
-            if (targetWidth <= 0 || targetHeight <= 0)
+            if (targetWidth <= 0 || targetHeight <= 0) 
             {
-                targetWidth = Bounds.Width / 2;
-                targetHeight = Bounds.Height;
+                targetWidth = 1000;
+                targetHeight = 1000;
             }
 
-            if (targetWidth > 0 && targetHeight > 0)
-            {
-                double targetAspect = targetWidth / targetHeight;
-                
-                // Pixel size of the requested region
-                double wantPixelWidth = region.Width * image.Size.Width;
-                double wantPixelHeight = region.Height * image.Size.Height;
-                
-                // Ensure non-zero
-                wantPixelWidth = Math.Max(1, wantPixelWidth);
-                wantPixelHeight = Math.Max(1, wantPixelHeight);
-                
-                double wantAspect = wantPixelWidth / wantPixelHeight;
-                double displayPixelWidth, displayPixelHeight;
+            double targetAspect = targetWidth / targetHeight;
+            
+            // Fixed virtual coordinate system for the canvas window
+            canvas.Width = 2000;
+            canvas.Height = 2000 / targetAspect;
 
-                if (wantAspect < targetAspect)
-                {
-                    // Panel is narrower than the display area -> expand width to fill
-                    displayPixelHeight = wantPixelHeight;
-                    displayPixelWidth = wantPixelHeight * targetAspect;
-                }
-                else
-                {
-                    // Panel is wider than the display area -> expand height to fill
-                    displayPixelWidth = wantPixelWidth;
-                    displayPixelHeight = wantPixelWidth / targetAspect;
-                }
+            // Magnification: scale the image so the selected region fills the window
+            double scaleX = canvas.Width / (region.Width * image.Size.Width);
+            double scaleY = canvas.Height / (region.Height * image.Size.Height);
+            double scale = Math.Min(scaleX, scaleY);
 
-                _actualDisplayWidthNormalized = displayPixelWidth / image.Size.Width;
-                _actualDisplayHeightNormalized = displayPixelHeight / image.Size.Height;
+            double displayImgWidth = image.Size.Width * scale;
+            double displayImgHeight = image.Size.Height * scale;
 
-                canvas.Width = displayPixelWidth;
-                canvas.Height = displayPixelHeight;
-                areaImage.Width = image.Size.Width;
-                areaImage.Height = image.Size.Height;
+            areaImage.Width = displayImgWidth;
+            areaImage.Height = displayImgHeight;
 
-                Canvas.SetLeft(areaImage, (displayPixelWidth / 2) - (region.CenterX * image.Size.Width));
-                Canvas.SetTop(areaImage, (displayPixelHeight / 2) - (region.CenterY * image.Size.Height));
-            }
+            // Position image so the requested region center is at canvas center
+            Canvas.SetLeft(areaImage, (canvas.Width / 2) - (region.CenterX * displayImgWidth));
+            Canvas.SetTop(areaImage, (canvas.Height / 2) - (region.CenterY * displayImgHeight));
+
+            // Track what portion of the image is actually visible in the window for RedrawOverview
+            _actualDisplayWidthNormalized = canvas.Width / displayImgWidth;
+            _actualDisplayHeightNormalized = canvas.Height / displayImgHeight;
         }
         
         RedrawOverview();
@@ -227,54 +215,80 @@ public abstract class ZoomViewBase : UserControl
     private void OnOverviewPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not ReaderViewModel vm) return;
-        
         var canvas = sender as Canvas;
         if (canvas == null) return;
 
-        var position = e.GetPosition(canvas);
-        
-        var normalizedX = position.X / canvas.Width;
-        var normalizedY = position.Y / canvas.Height;
-        
-        normalizedX = Math.Max(0, Math.Min(1, normalizedX));
-        normalizedY = Math.Max(0, Math.Min(1, normalizedY));
-        
-        if (HandleOverviewClick(vm, normalizedX, normalizedY)) return;
+        var pos = e.GetPosition(canvas);
+        double nx = pos.X / canvas.Width;
+        double ny = pos.Y / canvas.Height;
 
-        _isDraggingZoomRegion = true;
-        vm.ZoomRegion.CenterX = normalizedX;
-        vm.ZoomRegion.CenterY = normalizedY;
+        var point = e.GetCurrentPoint(this);
+        if (point.Properties.IsRightButtonPressed)
+        {
+            _isDrawingManualRegion = true;
+            _manualDrawStart = pos;
+            e.Pointer.Capture(canvas);
+            return;
+        }
+
+        if (HandleOverviewClick(vm, nx, ny)) return;
+
+        _isDraggingOverview = true;
+        vm.ZoomRegion.CenterX = Math.Max(0, Math.Min(1, nx));
+        vm.ZoomRegion.CenterY = Math.Max(0, Math.Min(1, ny));
         vm.MoveZoomRegion(0, 0);
+        e.Pointer.Capture(canvas);
     }
 
     protected virtual bool HandleOverviewClick(ReaderViewModel vm, double x, double y) => false;
 
     private void OnOverviewPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (DataContext is not ReaderViewModel vm || !_isDraggingZoomRegion) return;
-        
+        if (DataContext is not ReaderViewModel vm) return;
         var canvas = sender as Canvas;
         if (canvas == null) return;
 
-        var position = e.GetPosition(canvas);
-        
-        var normalizedX = position.X / canvas.Width;
-        var normalizedY = position.Y / canvas.Height;
-        
-        vm.ZoomRegion.CenterX = Math.Max(0, Math.Min(1, normalizedX));
-        vm.ZoomRegion.CenterY = Math.Max(0, Math.Min(1, normalizedY));
-        vm.MoveZoomRegion(0, 0);
+        var pos = e.GetPosition(canvas);
+        double nx = Math.Max(0, Math.Min(1, pos.X / canvas.Width));
+        double ny = Math.Max(0, Math.Min(1, pos.Y / canvas.Height));
+
+        if (_isDrawingManualRegion)
+        {
+            double x1 = Math.Min(_manualDrawStart.X, pos.X) / canvas.Width;
+            double y1 = Math.Min(_manualDrawStart.Y, pos.Y) / canvas.Height;
+            double x2 = Math.Max(_manualDrawStart.X, pos.X) / canvas.Width;
+            double y2 = Math.Max(_manualDrawStart.Y, pos.Y) / canvas.Height;
+
+            vm.ZoomRegion.CenterX = (x1 + x2) / 2;
+            vm.ZoomRegion.CenterY = (y1 + y2) / 2;
+            vm.ZoomRegion.Width = Math.Max(ZoomRegion.MinSize, x2 - x1);
+            vm.ZoomRegion.Height = Math.Max(ZoomRegion.MinSize, y2 - y1);
+            vm.MoveZoomRegion(0, 0);
+        }
+        else if (_isDraggingOverview)
+        {
+            vm.ZoomRegion.CenterX = nx;
+            vm.ZoomRegion.CenterY = ny;
+            vm.MoveZoomRegion(0, 0);
+        }
     }
 
-    private void OnOverviewPointerReleased(object? sender, PointerReleasedEventArgs e) => _isDraggingZoomRegion = false;
+    private void OnOverviewPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _isDraggingOverview = false;
+        _isDrawingManualRegion = false;
+        if (sender is Control c) e.Pointer.Capture(null);
+    }
 
     private void OnZoomedAreaPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not ReaderViewModel vm) return;
 
+        _lastPointerPosition = e.GetPosition(this);
+
         if (e.Pointer.Type == PointerType.Touch)
         {
-            _touchPoints[e.Pointer.Id] = e.GetPosition(this);
+            _touchPoints[e.Pointer.Id] = _lastPointerPosition;
             if (_touchPoints.Count == 2)
             {
                 var points = _touchPoints.Values.ToArray();
@@ -284,17 +298,21 @@ public abstract class ZoomViewBase : UserControl
             }
         }
 
-        _swipeStartPoint = e.GetPosition(this);
+        _swipeStartPoint = _lastPointerPosition;
         _swipeStartTime = DateTime.UtcNow;
+        _isPanningZoomArea = true;
+        
+        if (sender is Control c) e.Pointer.Capture(c);
     }
 
     private void OnZoomedAreaPointerMoved(object? sender, PointerEventArgs e)
     {
         if (DataContext is not ReaderViewModel vm) return;
+        var currentPosition = e.GetPosition(this);
 
         if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
         {
-            _touchPoints[e.Pointer.Id] = e.GetPosition(this);
+            _touchPoints[e.Pointer.Id] = currentPosition;
             if (_touchPoints.Count == 2)
             {
                 var points = _touchPoints.Values.ToArray();
@@ -302,30 +320,52 @@ public abstract class ZoomViewBase : UserControl
                 if (_initialDistance > 0)
                 {
                     double scale = currentDistance / _initialDistance;
-                    double targetSize = _initialZoomRegionSize / scale;
-                    vm.ZoomRegion.Size = Math.Max(0.05, Math.Min(1.0, targetSize));
+                    vm.ZoomRegion.Resize(_initialZoomRegionSize / scale - vm.ZoomRegion.Size);
                     vm.MoveZoomRegion(0, 0);
                 }
                 return;
             }
         }
+
+        if (_isPanningZoomArea && vm.CurrentPageImage != null)
+        {
+            var delta = currentPosition - _lastPointerPosition;
+            if (Math.Abs(delta.X) > 1 || Math.Abs(delta.Y) > 1)
+            {
+                var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
+                var zoomCanvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
+                if (viewbox != null && zoomCanvas != null)
+                {
+                    double canvasToImageScale = vm.CurrentPageImage.Size.Width;
+                    // Our canvas window is fixed at 2000 height/proportional width.
+                    // The viewbox maps viewbox.Bounds to zoomCanvas.Width units.
+                    double screenToCanvasScale = viewbox.Bounds.Width / zoomCanvas.Width;
+                    
+                    double normalizedDeltaX = delta.X / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
+                    double normalizedDeltaY = delta.Y / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
+
+                    vm.MoveZoomRegion(-normalizedDeltaX, -normalizedDeltaY);
+                }
+            }
+        }
+        _lastPointerPosition = currentPosition;
     }
 
     private void OnZoomedAreaPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         _touchPoints.Remove(e.Pointer.Id);
-        if (_touchPoints.Count < 2)
-        {
-            _initialDistance = 0;
-        }
+        if (_touchPoints.Count < 2) _initialDistance = 0;
+        _isPanningZoomArea = false;
+        if (sender is Control c) e.Pointer.Capture(null);
 
         if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
         
         var position = e.GetPosition(this);
         var elapsed = (DateTime.UtcNow - _swipeStartTime).TotalMilliseconds;
         var deltaX = position.X - _swipeStartPoint.Value.X;
+        var deltaY = position.Y - _swipeStartPoint.Value.Y;
         
-        if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) > SwipeThreshold)
+        if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) > SwipeThreshold && Math.Abs(deltaY) < SwipeThreshold)
         {
             if (deltaX > 0)
             {
@@ -338,15 +378,12 @@ public abstract class ZoomViewBase : UserControl
                 else vm.GoToNextPageCommand.Execute(null);
             }
         }
-        else if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < 10)
+        else if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < 10 && Math.Abs(deltaY) < 10)
         {
             vm.ToggleControlsCommand.Execute(null);
         }
         _swipeStartPoint = null;
     }
 
-    private double GetDistance(Point p1, Point p2)
-    {
-        return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
-    }
+    private double GetDistance(Point p1, Point p2) => Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
 }

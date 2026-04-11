@@ -39,16 +39,19 @@ public partial class ZoomedReadingView : ZoomViewBase
 
         var region = vm.ZoomRegion;
 
+        // Draw the red rectangle showing the visible area on the zoom side
         var rect = new Rectangle
         {
             Stroke = Brushes.Red,
             StrokeThickness = 2,
             Width = _actualDisplayWidthNormalized * canvas.Width,
-            Height = _actualDisplayHeightNormalized * canvas.Height
+            Height = _actualDisplayHeightNormalized * canvas.Height,
+            IsHitTestVisible = false
         };
 
         Canvas.SetLeft(rect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
         Canvas.SetTop(rect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
+        rect.ZIndex = 1000;
         canvas.Children.Add(rect);
     }
 }

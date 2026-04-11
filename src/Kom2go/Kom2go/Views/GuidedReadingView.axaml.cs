@@ -38,7 +38,7 @@ public partial class GuidedReadingView : ZoomViewBase
 
         canvas.Children.Clear();
 
-        // Draw panels
+        // 1. Draw panels
         if (vm.CurrentPagePanels != null)
         {
             foreach (var panel in vm.CurrentPagePanels.Panels)
@@ -49,7 +49,8 @@ public partial class GuidedReadingView : ZoomViewBase
                     StrokeThickness = panel == vm.CurrentPanel ? 3 : 1,
                     Fill = panel == vm.CurrentPanel ? new SolidColorBrush(Colors.Yellow, 0.2) : Brushes.Transparent,
                     Width = panel.Width * canvas.Width,
-                    Height = panel.Height * canvas.Height
+                    Height = panel.Height * canvas.Height,
+                    IsHitTestVisible = false
                 };
 
                 Canvas.SetLeft(rect, panel.X * canvas.Width);
@@ -57,6 +58,22 @@ public partial class GuidedReadingView : ZoomViewBase
                 canvas.Children.Add(rect);
             }
         }
+
+        // 2. Draw the red rectangle showing the actual visible area on the zoom side
+        var region = vm.ZoomRegion;
+        var zoomRect = new Rectangle
+        {
+            Stroke = Brushes.Red,
+            StrokeThickness = 2,
+            Width = _actualDisplayWidthNormalized * canvas.Width,
+            Height = _actualDisplayHeightNormalized * canvas.Height,
+            IsHitTestVisible = false
+        };
+
+        Canvas.SetLeft(zoomRect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
+        Canvas.SetTop(zoomRect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
+        zoomRect.ZIndex = 1000;
+        canvas.Children.Add(zoomRect);
     }
 
     protected override bool HandleOverviewClick(ReaderViewModel vm, double x, double y)

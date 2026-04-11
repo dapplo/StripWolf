@@ -1,4 +1,5 @@
 using Avalonia.Media.Imaging;
+using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kom2go.Models;
@@ -32,6 +33,8 @@ public partial class ReaderViewModel : ViewModelBase
     private int _currentPage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
+    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Bitmap? _currentPageImage;
 
     [ObservableProperty]
@@ -61,6 +64,7 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isTwoPageMode;
 
     private bool _isLoadingPage;
+    private int _lastLoadedPageIndex = -1;
     private bool _shouldSelectLastPanel;
 
     public bool HasPreviousPage => CurrentPage > 0;
@@ -103,6 +107,8 @@ public partial class ReaderViewModel : ViewModelBase
     
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
+    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
+    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Handedness _handedness = Handedness.RightHanded;
     
     [ObservableProperty]
@@ -131,6 +137,17 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDetectingPanels;
     
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
+    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
+    private bool _compactOverview;
+
+    public GridLength LeftColumnWidth => IsOverviewOnLeft ? OverviewGridLength : ZoomGridLength;
+    public GridLength RightColumnWidth => IsOverviewOnLeft ? ZoomGridLength : OverviewGridLength;
+
+    private GridLength OverviewGridLength => CompactOverview ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
+    private GridLength ZoomGridLength => new GridLength(1, GridUnitType.Star);
+
     public bool IsNormalMode => ReadingMode == ReadingMode.Normal;
     public bool IsZoomedMode => ReadingMode == ReadingMode.Zoomed;
     public bool IsGuidedMode => ReadingMode == ReadingMode.Guided;
@@ -225,6 +242,7 @@ public partial class ReaderViewModel : ViewModelBase
             var settings = _settingsService.LoadSettings();
             ReadingMode = settings.PreferredReadingMode;
             Handedness = settings.Handedness;
+            CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
             
             Comic = await _libraryService.GetComicAsync(ComicId);
@@ -294,94 +312,93 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        // Capture current index to ensure panel detection is tied to the correct page
-        int pageIndex = CurrentPage;
-
-        // Validate page index is within range
-        if (Comic.PageCount == 0)
+        while (_lastLoadedPageIndex != CurrentPage)
         {
-            ErrorMessage = "Comic has no pages";
-            return;
-        }
+            // Capture current index
+            int pageIndex = CurrentPage;
 
-        // Ensure CurrentPage is within valid bounds
-        if (pageIndex < 0 || pageIndex >= Comic.PageCount)
-        {
-            pageIndex = Math.Max(0, Math.Min(pageIndex, Comic.PageCount - 1));
-            CurrentPage = pageIndex;
-        }
-
-        _isLoadingPage = true;
-        IsBusy = true;
-        try
-        {
-            // Store page data for panel detection in guided mode
-            byte[]? pageData = null;
-            
-            if (IsTwoPageMode)
+            // Validate page index is within range
+            if (Comic.PageCount == 0)
             {
-                // Load two pages for two-page mode
-                var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
-                using var leftStream = new MemoryStream(leftPageData);
-                var newLeftBitmap = new Bitmap(leftStream);
-                var oldLeftBitmap = LeftPageImage;
-                LeftPageImage = newLeftBitmap;
-                oldLeftBitmap?.Dispose();
+                ErrorMessage = "Comic has no pages";
+                return;
+            }
+
+            _isLoadingPage = true;
+            IsBusy = true;
+            try
+            {
+                // Store page data for panel detection in guided mode
+                byte[]? pageData = null;
                 
-                // Also update the single page image for consistency
-                CurrentPageImage = LeftPageImage;
-                pageData = leftPageData;
-                
-                // Load right page if available
-                if (pageIndex + 1 < Comic.PageCount)
+                if (IsTwoPageMode)
                 {
-                    var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex + 1);
-                    using var rightStream = new MemoryStream(rightPageData);
-                    var newRightBitmap = new Bitmap(rightStream);
-                    var oldRightBitmap = RightPageImage;
-                    RightPageImage = newRightBitmap;
-                    oldRightBitmap?.Dispose();
+                    // Load two pages for two-page mode
+                    var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                    using var leftStream = new MemoryStream(leftPageData);
+                    var newLeftBitmap = new Bitmap(leftStream);
+                    var oldLeftBitmap = LeftPageImage;
+                    LeftPageImage = newLeftBitmap;
+                    oldLeftBitmap?.Dispose();
+                    
+                    // Also update the single page image for consistency
+                    CurrentPageImage = LeftPageImage;
+                    pageData = leftPageData;
+                    
+                    // Load right page if available
+                    if (pageIndex + 1 < Comic.PageCount)
+                    {
+                        var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex + 1);
+                        using var rightStream = new MemoryStream(rightPageData);
+                        var newRightBitmap = new Bitmap(rightStream);
+                        var oldRightBitmap = RightPageImage;
+                        RightPageImage = newRightBitmap;
+                        oldRightBitmap?.Dispose();
+                    }
+                    else
+                    {
+                        var oldRightBitmap = RightPageImage;
+                        RightPageImage = null;
+                        oldRightBitmap?.Dispose();
+                    }
                 }
                 else
                 {
-                    var oldRightBitmap = RightPageImage;
-                    RightPageImage = null;
-                    oldRightBitmap?.Dispose();
+                    // Single page mode
+                    pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                    using var stream = new MemoryStream(pageData);
+                    
+                    // Create new bitmap first, then dispose old one to avoid memory leak
+                    var newBitmap = new Bitmap(stream);
+                    var oldBitmap = CurrentPageImage;
+                    CurrentPageImage = newBitmap;
+                    oldBitmap?.Dispose();
                 }
-            }
-            else
-            {
-                // Single page mode
-                pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
-                using var stream = new MemoryStream(pageData);
                 
-                // Create new bitmap first, then dispose old one to avoid memory leak
-                var newBitmap = new Bitmap(stream);
-                var oldBitmap = CurrentPageImage;
-                CurrentPageImage = newBitmap;
-                oldBitmap?.Dispose();
+                // If in guided mode, detect panels
+                if (ReadingMode == ReadingMode.Guided && pageData is not null)
+                {
+                    await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
+                }
+                
+                // Pre-detect panels for next page in background if in guided mode
+                if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
+                {
+                    _ = PreDetectNextPagePanelsAsync(pageIndex + 1);
+                }
+
+                _lastLoadedPageIndex = pageIndex;
             }
-            
-            // If in guided mode, detect panels
-            if (ReadingMode == ReadingMode.Guided && pageData is not null)
+            catch (Exception ex)
             {
-                await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
+                ErrorMessage = $"Failed to load page: {ex.Message}";
+                _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
             }
-            
-            // Pre-detect panels for next page in background if in guided mode
-            if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
+            finally
             {
-                _ = PreDetectNextPagePanelsAsync(pageIndex + 1);
+                _isLoadingPage = false;
+                IsBusy = false;
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Failed to load page: {ex.Message}";
-        }
-        finally
-        {
-            _isLoadingPage = false;
-            IsBusy = false;
         }
     }
 

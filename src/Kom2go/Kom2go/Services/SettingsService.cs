@@ -318,6 +318,11 @@ public class AppSettings
     public double DefaultZoomRegionSize { get; set; } = 0.3;
 
     /// <summary>
+    /// Whether to use compact overview in zoomed/guided reading mode (saves screen space)
+    /// </summary>
+    public bool CompactOverview { get; set; } = false;
+
+    /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
     public AppSettings Clone()
@@ -343,7 +348,8 @@ public class AppSettings
             UseSystemLanguage = UseSystemLanguage,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,
-            DefaultZoomRegionSize = DefaultZoomRegionSize
+            DefaultZoomRegionSize = DefaultZoomRegionSize,
+            CompactOverview = CompactOverview
         };
     }
 }

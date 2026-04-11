@@ -68,6 +68,9 @@ public partial class SettingsViewModel : ViewModelBase
     
     [ObservableProperty]
     private Handedness _selectedHandedness = Handedness.RightHanded;
+
+    [ObservableProperty]
+    private bool _compactOverview;
     
     /// <summary>
     /// Available reading modes
@@ -139,6 +142,17 @@ public partial class SettingsViewModel : ViewModelBase
         // Load reading mode settings
         SelectedReadingMode = _appSettings.PreferredReadingMode;
         SelectedHandedness = _appSettings.Handedness;
+        CompactOverview = _appSettings.CompactOverview;
+    }
+
+    partial void OnCompactOverviewChanged(bool value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.CompactOverview = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
     }
 
     partial void OnSelectedLanguageChanged(LanguageOption value)
