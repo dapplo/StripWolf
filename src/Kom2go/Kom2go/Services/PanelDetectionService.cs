@@ -10,18 +10,11 @@ namespace Kom2go.Services;
 /// </summary>
 public class PanelDetectionService
 {
-    // Cache for detected panels per comic file
     private readonly Dictionary<string, Dictionary<int, PagePanelInfo>> _cache = new();
     private readonly object _cacheLock = new();
     
-    /// <summary>
-    /// Minimum panel width/height ratio relative to page size
-    /// </summary>
     private const double MinPanelSizeRatio = 0.04;
 
-    /// <summary>
-    /// Detect panels on a comic page
-    /// </summary>
     public async Task<PagePanelInfo> DetectPanelsAsync(string comicFilePath, int pageIndex, byte[] pageData, bool isManga = false)
     {
         lock (_cacheLock)
@@ -56,18 +49,12 @@ public class PanelDetectionService
     
     public void ClearCache(string comicFilePath)
     {
-        lock (_cacheLock)
-        {
-            _cache.Remove(comicFilePath);
-        }
+        lock (_cacheLock) { _cache.Remove(comicFilePath); }
     }
     
     public void ClearAllCache()
     {
-        lock (_cacheLock)
-        {
-            _cache.Clear();
-        }
+        lock (_cacheLock) { _cache.Clear(); }
     }
     
     public bool IsCached(string comicFilePath, int pageIndex)
@@ -88,18 +75,18 @@ public class PanelDetectionService
             using var src = Mat.FromImageData(pageData, ImreadModes.Color);
             if (src.Empty()) throw new Exception("Failed to load image");
 
-            int imageWidth = src.Width;
-            int imageHeight = src.Height;
-            double pageArea = imageWidth * imageHeight;
+            int imgW = src.Width;
+            int imgH = src.Height;
+            double pageArea = (double)imgW * imgH;
 
-            // 1. Grayscale & Noise Reduction
+            // 1. Pre-processing: Grayscale + Bilateral Filter
             using var grayFull = new Mat();
             Cv2.CvtColor(src, grayFull, ColorConversionCodes.BGR2GRAY);
             
-            // Add a small white border to ensure edge-touching panels have a "gutter" to detect
-            int padding = 10;
+            // Add white padding so edge-touching panels have a detectable boundary
+            int pad = 15;
             using var gray = new Mat();
-            Cv2.CopyMakeBorder(grayFull, gray, padding, padding, padding, padding, BorderTypes.Constant, Scalar.White);
+            Cv2.CopyMakeBorder(grayFull, gray, pad, pad, pad, pad, BorderTypes.Constant, Scalar.White);
 
             using var blurred = new Mat();
             Cv2.BilateralFilter(gray, blurred, 9, 75, 75);
@@ -114,70 +101,65 @@ public class PanelDetectionService
             using var combined = new Mat();
             Cv2.BitwiseOr(edges, thresh, combined);
 
-            // 3. Precise Morphology
+            // 3. Morphology: Surgical kernel to bridge gaps but keep gutters
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
             using var morph = new Mat();
             Cv2.MorphologyEx(combined, morph, MorphTypes.Close, kernel, iterations: 1);
             
-            using var dilated = new Mat();
-            Cv2.Dilate(morph, dilated, kernel, iterations: 1);
-
-            // 4. Contour Analysis
-            // Use CComp to get all contours, then filter by size and solidity. 
-            // This is more robust against edge-touching panels that might be wrapped in a page-level contour.
-            Cv2.FindContours(dilated, out var contours, out var hierarchy, RetrievalModes.CComp, ContourApproximationModes.ApproxSimple);
+            // 4. Hierarchical Contour Analysis (CComp)
+            Cv2.FindContours(morph, out var contours, out var hierarchy, RetrievalModes.CComp, ContourApproximationModes.ApproxSimple);
 
             var candidates = new List<ComicPanel>();
-            double minW = imageWidth * MinPanelSizeRatio;
-            double minH = imageHeight * MinPanelSizeRatio;
+            double minW = imgW * MinPanelSizeRatio;
+            double minH = imgH * MinPanelSizeRatio;
 
             for (int i = 0; i < contours.Length; i++)
             {
-                var contour = contours[i];
-                var rect = Cv2.BoundingRect(contour);
+                // CComp Hierarchy: [Next, Previous, First_Child, Parent]
+                // We only want top-level components (Parent == -1)
+                // This ignores text/details that are inside a frame
+                if (hierarchy[i].Parent != -1) continue;
+
+                var rect = Cv2.BoundingRect(contours[i]);
                 
-                // Adjust for padding
-                int adjX = rect.X - padding;
-                int adjY = rect.Y - padding;
+                // Remove padding
+                int adjX = rect.X - pad;
+                int adjY = rect.Y - pad;
                 int adjW = rect.Width;
                 int adjH = rect.Height;
 
-                // Clamp to image bounds
+                // Clamp to original bounds
                 if (adjX < 0) { adjW += adjX; adjX = 0; }
                 if (adjY < 0) { adjH += adjY; adjY = 0; }
-                if (adjX + adjW > imageWidth) adjW = imageWidth - adjX;
-                if (adjY + adjH > imageHeight) adjH = imageHeight - adjY;
+                if (adjX + adjW > imgW) adjW = imgW - adjX;
+                if (adjY + adjH > imgH) adjH = imgH - adjY;
 
-                double area = Cv2.ContourArea(contour);
+                double area = Cv2.ContourArea(contours[i]);
                 double rectArea = (double)rect.Width * rect.Height;
                 
-                // Filtering
                 if (adjW < minW || adjH < minH) continue;
-                if (rectArea < pageArea * 0.01) continue;
-                
-                // Filter out panels that are basically the whole page
-                if (adjW > imageWidth * 0.98 && adjH > imageHeight * 0.98) continue;
+                if (rectArea < pageArea * 0.015) continue; // Slightly stricter area
+                if (adjW > imgW * 0.98 && adjH > imgH * 0.98) continue; // Whole page is splash
 
-                // Solidity Check: Panels are rectangular. 
-                // We use a slightly lower threshold (0.65) to be inclusive of stylized panels.
+                // Solidity Check: Panels are rectangular boxes
                 double solidity = area / rectArea;
-                if (solidity < 0.65) continue; 
+                if (solidity < 0.80) continue; // Stricter solidity to ignore non-boxes
 
                 candidates.Add(new ComicPanel
                 {
                     PageIndex = pageIndex,
-                    X = (double)adjX / imageWidth,
-                    Y = (double)adjY / imageHeight,
-                    Width = (double)adjW / imageWidth,
-                    Height = (double)adjH / imageHeight,
-                    Confidence = solidity * 0.9
+                    X = (double)adjX / imgW,
+                    Y = (double)adjY / imgH,
+                    Width = (double)adjW / imgW,
+                    Height = (double)adjH / imgH,
+                    Confidence = solidity
                 });
             }
 
-            // 5. Clean up Overlaps and Nested Panels
+            // 5. Filter overlaps and small artifacts
             var panels = FilterOverlappingPanels(candidates);
 
-            // 6. Sort and Index
+            // 6. Final Reading Order
             var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
             for (int i = 0; i < sortedPanels.Count; i++) sortedPanels[i].PanelIndex = i;
 
@@ -204,7 +186,6 @@ public class PanelDetectionService
     {
         if (candidates.Count <= 1) return candidates;
 
-        // Sort by area descending
         var sorted = candidates.OrderByDescending(p => p.Width * p.Height).ToList();
         var result = new List<ComicPanel>();
 
@@ -213,26 +194,14 @@ public class PanelDetectionService
             bool keep = true;
             foreach (var existing in result)
             {
-                // Is p almost the same as existing?
-                if (Math.Abs(p.X - existing.X) < 0.03 &&
-                    Math.Abs(p.Y - existing.Y) < 0.03 &&
-                    Math.Abs(p.Width - existing.Width) < 0.03 &&
-                    Math.Abs(p.Height - existing.Height) < 0.03)
+                // Exact duplication or very close overlap
+                if (Math.Abs(p.X - existing.X) < 0.02 && Math.Abs(p.Y - existing.Y) < 0.02 &&
+                    Math.Abs(p.Width - existing.Width) < 0.02 && Math.Abs(p.Height - existing.Height) < 0.02)
                 {
                     keep = false;
                     break;
                 }
                 
-                // Is p entirely inside existing?
-                if (p.X >= existing.X - 0.005 && 
-                    p.Y >= existing.Y - 0.005 && 
-                    p.X + p.Width <= existing.X + existing.Width + 0.005 && 
-                    p.Y + p.Height <= existing.Y + existing.Height + 0.005)
-                {
-                    keep = false;
-                    break;
-                }
-
                 // Intersection over Area check
                 double x1 = Math.Max(p.X, existing.X);
                 double y1 = Math.Max(p.Y, existing.Y);
@@ -243,18 +212,16 @@ public class PanelDetectionService
                 {
                     double intersectionArea = (x2 - x1) * (y2 - y1);
                     double pArea = p.Width * p.Height;
-                    // If more than 80% of p is covered by existing, it's likely a sub-panel or artifact
-                    if (intersectionArea / pArea > 0.8)
+                    // If p is 70% inside existing, it's likely redundant
+                    if (intersectionArea / pArea > 0.7)
                     {
                         keep = false;
                         break;
                     }
                 }
             }
-
             if (keep) result.Add(p);
         }
-
         return result;
     }
 
@@ -268,11 +235,10 @@ public class PanelDetectionService
         while (remaining.Count > 0)
         {
             var topPanel = remaining[0];
-            // Identify panels in the same row (vertical overlap with the center of the top-most panel)
             double rowCenterY = topPanel.Y + topPanel.Height / 2;
-            var row = remaining.Where(p => p.Y < rowCenterY && (p.Y + p.Height) > rowCenterY).ToList();
             
-            // If row logic fails, just take the top one
+            // Panels in the same visual row
+            var row = remaining.Where(p => p.Y < rowCenterY && (p.Y + p.Height) > rowCenterY).ToList();
             if (row.Count == 0) row = new List<ComicPanel> { topPanel };
 
             var sortedRow = isManga 
@@ -297,12 +263,8 @@ public class PanelDetectionService
             {
                 new ComicPanel
                 {
-                    PageIndex = pageIndex,
-                    PanelIndex = 0,
-                    X = 0,
-                    Y = 0,
-                    Width = 1,
-                    Height = 1,
+                    PageIndex = pageIndex, PanelIndex = 0,
+                    X = 0, Y = 0, Width = 1, Height = 1,
                     Confidence = confidence
                 }
             }

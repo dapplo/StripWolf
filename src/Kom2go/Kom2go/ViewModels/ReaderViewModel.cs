@@ -238,6 +238,11 @@ public partial class ReaderViewModel : ViewModelBase
             IsBusy = true;
             ErrorMessage = null;
             
+            // Clear previous comic data
+            _panelDetectionService.ClearAllCache();
+            _comicReaderService.ClearCache();
+            _lastLoadedPageIndex = -1;
+            
             // Load reading mode preferences
             var settings = _settingsService.LoadSettings();
             ReadingMode = settings.PreferredReadingMode;

@@ -12,6 +12,9 @@ namespace Kom2go.Services;
 /// </summary>
 public class ComicReaderService
 {
+    private readonly Dictionary<(string, int), byte[]> _pageCache = new();
+    private readonly object _cacheLock = new();
+
     /// <summary>
     /// Gets the format of a comic file based on its extension
     /// </summary>
@@ -76,9 +79,17 @@ public class ComicReaderService
     /// </summary>
     public async Task<byte[]> GetPageAsync(string filePath, int pageIndex)
     {
+        lock (_cacheLock)
+        {
+            if (_pageCache.TryGetValue((filePath, pageIndex), out var cached))
+            {
+                return cached;
+            }
+        }
+
         var format = GetComicFormat(filePath);
         
-        return format switch
+        byte[] data = format switch
         {
             ComicFormat.Cbz => await GetCbzPageAsync(filePath, pageIndex),
             ComicFormat.Cbr => await GetCbrPageAsync(filePath, pageIndex),
@@ -86,6 +97,21 @@ public class ComicReaderService
             ComicFormat.Cbt => await GetCbtPageAsync(filePath, pageIndex),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
+
+        lock (_cacheLock)
+        {
+            _pageCache[(filePath, pageIndex)] = data;
+        }
+
+        return data;
+    }
+
+    public void ClearCache()
+    {
+        lock (_cacheLock)
+        {
+            _pageCache.Clear();
+        }
     }
 
     /// <summary>
