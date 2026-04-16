@@ -209,6 +209,12 @@ public partial class ReaderViewModel : ViewModelBase
     
     public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
 
+    public bool IsDebug => 
+#if DEBUG
+        true;
+#else
+        false;
+#endif
 
     /// <summary>
     /// Event raised when the reader should be closed
@@ -228,6 +234,42 @@ public partial class ReaderViewModel : ViewModelBase
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
         Title = "Reader";
+    }
+
+    [RelayCommand]
+    private async Task SaveCurrentPageAsync()
+    {
+        if (Comic is null) return;
+
+        try
+        {
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var imagesDir = Path.Combine(appDir, "images");
+            if (!Directory.Exists(imagesDir))
+            {
+                Directory.CreateDirectory(imagesDir);
+            }
+
+            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            var pageNames = await _comicReaderService.GetPageNamesAsync(Comic.FilePath);
+            var extension = ".jpg"; // Default
+            if (pageNames.Count > CurrentPage)
+            {
+                extension = Path.GetExtension(pageNames[CurrentPage]);
+            }
+
+            var fileName = $"{Path.GetFileNameWithoutExtension(Comic.FilePath)}_p{CurrentPage}{extension}";
+            var filePath = Path.Combine(imagesDir, fileName);
+
+            await File.WriteAllBytesAsync(filePath, pageData);
+            
+            // Optional: Provide some feedback, though not strictly requested
+            System.Diagnostics.Debug.WriteLine($"Saved page to: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to save page: {ex.Message}");
+        }
     }
 
     public async Task LoadComicAsync(int comicId)
@@ -618,6 +660,73 @@ public partial class ReaderViewModel : ViewModelBase
         
         // If switching to guided mode, detect panels
         if (ReadingMode == ReadingMode.Guided && Comic is not null)
+        {
+            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
+        }
+        
+        // Notify properties that depend on reading mode
+        OnPropertyChanged(nameof(HasPreviousPanel));
+        OnPropertyChanged(nameof(HasNextPanel));
+        OnPropertyChanged(nameof(CurrentPanelDisplay));
+    }
+    
+    /// <summary>
+    /// Set reading mode to Normal
+    /// </summary>
+    [RelayCommand]
+    private void SetNormalMode()
+    {
+        ReadingMode = ReadingMode.Normal;
+        
+        // Disable two-page mode when switching to zoomed or guided
+        if (!IsNormalMode && IsTwoPageMode)
+        {
+            IsTwoPageMode = false;
+        }
+        
+        // Notify properties that depend on reading mode
+        OnPropertyChanged(nameof(HasPreviousPanel));
+        OnPropertyChanged(nameof(HasNextPanel));
+        OnPropertyChanged(nameof(CurrentPanelDisplay));
+    }
+    
+    /// <summary>
+    /// Set reading mode to Zoomed
+    /// </summary>
+    [RelayCommand]
+    private void SetZoomedMode()
+    {
+        ReadingMode = ReadingMode.Zoomed;
+        
+        // Disable two-page mode when switching to zoomed or guided
+        if (!IsNormalMode && IsTwoPageMode)
+        {
+            IsTwoPageMode = false;
+        }
+        
+        // Notify properties that depend on reading mode
+        OnPropertyChanged(nameof(HasPreviousPanel));
+        OnPropertyChanged(nameof(HasNextPanel));
+        OnPropertyChanged(nameof(CurrentPanelDisplay));
+    }
+    
+    /// <summary>
+    /// Set reading mode to Guided
+    /// </summary>
+    [RelayCommand]
+    private async Task SetGuidedModeAsync()
+    {
+        ReadingMode = ReadingMode.Guided;
+        
+        // Disable two-page mode when switching to zoomed or guided
+        if (!IsNormalMode && IsTwoPageMode)
+        {
+            IsTwoPageMode = false;
+        }
+        
+        // If switching to guided mode, detect panels
+        if (Comic is not null)
         {
             var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);

@@ -7,6 +7,25 @@
              Background="Black"
              Focusable="True">
   
+  <UserControl.Styles>
+    <Style Selector="Button.reading-mode">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Margin" Value="4,0"/>
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <Style Selector="Button.reading-mode:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#44FFFFFF"/>
+    </Style>
+    <Style Selector="Button.reading-mode.active">
+      <Setter Property="Background" Value="Red"/>
+    </Style>
+    <Style Selector="Button.reading-mode.active /template/ ContentPresenter">
+      <Setter Property="Background" Value="Red"/>
+    </Style>
+  </UserControl.Styles>
+
   <Grid>
     <!-- Content Area: Swaps based on ReadingMode -->
     <Panel>
@@ -24,42 +43,66 @@
     <!-- Top Controls -->
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
         <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackCommand}" 
                 Background="Transparent" Foreground="White"/>
         <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
                    VerticalAlignment="Center" HorizontalAlignment="Center"
                    TextTrimming="CharacterEllipsis" Margin="16,0"/>
         
-        <Button Grid.Column="2" Command="{Binding ToggleInfoPanelCommand}"
+        <!-- Save Page Button (Debug Only) -->
+        <Button Grid.Column="2" Command="{Binding SaveCurrentPageCommand}"
+                IsVisible="{Binding IsDebug}"
+                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Save Original Page (Debug)">
+          <TextBlock Text="💾" FontSize="24"/>
+        </Button>
+        
+        <Button Grid.Column="3" Command="{Binding ToggleInfoPanelCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Info (I)">
           <TextBlock Text="ⓘ" FontSize="24"/>
         </Button>
         
-        <Button Grid.Column="3" Command="{Binding CycleReadingModeCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Mode (M)">
-          <TextBlock Text="{Binding NextReadingModeIcon}" FontSize="24"/>
-        </Button>
+        <!-- Reading Modes -->
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center">
+          <Button Classes="reading-mode" 
+                  Classes.active="{Binding IsNormalMode}"
+                  Command="{Binding SetNormalModeCommand}"
+                  ToolTip.Tip="Normal Mode">
+            <TextBlock Text="▯" FontSize="20"/>
+          </Button>
+          <Button Classes="reading-mode" 
+                  Classes.active="{Binding IsZoomedMode}"
+                  Command="{Binding SetZoomedModeCommand}"
+                  ToolTip.Tip="Zoomed Mode">
+            <TextBlock Text="🔍" FontSize="20"/>
+          </Button>
+          <Button Classes="reading-mode" 
+                  Classes.active="{Binding IsGuidedMode}"
+                  Command="{Binding SetGuidedModeCommand}"
+                  ToolTip.Tip="Guided Mode">
+            <TextBlock Text="⊞" FontSize="20"/>
+          </Button>
+        </StackPanel>
         
-        <Button Grid.Column="4" Command="{Binding ToggleHandednessCommand}"
+        <Button Grid.Column="5" Command="{Binding ToggleHandednessCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Handedness"
                 IsEnabled="{Binding !IsNormalMode}">
           <TextBlock Text="🤚" FontSize="24"/>
         </Button>
         
-        <Button Grid.Column="5" Command="{Binding ToggleTwoPageModeCommand}"
+        <Button Grid.Column="6" Command="{Binding ToggleTwoPageModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Two-Page (2)"
                 IsEnabled="{Binding CanUseTwoPageMode}">
           <TextBlock Text="{Binding TwoPageModeIcon}" FontSize="24"/>
         </Button>
         
-        <Button Grid.Column="6" Command="{Binding CycleStretchModeCommand}"
+        <Button Grid.Column="7" Command="{Binding CycleStretchModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Fit Mode"
                 IsEnabled="{Binding IsNormalMode}">
           <TextBlock Text="{Binding StretchModeIcon}" FontSize="24"/>
         </Button>
         
-        <Button Grid.Column="7" Command="{Binding ToggleFullScreenCommand}"
+        <Button Grid.Column="8" Command="{Binding ToggleFullScreenCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="Full Screen (F)">
           <TextBlock Text="⛶" FontSize="24"/>
         </Button>

@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.IO.Pipelines;
+using System.Buffers;
 using Kom2go.Models;
 using Kom2go.Models.Komga;
 
@@ -129,11 +131,11 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync("api/v1/libraries");
+        var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<KomgaLibrary>>(json, _jsonOptions) ?? [];
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<List<KomgaLibrary>>(stream, _jsonOptions) ?? [];
     }
 
     #endregion
@@ -158,11 +160,11 @@ public class KomgaApiService : IDisposable
             url += $"&search={encodedPrefix}";
         }
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaSeries>>(json, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
     }
 
     /// <summary>
@@ -175,11 +177,11 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/series?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaSeries>>(json, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
     }
 
     /// <summary>
@@ -192,11 +194,11 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/books?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -206,7 +208,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}");
+        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -214,8 +216,8 @@ public class KomgaApiService : IDisposable
         
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaSeries>(json, _jsonOptions);
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaSeries>(stream, _jsonOptions);
     }
 
     /// <summary>
@@ -247,11 +249,11 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}");
+        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -267,11 +269,11 @@ public class KomgaApiService : IDisposable
             url += $"&library_id={libraryId}";
         }
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -281,7 +283,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}");
+        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -289,8 +291,8 @@ public class KomgaApiService : IDisposable
         
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaBook>(json, _jsonOptions);
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaBook>(stream, _jsonOptions);
     }
 
     /// <summary>
@@ -318,11 +320,11 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages");
+        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<KomgaPageInfo>>(json, _jsonOptions) ?? [];
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<List<KomgaPageInfo>>(stream, _jsonOptions) ?? [];
     }
 
     /// <summary>
@@ -332,7 +334,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}");
+        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}", HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -361,7 +363,7 @@ public class KomgaApiService : IDisposable
     }
 
     /// <summary>
-    /// Downloads a book file to a local path
+    /// Downloads a book file to a local path using System.IO.Pipelines for maximum performance.
     /// </summary>
     public async Task<bool> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null)
     {
@@ -379,26 +381,44 @@ public class KomgaApiService : IDisposable
         var totalBytes = response.Content.Headers.ContentLength ?? 0;
         var bytesRead = 0L;
         
+        await using var contentStream = await response.Content.ReadAsStreamAsync();
+        await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
+        
+        var reader = PipeReader.Create(contentStream);
+        var writer = PipeWriter.Create(fileStream);
+
+        while (true)
         {
-            await using var contentStream = await response.Content.ReadAsStreamAsync();
-            await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-            
-            var buffer = new byte[8192];
-            int read;
-            
-            while ((read = await contentStream.ReadAsync(buffer)) > 0)
+            var result = await reader.ReadAsync();
+            var buffer = result.Buffer;
+
+            if (buffer.IsEmpty && result.IsCompleted)
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, read));
-                bytesRead += read;
+                break;
+            }
+
+            foreach (var segment in buffer)
+            {
+                await writer.WriteAsync(segment);
+                bytesRead += segment.Length;
                 
                 if (totalBytes > 0)
                 {
                     progress?.Report((double)bytesRead / totalBytes);
                 }
             }
-            
-            await fileStream.FlushAsync();
+
+            reader.AdvanceTo(buffer.End);
+
+            if (result.IsCompleted)
+            {
+                break;
+            }
         }
+
+        await writer.FlushAsync();
+        await writer.CompleteAsync();
+        await reader.CompleteAsync();
         
         return true;
     }
@@ -462,11 +482,11 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/readlists?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaReadList>>(json, _jsonOptions) ?? new KomgaPage<KomgaReadList>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaReadList>>(stream, _jsonOptions) ?? new KomgaPage<KomgaReadList>();
     }
 
     /// <summary>
@@ -476,7 +496,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}");
+        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -484,8 +504,8 @@ public class KomgaApiService : IDisposable
         
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaReadList>(json, _jsonOptions);
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaReadList>(stream, _jsonOptions);
     }
 
     /// <summary>
@@ -513,11 +533,11 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}");
+        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -545,11 +565,11 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books?page={page}&size={size}&read_status=IN_PROGRESS&sort=readProgress.lastModified,desc";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -561,11 +581,11 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/ondeck?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -577,11 +597,11 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaBook>>(json, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -593,11 +613,11 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/series/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url);
+        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<KomgaPage<KomgaSeries>>(json, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        using var stream = await response.Content.ReadAsStreamAsync();
+        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
     }
 
     #endregion

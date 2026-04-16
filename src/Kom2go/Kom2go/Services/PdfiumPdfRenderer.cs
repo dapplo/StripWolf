@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Buffers;
 using PDFiumCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -299,19 +300,24 @@ public class PdfiumPdfRenderer : IPdfRenderer
             var buffer = fpdfview.FPDFBitmapGetBuffer(bitmap);
             var stride = fpdfview.FPDFBitmapGetStride(bitmap);
 
-            // Copy bitmap data to managed array
+            // Copy bitmap data to rented array from pool to avoid LOH allocations
             var dataSize = stride * heightInPixels;
-            var pixelData = new byte[dataSize];
-            System.Runtime.InteropServices.Marshal.Copy(buffer, pixelData, 0, dataSize);
+            var pixelData = ArrayPool<byte>.Shared.Rent(dataSize);
+            
+            try
+            {
+                System.Runtime.InteropServices.Marshal.Copy(buffer, pixelData, 0, dataSize);
 
-            // Convert BGRA to RGBA for ImageSharp using Span for better performance
-            ConvertBgraToRgba(pixelData);
-
-            // Save as JPG using ImageSharp
-            using var image = Image.LoadPixelData<Rgba32>(pixelData, widthInPixels, heightInPixels);
-            var outputPath = Path.Combine(outputDir, $"{pageIndex + 1:D5}.jpg");
-            var encoder = new JpegEncoder { Quality = JpegQuality };
-            image.Save(outputPath, encoder);
+                // Load as BGRA since that is what PDFium returns. This avoids a manual R/B swap.
+                using var image = Image.LoadPixelData<Bgra32>(pixelData.AsSpan(0, dataSize), widthInPixels, heightInPixels);
+                var outputPath = Path.Combine(outputDir, $"{pageIndex + 1:D5}.jpg");
+                var encoder = new JpegEncoder { Quality = JpegQuality };
+                image.Save(outputPath, encoder);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(pixelData);
+            }
         }
         finally
         {
@@ -320,18 +326,6 @@ public class PdfiumPdfRenderer : IPdfRenderer
                 fpdfview.FPDFBitmapDestroy(bitmap);
             }
             fpdfview.FPDF_ClosePage(page);
-        }
-    }
-
-    /// <summary>
-    /// Converts pixel data from BGRA to RGBA format in-place
-    /// </summary>
-    private static void ConvertBgraToRgba(Span<byte> pixelData)
-    {
-        for (var i = 0; i < pixelData.Length; i += 4)
-        {
-            // Swap B and R channels (indices 0 and 2)
-            (pixelData[i], pixelData[i + 2]) = (pixelData[i + 2], pixelData[i]);
         }
     }
 }

@@ -207,16 +207,20 @@ public class AsyncImage : Control
             
             if (response.IsSuccessStatusCode)
             {
-                var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                using var stream = new MemoryStream(bytes);
+                var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 
                 // Create bitmap on UI thread to ensure proper disposal
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!cancellationToken.IsCancellationRequested)
                     {
+                        // Bitmap constructor takes ownership of the stream and disposes it
                         _loadedBitmap = new Bitmap(stream);
                         InvalidateVisual();
+                    }
+                    else
+                    {
+                        stream.Dispose();
                     }
                 });
             }
