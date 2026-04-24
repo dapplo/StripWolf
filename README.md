@@ -1,4 +1,8 @@
-# Kom2go
+<div align="center">
+  <img src="StripFlow.png" alt="StripWolf Logo" width="300" />
+  <h1>StripWolf</h1>
+  <p><i>As comics are called strips in Dutch, and follow a flow, Wolf is the reverse of flow.</i></p>
+</div>
 
 A cross-platform comic book reader built with Avalonia UI that supports offline reading and Komga integration.
 
@@ -45,9 +49,9 @@ Comics can contain images in the following formats:
 
 ### Android APK
 
-Download the latest APK from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
+Download the latest APK from the [Releases](https://github.com/dapplo/StripWolf/releases) page:
 
-1. Download `Kom2go-Android.apk` from the latest release
+1. Download `StripWolf-Android.apk` from the latest release
 2. On your Android device, enable "Install from unknown sources" in Settings > Security
 3. Open the downloaded APK file and follow the installation prompts
 4. The app is now ready to use
@@ -56,27 +60,27 @@ Download the latest APK from the [Releases](https://github.com/dapplo/Kom2go/rel
 
 ### Windows
 
-Download the `Kom2go-Windows-x64.zip` from the [Releases](https://github.com/dapplo/Kom2go/releases) page and extract it to your preferred location.
+Download the `StripWolf-Windows-x64.zip` from the [Releases](https://github.com/dapplo/StripWolf/releases) page and extract it to your preferred location.
 
 ### Linux
 
-Download the `Kom2go-Linux-x64.tar.gz` from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
+Download the `StripWolf-Linux-x64.tar.gz` from the [Releases](https://github.com/dapplo/StripWolf/releases) page:
 
 ```bash
-mkdir -p ~/kom2go
-tar -xzvf Kom2go-Linux-x64.tar.gz -C ~/kom2go
-chmod +x ~/kom2go/Kom2go.Desktop
+mkdir -p ~/StripWolf
+tar -xzvf StripWolf-Linux-x64.tar.gz -C ~/StripWolf
+chmod +x ~/StripWolf/StripWolf.Desktop
 ```
 
 ### macOS
 
-Download the appropriate archive from the [Releases](https://github.com/dapplo/Kom2go/releases) page:
-- **Intel Macs**: `Kom2go-macOS-x64.tar.gz`
-- **Apple Silicon (M1/M2/M3)**: `Kom2go-macOS-arm64.tar.gz`
+Download the appropriate archive from the [Releases](https://github.com/dapplo/StripWolf/releases) page:
+- **Intel Macs**: `StripWolf-macOS-x64.tar.gz`
+- **Apple Silicon (M1/M2/M3)**: `StripWolf-macOS-arm64.tar.gz`
 
 Extract the archive:
 ```bash
-tar -xzvf Kom2go-macOS-*.tar.gz -C ~/Applications
+tar -xzvf StripWolf-macOS-*.tar.gz -C ~/Applications
 ```
 
 **Note**: On first run, you may need to allow the app in System Preferences > Security & Privacy if macOS blocks it.
@@ -90,22 +94,22 @@ tar -xzvf Kom2go-macOS-*.tar.gz -C ~/Applications
 ### Desktop (Windows/Linux/macOS)
 
 ```bash
-cd src/Kom2go
-dotnet build Kom2go.Desktop/Kom2go.Desktop.csproj -c Release
+cd src/StripWolf
+dotnet build StripWolf.Desktop/StripWolf.Desktop.csproj -c Release
 ```
 
 ### Android APK
 
 ```bash
-cd src/Kom2go
-dotnet build Kom2go.Android/Kom2go.Android.csproj -c Release
+cd src/StripWolf
+dotnet build StripWolf.Android/StripWolf.Android.csproj -c Release
 ```
 
 ## Project Structure
 
 ```
-src/Kom2go/
-├── Kom2go/               # Core library (shared code)
+src/StripWolf/
+├── StripWolf/               # Core library (shared code)
 │   ├── Data/             # Database service for local storage
 │   ├── Models/           # Data models (Comic, KomgaServer, etc.)
 │   │   └── Komga/        # Komga API models
@@ -116,8 +120,8 @@ src/Kom2go/
 │   │   └── LibraryService.cs           # Library management
 │   ├── ViewModels/       # MVVM view models
 │   └── Views/            # Avalonia XAML views
-├── Kom2go.Desktop/       # Desktop launcher (Windows/Linux/macOS)
-└── Kom2go.Android/       # Android launcher
+├── StripWolf.Desktop/       # Desktop launcher (Windows/Linux/macOS)
+└── StripWolf.Android/       # Android launcher
 ```
 
 ## Komga API
@@ -150,21 +154,21 @@ To publish this app to the Google Play Store, follow these steps:
 
 ```bash
 keytool -genkeypair -v \
-  -keystore kom2go-release.keystore \
-  -alias kom2go-release \
+  -keystore StripWolf-release.keystore \
+  -alias StripWolf-release \
   -keyalg RSA \
   -keysize 2048 \
   -validity 10000 \
   -storepass YOUR_STORE_PASSWORD \
   -keypass YOUR_KEY_PASSWORD \
-  -dname "CN=Kom2go, OU=Development, O=Your Organization, L=City, ST=State, C=Country"
+  -dname "CN=StripWolf, OU=Development, O=Your Organization, L=City, ST=State, C=Country"
 ```
 
 ### Configure GitHub Secrets (for automated releases)
 
 To use the production keystore with GitHub Actions:
 
-1. Base64 encode your keystore: `base64 -i kom2go-release.keystore -o keystore-base64.txt`
+1. Base64 encode your keystore: `base64 -i StripWolf-release.keystore -o keystore-base64.txt`
 2. Add these secrets to your GitHub repository:
    - `ANDROID_KEYSTORE_BASE64`: Contents of `keystore-base64.txt`
    - `ANDROID_SIGNING_KEY_PASS`: Your key password
@@ -174,14 +178,14 @@ To use the production keystore with GitHub Actions:
 
 For Google Play Store distribution, build an AAB (Android App Bundle) instead of APK:
 
-1. Update `Kom2go.Android.csproj`:
+1. Update `StripWolf.Android.csproj`:
    ```xml
    <AndroidPackageFormat>aab</AndroidPackageFormat>
    ```
 
 2. Build the release:
    ```bash
-   dotnet publish src/Kom2go/Kom2go.Android/Kom2go.Android.csproj -c Release
+   dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release
    ```
 
 ### Upload to Google Play

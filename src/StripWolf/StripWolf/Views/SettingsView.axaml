@@ -1,0 +1,274 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:StripWolf.ViewModels"
+             xmlns:models="using:StripWolf.Models"
+             xmlns:res="using:StripWolf.Resources"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="StripWolf.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  
+  <Grid>
+    <!-- Server List View -->
+    <ScrollViewer IsVisible="{Binding !IsEditing}" Padding="16">
+      <StackPanel Spacing="16">
+        <!-- Header -->
+        <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
+        
+        <!-- Error Message -->
+        <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+        </Border>
+
+        <!-- Komga Servers Section -->
+        <TextBlock Text="{Binding KomgaServers, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+        
+        <!-- Add Server Button -->
+        <Button Content="{Binding AddServer, Source={x:Static res:Loc.Instance}}" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
+
+        <!-- Servers List -->
+        <ItemsControl ItemsSource="{Binding Servers}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:KomgaServer">
+              <Border Padding="16" Margin="0,0,0,8" CornerRadius="8" 
+                      Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
+                      <Border Background="{DynamicResource AccentFillColorDefaultBrush}" 
+                              Padding="6,2" CornerRadius="4" IsVisible="{Binding IsActive}">
+                        <TextBlock Text="{Binding Active, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding BaseUrl}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Text="{Binding Username}" Foreground="Gray" FontSize="12"/>
+                  </StackPanel>
+                  
+                  <Button Grid.Column="1" Content="✓" 
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).SetActiveServerCommand}"
+                          CommandParameter="{Binding}"
+                          IsVisible="{Binding !IsActive}"
+                          Background="Transparent" FontSize="20" Width="44"/>
+                  
+                  <Button Grid.Column="2" Content="✏️"
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditServerCommand}"
+                          CommandParameter="{Binding}"
+                          Background="Transparent" FontSize="16" Width="44"/>
+                  
+                  <Button Grid.Column="3" Content="🗑️"
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteServerCommand}"
+                          CommandParameter="{Binding}"
+                          Background="Transparent" FontSize="16" Width="44"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Empty State -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="32"
+                    IsVisible="{Binding !Servers.Count}">
+          <TextBlock Text="{Binding NoServersConfigured, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center"/>
+          <TextBlock Text="{Binding AddServerHint, Source={x:Static res:Loc.Instance}}"
+                     Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Language Settings Section -->
+        <TextBlock Text="{Binding LanguageSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding Language, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+            <ComboBox ItemsSource="{Binding AvailableLanguages}" 
+                      SelectedItem="{Binding SelectedLanguage}"
+                      HorizontalAlignment="Stretch"
+                      Width="300">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding DisplayName}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="Select a language or use the system default. Changes will take effect after restarting the app."
+                       Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Reading Mode Settings Section -->
+        <TextBlock Text="Reading Settings" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="16">
+            <!-- Reading Mode Selection -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Default Reading Mode" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableReadingModes}" 
+                        SelectedItem="{Binding SelectedReadingMode}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Foreground="Gray" FontSize="12" TextWrapping="Wrap">
+                <Run Text="• Normal: Standard full-page reading"/>
+                <LineBreak/>
+                <Run Text="• Zoomed: Split view with overview and magnified area"/>
+                <LineBreak/>
+                <Run Text="• Guided: Automatic panel detection for scene-by-scene reading"/>
+              </TextBlock>
+            </StackPanel>
+            
+            <!-- Handedness Selection -->
+            <StackPanel Spacing="8">
+              <TextBlock Text="Handedness (for Zoomed/Guided modes)" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableHandednessOptions}" 
+                        SelectedItem="{Binding SelectedHandedness}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Text="Right-handed: Overview on left, zoom on right. Left-handed: Overview on right, zoom on left."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Separator/>
+
+            <!-- Compact Overview Toggle -->
+            <StackPanel Spacing="8">
+              <ToggleSwitch IsChecked="{Binding CompactOverview}" OnContent="Compact Overview Enabled" OffContent="Compact Overview Disabled"/>
+              <TextBlock Text="When enabled, the overview side will only take up as much space as needed by the page aspect ratio, giving more space to the zoomed area."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- About Section -->
+        <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="StripWolf" FontSize="16" FontWeight="Bold"/>
+            <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
+            <TextBlock Text="Version 1.0.0 (Avalonia)" Foreground="Gray" FontSize="12"/>
+            <Button Content="{Binding ViewReleaseNotes, Source={x:Static res:Loc.Instance}}" Command="{Binding ShowReleaseNotesCommand}" 
+                    Background="Transparent" Padding="0" Margin="0,8,0,0"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Release Notes Section (shown when clicking the button) -->
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                Margin="0,8,0,0" IsVisible="{Binding IsReleaseNotesVisible}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding ReleaseNotes, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="Bold"/>
+              <Button Grid.Column="1" Content="✕" Padding="4,2" Background="Transparent"
+                      Command="{Binding HideReleaseNotesCommand}"/>
+            </Grid>
+            <TextBlock Text="Version 1.1.0" FontWeight="SemiBold" Margin="0,4,0,0"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
+              <Run Text="• NEW: Zoomed reading mode - split view with page overview and magnified area"/>
+              <LineBreak/>
+              <Run Text="• NEW: Guided reading mode - automatic panel detection for scene-by-scene navigation"/>
+              <LineBreak/>
+              <Run Text="• NEW: Left/right-handed layout options for zoomed and guided modes"/>
+              <LineBreak/>
+              <Run Text="• NEW: Panel navigation with keyboard (M to cycle modes, H to toggle handedness)"/>
+              <LineBreak/>
+              <Run Text="• NEW: Background pre-caching of panel detection for smoother reading"/>
+            </TextBlock>
+            <TextBlock Text="Version 1.0.0" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
+              <Run Text="• Initial release with Komga integration"/>
+              <LineBreak/>
+              <Run Text="• Support for CBZ, CBR, and PDF comic formats"/>
+              <LineBreak/>
+              <Run Text="• Offline reading and progress tracking"/>
+              <LineBreak/>
+              <Run Text="• Cross-platform support (Windows, Linux, macOS, Android)"/>
+              <LineBreak/>
+              <Run Text="• Two-page reading mode"/>
+              <LineBreak/>
+              <Run Text="• Library management with read/unread status"/>
+              <LineBreak/>
+              <Run Text="• Black background for comic covers"/>
+              <LineBreak/>
+              <Run Text="• Scroll wheel page navigation"/>
+            </TextBlock>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Edit Server Form -->
+    <ScrollViewer IsVisible="{Binding IsEditing}" Padding="16">
+      <StackPanel Spacing="16" MaxWidth="400">
+        <TextBlock Text="{Binding ServerConfiguration, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+        
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding Name, Source={x:Static res:Loc.Instance}}"/>
+          <TextBox Text="{Binding ServerName}" PlaceholderText="My Komga Server"/>
+        </StackPanel>
+
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding ServerUrl, Source={x:Static res:Loc.Instance}}"/>
+          <TextBox Text="{Binding ServerUrl}" PlaceholderText="https://komga.example.com"/>
+        </StackPanel>
+
+        <StackPanel Spacing="12">
+          <TextBlock Text="Authentication (Choose one)" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,4"/>
+
+          <!-- API Key Section (Preferred) -->
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="12" CornerRadius="4">
+            <StackPanel Spacing="4">
+              <TextBlock Text="API Key (Preferred)" FontSize="12" FontWeight="Bold"/>
+              <TextBox Text="{Binding ApiKey}" PlaceholderText="Enter your Komga API key"/>
+              <TextBlock Text="Using an API key is more secure than credentials." FontSize="10" Foreground="Gray"/>
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="OR" HorizontalAlignment="Center" FontSize="10" Foreground="Gray" FontWeight="Bold"/>
+
+          <!-- Username/Password Section -->
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="12" CornerRadius="4">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Username &amp; Password" FontSize="12" FontWeight="Bold"/>
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding Username, Source={x:Static res:Loc.Instance}}" FontSize="11"/>
+                <TextBox Text="{Binding Username}" PlaceholderText="username"/>
+              </StackPanel>
+
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding Password, Source={x:Static res:Loc.Instance}}" FontSize="11"/>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0" Text="{Binding Password}" PlaceholderText="password" 
+                           PasswordChar="•" RevealPassword="{Binding IsPasswordVisible}"/>
+                  <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
+                          Margin="4,0,0,0" ToolTip.Tip="Show/Hide Password" Padding="8,6">
+                    <Panel>
+                      <TextBlock Text="👁" FontSize="14" IsVisible="{Binding !IsPasswordVisible}"/>
+                      <TextBlock Text="🙈" FontSize="14" IsVisible="{Binding IsPasswordVisible}"/>
+                    </Panel>
+                  </Button>
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+
+        <!-- Connection Status -->
+        <TextBlock Text="{Binding ConnectionStatus}" HorizontalAlignment="Center"
+                   IsVisible="{Binding ConnectionStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+        <!-- Action Buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+          <Button Content="{Binding TestConnection, Source={x:Static res:Loc.Instance}}" Command="{Binding TestConnectionCommand}"
+                  IsEnabled="{Binding !IsTestingConnection}"/>
+          
+          <Button Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" Command="{Binding CancelEditCommand}"/>
+          
+          <Button Content="{Binding Save, Source={x:Static res:Loc.Instance}}" Command="{Binding SaveServerCommand}" Classes="accent"/>
+        </StackPanel>
+
+        <!-- Testing Indicator -->
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsTestingConnection}"
+                     HorizontalAlignment="Center" Width="100"/>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

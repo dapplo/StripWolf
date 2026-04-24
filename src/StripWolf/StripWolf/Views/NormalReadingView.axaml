@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StripWolf.ViewModels"
+             x:Class="StripWolf.Views.NormalReadingView"
+             x:DataType="vm:ReaderViewModel">
+    <ScrollViewer x:Name="ImageScroller" 
+                  HorizontalScrollBarVisibility="Auto" 
+                  VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.GestureRecognizers>
+            <ScrollGestureRecognizer CanHorizontallyScroll="True" CanVerticallyScroll="True" />
+        </ScrollViewer.GestureRecognizers>
+        <Grid x:Name="ImageContainer" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- Two-page mode -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding IsTwoPageMode}">
+                <Image x:Name="LeftPageImage"
+                       Source="{Binding LeftPageImage}"
+                       Stretch="Uniform"/>
+                <Image x:Name="RightPageImage"
+                       Source="{Binding RightPageImage}"
+                       Stretch="Uniform"
+                       Margin="4,0,0,0"/>
+            </StackPanel>
+            
+            <!-- Single-page mode -->
+            <Image x:Name="PageImage"
+                   Source="{Binding CurrentPageImage}" 
+                   Stretch="Uniform"
+                   IsVisible="{Binding !IsTwoPageMode}"/>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

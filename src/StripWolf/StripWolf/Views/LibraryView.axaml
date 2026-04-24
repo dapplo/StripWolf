@@ -1,0 +1,546 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:StripWolf.ViewModels"
+             xmlns:views="using:StripWolf.Views"
+             xmlns:models="using:StripWolf.Models"
+             xmlns:converters="using:StripWolf.Converters"
+             xmlns:res="using:StripWolf.Resources"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="StripWolf.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel"
+             x:Name="Root">
+  
+  <UserControl.Resources>
+    <converters:FilePathToBitmapConverter x:Key="FilePathToBitmapConverter"/>
+  </UserControl.Resources>
+  
+  <Grid RowDefinitions="Auto,*">
+    <!-- Header -->
+    <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="📁 Open Folder" Command="{Binding OpenComicsDirectoryCommand}" 
+                Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
+        <Button Grid.Column="2" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
+      </Grid>
+    </Border>
+    
+    <!-- Content -->
+    <ScrollViewer Grid.Row="1" Padding="16">
+      <StackPanel Spacing="24" Margin="0,0,0,20">
+        
+        <!-- Search Box -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="🔍 Search comics..."
+                   VerticalContentAlignment="Center"/>
+          <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
+                  Padding="8,6" Margin="4,0,0,0"
+                  IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </Grid>
+
+        <!-- Search Results Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsSearching}">
+          <TextBlock Text="Search Results" FontSize="18" FontWeight="Bold"/>
+          
+          <!-- No Results -->
+          <TextBlock Text="No comics found" Foreground="Gray" 
+                     IsVisible="{Binding !SearchResults.Count}" Margin="0,8"/>
+          
+          <!-- Results Grid -->
+          <ItemsControl ItemsSource="{Binding SearchResults}" IsVisible="{Binding SearchResults.Count}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            IsEnabled="{Binding !IsDeleting}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Panel>
+                          <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                                 VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                          <!-- Deleting overlay -->
+                          <Border Background="#80000000" IsVisible="{Binding IsDeleting}">
+                            <TextBlock Text="DELETING..." Foreground="White" FontWeight="Bold" 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                        </Panel>
+                      </Border>
+                    </Button>
+                    <Border Grid.Row="1" Height="34" Margin="8,4">
+                      <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Title}"/>
+                    </Border>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Delete/Undo Section -->
+                    <Panel Grid.Row="3" Margin="8,0,8,8">
+                      <!-- Delete Button -->
+                      <Button Content="🗑️ Delete" FontSize="10" Padding="8,4"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding !IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}"/>
+                      
+                      <!-- Undo Button with Timer -->
+                      <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="↩ Undo" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding DeletionSecondsRemaining, StringFormat='{} ({0}s)'}" 
+                                     FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </Grid>
+                      </Button>
+                    </Panel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        
+        <!-- Error Message -->
+        <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
+        </Border>
+
+        <!-- Pending Imports Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding PendingImports.Count}">
+          <TextBlock Text="Importing..." FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding PendingImports}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:PendingImport">
+                <Border Margin="0,0,0,8" CornerRadius="8" Padding="12"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Grid.RowSpan="3" Width="48" Height="48" 
+                            CornerRadius="8" Background="Black" Margin="0,0,12,0"
+                            VerticalAlignment="Center">
+                      <TextBlock Text="📄" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    
+                    <!-- File name -->
+                    <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}" 
+                               FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    
+                    <!-- Status -->
+                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" 
+                               FontSize="12" Foreground="Gray"/>
+                    
+                    <!-- Progress bar -->
+                    <ProgressBar Grid.Column="1" Grid.Row="2" Minimum="0" Maximum="1" 
+                                 Value="{Binding Progress}" Height="6" Margin="0,4,0,0"
+                                 IsVisible="{Binding IsProcessing}"/>
+                    
+                    <!-- Error message -->
+                    <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding ErrorMessage}" 
+                               FontSize="10" Foreground="#C62828" Margin="0,4,0,0"
+                               IsVisible="{Binding IsFailed}" TextWrapping="Wrap"/>
+                    
+                    <!-- Remove button (for failed items) -->
+                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4"
+                            VerticalAlignment="Center" IsVisible="{Binding IsFailed}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).RemovePendingImportCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}"/>
+                    
+                    <!-- Completed checkmark -->
+                    <TextBlock Grid.Column="2" Grid.RowSpan="3" Text="✓" FontSize="20" 
+                               Foreground="Green" VerticalAlignment="Center"
+                               IsVisible="{Binding IsCompleted}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Main Content (hidden when searching) -->
+        <StackPanel Spacing="24" IsVisible="{Binding !IsSearching}">
+          
+        <!-- Favorites Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding FavoriteComics.Count}">
+          <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding FavoriteComics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            IsEnabled="{Binding !IsDeleting}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Panel>
+                          <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                                 VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                          <!-- Deleting overlay -->
+                          <Border Background="#80000000" IsVisible="{Binding IsDeleting}">
+                            <TextBlock Text="DELETING..." Foreground="White" FontWeight="Bold" 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                        </Panel>
+                      </Border>
+                    </Button>
+                    <Border Grid.Row="1" Height="34" Margin="8,4">
+                      <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Title}"/>
+                    </Border>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="3" Content="★ Remove from Favorites" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}"/>
+                    <!-- Delete/Undo Section -->
+                    <Panel Grid.Row="4" Margin="8,0,8,8">
+                      <!-- Delete Button -->
+                      <Button Content="🗑️ Delete" FontSize="10" Padding="8,4"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding !IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}"/>
+                      
+                      <!-- Undo Button with Timer -->
+                      <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="↩ Undo" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding DeletionSecondsRemaining, StringFormat='{} ({0}s)'}" 
+                                     FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </Grid>
+                      </Button>
+                    </Panel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+          
+        <!-- In Progress Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
+          <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding InProgressComics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                      </Border>
+                    </Button>
+                    <Border Grid.Row="1" Height="34" Margin="8,4">
+                      <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Title}"/>
+                    </Border>
+                    <ProgressBar Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
+                                 Height="4" Margin="8,2"/>
+                    <TextBlock Grid.Row="3" FontSize="10" Foreground="Gray" Margin="8,2,8,4">
+                      <TextBlock.Text>
+                        <MultiBinding StringFormat="Page {0} of {1}">
+                          <Binding Path="CurrentPage"/>
+                          <Binding Path="PageCount"/>
+                        </MultiBinding>
+                      </TextBlock.Text>
+                    </TextBlock>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="4" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
+                    <!-- Mark as Read Button -->
+                    <Button Grid.Row="5" Content="✓ Mark as Read" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}"/>
+                    <!-- Delete/Undo Section -->
+                    <Panel Grid.Row="6" Margin="8,0,8,8">
+                      <!-- Delete Button -->
+                      <Button Content="🗑️ Delete" FontSize="10" Padding="8,4"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding !IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}"/>
+                      
+                      <!-- Undo Button with Timer -->
+                      <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="↩ Undo" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding DeletionSecondsRemaining, StringFormat='{} ({0}s)'}" 
+                                     FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </Grid>
+                      </Button>
+                    </Panel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Completed (Read) Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding CompletedComics.Count}">
+          <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding CompletedComics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            IsEnabled="{Binding !IsDeleting}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Panel>
+                          <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                                 VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                          <!-- Deleting overlay -->
+                          <Border Background="#80000000" IsVisible="{Binding IsDeleting}">
+                            <TextBlock Text="DELETING..." Foreground="White" FontWeight="Bold" 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                        </Panel>
+                      </Border>
+                    </Button>
+                    <Border Grid.Row="1" Height="34" Margin="8,4">
+                      <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Title}"/>
+                    </Border>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="3" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
+                    <!-- Mark as Unread Button -->
+                    <Button Grid.Row="4" Content="↩ Mark as Unread" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}"/>
+                    <!-- Delete/Undo Section -->
+                    <Panel Grid.Row="5" Margin="8,0,8,8">
+                      <!-- Delete Button -->
+                      <Button Content="🗑️ Delete" FontSize="10" Padding="8,4"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding !IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}"/>
+                      
+                      <!-- Undo Button with Timer -->
+                      <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="↩ Undo" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding DeletionSecondsRemaining, StringFormat='{} ({0}s)'}" 
+                                     FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </Grid>
+                      </Button>
+                    </Panel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- New Comics Section -->
+        <StackPanel Spacing="8">
+          <TextBlock Text="New Comics" FontSize="18" FontWeight="Bold"/>
+          
+          <!-- Empty State -->
+          <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32"
+                      IsVisible="{Binding !NewComics.Count}">
+            <TextBlock Text="📚" FontSize="64" HorizontalAlignment="Center"/>
+            <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <TextBlock Text="Import a comic file or download from Komga to get started"
+                       Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
+            <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
+          </StackPanel>
+
+          <!-- Comics Grid -->
+          <ItemsControl ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:Comic">
+                <Border Margin="0,0,12,12" CornerRadius="8" ClipToBounds="True" Width="150"
+                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                  <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
+                    <!-- Cover with click handler -->
+                    <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                            IsEnabled="{Binding !IsDeleting}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Border Background="Black" CornerRadius="8,8,0,0">
+                        <Panel>
+                          <Image Source="{Binding CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                                 VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                          <!-- Deleting overlay -->
+                          <Border Background="#80000000" IsVisible="{Binding IsDeleting}">
+                            <TextBlock Text="DELETING..." Foreground="White" FontWeight="Bold" 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                        </Panel>
+                      </Border>
+                    </Button>
+                    <Border Grid.Row="1" Height="34" Margin="8,4">
+                      <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Bold"
+                                 TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap"
+                                 VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Title}"/>
+                    </Border>
+                    <TextBlock Grid.Row="2" Text="{Binding PageCount, StringFormat='{}{0} pages'}"
+                               FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
+                    <!-- Favorite Toggle Button -->
+                    <Button Grid.Row="3" FontSize="10" Padding="8,4" Margin="8,0,8,4"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                            CommandParameter="{Binding}">
+                      <Button.Content>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                          <TextBlock Text="☆ Add to Favorites" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="★ Remove Favorite" IsVisible="{Binding IsFavorite}"/>
+                        </StackPanel>
+                      </Button.Content>
+                    </Button>
+                    <!-- Delete/Undo Section -->
+                    <Panel Grid.Row="4" Margin="8,0,8,8">
+                      <!-- Delete Button -->
+                      <Button Content="🗑️ Delete" FontSize="10" Padding="8,4"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding !IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}"/>
+                      
+                      <!-- Undo Button with Timer -->
+                      <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding IsDeleting}"
+                              Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                              CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="↩ Undo" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="1" Text="{Binding DeletionSecondsRemaining, StringFormat='{} ({0}s)'}" 
+                                     FontSize="9" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </Grid>
+                      </Button>
+                    </Panel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        
+        </StackPanel> <!-- End of Main Content (hidden when searching) -->
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Delete Confirmation Overlay -->
+    <Border Grid.RowSpan="2" Background="#80000000" IsVisible="{Binding ShowDeleteConfirmation}">
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+              CornerRadius="8" Padding="24" Width="400"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 4 20 0 #40000000">
+        <StackPanel Spacing="16">
+          <TextBlock Text="Confirm External File Deletion" FontSize="20" FontWeight="Bold"/>
+          <TextBlock Text="This comic is located outside of the application's internal directory. Are you sure you want to delete it from its original location?"
+                     TextWrapping="Wrap"/>
+          <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
+            <TextBlock Text="{Binding DeleteConfirmationPath}" FontSize="12" Foreground="Gray" TextWrapping="Wrap"/>
+          </Border>
+          <StackPanel Orientation="Vertical" Spacing="8">
+            <Button Content="Remove from Library (Keep File)" Command="{Binding RemoveFromLibraryCommand}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    ToolTip.Tip="Removes the comic from the app but keeps the original file on disk."/>
+            
+            <Grid ColumnDefinitions="*,*">
+              <Button Grid.Column="0" Content="Cancel" Command="{Binding CancelDeleteCommand}"
+                      HorizontalAlignment="Stretch" Margin="0,0,4,0" HorizontalContentAlignment="Center"/>
+              <Button Grid.Column="1" Content="Delete Permanently" Command="{Binding ConfirmDeleteCommand}"
+                      Background="#D32F2F" Foreground="White"
+                      HorizontalAlignment="Stretch" Margin="4,0,0,0" HorizontalContentAlignment="Center"/>
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+  </Grid>
+</UserControl>
