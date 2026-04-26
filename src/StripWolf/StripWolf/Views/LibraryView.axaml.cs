@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using StripWolf.Services;
@@ -12,6 +13,24 @@ public partial class LibraryView : UserControl
     public LibraryView()
     {
         InitializeComponent();
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Escape && DataContext is LibraryViewModel vm)
+        {
+            if (vm.SelectedInfoComic != null)
+            {
+                vm.CloseComicInfoCommand.Execute(null);
+                e.Handled = true;
+            }
+            else if (vm.ShowDeleteConfirmation)
+            {
+                vm.CancelDeleteCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
     }
 
     protected override async void OnDataContextChanged(EventArgs e)

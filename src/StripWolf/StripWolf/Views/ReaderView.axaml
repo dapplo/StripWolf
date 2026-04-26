@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StripWolf.ViewModels"
              xmlns:views="using:StripWolf.Views"
+             xmlns:converters="using:StripWolf.Converters"
              x:Class="StripWolf.Views.ReaderView"
              x:DataType="vm:ReaderViewModel"
              Background="Black"
@@ -153,11 +154,22 @@
               <TextBlock Text="Title" Foreground="#888" FontSize="12"/>
               <TextBlock Text="{Binding Comic.Title}" Foreground="White" FontSize="18" TextWrapping="Wrap"/>
               
-              <TextBlock IsVisible="{Binding ComicInfo.Series, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" 
-                         Text="Series" Foreground="#888" FontSize="12" Margin="0,8,0,0"/>
-              <TextBlock IsVisible="{Binding ComicInfo.Series, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" 
-                         Text="{Binding ComicInfo.Series}" Foreground="White" FontSize="16"/>
-              
+              <TextBlock Foreground="#888" FontSize="12" Margin="0,8,0,0" Text="Series">
+                <TextBlock.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="ComicInfo.Series" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                    <Binding Path="Comic.SeriesName" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                  </MultiBinding>
+                </TextBlock.IsVisible>
+              </TextBlock>
+              <TextBlock Foreground="White" FontSize="16">
+                <TextBlock.Text>
+                  <MultiBinding Converter="{x:Static converters:FilePathToBitmapConverter.FirstNonNullStringConverter}">
+                    <Binding Path="ComicInfo.Series"/>
+                    <Binding Path="Comic.SeriesName"/>
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>              
               <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
                 <StackPanel Grid.Column="0" IsVisible="{Binding ComicInfo.Number, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                   <TextBlock Text="Issue" Foreground="#888" FontSize="12"/>

@@ -1,3 +1,4 @@
+using System.Xml.Serialization;
 using StripWolf.Data;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
@@ -16,6 +17,11 @@ public class LibraryService
     private readonly ComicConverterService _comicConverter;
     private readonly string _comicsDirectory;
     private readonly string _coversDirectory;
+
+    /// <summary>
+    /// Event raised when the library content changes (add, delete, import)
+    /// </summary>
+    public event EventHandler? LibraryChanged;
 
     public LibraryService(
         DatabaseService databaseService,
@@ -288,6 +294,7 @@ public class LibraryService
         };
 
         await _databaseService.SaveComicAsync(comic);
+        OnLibraryChanged();
         return comic;
     }
 
@@ -374,6 +381,17 @@ public class LibraryService
             (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
         }
 
+        // Extract ComicInfo.xml metadata if available
+        ComicInfo? comicInfo = null;
+        try
+        {
+            comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
+        }
+        catch
+        {
+            // ComicInfo extraction failed, continue without it
+        }
+
         // Download thumbnail to unified covers directory
         string? coverPath = null;
         var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
@@ -410,6 +428,7 @@ public class LibraryService
         {
             KomgaId = book.Id,
             KomgaHash = book.FileHash,
+            KomgaSeriesId = book.SeriesId,
             Title = book.Metadata?.Title ?? book.Name,
             SeriesName = book.SeriesTitle,
             Number = book.Number,
@@ -429,7 +448,15 @@ public class LibraryService
             IsCompleted = book.ReadProgress?.Completed ?? false
         };
 
+        // Create sidecar ComicInfo.xml if not already embedded
+        if (comicInfo == null)
+        {
+            var newInfo = CreateComicInfoFromKomgaBook(book);
+            await WriteComicInfoSidecarAsync(newInfo, actualFilePath);
+        }
+
         await _databaseService.SaveComicAsync(comic);
+        OnLibraryChanged();
         return comic;
     }
 
@@ -475,6 +502,7 @@ public class LibraryService
         }
 
         await _databaseService.DeleteComicAsync(comic);
+        OnLibraryChanged();
     }
 
     /// <summary>
@@ -503,6 +531,7 @@ public class LibraryService
         }
 
         await _databaseService.DeleteComicAsync(comic);
+        OnLibraryChanged();
     }
 
     /// <summary>
@@ -561,9 +590,72 @@ public class LibraryService
         return coverPath;
     }
 
+    private ComicInfo CreateComicInfoFromKomgaBook(KomgaBook book)
+    {
+        var metadata = book.Metadata;
+        var info = new ComicInfo
+        {
+            Title = metadata?.Title ?? book.Name,
+            Series = book.SeriesTitle,
+            Number = book.Number.ToString(),
+            Summary = metadata?.Summary,
+            Tags = metadata?.Tags != null ? string.Join(", ", metadata.Tags) : null,
+            Writer = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("writer", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            Penciller = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("penciller", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            Inker = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("inker", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            Colorist = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("colorist", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            Letterer = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("letterer", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            CoverArtist = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("cover artist", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+            Editor = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("editor", StringComparison.OrdinalIgnoreCase) == true)?.Name,
+        };
+
+        if (DateTime.TryParse(metadata?.ReleaseDate, out var date))
+        {
+            info.Year = date.Year;
+            info.Month = date.Month;
+            info.Day = date.Day;
+        }
+
+        return info;
+    }
+
+    private async Task WriteComicInfoSidecarAsync(ComicInfo comicInfo, string comicFilePath)
+    {
+        var sidecarPath = Path.ChangeExtension(comicFilePath, ".xml");
+        
+        await Task.Run(() =>
+        {
+            try
+            {
+                var serializer = new XmlSerializer(typeof(ComicInfo));
+                var namespaces = new XmlSerializerNamespaces();
+                namespaces.Add("", "");
+
+                var settings = new System.Xml.XmlWriterSettings
+                {
+                    Indent = true,
+                    Encoding = System.Text.Encoding.UTF8,
+                    OmitXmlDeclaration = false
+                };
+
+                using var writer = System.Xml.XmlWriter.Create(sidecarPath, settings);
+                serializer.Serialize(writer, comicInfo, namespaces);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to write sidecar ComicInfo for {comicFilePath}: {ex.Message}");
+            }
+        });
+    }
+
     internal static string SanitizeFileName(string fileName)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private void OnLibraryChanged()
+    {
+        LibraryChanged?.Invoke(this, EventArgs.Empty);
     }
 }

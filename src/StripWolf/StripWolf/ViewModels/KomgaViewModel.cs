@@ -116,8 +116,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task SelectPrefixAsync(string? prefix)
     {
-        _selectedSeriesPrefix = prefix;
-        OnPropertyChanged(nameof(SelectedSeriesPrefix));
+        SelectedSeriesPrefix = prefix;
 
         if (SelectedLibrary != null)
         {
@@ -695,6 +694,42 @@ public partial class KomgaViewModel : ViewModelBase
         {
             ErrorMessage = $"Failed to load libraries: {ex.Message}";
             System.Diagnostics.Debug.WriteLine($"Error loading libraries: {ex}");
+        }
+    }
+
+    public async Task LoadSeriesByIdAsync(string seriesId)
+    {
+        // Cancel any ongoing loading
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+
+        SelectedLibrary = null;
+        SelectedSeries = null;
+        _currentPage = 0;
+        Series.Clear();
+        Books.Clear();
+
+        try
+        {
+            IsBusy = true;
+            var series = await _komgaApiService.GetSeriesAsync(seriesId);
+            if (series != null)
+            {
+                // Find and set the library
+                if (Libraries.Count == 0) await LoadLibrariesAsync();
+                SelectedLibrary = Libraries.FirstOrDefault(l => l.Id == series.LibraryId);
+                
+                await SelectSeriesAsync(new KomgaSeriesDisplay { Series = series });
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load series: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 

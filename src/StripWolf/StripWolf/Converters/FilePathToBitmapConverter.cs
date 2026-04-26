@@ -53,6 +53,25 @@ public class FilePathToBitmapConverter : IValueConverter
     }
 
     /// <summary>
+    /// Multi-value converter that returns the first non-null, non-empty string from its inputs.
+    /// </summary>
+    public static readonly IMultiValueConverter FirstNonNullStringConverter = 
+        new FuncMultiValueConverter<object?, string?>(values => 
+            values?.Select(v => v?.ToString()).FirstOrDefault(s => !string.IsNullOrEmpty(s)));
+
+    /// <summary>
+    /// Returns true if the numeric value is greater than zero.
+    /// </summary>
+    public static readonly IValueConverter GreaterThanZeroConverter =
+        new FuncValueConverter<double, bool>(val => val > 0);
+
+    /// <summary>
+    /// Returns true if the numeric value is zero.
+    /// </summary>
+    public static readonly IValueConverter IsZeroConverter =
+        new FuncValueConverter<double, bool>(val => Math.Abs(val) < 0.0001);
+
+    /// <summary>
     /// Converts a boolean (IsDescending) to a sort direction icon (↑/↓)
     /// </summary>
     public static readonly IValueConverter SortDirectionIconConverter = 

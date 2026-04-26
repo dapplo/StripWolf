@@ -38,7 +38,14 @@ public partial class MainViewModel : ViewModelBase
 
         // Subscribe to events
         _libraryViewModel.ComicOpenRequested += OnComicOpenRequested;
+        _libraryViewModel.ViewKomgaSeriesRequested += OnViewKomgaSeriesRequested;
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
+    }
+
+    private async void OnViewKomgaSeriesRequested(object? sender, string seriesId)
+    {
+        SelectedTabIndex = 1; // Switch to Komga tab
+        await _komgaViewModel.LoadSeriesByIdAsync(seriesId);
     }
 
     private async void OnComicOpenRequested(object? sender, int comicId)

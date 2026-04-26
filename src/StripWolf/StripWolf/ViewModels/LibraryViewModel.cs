@@ -58,11 +58,44 @@ public partial class LibraryViewModel : ViewModelBase
     /// </summary>
     public event EventHandler<int>? ComicOpenRequested;
 
+    /// <summary>
+    /// Event raised when a request is made to view a specific Komga series
+    /// </summary>
+    public event EventHandler<string>? ViewKomgaSeriesRequested;
+
+    [ObservableProperty]
+    private Comic? _selectedInfoComic;
+
     public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         Title = "Library";
+        
+        // Refresh when library changes
+        _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
+    }
+
+    [RelayCommand]
+    private void ShowComicInfo(Comic comic)
+    {
+        SelectedInfoComic = comic;
+    }
+
+    [RelayCommand]
+    private void CloseComicInfo()
+    {
+        SelectedInfoComic = null;
+    }
+
+    [RelayCommand]
+    private void ViewSeriesOnKomga(Comic comic)
+    {
+        if (comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaSeriesId))
+        {
+            ViewKomgaSeriesRequested?.Invoke(this, comic.KomgaSeriesId);
+            SelectedInfoComic = null;
+        }
     }
 
     partial void OnSearchTextChanged(string value)

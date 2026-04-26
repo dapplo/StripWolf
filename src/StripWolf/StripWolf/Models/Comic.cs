@@ -26,6 +26,13 @@ public partial class Comic : ObservableObject
     private string? _komgaHash;
 
     /// <summary>
+    /// The Komga series ID if this comic was downloaded from Komga
+    /// </summary>
+    [ObservableProperty]
+    [property: Indexed]
+    private string? _komgaSeriesId;
+
+    /// <summary>
     /// Title of the comic
     /// </summary>
     [ObservableProperty]
