@@ -8,9 +8,6 @@
             <ColumnDefinition Width="{Binding LeftColumnWidth}" />
             <ColumnDefinition Width="{Binding RightColumnWidth}" />
         </Grid.ColumnDefinitions>
-        <Grid.GestureRecognizers>
-            <ScrollGestureRecognizer CanHorizontallyScroll="True" CanVerticallyScroll="True" />
-        </Grid.GestureRecognizers>
 
         <!-- Left Side -->
 

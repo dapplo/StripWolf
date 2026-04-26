@@ -228,16 +228,22 @@ public abstract class ZoomViewBase : UserControl
             _isDrawingManualRegion = true;
             _manualDrawStart = pos;
             e.Pointer.Capture(canvas);
+            e.Handled = true;
             return;
         }
 
-        if (HandleOverviewClick(vm, nx, ny)) return;
+        if (HandleOverviewClick(vm, nx, ny))
+        {
+            e.Handled = true;
+            return;
+        }
 
         _isDraggingOverview = true;
         vm.ZoomRegion.CenterX = Math.Max(0, Math.Min(1, nx));
         vm.ZoomRegion.CenterY = Math.Max(0, Math.Min(1, ny));
         vm.MoveZoomRegion(0, 0);
         e.Pointer.Capture(canvas);
+        e.Handled = true;
     }
 
     protected virtual bool HandleOverviewClick(ReaderViewModel vm, double x, double y) => false;
@@ -264,20 +270,26 @@ public abstract class ZoomViewBase : UserControl
             vm.ZoomRegion.Width = Math.Max(ZoomRegion.MinSize, x2 - x1);
             vm.ZoomRegion.Height = Math.Max(ZoomRegion.MinSize, y2 - y1);
             vm.MoveZoomRegion(0, 0);
+            e.Handled = true;
         }
         else if (_isDraggingOverview)
         {
             vm.ZoomRegion.CenterX = nx;
             vm.ZoomRegion.CenterY = ny;
             vm.MoveZoomRegion(0, 0);
+            e.Handled = true;
         }
     }
 
     private void OnOverviewPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        _isDraggingOverview = false;
-        _isDrawingManualRegion = false;
-        if (sender is Control c) e.Pointer.Capture(null);
+        if (_isDraggingOverview || _isDrawingManualRegion)
+        {
+            _isDraggingOverview = false;
+            _isDrawingManualRegion = false;
+            if (sender is Control c) e.Pointer.Capture(null);
+            e.Handled = true;
+        }
     }
 
     private void OnZoomedAreaPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -294,6 +306,7 @@ public abstract class ZoomViewBase : UserControl
                 var points = _touchPoints.Values.ToArray();
                 _initialDistance = GetDistance(points[0], points[1]);
                 _initialZoomRegionSize = vm.ZoomRegion.Size;
+                e.Handled = true;
                 return;
             }
         }
@@ -302,7 +315,11 @@ public abstract class ZoomViewBase : UserControl
         _swipeStartTime = DateTime.UtcNow;
         _isPanningZoomArea = true;
         
-        if (sender is Control c) e.Pointer.Capture(c);
+        if (sender is Control c)
+        {
+            e.Pointer.Capture(c);
+            e.Handled = true;
+        }
     }
 
     private void OnZoomedAreaPointerMoved(object? sender, PointerEventArgs e)
@@ -323,6 +340,7 @@ public abstract class ZoomViewBase : UserControl
                     vm.ZoomRegion.Resize(_initialZoomRegionSize / scale - vm.ZoomRegion.Size);
                     vm.MoveZoomRegion(0, 0);
                 }
+                e.Handled = true;
                 return;
             }
         }
@@ -330,21 +348,19 @@ public abstract class ZoomViewBase : UserControl
         if (_isPanningZoomArea && vm.CurrentPageImage != null)
         {
             var delta = currentPosition - _lastPointerPosition;
-            if (Math.Abs(delta.X) > 1 || Math.Abs(delta.Y) > 1)
+            if (Math.Abs(delta.X) > 0.1 || Math.Abs(delta.Y) > 0.1)
             {
                 var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
                 var zoomCanvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
                 if (viewbox != null && zoomCanvas != null)
                 {
-                    double canvasToImageScale = vm.CurrentPageImage.Size.Width;
-                    // Our canvas window is fixed at 2000 height/proportional width.
-                    // The viewbox maps viewbox.Bounds to zoomCanvas.Width units.
                     double screenToCanvasScale = viewbox.Bounds.Width / zoomCanvas.Width;
                     
                     double normalizedDeltaX = delta.X / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
                     double normalizedDeltaY = delta.Y / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
 
                     vm.MoveZoomRegion(-normalizedDeltaX, -normalizedDeltaY);
+                    e.Handled = true;
                 }
             }
         }

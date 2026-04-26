@@ -234,6 +234,7 @@ public partial class NormalReadingView : UserControl
             _panStartPoint = e.GetPosition(this);
             _panScrollOffset = _imageScroller?.Offset ?? default;
             e.Pointer.Capture(_imageScroller);
+            e.Handled = true;
         }
     }
 
@@ -254,21 +255,20 @@ public partial class NormalReadingView : UserControl
                     double scale = currentDistance / _initialDistance;
                     double targetZoom = _initialZoom * scale;
                     
-                    // Center point of the two fingers
+                    // Center point of the two fingers in viewport coordinates
                     var center = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
                     
-                    // Apply zoom (manually instead of AdjustZoom to have smooth target)
                     double oldZoom = vm.ZoomLevel;
                     vm.ZoomLevel = Math.Max(0.5, Math.Min(5.0, targetZoom));
                     
-                    if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.001)
+                    if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.0001)
                     {
                         var scrollOffset = _imageScroller.Offset;
                         var relativeX = (center.X + scrollOffset.X) / oldZoom;
                         var relativeY = (center.Y + scrollOffset.Y) / oldZoom;
 
                         UpdateImageSize();
-                        UpdateLayout();
+                        // Removed UpdateLayout() as it causes stuttering. Avalonia will handle it.
 
                         var newOffsetX = relativeX * vm.ZoomLevel - center.X;
                         var newOffsetY = relativeY * vm.ZoomLevel - center.Y;
@@ -279,6 +279,7 @@ public partial class NormalReadingView : UserControl
                         );
                     }
                 }
+                e.Handled = true;
                 return;
             }
         }
@@ -288,6 +289,7 @@ public partial class NormalReadingView : UserControl
             var currentPoint = e.GetPosition(this);
             var delta = _panStartPoint - currentPoint;
             _imageScroller.Offset = _panScrollOffset + delta;
+            e.Handled = true;
         }
     }
 

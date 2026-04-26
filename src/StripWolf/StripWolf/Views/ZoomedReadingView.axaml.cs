@@ -28,6 +28,8 @@ public partial class ZoomedReadingView : ZoomViewBase
         InitializeZoomLogic();
     }
 
+    private Rectangle? _overviewRect;
+
     protected override void RedrawOverview()
     {
         if (DataContext is not ReaderViewModel vm) return;
@@ -35,23 +37,28 @@ public partial class ZoomedReadingView : ZoomViewBase
         var canvas = vm.IsOverviewOnLeft ? OverviewCanvasLeftControl : OverviewCanvasRightControl;
         if (canvas == null) return;
 
-        canvas.Children.Clear();
-
         var region = vm.ZoomRegion;
+        double rectWidth = _actualDisplayWidthNormalized * canvas.Width;
+        double rectHeight = _actualDisplayHeightNormalized * canvas.Height;
+        double rectLeft = (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width;
+        double rectTop = (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height;
 
-        // Draw the red rectangle showing the visible area on the zoom side
-        var rect = new Rectangle
+        if (_overviewRect == null || !canvas.Children.Contains(_overviewRect))
         {
-            Stroke = Brushes.Red,
-            StrokeThickness = 2,
-            Width = _actualDisplayWidthNormalized * canvas.Width,
-            Height = _actualDisplayHeightNormalized * canvas.Height,
-            IsHitTestVisible = false
-        };
+            canvas.Children.Clear();
+            _overviewRect = new Rectangle
+            {
+                Stroke = Brushes.Red,
+                StrokeThickness = 2,
+                IsHitTestVisible = false,
+                ZIndex = 1000
+            };
+            canvas.Children.Add(_overviewRect);
+        }
 
-        Canvas.SetLeft(rect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
-        Canvas.SetTop(rect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
-        rect.ZIndex = 1000;
-        canvas.Children.Add(rect);
+        _overviewRect.Width = rectWidth;
+        _overviewRect.Height = rectHeight;
+        Canvas.SetLeft(_overviewRect, rectLeft);
+        Canvas.SetTop(_overviewRect, rectTop);
     }
 }

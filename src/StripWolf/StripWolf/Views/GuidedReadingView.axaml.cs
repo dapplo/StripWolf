@@ -29,6 +29,9 @@ public partial class GuidedReadingView : ZoomViewBase
         InitializeZoomLogic();
     }
 
+    private Rectangle? _zoomRect;
+    private readonly List<Rectangle> _panelRects = new();
+
     protected override void RedrawOverview()
     {
         if (DataContext is not ReaderViewModel vm) return;
@@ -36,44 +39,60 @@ public partial class GuidedReadingView : ZoomViewBase
         var canvas = vm.IsOverviewOnLeft ? OverviewCanvasLeftControl : OverviewCanvasRightControl;
         if (canvas == null) return;
 
-        canvas.Children.Clear();
+        // Sync panel rectangles
+        int panelCount = vm.CurrentPagePanels?.Panels.Count ?? 0;
+        
+        // Adjust pool size
+        while (_panelRects.Count < panelCount)
+        {
+            var r = new Rectangle { IsHitTestVisible = false };
+            _panelRects.Add(r);
+            canvas.Children.Add(r);
+        }
+        while (_panelRects.Count > panelCount)
+        {
+            var r = _panelRects[_panelRects.Count - 1];
+            canvas.Children.Remove(r);
+            _panelRects.RemoveAt(_panelRects.Count - 1);
+        }
 
-        // 1. Draw panels
+        // Update panel rectangles
         if (vm.CurrentPagePanels != null)
         {
-            foreach (var panel in vm.CurrentPagePanels.Panels)
+            for (int i = 0; i < panelCount; i++)
             {
-                var rect = new Rectangle
-                {
-                    Stroke = panel == vm.CurrentPanel ? Brushes.Yellow : Brushes.Blue,
-                    StrokeThickness = panel == vm.CurrentPanel ? 3 : 1,
-                    Fill = panel == vm.CurrentPanel ? new SolidColorBrush(Colors.Yellow, 0.2) : Brushes.Transparent,
-                    Width = panel.Width * canvas.Width,
-                    Height = panel.Height * canvas.Height,
-                    IsHitTestVisible = false
-                };
-
+                var panel = vm.CurrentPagePanels.Panels[i];
+                var rect = _panelRects[i];
+                bool isCurrent = panel == vm.CurrentPanel;
+                
+                rect.Stroke = isCurrent ? Brushes.Yellow : Brushes.Blue;
+                rect.StrokeThickness = isCurrent ? 3 : 1;
+                rect.Fill = isCurrent ? new SolidColorBrush(Colors.Yellow, 0.2) : Brushes.Transparent;
+                rect.Width = panel.Width * canvas.Width;
+                rect.Height = panel.Height * canvas.Height;
                 Canvas.SetLeft(rect, panel.X * canvas.Width);
                 Canvas.SetTop(rect, panel.Y * canvas.Height);
-                canvas.Children.Add(rect);
             }
         }
 
-        // 2. Draw the red rectangle showing the actual visible area on the zoom side
+        // Update Zoom rectangle
         var region = vm.ZoomRegion;
-        var zoomRect = new Rectangle
+        if (_zoomRect == null || !canvas.Children.Contains(_zoomRect))
         {
-            Stroke = Brushes.Red,
-            StrokeThickness = 2,
-            Width = _actualDisplayWidthNormalized * canvas.Width,
-            Height = _actualDisplayHeightNormalized * canvas.Height,
-            IsHitTestVisible = false
-        };
+            _zoomRect = new Rectangle
+            {
+                Stroke = Brushes.Red,
+                StrokeThickness = 2,
+                IsHitTestVisible = false,
+                ZIndex = 1000
+            };
+            canvas.Children.Add(_zoomRect);
+        }
 
-        Canvas.SetLeft(zoomRect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
-        Canvas.SetTop(zoomRect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
-        zoomRect.ZIndex = 1000;
-        canvas.Children.Add(zoomRect);
+        _zoomRect.Width = _actualDisplayWidthNormalized * canvas.Width;
+        _zoomRect.Height = _actualDisplayHeightNormalized * canvas.Height;
+        Canvas.SetLeft(_zoomRect, (region.CenterX - _actualDisplayWidthNormalized / 2) * canvas.Width);
+        Canvas.SetTop(_zoomRect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
     }
 
     protected override bool HandleOverviewClick(ReaderViewModel vm, double x, double y)
