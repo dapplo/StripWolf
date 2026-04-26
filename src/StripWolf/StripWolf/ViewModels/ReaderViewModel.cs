@@ -57,6 +57,12 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(StretchModeIcon))]
     private StretchMode _stretchMode = StretchMode.FitPage;
 
+    partial void OnStretchModeChanged(StretchMode value)
+    {
+        // Reset manual zoom when switching fit modes
+        ZoomLevel = 1.0;
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TwoPageModeIcon))]
     [NotifyPropertyChangedFor(nameof(PageDisplay))]
@@ -86,6 +92,8 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
 
+    public string? SeriesDisplay => !string.IsNullOrEmpty(ComicInfo?.Series) ? ComicInfo.Series : Comic?.SeriesName;
+
     private static string FormatBytes(long bytes)
     {
         string[] suffix = { "B", "KB", "MB", "GB", "TB" };
@@ -104,6 +112,24 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(CanUseTwoPageMode))]
     [NotifyPropertyChangedFor(nameof(NextReadingModeIcon))]
     private ReadingMode _readingMode = ReadingMode.Normal;
+
+    partial void OnReadingModeChanged(ReadingMode value)
+    {
+        // Reset zoom and stretch when switching modes
+        ZoomLevel = 1.0;
+        if (value == ReadingMode.Normal)
+        {
+            StretchMode = StretchMode.FitPage;
+        }
+
+        // Clear panel info when leaving guided mode
+        if (value != ReadingMode.Guided)
+        {
+            CurrentPagePanels = null;
+            CurrentPanel = null;
+            CurrentPanelIndex = 0;
+        }
+    }
     
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
@@ -435,6 +461,9 @@ public partial class ReaderViewModel : ViewModelBase
                 }
 
                 _lastLoadedPageIndex = pageIndex;
+                
+                // Reset zoom when changing pages
+                ZoomLevel = 1.0;
             }
             catch (Exception ex)
             {
@@ -470,6 +499,52 @@ public partial class ReaderViewModel : ViewModelBase
         if (Comic is not null && !_isLoadingPage)
         {
             _ = LoadPageAsync();
+        }
+    }
+
+    /// <summary>
+    /// Event raised when a request is made to view a specific Komga series
+    /// </summary>
+    public event EventHandler<string>? ViewSeriesRequested;
+
+    [RelayCommand]
+    private async Task ToggleFavoriteAsync()
+    {
+        if (Comic is null) return;
+        await _libraryService.ToggleFavoriteAsync(Comic.Id);
+        // Refresh local comic object
+        var updated = await _libraryService.GetComicAsync(Comic.Id);
+        if (updated != null) Comic = updated;
+    }
+
+    [RelayCommand]
+    private async Task ToggleReadStatusAsync()
+    {
+        if (Comic is null) return;
+        await _libraryService.ToggleReadStatusAsync(Comic.Id);
+        // Close reader and go back as requested by user
+        await GoBackAsync();
+    }
+
+    [RelayCommand]
+    private async Task DeleteComicAsync()
+    {
+        if (Comic is null) return;
+        // Close reader first to release file locks
+        var comicToDelete = Comic;
+        await GoBackAsync();
+        await _libraryService.DeleteComicAsync(comicToDelete);
+    }
+
+    [RelayCommand]
+    private void ViewSeriesOnKomga()
+    {
+        if (Comic?.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaSeriesId))
+        {
+            var seriesId = Comic.KomgaSeriesId;
+            // Close reader and navigate
+            _ = GoBackAsync();
+            ViewSeriesRequested?.Invoke(this, seriesId);
         }
     }
 
@@ -774,17 +849,6 @@ public partial class ReaderViewModel : ViewModelBase
         Handedness = Handedness == Handedness.RightHanded 
             ? Handedness.LeftHanded 
             : Handedness.RightHanded;
-    }
-    
-    partial void OnReadingModeChanged(ReadingMode value)
-    {
-        // Clear panel info when leaving guided mode
-        if (value != ReadingMode.Guided)
-        {
-            CurrentPagePanels = null;
-            CurrentPanel = null;
-            CurrentPanelIndex = 0;
-        }
     }
     
     #endregion

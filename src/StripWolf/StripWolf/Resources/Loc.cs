@@ -8,14 +8,12 @@ namespace StripWolf.Resources;
 /// <summary>
 /// Provides localized strings for the UI. Bind to this class in XAML.
 /// </summary>
-public class Loc : INotifyPropertyChanged
+public class Loc
 {
     private static readonly ResourceManager ResourceManager = new("StripWolf.Resources.Strings", typeof(Loc).Assembly);
     private static Loc _instance = new();
-    
+
     public static Loc Instance => _instance;
-    
-    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>
     /// Call this when the culture changes to refresh all bindings

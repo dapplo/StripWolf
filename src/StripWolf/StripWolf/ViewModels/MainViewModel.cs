@@ -40,6 +40,7 @@ public partial class MainViewModel : ViewModelBase
         _libraryViewModel.ComicOpenRequested += OnComicOpenRequested;
         _libraryViewModel.ViewKomgaSeriesRequested += OnViewKomgaSeriesRequested;
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
+        _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
     }
 
     private async void OnViewKomgaSeriesRequested(object? sender, string seriesId)

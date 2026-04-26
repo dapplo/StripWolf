@@ -15,11 +15,6 @@ public partial class NormalReadingView : UserControl
     private Image? _leftPageImage;
     private Image? _rightPageImage;
 
-    // Pan tracking
-    private bool _isPanning;
-    private Point _panStartPoint;
-    private Vector _panScrollOffset;
-
     // Gesture tracking
     private Point? _swipeStartPoint;
     private DateTime _swipeStartTime;
@@ -57,9 +52,17 @@ public partial class NormalReadingView : UserControl
         }
     }
 
+    private void EnsureControls()
+    {
+        _imageScroller ??= this.FindControl<ScrollViewer>("ImageScroller");
+        _imageContainer ??= this.FindControl<Grid>("ImageContainer");
+        _pageImage ??= this.FindControl<Image>("PageImage");
+        _leftPageImage ??= this.FindControl<Image>("LeftPageImage");
+        _rightPageImage ??= this.FindControl<Image>("RightPageImage");
+    }
+
     private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        _isPanning = false;
         _touchPoints.Clear();
         _initialDistance = 0;
     }
@@ -79,6 +82,16 @@ public partial class NormalReadingView : UserControl
                     args.PropertyName == nameof(ReaderViewModel.RightPageImage))
                 {
                     UpdateImageSize();
+                    
+                    // Reset scroll position when switching stretch modes or loading new pages
+                    if (args.PropertyName == nameof(ReaderViewModel.StretchMode) || 
+                        args.PropertyName == nameof(ReaderViewModel.CurrentPageImage))
+                    {
+                        if (_imageScroller != null)
+                        {
+                            _imageScroller.Offset = new Vector(0, 0);
+                        }
+                    }
                 }
             };
             UpdateImageSize();
@@ -87,6 +100,7 @@ public partial class NormalReadingView : UserControl
 
     private void UpdateImageSize()
     {
+        EnsureControls();
         if (DataContext is not ReaderViewModel vm || _imageScroller == null) return;
         
         var bitmap = vm.CurrentPageImage;
@@ -95,8 +109,6 @@ public partial class NormalReadingView : UserControl
         // Use Viewport if available, otherwise fallback to Bounds
         double availableWidth = _imageScroller.Viewport.Width > 0 ? _imageScroller.Viewport.Width : _imageScroller.Bounds.Width;
         double availableHeight = _imageScroller.Viewport.Height > 0 ? _imageScroller.Viewport.Height : _imageScroller.Bounds.Height;
-
-        if (availableWidth <= 0 || availableHeight <= 0) return;
 
         double contentWidth = bitmap.Size.Width;
         double contentHeight = bitmap.Size.Height;
@@ -112,20 +124,23 @@ public partial class NormalReadingView : UserControl
         }
 
         double scale = 1.0;
-        switch (vm.StretchMode)
+        if (availableWidth > 0 && availableHeight > 0)
         {
-            case StretchMode.FitPage:
-                scale = Math.Min(availableWidth / contentWidth, availableHeight / contentHeight);
-                break;
-            case StretchMode.FitWidth:
-                scale = availableWidth / contentWidth;
-                break;
-            case StretchMode.FitHeight:
-                scale = availableHeight / contentHeight;
-                break;
-            case StretchMode.Original:
-                scale = 1.0;
-                break;
+            switch (vm.StretchMode)
+            {
+                case StretchMode.FitPage:
+                    scale = Math.Min(availableWidth / contentWidth, availableHeight / contentHeight);
+                    break;
+                case StretchMode.FitWidth:
+                    scale = availableWidth / contentWidth;
+                    break;
+                case StretchMode.FitHeight:
+                    scale = availableHeight / contentHeight;
+                    break;
+                case StretchMode.Original:
+                    scale = 1.0;
+                    break;
+            }
         }
 
         double finalScale = scale * vm.ZoomLevel;
@@ -227,13 +242,19 @@ public partial class NormalReadingView : UserControl
         if (e.Pointer.Type == PointerType.Touch)
         {
             _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
-            if (_touchPoints.Count == 2)
+            if (_touchPoints.Count >= 2)
             {
-                // Start pinch
-                var points = _touchPoints.Values.ToArray();
-                _initialDistance = GetDistance(points[0], points[1]);
-                _initialZoom = vm.ZoomLevel;
-                _isPanning = false; // Disable panning during pinch
+                // Multi-touch detected: stop the ScrollViewer from taking over
+                e.Handled = true;
+                
+                if (_touchPoints.Count == 2)
+                {
+                    var points = _touchPoints.Values.ToArray();
+                    _initialDistance = GetDistance(points[0], points[1]);
+                    _initialZoom = vm.ZoomLevel;
+                    // Capture the pointer to this control to prevent gesture recognizer from winning
+                    e.Pointer.Capture(_imageScroller);
+                }
                 return;
             }
         }
@@ -241,15 +262,6 @@ public partial class NormalReadingView : UserControl
         var position = e.GetPosition(_imageScroller);
         _swipeStartPoint = position;
         _swipeStartTime = DateTime.UtcNow;
-
-        if (vm.ZoomLevel > 1.05 || vm.StretchMode != StretchMode.FitPage)
-        {
-            _isPanning = true;
-            _panStartPoint = e.GetPosition(this);
-            _panScrollOffset = _imageScroller?.Offset ?? default;
-            e.Pointer.Capture(_imageScroller);
-            e.Handled = true;
-        }
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
@@ -259,51 +271,46 @@ public partial class NormalReadingView : UserControl
         if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
         {
             _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
-            if (_touchPoints.Count == 2)
+            if (_touchPoints.Count >= 2)
             {
-                // Update pinch
-                var points = _touchPoints.Values.ToArray();
-                double currentDistance = GetDistance(points[0], points[1]);
-                if (_initialDistance > 0)
+                // Ensure the event is consumed so ScrollViewer doesn't pan
+                e.Handled = true;
+
+                if (_touchPoints.Count == 2)
                 {
-                    double scale = currentDistance / _initialDistance;
-                    double targetZoom = _initialZoom * scale;
-                    
-                    // Center point of the two fingers in viewport coordinates
-                    var center = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
-                    
-                    double oldZoom = vm.ZoomLevel;
-                    vm.ZoomLevel = Math.Max(0.5, Math.Min(5.0, targetZoom));
-                    
-                    if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.0001)
+                    // Update pinch
+                    var points = _touchPoints.Values.ToArray();
+                    double currentDistance = GetDistance(points[0], points[1]);
+                    if (_initialDistance > 10) // Minimum distance threshold
                     {
-                        var scrollOffset = _imageScroller.Offset;
-                        var relativeX = (center.X + scrollOffset.X) / oldZoom;
-                        var relativeY = (center.Y + scrollOffset.Y) / oldZoom;
+                        double scale = currentDistance / _initialDistance;
+                        double targetZoom = _initialZoom * scale;
+                        
+                        var center = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
+                        
+                        double oldZoom = vm.ZoomLevel;
+                        vm.ZoomLevel = Math.Max(0.5, Math.Min(5.0, targetZoom));
+                        
+                        if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.0001)
+                        {
+                            var scrollOffset = _imageScroller.Offset;
+                            var relativeX = (center.X + scrollOffset.X) / oldZoom;
+                            var relativeY = (center.Y + scrollOffset.Y) / oldZoom;
 
-                        UpdateImageSize();
-                        // Removed UpdateLayout() as it causes stuttering. Avalonia will handle it.
+                            UpdateImageSize();
 
-                        var newOffsetX = relativeX * vm.ZoomLevel - center.X;
-                        var newOffsetY = relativeY * vm.ZoomLevel - center.Y;
+                            var newOffsetX = relativeX * vm.ZoomLevel - center.X;
+                            var newOffsetY = relativeY * vm.ZoomLevel - center.Y;
 
-                        _imageScroller.Offset = new Vector(
-                            Math.Max(0, Math.Min(_imageScroller.Extent.Width - _imageScroller.Viewport.Width, newOffsetX)),
-                            Math.Max(0, Math.Min(_imageScroller.Extent.Height - _imageScroller.Viewport.Height, newOffsetY))
-                        );
+                            _imageScroller.Offset = new Vector(
+                                Math.Max(0, Math.Min(_imageScroller.Extent.Width - _imageScroller.Viewport.Width, newOffsetX)),
+                                Math.Max(0, Math.Min(_imageScroller.Extent.Height - _imageScroller.Viewport.Height, newOffsetY))
+                            );
+                        }
                     }
                 }
-                e.Handled = true;
                 return;
             }
-        }
-
-        if (_isPanning && _imageScroller != null)
-        {
-            var currentPoint = e.GetPosition(this);
-            var delta = _panStartPoint - currentPoint;
-            _imageScroller.Offset = _panScrollOffset + delta;
-            e.Handled = true;
         }
     }
 
@@ -313,12 +320,6 @@ public partial class NormalReadingView : UserControl
         if (_touchPoints.Count < 2)
         {
             _initialDistance = 0;
-        }
-
-        if (_isPanning)
-        {
-            _isPanning = false;
-            e.Pointer.Capture(null);
         }
 
         if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;

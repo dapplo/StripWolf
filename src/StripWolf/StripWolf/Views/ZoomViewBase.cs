@@ -42,6 +42,12 @@ public abstract class ZoomViewBase : UserControl
     private double _initialDistance = 0;
     private double _initialZoomRegionSize = 1.0;
 
+    // Inertia/Flick fields
+    private Vector _panVelocity;
+    private DateTime _lastPanTime;
+    private Point _lastPanPosition;
+    private CancellationTokenSource? _inertiaCts;
+
     protected double _actualDisplayWidthNormalized = 0.4;
     protected double _actualDisplayHeightNormalized = 0.4;
 
@@ -296,7 +302,14 @@ public abstract class ZoomViewBase : UserControl
     {
         if (DataContext is not ReaderViewModel vm) return;
 
+        // Stop any current inertia
+        _inertiaCts?.Cancel();
+        _inertiaCts = null;
+
         _lastPointerPosition = e.GetPosition(this);
+        _lastPanPosition = _lastPointerPosition;
+        _lastPanTime = DateTime.UtcNow;
+        _panVelocity = default;
 
         if (e.Pointer.Type == PointerType.Touch)
         {
@@ -326,6 +339,7 @@ public abstract class ZoomViewBase : UserControl
     {
         if (DataContext is not ReaderViewModel vm) return;
         var currentPosition = e.GetPosition(this);
+        var now = DateTime.UtcNow;
 
         if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
         {
@@ -348,6 +362,18 @@ public abstract class ZoomViewBase : UserControl
         if (_isPanningZoomArea && vm.CurrentPageImage != null)
         {
             var delta = currentPosition - _lastPointerPosition;
+            
+            // Calculate instantaneous velocity
+            var elapsed = (now - _lastPanTime).TotalSeconds;
+            if (elapsed > 0)
+            {
+                var instantaneousVelocity = (currentPosition - _lastPanPosition) / elapsed;
+                // Simple EMA (Exponential Moving Average) to smooth velocity
+                _panVelocity = _panVelocity * 0.4 + instantaneousVelocity * 0.6;
+            }
+            _lastPanTime = now;
+            _lastPanPosition = currentPosition;
+
             if (Math.Abs(delta.X) > 0.1 || Math.Abs(delta.Y) > 0.1)
             {
                 var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
@@ -371,8 +397,15 @@ public abstract class ZoomViewBase : UserControl
     {
         _touchPoints.Remove(e.Pointer.Id);
         if (_touchPoints.Count < 2) _initialDistance = 0;
+        
+        bool wasPanning = _isPanningZoomArea;
         _isPanningZoomArea = false;
         if (sender is Control c) e.Pointer.Capture(null);
+
+        if (wasPanning && _panVelocity.Length > 100)
+        {
+            StartInertia(_panVelocity);
+        }
 
         if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
         
@@ -393,12 +426,58 @@ public abstract class ZoomViewBase : UserControl
                 if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
                 else vm.GoToNextPageCommand.Execute(null);
             }
+            e.Handled = true;
         }
         else if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < 10 && Math.Abs(deltaY) < 10)
         {
             vm.ToggleControlsCommand.Execute(null);
+            e.Handled = true;
         }
         _swipeStartPoint = null;
+    }
+
+    private void StartInertia(Vector initialVelocity)
+    {
+        _inertiaCts?.Cancel();
+        _inertiaCts = new CancellationTokenSource();
+        var token = _inertiaCts.Token;
+
+        Task.Run(async () =>
+        {
+            var velocity = initialVelocity;
+            var friction = 0.95; // Deceleration per frame
+            
+            while (velocity.Length > 20 && !token.IsCancellationRequested)
+            {
+                await Task.Delay(16, token); // ~60 FPS
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (token.IsCancellationRequested || DataContext is not ReaderViewModel vm) return;
+
+                    var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
+                    var zoomCanvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
+                    
+                    if (viewbox != null && zoomCanvas != null)
+                    {
+                        double frameSeconds = 0.016;
+                        var frameDelta = velocity * frameSeconds;
+                        
+                        double screenToCanvasScale = viewbox.Bounds.Width / zoomCanvas.Width;
+                        double normalizedDeltaX = frameDelta.X / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
+                        double normalizedDeltaY = frameDelta.Y / (screenToCanvasScale * (zoomCanvas.Width / _actualDisplayWidthNormalized));
+
+                        vm.MoveZoomRegion(-normalizedDeltaX, -normalizedDeltaY);
+                        
+                        velocity *= friction;
+                    }
+                    else
+                    {
+                        velocity = default; // Stop if UI is not ready
+                    }
+                }, DispatcherPriority.Render);
+            }
+        }, token);
     }
 
     private double GetDistance(Point p1, Point p2) => Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));

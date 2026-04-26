@@ -5,7 +5,11 @@
              x:DataType="vm:ReaderViewModel">
     <ScrollViewer x:Name="ImageScroller" 
                   HorizontalScrollBarVisibility="Auto" 
-                  VerticalScrollBarVisibility="Auto">
+                  VerticalScrollBarVisibility="Auto"
+                  IsScrollChainingEnabled="False">
+        <ScrollViewer.GestureRecognizers>
+            <ScrollGestureRecognizer CanHorizontallyScroll="True" CanVerticallyScroll="True" />
+        </ScrollViewer.GestureRecognizers>
         <Grid x:Name="ImageContainer" HorizontalAlignment="Center" VerticalAlignment="Center">
             <!-- Two-page mode -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"

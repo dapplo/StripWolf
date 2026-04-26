@@ -34,6 +34,11 @@ public class DatabaseService : IAsyncDisposable
 
         _database = new SQLiteAsyncConnection(_databasePath);
         
+        // Enable WAL mode for better concurrency and faster writes
+        // Also helps with "database is locked" and recovery after kills
+        await _database.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL");
+        await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
+        
         await _database.CreateTableAsync<Comic>();
         await _database.CreateTableAsync<KomgaServer>();
         
