@@ -149,15 +149,25 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var url = $"api/v1/series?page={page}&size={size}";
+        var url = $"api/v1/series?page={page}&size={size}&sort=metadata.titleSort,asc";
         if (!string.IsNullOrEmpty(libraryId))
         {
             url += $"&library_id={libraryId}";
         }
         if (!string.IsNullOrEmpty(searchPrefix))
         {
-            var encodedPrefix = Uri.EscapeDataString(searchPrefix);
-            url += $"&search={encodedPrefix}";
+            // Use regex for precise "starts with" filtering
+            string regex;
+            if (searchPrefix == "0-9")
+            {
+                regex = "^[0-9].*";
+            }
+            else
+            {
+                regex = "^" + searchPrefix + ".*";
+            }
+            // Komga expects search_regex format: regex,field
+            url += $"&search_regex={Uri.EscapeDataString(regex + ",TITLE")}";
         }
         
         var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
@@ -397,14 +407,21 @@ public class KomgaApiService : IDisposable
                 break;
             }
 
+            double lastReportedProgress = -1;
             foreach (var segment in buffer)
             {
                 await writer.WriteAsync(segment);
                 bytesRead += segment.Length;
                 
-                if (totalBytes > 0)
+                if (totalBytes > 0 && progress != null)
                 {
-                    progress?.Report((double)bytesRead / totalBytes);
+                    double currentProgress = (double)bytesRead / totalBytes;
+                    // Only report if progress increased by at least 1% to avoid overwhelming UI thread
+                    if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                    {
+                        progress.Report(currentProgress);
+                        lastReportedProgress = currentProgress;
+                    }
                 }
             }
 

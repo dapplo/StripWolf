@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-
-  <item>
-    <color android:color="@color/splash_background"/>
-  </item>
-
   <item>
     <bitmap
         android:src="@drawable/strip_flow"
@@ -12,5 +7,4 @@
         android:mipMap="false"
         android:tileMode="disabled" />
   </item>
-
 </layer-list>

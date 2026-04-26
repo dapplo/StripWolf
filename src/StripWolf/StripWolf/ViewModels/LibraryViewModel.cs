@@ -119,9 +119,6 @@ public partial class LibraryViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
-            // Clean up comics with missing files on first load
-            await _libraryService.CleanupMissingFilesAsync();
-            
             var favorites = await _libraryService.GetFavoriteComicsAsync();
             MergeComics(FavoriteComics, favorites);
             
@@ -133,6 +130,12 @@ public partial class LibraryViewModel : ViewModelBase
 
             var completed = await _libraryService.GetCompletedComicsAsync();
             MergeComics(CompletedComics, completed);
+
+            // Defer cleanup to background after initial load is done
+            _ = Task.Run(async () => 
+            {
+                try { await _libraryService.CleanupMissingFilesAsync(); } catch { }
+            });
         });
     }
 

@@ -55,15 +55,15 @@
             <!-- Series Search Results -->
             <StackPanel Spacing="8" IsVisible="{Binding SearchSeriesResults.Count}">
               <TextBlock Text="{Binding SeriesResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding SearchSeriesResults}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding SearchSeriesResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                    <Button Padding="0" Background="Transparent"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
@@ -84,22 +84,22 @@
                       </Border>
                     </Button>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
 
             <!-- Book Search Results -->
             <StackPanel Spacing="8" IsVisible="{Binding SearchBookResults.Count}">
               <TextBlock Text="{Binding BookResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding SearchBookResults}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding SearchBookResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                    <Border CornerRadius="8" Padding="0"
                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                             ClipToBounds="True">
                       <Grid RowDefinitions="200,Auto,Auto,Auto">
@@ -140,8 +140,8 @@
                       </Grid>
                     </Border>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
 
             <!-- No Results -->
@@ -214,15 +214,15 @@
                 <Button Grid.Column="1" Content="↻" Command="{Binding RefreshSmartListsCommand}" 
                         Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
               </Grid>
-              <ItemsControl ItemsSource="{Binding KeepReadingBooks}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding KeepReadingBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                    <Border CornerRadius="8" Padding="0"
                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                             ClipToBounds="True">
                       <Grid RowDefinitions="200,Auto,Auto,Auto">
@@ -263,22 +263,22 @@
                       </Grid>
                     </Border>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
             
             <!-- On Deck Section -->
             <StackPanel Spacing="8" IsVisible="{Binding HasOnDeck}">
               <TextBlock Text="{Binding OnDeck, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding OnDeckBooks}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding OnDeckBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                    <Border CornerRadius="8" Padding="0"
                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                             ClipToBounds="True">
                       <Grid RowDefinitions="200,Auto,Auto,Auto">
@@ -319,22 +319,22 @@
                       </Grid>
                     </Border>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
             
             <!-- Recently Added Books Section -->
             <StackPanel Spacing="8" IsVisible="{Binding HasRecentBooks}">
               <TextBlock Text="{Binding RecentlyAddedBooks, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding RecentlyAddedBooks}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding RecentlyAddedBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                    <Border CornerRadius="8" Padding="0"
                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                             ClipToBounds="True">
                       <Grid RowDefinitions="200,Auto,Auto,Auto">
@@ -375,22 +375,22 @@
                       </Grid>
                     </Border>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
             
             <!-- Recently Added Series Section -->
             <StackPanel Spacing="8" IsVisible="{Binding HasRecentSeries}">
               <TextBlock Text="{Binding RecentlyAddedSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding RecentlyAddedSeries}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding RecentlyAddedSeries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                    <Button Padding="0" Background="Transparent"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
@@ -411,17 +411,17 @@
                       </Border>
                     </Button>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
             
             <!-- Libraries List -->
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding Libraries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ItemsControl ItemsSource="{Binding Libraries}">
-                <ItemsControl.ItemTemplate>
+              <ListBox ItemsSource="{Binding Libraries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaLibrary">
-                    <Button Margin="0,0,0,8" Padding="16" HorizontalAlignment="Stretch"
+                    <Button Padding="16" HorizontalAlignment="Stretch"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <StackPanel Orientation="Horizontal" Spacing="12">
@@ -430,8 +430,8 @@
                       </StackPanel>
                     </Button>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
             
             <!-- Read Lists -->
@@ -441,15 +441,15 @@
                 <Button Grid.Column="1" Content="↻" Command="{Binding RefreshReadListsCommand}" 
                         Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
               </Grid>
-              <ItemsControl ItemsSource="{Binding ReadLists}">
-                <ItemsControl.ItemsPanel>
+              <ListBox ItemsSource="{Binding ReadLists}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaReadListDisplay">
-                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                    <Button Padding="0" Background="Transparent"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).SelectReadListCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
@@ -470,8 +470,8 @@
                       </Border>
                     </Button>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
               <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
                       HorizontalAlignment="Center" Margin="0,8,0,0"
                       IsVisible="{Binding HasMoreReadLists}"/>
@@ -480,16 +480,20 @@
 
           <!-- Read List Books Grid -->
           <StackPanel Spacing="8" IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="Books" FontSize="18" FontWeight="Bold"/>
-            <ItemsControl ItemsSource="{Binding Books}">
-              <ItemsControl.ItemsPanel>
+            <Grid ColumnDefinitions="Auto,*">
+              <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackToLibrariesCommand}"
+                      Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            </Grid>
+            <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                   <WrapPanel Orientation="Horizontal"/>
                 </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                  <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                  <Border CornerRadius="8" Padding="0"
                           Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                           ClipToBounds="True">
                     <Grid RowDefinitions="200,Auto,Auto,Auto">
@@ -530,8 +534,8 @@
                     </Grid>
                   </Border>
                 </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+              </ListBox.ItemTemplate>
+            </ListBox>
           </StackPanel>
 
           <!-- Series Grid (only show when library is selected but no read list) -->
@@ -543,17 +547,45 @@
               </MultiBinding>
             </StackPanel.IsVisible>
             <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
-              <TextBlock Text="Series" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
-              
-              <ItemsControl ItemsSource="{Binding Series}">
-                <ItemsControl.ItemsPanel>
+              <!-- Prefix Selector (A-Z) -->
+              <ListBox ItemsSource="{Binding AvailablePrefixes}" 
+                       SelectedItem="{Binding SelectedSeriesPrefix}"
+                       Background="Transparent" 
+                       Margin="0,0,0,16"
+                       Padding="0">
+                <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal"/>
                   </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Border CornerRadius="4" Padding="8,4">
+                      <TextBlock Text="{Binding}" FontSize="14" HorizontalAlignment="Center"/>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.Styles>
+                  <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="2"/>
+                    <Setter Property="Margin" Value="0,0,4,4"/>
+                    <Setter Property="MinWidth" Value="36"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                  </Style>
+                </ListBox.Styles>
+              </ListBox>
+
+              <TextBlock Text="Series" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+              
+              <ListBox ItemsSource="{Binding Series}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Margin="0,0,12,12" Padding="0" Background="Transparent"
+                    <Button Padding="0" Background="Transparent"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                             CommandParameter="{Binding}">
                       <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
@@ -577,8 +609,8 @@
                       </Border>
                     </Button>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </StackPanel>
           </StackPanel>
 
@@ -591,11 +623,13 @@
               </MultiBinding>
             </StackPanel.IsVisible>
             
-            <Grid ColumnDefinitions="*,Auto,Auto">
-              <TextBlock Grid.Column="0" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+              <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackToSeriesCommand}"
+                      Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
               
               <!-- Sort Order Toggle -->
-              <Button Grid.Column="1" Command="{Binding CycleSortOrderCommand}"
+              <Button Grid.Column="2" Command="{Binding CycleSortOrderCommand}"
                       Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                   <TextBlock Text="Sort:"/>
@@ -610,15 +644,15 @@
               </Button>
             </Grid>
 
-            <ItemsControl ItemsSource="{Binding Books}">
-              <ItemsControl.ItemsPanel>
+            <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                   <WrapPanel Orientation="Horizontal"/>
                 </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                  <Border Margin="0,0,12,12" CornerRadius="8" Padding="0"
+                  <Border CornerRadius="8" Padding="0"
                           Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
                           ClipToBounds="True">
                     <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
@@ -662,8 +696,8 @@
                     </Grid>
                   </Border>
                 </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+              </ListBox.ItemTemplate>
+            </ListBox>
           </StackPanel>
           
           </StackPanel> <!-- End of Main Content (hidden when searching) -->

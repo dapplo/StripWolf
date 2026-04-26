@@ -63,33 +63,20 @@ public class LibraryService
     /// </summary>
     public async Task<int> CleanupMissingFilesAsync()
     {
-        var removedCount = 0;
         var comics = await _databaseService.GetComicsAsync();
+        var missingComics = comics.Where(c => !File.Exists(c.FilePath)).ToList();
         
-        foreach (var comic in comics)
+        foreach (var comic in missingComics)
         {
-            if (!File.Exists(comic.FilePath))
+            await _databaseService.DeleteComicAsync(comic);
+            
+            if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
             {
-                await _databaseService.DeleteComicAsync(comic);
-                
-                // Clean up cover if it exists (now just a single file)
-                if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
-                {
-                    try
-                    {
-                        File.Delete(comic.CoverPath);
-                    }
-                    catch
-                    {
-                        // Ignore cleanup errors
-                    }
-                }
-                
-                removedCount++;
+                try { File.Delete(comic.CoverPath); } catch { /* Ignore cleanup errors */ }
             }
         }
         
-        return removedCount;
+        return missingComics.Count;
     }
 
     /// <summary>

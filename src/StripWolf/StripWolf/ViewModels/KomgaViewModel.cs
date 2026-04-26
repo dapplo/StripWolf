@@ -102,6 +102,32 @@ public partial class KomgaViewModel : ViewModelBase
     
     private int _currentReadListPage;
     
+    [ObservableProperty]
+    private string? _selectedSeriesPrefix = "All";
+
+    public List<string> AvailablePrefixes { get; } = 
+        ["All", "0-9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
+
+    partial void OnSelectedSeriesPrefixChanged(string? value)
+    {
+        _ = SelectPrefixAsync(value);
+    }
+
+    [RelayCommand]
+    private async Task SelectPrefixAsync(string? prefix)
+    {
+        _selectedSeriesPrefix = prefix;
+        OnPropertyChanged(nameof(SelectedSeriesPrefix));
+
+        if (SelectedLibrary != null)
+        {
+            _currentPage = 0;
+            HasMoreSeries = true;
+            Series.Clear();
+            await LoadSeriesAsync();
+        }
+    }
+
     // Smart Lists (Keep Reading, On Deck, Recently Added)
     [ObservableProperty]
     private ObservableCollection<KomgaBookDisplay> _keepReadingBooks = [];
@@ -705,10 +731,13 @@ public partial class KomgaViewModel : ViewModelBase
         {
             IsBusy = true;
             
+            var prefix = SelectedSeriesPrefix == "All" ? null : SelectedSeriesPrefix;
+            
             var result = await _komgaApiService.GetSeriesAsync(
                 page: _currentPage,
                 size: 20,
-                libraryId: SelectedLibrary?.Id);
+                libraryId: SelectedLibrary?.Id,
+                searchPrefix: prefix);
 
             HasMoreSeries = !result.Last;
             _currentPage++;
@@ -1044,12 +1073,18 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void GoBackToSeries()
+    private async Task GoBackToSeriesAsync()
     {
         SelectedSeries = null;
         Books.Clear();
         _currentPage = 0;
-        HasMoreBooks = true;
+        HasMoreSeries = true;
+        Series.Clear();
+        
+        if (SelectedLibrary != null)
+        {
+            await LoadSeriesAsync();
+        }
     }
 
     [RelayCommand]

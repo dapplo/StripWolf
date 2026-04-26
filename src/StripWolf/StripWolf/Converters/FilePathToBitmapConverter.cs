@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media.Imaging;
@@ -15,15 +16,22 @@ public class FilePathToBitmapConverter : IValueConverter
     /// </summary>
     public static readonly FilePathToBitmapConverter Instance = new();
 
+    private static readonly ConcurrentDictionary<string, Bitmap> _cache = new();
+
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is string filePath && !string.IsNullOrEmpty(filePath))
         {
+            if (_cache.TryGetValue(filePath, out var cached))
+                return cached;
+
             if (File.Exists(filePath))
             {
                 try
                 {
-                    return new Bitmap(filePath);
+                    var bitmap = new Bitmap(filePath);
+                    _cache.TryAdd(filePath, bitmap);
+                    return bitmap;
                 }
                 catch (Exception ex)
                 {

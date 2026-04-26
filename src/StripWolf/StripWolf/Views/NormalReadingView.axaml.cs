@@ -92,8 +92,9 @@ public partial class NormalReadingView : UserControl
         var bitmap = vm.CurrentPageImage;
         if (bitmap == null) return;
 
-        double availableWidth = _imageScroller.Viewport.Width;
-        double availableHeight = _imageScroller.Viewport.Height;
+        // Use Viewport if available, otherwise fallback to Bounds
+        double availableWidth = _imageScroller.Viewport.Width > 0 ? _imageScroller.Viewport.Width : _imageScroller.Bounds.Width;
+        double availableHeight = _imageScroller.Viewport.Height > 0 ? _imageScroller.Viewport.Height : _imageScroller.Bounds.Height;
 
         if (availableWidth <= 0 || availableHeight <= 0) return;
 
@@ -136,6 +137,9 @@ public partial class NormalReadingView : UserControl
                 _pageImage.Width = bitmap.Size.Width * finalScale;
                 _pageImage.Height = bitmap.Size.Height * finalScale;
             }
+            // Clear sizes for unused controls to avoid layout ghosting
+            if (_leftPageImage != null) { _leftPageImage.Width = 0; _leftPageImage.Height = 0; }
+            if (_rightPageImage != null) { _rightPageImage.Width = 0; _rightPageImage.Height = 0; }
         }
         else
         {
@@ -144,11 +148,21 @@ public partial class NormalReadingView : UserControl
                 _leftPageImage.Width = bitmap.Size.Width * finalScale;
                 _leftPageImage.Height = bitmap.Size.Height * finalScale;
             }
-            if (_rightPageImage != null && vm.RightPageImage != null)
+            if (_rightPageImage != null)
             {
-                _rightPageImage.Width = vm.RightPageImage.Size.Width * finalScale;
-                _rightPageImage.Height = vm.RightPageImage.Size.Height * finalScale;
+                if (vm.RightPageImage != null)
+                {
+                    _rightPageImage.Width = vm.RightPageImage.Size.Width * finalScale;
+                    _rightPageImage.Height = vm.RightPageImage.Size.Height * finalScale;
+                }
+                else
+                {
+                    _rightPageImage.Width = 0;
+                    _rightPageImage.Height = 0;
+                }
             }
+            // Clear sizes for unused controls
+            if (_pageImage != null) { _pageImage.Width = 0; _pageImage.Height = 0; }
         }
     }
 
