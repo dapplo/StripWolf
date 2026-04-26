@@ -1,6 +1,5 @@
 <div align="center">
   <img src="StripFlow.png" alt="StripWolf Logo" width="300" />
-  <h1>StripWolf</h1>
   <p><i>As comics are called strips in Dutch, and follow a flow, Wolf is the reverse of flow.</i></p>
 </div>
 
