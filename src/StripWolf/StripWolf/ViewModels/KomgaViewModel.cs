@@ -324,7 +324,9 @@ public partial class KomgaViewModel : ViewModelBase
     {
         var comic = await _libraryService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
         if (comic is null) return false;
-        // If the comic has a server link, only consider it downloaded for the current server
+        // If the comic has a server link, only consider it downloaded for the current server.
+        // Comics without a server link (downloaded before this feature) are treated as matching
+        // all servers to preserve backward compatibility.
         if (comic.KomgaServerId.HasValue && _activeServer is not null)
         {
             return comic.KomgaServerId.Value == _activeServer.Id;
