@@ -118,6 +118,14 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets all comics downloaded from a specific Komga server
+    /// </summary>
+    public Task<List<Comic>> GetComicsByKomgaServerIdAsync(int serverId)
+    {
+        return _databaseService.GetComicsByKomgaServerIdAsync(serverId);
+    }
+
+    /// <summary>
     /// Gets a comic by Komga ID or hash
     /// </summary>
     public Task<Comic?> GetComicByKomgaIdOrHashAsync(string komgaId, string? fileHash)
@@ -301,7 +309,7 @@ public class LibraryService
     /// <summary>
     /// Downloads a comic from Komga and adds it to the library
     /// </summary>
-    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, IProgress<double>? progress = null)
+    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null)
     {
         // Check if already downloaded by ID or Hash
         var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
@@ -445,7 +453,8 @@ public class LibraryService
             Source = ComicSource.Komga,
             AddedDate = DateTime.UtcNow,
             CurrentPage = book.ReadProgress?.Page ?? 0,
-            IsCompleted = book.ReadProgress?.Completed ?? false
+            IsCompleted = book.ReadProgress?.Completed ?? false,
+            KomgaServerId = serverId
         };
 
         // Create sidecar ComicInfo.xml if not already embedded

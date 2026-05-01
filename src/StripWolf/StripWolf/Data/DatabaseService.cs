@@ -124,6 +124,12 @@ public class DatabaseService : IAsyncDisposable
         return comic;
     }
 
+    public async Task<List<Comic>> GetComicsByKomgaServerIdAsync(int serverId)
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<Comic>().Where(c => c.KomgaServerId == serverId).ToListAsync();
+    }
+
     public async Task<Comic?> GetComicByFilePathAsync(string filePath)
     {
         var db = await GetDatabaseAsync();
