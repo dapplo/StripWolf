@@ -13,6 +13,7 @@ namespace StripWolf.Services;
 public class ComicReaderService
 {
     private readonly Dictionary<(string, int), byte[]> _pageCache = new();
+    private readonly Dictionary<string, List<string>> _pageNamesCache = new();
     private readonly object _cacheLock = new();
 
     /// <summary>
@@ -37,7 +38,6 @@ public class ComicReaderService
     /// </summary>
     public async Task<(int pageCount, long fileSize)> GetComicInfoAsync(string filePath)
     {
-        var format = GetComicFormat(filePath);
         var fileInfo = new FileInfo(filePath);
         
         if (!fileInfo.Exists)
@@ -45,33 +45,51 @@ public class ComicReaderService
             throw new FileNotFoundException("Comic file not found", filePath);
         }
 
-        int pageCount = format switch
-        {
-            ComicFormat.Cbz => await GetCbzPageCountAsync(filePath),
-            ComicFormat.Cbr => await GetCbrPageCountAsync(filePath),
-            ComicFormat.Cb7 => await GetCb7PageCountAsync(filePath),
-            ComicFormat.Cbt => await GetCbtPageCountAsync(filePath),
-            _ => throw new NotSupportedException($"Unsupported comic format: {format}")
-        };
-
-        return (pageCount, fileInfo.Length);
+        var pageNames = await GetCachedPageNamesAsync(filePath);
+        return (pageNames.Count, fileInfo.Length);
     }
 
     /// <summary>
-    /// Gets all page file names from a comic archive
+    /// Gets all page file names from a comic archive (cached after the first call)
     /// </summary>
     public async Task<List<string>> GetPageNamesAsync(string filePath)
     {
-        var format = GetComicFormat(filePath);
-        
-        return format switch
+        return await GetCachedPageNamesAsync(filePath);
+    }
+
+    /// <summary>
+    /// Returns the cached sorted page-name list, building and caching it on first access
+    /// </summary>
+    private async Task<List<string>> GetCachedPageNamesAsync(string filePath)
+    {
+        lock (_cacheLock)
         {
-            ComicFormat.Cbz => await GetCbzPageNamesAsync(filePath),
-            ComicFormat.Cbr => await GetCbrPageNamesAsync(filePath),
-            ComicFormat.Cb7 => await GetCb7PageNamesAsync(filePath),
-            ComicFormat.Cbt => await GetCbtPageNamesAsync(filePath),
+            if (_pageNamesCache.TryGetValue(filePath, out var cached))
+            {
+                return cached;
+            }
+        }
+
+        var format = GetComicFormat(filePath);
+        var names = format switch
+        {
+            ComicFormat.Cbz => await BuildCbzPageNamesAsync(filePath),
+            ComicFormat.Cbr => await BuildCbrPageNamesAsync(filePath),
+            ComicFormat.Cb7 => await BuildCb7PageNamesAsync(filePath),
+            ComicFormat.Cbt => await BuildCbtPageNamesAsync(filePath),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
+
+        lock (_cacheLock)
+        {
+            // Another thread may have populated the cache while we were building; prefer theirs
+            if (!_pageNamesCache.TryGetValue(filePath, out var existing))
+            {
+                _pageNamesCache[filePath] = names;
+                existing = names;
+            }
+            return existing;
+        }
     }
 
     /// <summary>
@@ -87,14 +105,22 @@ public class ComicReaderService
             }
         }
 
+        var sortedNames = await GetCachedPageNamesAsync(filePath);
+
+        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+        }
+
+        var entryName = sortedNames[pageIndex];
         var format = GetComicFormat(filePath);
-        
+
         byte[] data = format switch
         {
-            ComicFormat.Cbz => await GetCbzPageAsync(filePath, pageIndex),
-            ComicFormat.Cbr => await GetCbrPageAsync(filePath, pageIndex),
-            ComicFormat.Cb7 => await GetCb7PageAsync(filePath, pageIndex),
-            ComicFormat.Cbt => await GetCbtPageAsync(filePath, pageIndex),
+            ComicFormat.Cbz => await ReadCbzPageAsync(filePath, entryName),
+            ComicFormat.Cbr => await ReadCbrPageAsync(filePath, pageIndex, entryName, sortedNames),
+            ComicFormat.Cb7 => await ReadCb7PageAsync(filePath, entryName),
+            ComicFormat.Cbt => await ReadCbtPageAsync(filePath, entryName),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
 
@@ -111,6 +137,7 @@ public class ComicReaderService
         lock (_cacheLock)
         {
             _pageCache.Clear();
+            _pageNamesCache.Clear();
         }
     }
 
@@ -137,18 +164,7 @@ public class ComicReaderService
 
     #region CBZ (ZIP) Operations
 
-    private static async Task<int> GetCbzPageCountAsync(string filePath)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-            return archive.Entries
-                .Count(e => IsImageFile(e.FullName));
-        });
-    }
-
-    private static async Task<List<string>> GetCbzPageNamesAsync(string filePath)
+    private static async Task<List<string>> BuildCbzPageNamesAsync(string filePath)
     {
         return await Task.Run(() =>
         {
@@ -162,29 +178,19 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> GetCbzPageAsync(string filePath, int pageIndex)
+    private static async Task<byte[]> ReadCbzPageAsync(string filePath, string entryName)
     {
         return await Task.Run(() =>
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-            var sortedNames = archive.Entries
-                .Where(e => IsImageFile(e.FullName))
-                .Select(e => e.FullName)
-                .OrderBy(name => name, ComicPageComparer.Instance)
-                .ToList();
 
-            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
-            }
-
-            var entry = archive.GetEntry(sortedNames[pageIndex]);
+            var entry = archive.GetEntry(entryName);
             if (entry is null)
             {
-                throw new InvalidOperationException($"Could not find page {pageIndex} in archive");
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
             }
-            
+
             using var entryStream = entry.Open();
             using var memoryStream = new MemoryStream();
             entryStream.CopyTo(memoryStream);
@@ -196,18 +202,7 @@ public class ComicReaderService
 
     #region CBR (RAR) Operations
 
-    private static async Task<int> GetCbrPageCountAsync(string filePath)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = RarArchive.OpenArchive(stream);
-            return archive.Entries
-                .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
-        });
-    }
-
-    private static async Task<List<string>> GetCbrPageNamesAsync(string filePath)
+    private static async Task<List<string>> BuildCbrPageNamesAsync(string filePath)
     {
         return await Task.Run(() =>
         {
@@ -221,68 +216,44 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> GetCbrPageAsync(string filePath, int pageIndex)
+    private static async Task<byte[]> ReadCbrPageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames)
     {
         return await Task.Run(() =>
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = RarArchive.OpenArchive(stream);
-            
-            // Check if this is a solid archive
+
+            // Solid archives must be read sequentially
             if (archive.IsSolid)
             {
-                // For solid archives, we must read sequentially
-                return GetPageFromSolidRar(archive, pageIndex);
-            }
-            
-            var sortedNames = archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-                .Select(e => e.Key ?? string.Empty)
-                .OrderBy(name => name, ComicPageComparer.Instance)
-                .ToList();
-
-            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+                return ReadPageFromSolidRar(archive, pageIndex, entryName, sortedNames);
             }
 
-            var targetName = sortedNames[pageIndex];
-            var entry = archive.Entries.FirstOrDefault(e => e.Key == targetName);
-            
+            var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
             if (entry is null)
             {
-                throw new InvalidOperationException($"Could not find page {pageIndex} in archive");
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
             }
-            
-            // Handle entries that may not be extractable
+
             using var entryStream = entry.OpenEntryStream();
             if (entryStream is null)
             {
-                throw new InvalidOperationException($"Could not extract page {pageIndex} from CBR archive. The entry may be corrupted or use an unsupported compression method.");
+                throw new InvalidOperationException($"Could not extract entry '{entryName}' from CBR archive. The entry may be corrupted or use an unsupported compression method.");
             }
-            
+
             using var memoryStream = new MemoryStream();
             entryStream.CopyTo(memoryStream);
             return memoryStream.ToArray();
         });
     }
 
-    private static byte[] GetPageFromSolidRar(IRarArchive archive, int pageIndex)
+    private static byte[] ReadPageFromSolidRar(IRarArchive archive, int pageIndex, string targetName, List<string> sortedNames)
     {
-        // Build sorted list of image entry names
-        var sortedNames = archive.Entries
-            .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-            .Select(e => e.Key ?? string.Empty)
-            .OrderBy(name => name, ComicPageComparer.Instance)
-            .ToList();
-
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
         }
 
-        var targetName = sortedNames[pageIndex];
-        
         // For solid archives, we must read through sequentially
         using var reader = archive.ExtractAllEntries();
         while (reader.MoveToNextEntry())
@@ -303,18 +274,7 @@ public class ComicReaderService
 
     #region CB7 (7-Zip) Operations
 
-    private static async Task<int> GetCb7PageCountAsync(string filePath)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = SevenZipArchive.OpenArchive(stream);
-            return archive.Entries
-                .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
-        });
-    }
-
-    private static async Task<List<string>> GetCb7PageNamesAsync(string filePath)
+    private static async Task<List<string>> BuildCb7PageNamesAsync(string filePath)
     {
         return await Task.Run(() =>
         {
@@ -328,30 +288,18 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> GetCb7PageAsync(string filePath, int pageIndex)
+    private static async Task<byte[]> ReadCb7PageAsync(string filePath, string entryName)
     {
         return await Task.Run(() =>
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = SevenZipArchive.OpenArchive(stream);
-            var sortedNames = archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-                .Select(e => e.Key ?? string.Empty)
-                .OrderBy(name => name, ComicPageComparer.Instance)
-                .ToList();
 
-            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
-            }
-
-            var targetName = sortedNames[pageIndex];
-            
             // 7z archives may be solid, so we use ExtractAllEntries
             using var reader = archive.ExtractAllEntries();
             while (reader.MoveToNextEntry())
             {
-                if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
+                if (!reader.Entry.IsDirectory && reader.Entry.Key == entryName)
                 {
                     using var entryStream = reader.OpenEntryStream();
                     using var memoryStream = new MemoryStream();
@@ -360,7 +308,7 @@ public class ComicReaderService
                 }
             }
 
-            throw new InvalidOperationException($"Could not find page {pageIndex} in CB7 archive");
+            throw new InvalidOperationException($"Could not find entry '{entryName}' in CB7 archive");
         });
     }
 
@@ -368,18 +316,7 @@ public class ComicReaderService
 
     #region CBT (TAR) Operations
 
-    private static async Task<int> GetCbtPageCountAsync(string filePath)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = TarArchive.OpenArchive(stream);
-            return archive.Entries
-                .Count(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty));
-        });
-    }
-
-    private static async Task<List<string>> GetCbtPageNamesAsync(string filePath)
+    private static async Task<List<string>> BuildCbtPageNamesAsync(string filePath)
     {
         return await Task.Run(() =>
         {
@@ -393,34 +330,21 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> GetCbtPageAsync(string filePath, int pageIndex)
+    private static async Task<byte[]> ReadCbtPageAsync(string filePath, string entryName)
     {
         return await Task.Run(() =>
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = TarArchive.OpenArchive(stream);
-            var entries = archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
-                .ToList();
-            
-            var sortedNames = entries
-                .Select(e => e.Key ?? string.Empty)
-                .OrderBy(name => name, ComicPageComparer.Instance)
-                .ToList();
 
-            if (pageIndex < 0 || pageIndex >= sortedNames.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
-            }
+            var entry = archive.Entries
+                .FirstOrDefault(e => !e.IsDirectory && e.Key == entryName);
 
-            var targetName = sortedNames[pageIndex];
-            var entry = entries.FirstOrDefault(e => e.Key == targetName);
-            
             if (entry is null)
             {
-                throw new InvalidOperationException($"Could not find page {pageIndex} in CBT archive");
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in CBT archive");
             }
-            
+
             using var entryStream = entry.OpenEntryStream();
             using var memoryStream = new MemoryStream();
             entryStream.CopyTo(memoryStream);
