@@ -323,7 +323,15 @@ public partial class KomgaViewModel : ViewModelBase
     private async Task<bool> CheckIfDownloadedAsync(KomgaBook book)
     {
         var comic = await _libraryService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
-        return comic is not null;
+        if (comic is null) return false;
+        // If the comic has a server link, only consider it downloaded for the current server.
+        // Comics without a server link (downloaded before this feature) are treated as matching
+        // all servers to preserve backward compatibility.
+        if (comic.KomgaServerId.HasValue && _activeServer is not null)
+        {
+            return comic.KomgaServerId.Value == _activeServer.Id;
+        }
+        return true;
     }
 
     private async Task LoadSearchBookThumbnailAsync(KomgaBook book, CancellationToken ct)
@@ -1061,7 +1069,7 @@ public partial class KomgaViewModel : ViewModelBase
                     DownloadProgress = p;
                     bookDisplay.DownloadProgress = p;
                 });
-                await _libraryService.DownloadFromKomgaAsync(bookDisplay.Book, progress);
+                await _libraryService.DownloadFromKomgaAsync(bookDisplay.Book, _activeServer?.Id, progress);
                 bookDisplay.IsDownloaded = true;
             }
             catch (Exception ex)
