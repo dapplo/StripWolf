@@ -55,6 +55,15 @@ public partial class KomgaBookDisplay : ObservableObject
     public string Id => Book.Id;
     public string Name => Book.Name;
     public int? PagesCount => Book.Media?.PagesCount;
+
+    // Reading progress properties
+    public bool IsRead => Book.ReadProgress?.Completed ?? false;
+    public bool IsReading => Book.ReadProgress != null && !IsRead;
+    public int? CurrentPage => Book.ReadProgress?.Page;
+    
+    public double ReadingProgress => (PagesCount > 0 && CurrentPage.HasValue) 
+        ? (double)CurrentPage.Value / PagesCount.Value 
+        : 0;
 }
 
 /// <summary>
