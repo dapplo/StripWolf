@@ -73,6 +73,11 @@ public partial class ReaderViewModel : ViewModelBase
     private int _lastLoadedPageIndex = -1;
     private bool _shouldSelectLastPanel;
 
+    // Pre-decoded bitmap cache for instant page display without loading bar
+    private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
+    private readonly object _bitmapPrefetchLock = new();
+    private const int MaxPrefetchedBitmaps = 3;
+
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
     public bool IsFirstPage => CurrentPage == 0;
@@ -309,6 +314,7 @@ public partial class ReaderViewModel : ViewModelBase
             // Clear previous comic data
             _panelDetectionService.ClearAllCache();
             _comicReaderService.ClearCache();
+            ClearBitmapPrefetchCache();
             _lastLoadedPageIndex = -1;
             
             // Load reading mode preferences
@@ -397,8 +403,14 @@ public partial class ReaderViewModel : ViewModelBase
                 return;
             }
 
+            // Only show the loading indicator when the bitmap is not already pre-decoded
+            bool hasPrefetchedBitmap = !IsTwoPageMode && HasPrefetchedBitmap(pageIndex);
+
             _isLoadingPage = true;
-            IsBusy = true;
+            if (!hasPrefetchedBitmap)
+            {
+                IsBusy = true;
+            }
             try
             {
                 // Store page data for panel detection in guided mode
@@ -408,8 +420,11 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     // Load two pages for two-page mode
                     var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
-                    using var leftStream = new MemoryStream(leftPageData);
-                    var newLeftBitmap = new Bitmap(leftStream);
+                    var newLeftBitmap = await Task.Run(() =>
+                    {
+                        using var stream = new MemoryStream(leftPageData);
+                        return new Bitmap(stream);
+                    });
                     var oldLeftBitmap = LeftPageImage;
                     LeftPageImage = newLeftBitmap;
                     oldLeftBitmap?.Dispose();
@@ -422,8 +437,11 @@ public partial class ReaderViewModel : ViewModelBase
                     if (pageIndex + 1 < Comic.PageCount)
                     {
                         var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex + 1);
-                        using var rightStream = new MemoryStream(rightPageData);
-                        var newRightBitmap = new Bitmap(rightStream);
+                        var newRightBitmap = await Task.Run(() =>
+                        {
+                            using var stream = new MemoryStream(rightPageData);
+                            return new Bitmap(stream);
+                        });
                         var oldRightBitmap = RightPageImage;
                         RightPageImage = newRightBitmap;
                         oldRightBitmap?.Dispose();
@@ -437,12 +455,24 @@ public partial class ReaderViewModel : ViewModelBase
                 }
                 else
                 {
-                    // Single page mode
-                    pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
-                    using var stream = new MemoryStream(pageData);
-                    
-                    // Create new bitmap first, then dispose old one to avoid memory leak
-                    var newBitmap = new Bitmap(stream);
+                    // Single page mode - use pre-decoded bitmap from prefetch cache if available
+                    var newBitmap = TakePrefetchedBitmap(pageIndex);
+                    if (newBitmap is null)
+                    {
+                        // Not prefetched - decode now on a background thread
+                        pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                        newBitmap = await Task.Run(() =>
+                        {
+                            using var stream = new MemoryStream(pageData);
+                            return new Bitmap(stream);
+                        });
+                    }
+                    else if (ReadingMode == ReadingMode.Guided)
+                    {
+                        // Need raw data for panel detection even though bitmap was prefetched
+                        pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                    }
+
                     var oldBitmap = CurrentPageImage;
                     CurrentPageImage = newBitmap;
                     oldBitmap?.Dispose();
@@ -476,6 +506,9 @@ public partial class ReaderViewModel : ViewModelBase
                 IsBusy = false;
             }
         }
+
+        // Prefetch adjacent pages in the background so the next navigation is instant
+        PrefetchAdjacentPages(CurrentPage);
     }
 
     partial void OnCurrentPageChanged(int value)
@@ -943,6 +976,136 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
     
+    #endregion
+
+    #region Bitmap Prefetch Cache
+
+    private bool HasPrefetchedBitmap(int pageIndex)
+    {
+        lock (_bitmapPrefetchLock)
+        {
+            return _bitmapPrefetchCache.ContainsKey(pageIndex);
+        }
+    }
+
+    private Bitmap? TakePrefetchedBitmap(int pageIndex)
+    {
+        lock (_bitmapPrefetchLock)
+        {
+            if (_bitmapPrefetchCache.TryGetValue(pageIndex, out var bitmap))
+            {
+                _bitmapPrefetchCache.Remove(pageIndex);
+                return bitmap;
+            }
+            return null;
+        }
+    }
+
+    private void StorePrefetchedBitmap(int pageIndex, Bitmap bitmap)
+    {
+        lock (_bitmapPrefetchLock)
+        {
+            // Dispose existing entry if present
+            if (_bitmapPrefetchCache.TryGetValue(pageIndex, out var existing))
+            {
+                existing.Dispose();
+            }
+            _bitmapPrefetchCache[pageIndex] = bitmap;
+
+            // Evict entries furthest from the stored page when over limit
+            while (_bitmapPrefetchCache.Count > MaxPrefetchedBitmaps)
+            {
+                var toRemove = _bitmapPrefetchCache.Keys
+                    .MaxBy(k => Math.Abs(k - pageIndex))!;
+                if (_bitmapPrefetchCache.TryGetValue(toRemove, out var toDispose))
+                {
+                    toDispose.Dispose();
+                }
+                _bitmapPrefetchCache.Remove(toRemove);
+            }
+        }
+    }
+
+    private void ClearBitmapPrefetchCache()
+    {
+        lock (_bitmapPrefetchLock)
+        {
+            foreach (var bitmap in _bitmapPrefetchCache.Values)
+            {
+                bitmap.Dispose();
+            }
+            _bitmapPrefetchCache.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Pre-decode a page bitmap on a background thread so it is ready for instant display
+    /// </summary>
+    private async Task PrefetchPageBitmapAsync(int pageIndex)
+    {
+        if (Comic is null || pageIndex < 0 || pageIndex >= Comic.PageCount || IsTwoPageMode)
+        {
+            return;
+        }
+
+        // Skip if already prefetched
+        lock (_bitmapPrefetchLock)
+        {
+            if (_bitmapPrefetchCache.ContainsKey(pageIndex))
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var filePath = Comic.FilePath;
+            var pageData = await _comicReaderService.GetPageAsync(filePath, pageIndex);
+
+            // Decode bitmap on a background thread to avoid blocking the UI
+            var bitmap = await Task.Run(() =>
+            {
+                using var stream = new MemoryStream(pageData);
+                return new Bitmap(stream);
+            });
+
+            // Only cache if still reading the same comic
+            if (Comic?.FilePath == filePath)
+            {
+                StorePrefetchedBitmap(pageIndex, bitmap);
+            }
+            else
+            {
+                bitmap.Dispose();
+            }
+        }
+        catch
+        {
+            // Silently fail - prefetching is best-effort
+        }
+    }
+
+    /// <summary>
+    /// Kick off background prefetch tasks for the pages immediately before and after the current one
+    /// </summary>
+    private void PrefetchAdjacentPages(int currentPage)
+    {
+        if (Comic is null || IsTwoPageMode)
+        {
+            return;
+        }
+
+        if (currentPage + 1 < Comic.PageCount)
+        {
+            _ = PrefetchPageBitmapAsync(currentPage + 1);
+        }
+
+        if (currentPage - 1 >= 0)
+        {
+            _ = PrefetchPageBitmapAsync(currentPage - 1);
+        }
+    }
+
     #endregion
     
     #region Panel Navigation Methods
