@@ -17,7 +17,7 @@ namespace StripWolf.Services;
 /// </summary>
 public sealed class EpubToCbzConverterService
 {
-    private const string PaginationCss = "body { column-width: 100vw; column-gap: 0; height: 100vh; overflow: hidden; }";
+    private const string PaginationCss = "body { height: 100vh; overflow: hidden; }";
 
     private const string PaginationScriptTemplate = """
         <script>
@@ -25,6 +25,24 @@ public sealed class EpubToCbzConverterService
         window.__stripWolfPageCount = 1;
         window.__stripWolfGetPageCount = () => window.__stripWolfPageCount;
         (() => {
+            const notifyReady = () => {
+                window.__stripWolfReady = true;
+                try {
+                    if (window.chrome?.webview?.postMessage) {
+                        window.chrome.webview.postMessage('stripwolf-ready');
+                    }
+                } catch {
+                }
+                try {
+                    if (typeof window.StripWolfBridge?.onPaginationReady === 'function') {
+                        window.StripWolfBridge.onPaginationReady('stripwolf-ready');
+                    }
+                } catch {
+                }
+            };
+            const scheduleReady = () => {
+                requestAnimationFrame(() => requestAnimationFrame(notifyReady));
+            };
             const waitForAssets = async () => {
                 const images = Array.from(document.images || []);
                 await Promise.all(images.map(image => {
@@ -69,12 +87,12 @@ public sealed class EpubToCbzConverterService
             };
             const wrapReadingContent = () => {
                 const body = document.body;
-                if (!body || body.querySelector(':scope > .stripwolf-page-strip')) {
+                if (!body || body.querySelector(':scope > .stripwolf-page-viewport')) {
                     return;
                 }
 
-                const pageStrip = document.createElement('div');
-                pageStrip.className = 'stripwolf-page-strip';
+                const pageViewport = document.createElement('div');
+                pageViewport.className = 'stripwolf-page-viewport';
 
                 const contentWrapper = document.createElement('div');
                 contentWrapper.className = body.classList.contains('stripwolf-reading-page')
@@ -85,37 +103,36 @@ public sealed class EpubToCbzConverterService
                     contentWrapper.appendChild(body.firstChild);
                 }
 
-                pageStrip.appendChild(contentWrapper);
-                body.appendChild(pageStrip);
+                pageViewport.appendChild(contentWrapper);
+                body.appendChild(pageViewport);
             };
-            const settlePageOffset = (pageStrip, targetOffset, remainingFrames = 12) => {
-                const currentOffset = Math.abs(parseFloat(pageStrip.style.left || '0'));
+            const settlePageOffset = (pageScroller, targetOffset, remainingFrames = 12) => {
+                const currentOffset = Math.abs(pageScroller.scrollLeft || 0);
                 if (Math.abs(currentOffset - targetOffset) <= 1 || remainingFrames <= 0) {
-                    window.__stripWolfReady = true;
+                    scheduleReady();
                     return;
                 }
 
-                pageStrip.style.left = `${-targetOffset}px`;
-                requestAnimationFrame(() => settlePageOffset(pageStrip, targetOffset, remainingFrames - 1));
+                pageScroller.scrollLeft = targetOffset;
+                requestAnimationFrame(() => settlePageOffset(pageScroller, targetOffset, remainingFrames - 1));
             };
             const computePagination = () => {
-                const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0, 1);
-                const pageStrip = document.querySelector(':scope body > .stripwolf-page-strip') || document.querySelector('body > .stripwolf-page-strip');
-                if (!pageStrip) {
-                    return { pageCount: 1, maxScrollLeft: 0, pageStrip: null, viewportWidth };
+                const pageViewport = document.querySelector(':scope body > .stripwolf-page-viewport') || document.querySelector('body > .stripwolf-page-viewport');
+                const pageContent = pageViewport?.firstElementChild;
+                const viewportWidth = Math.max(pageViewport?.clientWidth || 0, window.innerWidth || 0, document.documentElement.clientWidth || 0, 1);
+                if (!pageViewport || !pageContent) {
+                    return { pageCount: 1, maxScrollLeft: 0, pageScroller: null, viewportWidth };
                 }
 
                 const totalScrollWidth = Math.max(
-                    pageStrip.scrollWidth || 0,
-                    document.documentElement.scrollWidth || 0,
-                    document.body ? document.body.scrollWidth : 0,
+                    pageContent.scrollWidth || 0,
                     viewportWidth);
-                const maxScrollLeft = Math.max(0, totalScrollWidth - viewportWidth);
+                const maxScrollLeft = Math.max(0, totalScrollWidth - (pageContent.clientWidth || viewportWidth));
                 const trailingOverflowTolerance = 32;
                 const pageCount = maxScrollLeft <= trailingOverflowTolerance
                     ? 1
                     : Math.ceil((maxScrollLeft - trailingOverflowTolerance) / viewportWidth) + 1;
-                return { pageCount, maxScrollLeft, pageStrip, viewportWidth };
+                return { pageCount, maxScrollLeft, pageScroller: pageContent, viewportWidth };
             };
             window.__stripWolfSetPage = (requestedPageIndex) => {
                 const pagination = computePagination();
@@ -123,15 +140,15 @@ public sealed class EpubToCbzConverterService
                 window.__stripWolfPageCount = pageCount;
                 window.__stripWolfGetPageCount = () => pageCount;
                 const safePageIndex = Math.max(0, Math.min(Number(requestedPageIndex) || 0, pageCount - 1));
-                if (!pagination.pageStrip) {
-                    window.__stripWolfReady = true;
+                if (!pagination.pageScroller) {
+                    scheduleReady();
                     return safePageIndex;
                 }
 
                 const targetScrollLeft = Math.min(safePageIndex * pagination.viewportWidth, pagination.maxScrollLeft);
                 window.__stripWolfReady = false;
-                pagination.pageStrip.style.left = `${-targetScrollLeft}px`;
-                requestAnimationFrame(() => settlePageOffset(pagination.pageStrip, targetScrollLeft));
+                pagination.pageScroller.scrollLeft = targetScrollLeft;
+                requestAnimationFrame(() => settlePageOffset(pagination.pageScroller, targetScrollLeft));
                 return safePageIndex;
             };
             window.addEventListener('load', async () => {
@@ -339,19 +356,20 @@ public sealed class EpubToCbzConverterService
             "<style id=\"stripwolf-pagination-style\">" + Environment.NewLine +
             "* { box-sizing: border-box; }" + Environment.NewLine +
             $"html {{ margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: {backgroundColor}; color: {foregroundColor}; }}" + Environment.NewLine +
-            $"body {{ margin: 0; padding: 0; width: 100vw; background: {backgroundColor}; color: {foregroundColor}; -webkit-column-width: 100vw; -webkit-column-gap: 0; -webkit-column-fill: auto; }}" + Environment.NewLine +
+            $"body {{ margin: 0; padding: 0; width: 100vw; background: {backgroundColor}; color: {foregroundColor}; }}" + Environment.NewLine +
             PaginationCss + Environment.NewLine +
-            $"body.stripwolf-reading-page {{ font-size: 1.3em; line-height: 1.55; color: {foregroundColor}; background: {backgroundColor}; }}" + Environment.NewLine +
-            "body > .stripwolf-page-strip { position: relative; left: 0; width: max-content; min-width: 100vw; }" + Environment.NewLine +
-            "body.stripwolf-reading-page > .stripwolf-page-strip > .stripwolf-reading-content { width: 100vw; padding: 5vh 6vw; }" + Environment.NewLine +
+            $"body.stripwolf-reading-page {{ font-size: 1.256em; line-height: 1.55; color: {foregroundColor}; background: {backgroundColor}; }}" + Environment.NewLine +
+            "body > .stripwolf-page-viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; }" + Environment.NewLine +
+            "body.stripwolf-reading-page > .stripwolf-page-viewport > .stripwolf-reading-content { width: 100vw; height: 100vh; padding: 3vh 6vw; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; column-width: calc(100vw - 12vw); column-gap: 12vw; column-fill: auto; -webkit-column-width: calc(100vw - 12vw); -webkit-column-gap: 12vw; -webkit-column-fill: auto; }" + Environment.NewLine +
+            "body.stripwolf-reading-page > .stripwolf-page-viewport > .stripwolf-reading-content::-webkit-scrollbar { display: none; }" + Environment.NewLine +
             $"body.stripwolf-reading-page p, body.stripwolf-reading-page li, body.stripwolf-reading-page div, body.stripwolf-reading-page blockquote {{ color: {foregroundColor}; }}" + Environment.NewLine +
             $"body.stripwolf-reading-page h1, body.stripwolf-reading-page h2, body.stripwolf-reading-page h3, body.stripwolf-reading-page h4, body.stripwolf-reading-page h5, body.stripwolf-reading-page h6 {{ color: {foregroundColor}; margin-top: 0; }}" + Environment.NewLine +
             $"body.stripwolf-reading-page small, body.stripwolf-reading-page figcaption {{ color: {mutedForegroundColor}; }}" + Environment.NewLine +
-            $"body.stripwolf-reading-page img, body.stripwolf-reading-page svg {{ margin-top: 0.5em; margin-bottom: 0.75em; }}" + Environment.NewLine +
+            $"body.stripwolf-reading-page img, body.stripwolf-reading-page svg {{ margin: 0.5em auto 0.75em; max-height: calc(100vh - 8vh); }}" + Environment.NewLine +
             "img, svg, video, canvas { display: block; max-width: 100%; max-height: 100vh; height: auto; break-inside: avoid-column; page-break-inside: avoid; }" + Environment.NewLine +
             $"a {{ color: {foregroundColor}; }}" + Environment.NewLine +
             $"body.stripwolf-single-visual-page {{ background: {backgroundColor}; }}" + Environment.NewLine +
-            "body.stripwolf-single-visual-page > .stripwolf-page-strip > .stripwolf-visual-content { display: flex; align-items: center; justify-content: center; width: 100vw; min-height: 100vh; }" + Environment.NewLine +
+            "body.stripwolf-single-visual-page > .stripwolf-page-viewport > .stripwolf-visual-content { display: flex; align-items: center; justify-content: center; width: 100vw; min-height: 100vh; }" + Environment.NewLine +
             "body.stripwolf-single-visual-page img, body.stripwolf-single-visual-page svg { width: 100%; height: 100vh; object-fit: contain; }" + Environment.NewLine +
             "</style>" + Environment.NewLine +
             PaginationScriptTemplate;

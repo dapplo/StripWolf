@@ -16,8 +16,8 @@ namespace StripWolf.Desktop.Services;
 /// </summary>
 public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 {
-    private const int PollDelayMilliseconds = 50;
-    private const int MaxReadyChecks = 120;
+    private const double RenderScale = 1.5;
+    private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(6);
     private const int SwHide = 0;
     private const int WsOverlapped = 0x00000000;
     private const int WsClipSiblings = 0x04000000;
@@ -97,34 +97,11 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         return windowHandle;
     }
 
-    private static async Task WaitForReadyAsync(CoreWebView2 coreWebView)
-    {
-        for (var attempt = 0; attempt < MaxReadyChecks; attempt++)
-        {
-            var isReadyJson = await coreWebView.ExecuteScriptAsync("window.__stripWolfReady === true");
-            var isReady = JsonSerializer.Deserialize<bool?>(isReadyJson) ?? false;
-            if (isReady)
-            {
-                return;
-            }
-
-            await Task.Delay(PollDelayMilliseconds);
-        }
-
-        throw new TimeoutException("Timed out waiting for WebView2 EPUB pagination to finish.");
-    }
-
     private static async Task<int> GetPageCountAsync(CoreWebView2 coreWebView)
     {
         var pageCountJson = await coreWebView.ExecuteScriptAsync("window.__stripWolfPageCount ?? 1");
         var parsed = JsonSerializer.Deserialize<int?>(pageCountJson);
         return Math.Max(1, parsed ?? 1);
-    }
-
-    private static async Task SetPageAsync(CoreWebView2 coreWebView, int pageIndex)
-    {
-        await coreWebView.ExecuteScriptAsync($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
-        await WaitForReadyAsync(coreWebView);
     }
 
     private static void CleanupTemporaryHtmlFile(string? temporaryHtmlPath)
@@ -174,6 +151,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         private readonly CoreWebView2Controller _controller;
         private readonly CoreWebView2 _coreWebView;
         private string? _temporaryHtmlPath;
+        private TaskCompletionSource? _readyCompletionSource;
         private bool _disposed;
 
         private PaginationSession(
@@ -186,6 +164,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             _hostWindow = hostWindow;
             _controller = controller;
             _coreWebView = coreWebView;
+            _coreWebView.WebMessageReceived += OnWebMessageReceived;
         }
 
         public static async Task<PaginationSession> CreateAsync(
@@ -201,6 +180,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             {
                 controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
                 controller.Bounds = new Rectangle(0, 0, viewportWidth, viewportHeight);
+                controller.RasterizationScale = RenderScale;
                 controller.IsVisible = true;
                 controller.DefaultBackgroundColor = DrawingColor.White;
 
@@ -222,6 +202,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public async Task LoadHtmlAsync(string htmlContent)
         {
             ThrowIfDisposed();
+            var readyTask = PrepareReadyAwaiter();
 
             var navigationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
@@ -251,7 +232,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
                 }
 
                 await navigationCompleted.Task;
-                await WaitForReadyAsync(_coreWebView);
+                await WaitForReadyAsync(readyTask, "Timed out waiting for WebView2 EPUB pagination to finish loading.");
 
                 CleanupTemporaryHtmlFile(_temporaryHtmlPath);
                 _temporaryHtmlPath = nextTemporaryHtmlPath;
@@ -282,7 +263,9 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public async Task CapturePageToStreamAsync(int pageIndex, Stream outputStream)
         {
             ThrowIfDisposed();
-            await SetPageAsync(_coreWebView, pageIndex);
+            var readyTask = PrepareReadyAwaiter();
+            await _coreWebView.ExecuteScriptAsync($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
+            await WaitForReadyAsync(readyTask, "Timed out waiting for WebView2 EPUB pagination to finish paging.");
             await _coreWebView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, outputStream);
         }
 
@@ -294,6 +277,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             }
 
             _disposed = true;
+            _coreWebView.WebMessageReceived -= OnWebMessageReceived;
             _controller.Close();
             DestroyWindow(_hostWindow);
             CleanupTemporaryHtmlFile(_temporaryHtmlPath);
@@ -304,6 +288,37 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         private void ThrowIfDisposed()
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+        }
+
+        private Task PrepareReadyAwaiter()
+        {
+            var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _readyCompletionSource = completionSource;
+            return completionSource.Task;
+        }
+
+        private static async Task WaitForReadyAsync(Task readyTask, string timeoutMessage)
+        {
+            try
+            {
+                await readyTask.WaitAsync(ReadyTimeout);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(timeoutMessage);
+            }
+        }
+
+        private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            if (!string.Equals(args.TryGetWebMessageAsString(), "stripwolf-ready", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var completionSource = _readyCompletionSource;
+            _readyCompletionSource = null;
+            completionSource?.TrySetResult();
         }
     }
 }

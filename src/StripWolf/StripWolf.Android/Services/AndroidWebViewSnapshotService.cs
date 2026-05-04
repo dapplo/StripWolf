@@ -6,6 +6,7 @@ using Android.Graphics;
 using Android.OS;
 using Android.Views;
 using Android.Webkit;
+using Java.Interop;
 using StripWolf.Services;
 
 namespace StripWolf.Android.Services;
@@ -15,8 +16,8 @@ namespace StripWolf.Android.Services;
 /// </summary>
 public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPaginationService
 {
-    private const int PollDelayMilliseconds = 50;
-    private const int MaxReadyChecks = 120;
+    private const double RenderScale = 1.5;
+    private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(6);
 
     static AndroidWebViewSnapshotService()
     {
@@ -116,34 +117,12 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         return temporaryHtmlPath;
     }
 
-    private static async Task WaitForReadyAsync(WebView webView)
-    {
-        for (var attempt = 0; attempt < MaxReadyChecks; attempt++)
-        {
-            var readyValue = await EvaluateJavascriptAsync(webView, "String(window.__stripWolfReady === true)");
-            if (string.Equals(UnwrapJavascriptString(readyValue), "true", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            await Task.Delay(PollDelayMilliseconds);
-        }
-
-        throw new TimeoutException("Timed out waiting for Android WebView EPUB pagination to finish.");
-    }
-
     private static async Task<int> GetPageCountAsync(WebView webView)
     {
         var pageCountValue = await EvaluateJavascriptAsync(webView, "String(window.__stripWolfPageCount ?? 1)");
         return int.TryParse(UnwrapJavascriptString(pageCountValue), out var pageCount)
             ? Math.Max(1, pageCount)
             : 1;
-    }
-
-    private static async Task SetPageAsync(WebView webView, int pageIndex)
-    {
-        await EvaluateJavascriptAsync(webView, $"window.__stripWolfSetPage({Math.Max(0, pageIndex)});");
-        await WaitForReadyAsync(webView);
     }
 
     private static Task<string?> EvaluateJavascriptAsync(WebView webView, string script)
@@ -253,6 +232,8 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         private string? _temporaryHtmlPath;
         private readonly int _viewportWidth;
         private readonly int _viewportHeight;
+        private readonly ReadyJavascriptBridge _readyBridge;
+        private TaskCompletionSource? _readyCompletionSource;
         private bool _disposed;
 
         private PaginationSession(
@@ -265,6 +246,7 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
             _webView = webView;
             _viewportWidth = viewportWidth;
             _viewportHeight = viewportHeight;
+            _readyBridge = new ReadyJavascriptBridge(this);
         }
 
         public static async Task<PaginationSession> CreateAsync(
@@ -279,8 +261,10 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
                 return await owner.RunOnUiThreadAsync(async () =>
                 {
                     webView = owner.CreateWebView();
+                    var session = new PaginationSession(owner, webView, viewportWidth, viewportHeight);
+                    webView.AddJavascriptInterface(session._readyBridge, "StripWolfBridge");
                     await Task.CompletedTask;
-                    return new PaginationSession(owner, webView, viewportWidth, viewportHeight);
+                    return session;
                 });
             }
             catch
@@ -355,11 +339,12 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
 
         private async Task LoadHtmlCoreAsync(string htmlContent)
         {
+            var readyTask = PrepareReadyAwaiter();
             string? nextTemporaryHtmlPath = null;
             try
             {
                 nextTemporaryHtmlPath = await AndroidWebViewSnapshotService.LoadHtmlAsync(_webView, htmlContent, _viewportWidth, _viewportHeight);
-                await WaitForReadyAsync(_webView);
+                await WaitForReadyAsync(readyTask, "Timed out waiting for Android WebView EPUB pagination to finish loading.");
 
                 CleanupTemporaryHtmlFile(_temporaryHtmlPath);
                 _temporaryHtmlPath = nextTemporaryHtmlPath;
@@ -373,16 +358,60 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
 
         private async Task CapturePageToStreamCoreAsync(int pageIndex, Stream outputStream)
         {
-            await SetPageAsync(_webView, pageIndex);
-            await Task.Delay(50);
-
-            using var bitmap = Bitmap.CreateBitmap(_viewportWidth, _viewportHeight, Bitmap.Config.Argb8888!);
-            bitmap!.Density = (int?)_webView.Resources?.DisplayMetrics?.DensityDpi ?? 160;
+            var readyTask = PrepareReadyAwaiter();
+            await EvaluateJavascriptAsync(_webView, $"window.__stripWolfSetPage({Math.Max(0, pageIndex)});");
+            await WaitForReadyAsync(readyTask, "Timed out waiting for Android WebView EPUB pagination to finish paging.");
+            var outputWidth = Math.Max(1, (int)Math.Ceiling(_viewportWidth * RenderScale));
+            var outputHeight = Math.Max(1, (int)Math.Ceiling(_viewportHeight * RenderScale));
+            using var bitmap = Bitmap.CreateBitmap(outputWidth, outputHeight, Bitmap.Config.Argb8888!);
+            bitmap!.Density = (int)Math.Round(((int?)_webView.Resources?.DisplayMetrics?.DensityDpi ?? 160) * RenderScale);
             using var canvas = new Canvas(bitmap!);
+            canvas.Scale((float)RenderScale, (float)RenderScale);
             bitmap.EraseColor(Color.White);
             _webView.Invalidate();
             _webView.Draw(canvas);
             bitmap.Compress(Bitmap.CompressFormat.Png!, 100, outputStream);
+        }
+
+        private Task PrepareReadyAwaiter()
+        {
+            var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _readyCompletionSource = completionSource;
+            return completionSource.Task;
+        }
+
+        private static async Task WaitForReadyAsync(Task readyTask, string timeoutMessage)
+        {
+            try
+            {
+                await readyTask.WaitAsync(ReadyTimeout);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(timeoutMessage);
+            }
+        }
+
+        private void NotifyReady(string? message)
+        {
+            if (!string.Equals(message, "stripwolf-ready", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var completionSource = _readyCompletionSource;
+            _readyCompletionSource = null;
+            completionSource?.TrySetResult();
+        }
+
+        private sealed class ReadyJavascriptBridge(PaginationSession owner) : Java.Lang.Object
+        {
+            [JavascriptInterface]
+            [Export("onPaginationReady")]
+            public void OnPaginationReady(string? message)
+            {
+                owner.NotifyReady(message);
+            }
         }
     }
 }
