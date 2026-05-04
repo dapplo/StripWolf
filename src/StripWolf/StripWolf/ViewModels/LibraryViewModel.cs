@@ -154,7 +154,7 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private void ViewSeriesOnKomga(Comic comic)
     {
-        if (comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaSeriesId))
+        if (!string.IsNullOrEmpty(comic.KomgaSeriesId))
         {
             ViewKomgaSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
             {

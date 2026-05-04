@@ -56,6 +56,24 @@ public partial class LibraryView : UserControl
         await OpenFilePickerAsync();
     }
 
+    private void OnComicInfoBackdropPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel && viewModel.SelectedInfoComic is not null)
+        {
+            viewModel.CloseComicInfoCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewSeriesOnKomgaClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel && viewModel.SelectedInfoComic is not null)
+        {
+            viewModel.ViewSeriesOnKomgaCommand.Execute(viewModel.SelectedInfoComic);
+            e.Handled = true;
+        }
+    }
+
     public async Task OpenFilePickerAsync()
     {
         var topLevel = TopLevel.GetTopLevel(this);

@@ -352,8 +352,9 @@
     <!-- Comic Info Overlay -->
     <Panel Grid.RowSpan="2" IsVisible="{Binding SelectedInfoComic, Converter={x:Static ObjectConverters.IsNotNull}}">
       <!-- Click background to close -->
-      <Button Background="#80000000" Command="{Binding CloseComicInfoCommand}" 
-              HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" BorderThickness="0"/>
+      <Border Background="#80000000"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+              PointerPressed="OnComicInfoBackdropPressed"/>
       
       <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
               CornerRadius="8" Padding="0" MaxWidth="500" Margin="24"
@@ -389,7 +390,7 @@
                          <TextBlock Text="{Binding PageCount}" FontSize="16"/>
                       </StackPanel>
                     </Grid>
-                    <Button Content="🌐 View Series on Komga" Command="{Binding ((vm:LibraryViewModel)DataContext).ViewSeriesOnKomgaCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                    <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
                       <Button.IsVisible>
                          <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                       </Button.IsVisible>

@@ -570,12 +570,12 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ViewSeriesOnKomga()
+    private async Task ViewSeriesOnKomga()
     {
-        if (Comic?.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaSeriesId))
+        if (Comic is not null && !string.IsNullOrEmpty(Comic.KomgaSeriesId))
         {
-            // Close reader and navigate
-            _ = GoBackAsync();
+            IsInfoPanelVisible = false;
+            await SaveProgressAsync();
             ViewSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
             {
                 SeriesId = Comic.KomgaSeriesId,

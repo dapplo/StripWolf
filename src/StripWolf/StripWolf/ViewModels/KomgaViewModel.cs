@@ -963,6 +963,10 @@ public partial class KomgaViewModel : ViewModelBase
 
             RefreshHomeSectionVisibilityState();
         }
+        catch (OperationCanceledException)
+        {
+            // Navigation can cancel in-flight refresh work when switching context.
+        }
         catch (Exception ex)
         {
             ErrorMessage = $"Failed to load libraries: {ex.Message}";
@@ -1007,6 +1011,10 @@ public partial class KomgaViewModel : ViewModelBase
                 
                 await SelectSeriesAsync(CreateSeriesDisplay(series, null));
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when a previous load is replaced by a newer navigation request.
         }
         catch (Exception ex)
         {

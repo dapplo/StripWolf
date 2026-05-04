@@ -46,7 +46,12 @@ public partial class MainViewModel : ViewModelBase
 
     private async void OnViewKomgaSeriesRequested(object? sender, KomgaSeriesNavigationRequest request)
     {
-        SelectedTabIndex = 1; // Switch to Komga tab
+        if (sender == _readerViewModel || IsInReader)
+        {
+            IsInReader = false;
+        }
+
+        ActivateTab(1);
         await _komgaViewModel.LoadSeriesByIdAsync(request.SeriesId, request.ServerId);
     }
 
@@ -69,32 +74,47 @@ public partial class MainViewModel : ViewModelBase
     {
         if (!IsInReader)
         {
-            CurrentView = value switch
-            {
-                0 => _libraryViewModel,
-                1 => _komgaViewModel,
-                2 => _settingsViewModel,
-                _ => _libraryViewModel
-            };
+            CurrentView = GetViewForTab(value);
+        }
+    }
+
+    private ViewModelBase GetViewForTab(int tabIndex)
+    {
+        return tabIndex switch
+        {
+            0 => _libraryViewModel,
+            1 => _komgaViewModel,
+            2 => _settingsViewModel,
+            _ => _libraryViewModel
+        };
+    }
+
+    private void ActivateTab(int tabIndex)
+    {
+        SelectedTabIndex = tabIndex;
+
+        if (!IsInReader)
+        {
+            CurrentView = GetViewForTab(tabIndex);
         }
     }
 
     [RelayCommand]
     private void NavigateToLibrary()
     {
-        SelectedTabIndex = 0;
+        ActivateTab(0);
     }
 
     [RelayCommand]
     private void NavigateToKomga()
     {
-        SelectedTabIndex = 1;
+        ActivateTab(1);
     }
 
     [RelayCommand]
     private void NavigateToSettings()
     {
-        SelectedTabIndex = 2;
+        ActivateTab(2);
     }
 
     [RelayCommand]
@@ -109,7 +129,7 @@ public partial class MainViewModel : ViewModelBase
     private void CloseReader()
     {
         IsInReader = false;
-        CurrentView = _libraryViewModel;
+        ActivateTab(0);
         // Refresh the library to show updated progress
         _ = _libraryViewModel.RefreshCommand.ExecuteAsync(null);
     }
