@@ -21,6 +21,12 @@ public partial class App : Application
     /// </summary>
     public static Action<IServiceCollection>? RegisterPdfRenderer { get; set; }
 
+    /// <summary>
+    /// Action to register the platform-specific off-screen WebView snapshot service.
+    /// Set this before Initialize() is called if you need a custom renderer for EPUB pagination.
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterWebViewSnapshotService { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -118,7 +124,19 @@ public partial class App : Application
         }
     #endif
 
+        if (RegisterWebViewSnapshotService != null)
+        {
+            RegisterWebViewSnapshotService(services);
+        }
+        else
+        {
+            services.AddSingleton<IWebViewPaginationService, UnsupportedWebViewSnapshotService>();
+        }
+
+        services.AddSingleton<IWebViewSnapshotService>(serviceProvider =>
+            serviceProvider.GetRequiredService<IWebViewPaginationService>());
         services.AddSingleton<PdfToCbzConverterService>();
+        services.AddSingleton<IEpubToCbzConverter, EpubToCbzConverterService>();
         services.AddSingleton<LibraryService>();
 
         // Register view models

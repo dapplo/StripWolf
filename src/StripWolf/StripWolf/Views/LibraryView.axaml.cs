@@ -90,7 +90,7 @@ public partial class LibraryView : UserControl
             [
                 new FilePickerFileType("Comic Files")
                 {
-                    Patterns = ["*.cbz", "*.cbr"]
+                    Patterns = ["*.cbz", "*.cbr", "*.cb7", "*.cbt", "*.epub"]
                 },
                 new FilePickerFileType("PDF Files")
                 {

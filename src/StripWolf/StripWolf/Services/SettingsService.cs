@@ -340,6 +340,12 @@ public class AppSettings
     /// </summary>
     public bool CompactOverview { get; set; } = false;
 
+    /// <summary>
+    /// Theme to use when converting EPUB pages into rendered images.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.Light;
+
     public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
 
     public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
@@ -372,6 +378,7 @@ public class AppSettings
             Handedness = Handedness,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
             CompactOverview = CompactOverview,
+            EpubConversionTheme = EpubConversionTheme,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList()
         };

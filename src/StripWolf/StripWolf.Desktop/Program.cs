@@ -1,5 +1,8 @@
 using System;
 using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
+using StripWolf.Desktop.Services;
+using StripWolf.Services;
 
 namespace StripWolf.Desktop;
 
@@ -14,8 +17,22 @@ sealed class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
+    {
+        App.RegisterWebViewSnapshotService = services =>
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                services.AddSingleton<IWebViewPaginationService, WindowsWebView2SnapshotService>();
+            }
+            else
+            {
+                services.AddSingleton<IWebViewPaginationService, UnsupportedWebViewSnapshotService>();
+            }
+        };
+
+        return AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+    }
 }

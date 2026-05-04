@@ -176,7 +176,8 @@ public enum ComicFormat
     Cbr,
     Cb7,
     Cbt,
-    Pdf
+    Pdf,
+    Epub
 }
 
 public enum ComicSource

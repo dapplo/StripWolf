@@ -16,9 +16,11 @@
     <PackageVersion Include="Avalonia.Android" Version="12.0.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3065.39" />
     <PackageVersion Include="PDFiumCore" Version="148.0.7763" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.92.0" />
+    <PackageVersion Include="VersOne.Epub" Version="3.3.6" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.2.0.2" />
     <!-- For SQLite local storage -->
     <PackageVersion Include="sqlite-net-pcl" Version="1.9.172" />

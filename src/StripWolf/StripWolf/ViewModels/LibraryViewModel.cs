@@ -475,6 +475,7 @@ public partial class LibraryViewModel : ViewModelBase
             pending.Status = format switch
             {
                 ComicFormat.Pdf => "Converting PDF...",
+                ComicFormat.Epub => "Converting EPUB...",
                 ComicFormat.Cb7 => "Converting CB7...",
                 ComicFormat.Cbt => "Converting CBT...",
                 _ => "Importing..."

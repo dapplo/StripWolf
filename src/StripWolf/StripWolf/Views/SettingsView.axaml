@@ -135,6 +135,18 @@
               <TextBlock Text="When enabled, the overview side will only take up as much space as needed by the page aspect ratio, giving more space to the zoomed area."
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
+
+            <Separator/>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="EPUB Conversion Theme" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableEpubConversionThemes}"
+                        SelectedItem="{Binding SelectedEpubConversionTheme}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Text="Controls whether EPUB pages are rendered with a light or dark reading theme during conversion to CBZ."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
           </StackPanel>
         </Border>
 

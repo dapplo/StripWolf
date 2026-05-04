@@ -22,7 +22,9 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
         // Register Android-specific PDF renderer before the app initializes
         App.RegisterPdfRenderer = services => 
             services.AddSingleton<IPdfRenderer, AndroidPdfRenderer>();
-            
+        App.RegisterWebViewSnapshotService = services =>
+            services.AddSingleton<IWebViewPaginationService, AndroidWebViewSnapshotService>();
+             
         return base.CustomizeAppBuilder(builder)
             .WithInterFont();
     }

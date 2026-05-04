@@ -74,6 +74,9 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _compactOverview;
 
     [ObservableProperty]
+    private EpubConversionTheme _selectedEpubConversionTheme = EpubConversionTheme.Light;
+
+    [ObservableProperty]
     private ObservableCollection<SectionLayoutPreference> _librarySections = [];
 
     [ObservableProperty]
@@ -90,6 +93,9 @@ public partial class SettingsViewModel : ViewModelBase
     /// </summary>
     public IReadOnlyList<Handedness> AvailableHandednessOptions { get; } = 
         [Handedness.RightHanded, Handedness.LeftHanded];
+
+    public IReadOnlyList<EpubConversionTheme> AvailableEpubConversionThemes { get; } =
+        [EpubConversionTheme.Light, EpubConversionTheme.Dark];
 
     private KomgaServer? _editingServer;
 
@@ -241,6 +247,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedReadingMode = _appSettings.PreferredReadingMode;
         SelectedHandedness = _appSettings.Handedness;
         CompactOverview = _appSettings.CompactOverview;
+        SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
@@ -286,6 +293,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.Handedness = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedEpubConversionThemeChanged(EpubConversionTheme value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.EpubConversionTheme = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

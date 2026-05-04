@@ -8,7 +8,7 @@ using SharpCompress.Archives.Tar;
 namespace StripWolf.Services;
 
 /// <summary>
-/// Service for reading comic book archives (CBZ, CBR, CB7, and CBT files)
+/// Service for reading comic book archives after import/conversion.
 /// </summary>
 public class ComicReaderService
 {
@@ -29,6 +29,7 @@ public class ComicReaderService
             ".cb7" => ComicFormat.Cb7,
             ".cbt" => ComicFormat.Cbt,
             ".pdf" => ComicFormat.Pdf,
+            ".epub" => ComicFormat.Epub,
             _ => ComicFormat.Unknown
         };
     }

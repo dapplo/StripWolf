@@ -14,7 +14,9 @@ public class LibraryService
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
     private readonly PdfToCbzConverterService _pdfConverter;
+    private readonly IEpubToCbzConverter _epubConverter;
     private readonly ComicConverterService _comicConverter;
+    private readonly string _appDataDirectory;
     private readonly string _comicsDirectory;
     private readonly string _coversDirectory;
 
@@ -28,17 +30,19 @@ public class LibraryService
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
         PdfToCbzConverterService pdfConverter,
+        IEpubToCbzConverter epubConverter,
         ComicConverterService comicConverter)
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
         _pdfConverter = pdfConverter;
+        _epubConverter = epubConverter;
         _comicConverter = comicConverter;
         
-        var appDataDir = GetAppDataDirectory();
-        _comicsDirectory = Path.Combine(appDataDir, "Comics");
-        _coversDirectory = Path.Combine(appDataDir, "Covers");
+        _appDataDirectory = GetAppDataDirectory();
+        _comicsDirectory = Path.Combine(_appDataDirectory, "Comics");
+        _coversDirectory = Path.Combine(_appDataDirectory, "Covers");
         
         Directory.CreateDirectory(_comicsDirectory);
         Directory.CreateDirectory(_coversDirectory);
@@ -54,6 +58,40 @@ public class LibraryService
         // Cross-platform app data directory
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(baseDir, "StripWolf");
+    }
+
+    private bool IsAppOwnedSourcePath(string filePath)
+    {
+        return IsPathWithinDirectory(filePath, _appDataDirectory);
+    }
+
+    private static bool IsPathWithinDirectory(string filePath, string directoryPath)
+    {
+        var fullFilePath = Path.GetFullPath(filePath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullDirectoryPath = Path.GetFullPath(directoryPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return fullFilePath.StartsWith(fullDirectoryPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(fullFilePath, fullDirectoryPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task DeleteManagedSourceFileAsync(string filePath)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            try
+            {
+                File.Delete(filePath);
+                return;
+            }
+            catch
+            {
+                await Task.Delay(500);
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete managed source file '{filePath}' after conversion.");
     }
 
     /// <summary>
@@ -233,12 +271,13 @@ public class LibraryService
         var format = ComicReaderService.GetComicFormat(filePath);
         if (format == ComicFormat.Unknown)
         {
-            throw new NotSupportedException("Unsupported comic format. Only CBZ, CBR, CB7, CBT, and PDF files are supported.");
+            throw new NotSupportedException("Unsupported comic format. Only CBZ, CBR, CB7, CBT, PDF, and EPUB files are supported.");
         }
 
         // Determine if conversion to CBZ is needed
         string actualFilePath = filePath;
-        var needsConversion = format == ComicFormat.Pdf || 
+        var needsConversion = format == ComicFormat.Pdf ||
+                              format == ComicFormat.Epub ||
                               format == ComicFormat.Cb7 || 
                               format == ComicFormat.Cbt ||
                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
@@ -250,35 +289,19 @@ public class LibraryService
                 // PDF conversion
                 actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
             }
+            else if (format == ComicFormat.Epub)
+            {
+                actualFilePath = await _epubConverter.ConvertEpubToCbzAsync(filePath, _comicsDirectory, progress: progress);
+            }
             else
             {
                 // Convert CB7, CBT, or solid CBR to CBZ
                 actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, progress);
             }
-            
-            // Delete original file if it was converted and moved to comics directory
-            if (actualFilePath != filePath && File.Exists(filePath))
+
+            if (actualFilePath != filePath && File.Exists(filePath) && IsAppOwnedSourcePath(filePath))
             {
-                // Add a small delay and retry to allow system to release locks
-                bool deleted = false;
-                for (int i = 0; i < 5; i++)
-                {
-                    try
-                    {
-                        File.Delete(filePath);
-                        deleted = true;
-                        break;
-                    }
-                    catch
-                    {
-                        await Task.Delay(500);
-                    }
-                }
-                
-                if (!deleted)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
-                }
+                await DeleteManagedSourceFileAsync(filePath);
             }
         }
 
@@ -362,6 +385,7 @@ public class LibraryService
             "application/x-7z-compressed" => ".cb7",
             "application/x-tar" => ".cbt",
             "application/pdf" => ".pdf",
+            "application/epub+zip" => ".epub",
             _ => ".cbz"
         };
 
@@ -384,6 +408,7 @@ public class LibraryService
             // Check if downloaded file needs conversion (solid RAR, CB7, CBT, PDF)
             var format = ComicReaderService.GetComicFormat(filePath);
             var needsConversion = format == ComicFormat.Pdf ||
+                                  format == ComicFormat.Epub ||
                                   format == ComicFormat.Cb7 || 
                                   format == ComicFormat.Cbt ||
                                   (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
@@ -395,6 +420,10 @@ public class LibraryService
                 if (format == ComicFormat.Pdf)
                 {
                     actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+                }
+                else if (format == ComicFormat.Epub)
+                {
+                    actualFilePath = await _epubConverter.ConvertEpubToCbzAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
                 }
                 else
                 {
@@ -626,7 +655,8 @@ public class LibraryService
                         f.EndsWith(".cbr", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".cb7", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".cbt", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+                        f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                        f.EndsWith(".epub", StringComparison.OrdinalIgnoreCase));
 
         foreach (var file in files)
         {

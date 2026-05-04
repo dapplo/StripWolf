@@ -18,7 +18,7 @@ public static class ComicConstants
     /// </summary>
     public static readonly string[] ComicExtensions = 
     [
-        ".cbz", ".cbr", ".cb7", ".cbt", ".pdf"
+        ".cbz", ".cbr", ".cb7", ".cbt", ".pdf", ".epub"
     ];
 
     /// <summary>
