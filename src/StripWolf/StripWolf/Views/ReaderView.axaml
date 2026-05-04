@@ -129,11 +129,56 @@
         </Grid>
         
         <Button Grid.Column="2" Command="{Binding GoToNextPageCommand}"
-                Background="Transparent" Foreground="White" IsEnabled="{Binding HasNextPage}">
+                Background="Transparent" Foreground="White" IsEnabled="{Binding CanAdvanceOrShowEndChoices}">
           <TextBlock Text="▶" FontSize="28"/>
         </Button>
       </Grid>
     </Border>
+
+    <!-- End Of Comic Overlay -->
+    <Panel IsVisible="{Binding IsEndOfComicOptionsVisible}" ZIndex="110">
+      <Button Background="#F0000000" Command="{Binding DismissEndOfComicOptionsCommand}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" BorderThickness="0"/>
+
+      <Border Background="#E0222222" CornerRadius="8" Padding="24" MaxWidth="520" Margin="24"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 4 20 0 #40000000">
+        <StackPanel Spacing="16">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="End of Comic" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <Button Grid.Column="1" Command="{Binding DismissEndOfComicOptionsCommand}"
+                    Background="Transparent" Foreground="White">
+              <TextBlock Text="✕" FontSize="24"/>
+            </Button>
+          </Grid>
+
+          <TextBlock Text="What would you like to do next?" Foreground="White" Opacity="0.9" FontSize="16"/>
+
+          <Button Command="{Binding OpenNextSeriesComicCommand}" IsEnabled="{Binding HasNextSeriesComic}"
+                  Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                  HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center">
+            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+              <TextBlock Text="Open Next in Series" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+              <TextBlock Text="{Binding NextSeriesComicTitle}" FontSize="12" Opacity="0.85"
+                         HorizontalAlignment="Center" IsVisible="{Binding HasNextSeriesComic}"/>
+            </StackPanel>
+          </Button>
+
+          <TextBlock Text="No next comic from this series is available locally."
+                     Foreground="#CCCCCC" FontSize="12"
+                     IsVisible="{Binding !HasNextSeriesComic}"/>
+
+          <Button Content="🌐 View Series on Komga" Command="{Binding ViewSeriesOnKomgaCommand}"
+                  Background="#444" Foreground="White"
+                  HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"
+                  IsVisible="{Binding CanViewSeriesOnKomgaOption}"/>
+
+          <Button Content="📚 Back to Library" Command="{Binding ReturnToLibraryCommand}"
+                  Background="#444" Foreground="White"
+                  HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+      </Border>
+    </Panel>
 
     <!-- Info Panel Overlay -->
     <Panel IsVisible="{Binding IsInfoPanelVisible}" ZIndex="100">

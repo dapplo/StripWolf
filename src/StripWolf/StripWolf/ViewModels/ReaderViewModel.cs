@@ -22,6 +22,8 @@ public partial class ReaderViewModel : ViewModelBase
     private int _comicId;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanAdvanceOrShowEndChoices))]
+    [NotifyPropertyChangedFor(nameof(CanViewSeriesOnKomgaOption))]
     private Comic? _comic;
 
     [ObservableProperty]
@@ -90,10 +92,22 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isInfoPanelVisible;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextSeriesComic))]
+    [NotifyPropertyChangedFor(nameof(NextSeriesComicTitle))]
+    private Comic? _nextSeriesComic;
+
+    [ObservableProperty]
+    private bool _isEndOfComicOptionsVisible;
+
     public string FormattedFileSize => Comic is null ? "" : FormatBytes(Comic.FileSize);
     public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
     public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
     public string Location => Comic?.FilePath ?? "";
+    public bool CanAdvanceOrShowEndChoices => Comic is not null && Comic.PageCount > 0;
+    public bool CanViewSeriesOnKomgaOption => !string.IsNullOrEmpty(Comic?.KomgaSeriesId);
+    public bool HasNextSeriesComic => NextSeriesComic is not null;
+    public string NextSeriesComicTitle => NextSeriesComic?.Title ?? string.Empty;
 
     public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
 
@@ -310,6 +324,9 @@ public partial class ReaderViewModel : ViewModelBase
         {
             IsBusy = true;
             ErrorMessage = null;
+            IsInfoPanelVisible = false;
+            IsEndOfComicOptionsVisible = false;
+            NextSeriesComic = null;
             
             // Clear previous comic data
             _panelDetectionService.ClearAllCache();
@@ -328,6 +345,7 @@ public partial class ReaderViewModel : ViewModelBase
             if (Comic is not null)
             {
                 Title = Comic.Title;
+                await RefreshSeriesNavigationTargetsAsync();
                 
                 // Sync with Komga if this is a Komga comic
                 if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
@@ -540,6 +558,11 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     public event EventHandler<KomgaSeriesNavigationRequest>? ViewSeriesRequested;
 
+    /// <summary>
+    /// Event raised when another comic should be opened in the reader.
+    /// </summary>
+    public event EventHandler<int>? ComicOpenRequested;
+
     [RelayCommand]
     private async Task ToggleFavoriteAsync()
     {
@@ -547,7 +570,11 @@ public partial class ReaderViewModel : ViewModelBase
         await _libraryService.ToggleFavoriteAsync(Comic.Id);
         // Refresh local comic object
         var updated = await _libraryService.GetComicAsync(Comic.Id);
-        if (updated != null) Comic = updated;
+        if (updated != null)
+        {
+            Comic = updated;
+            await RefreshSeriesNavigationTargetsAsync();
+        }
     }
 
     [RelayCommand]
@@ -574,6 +601,7 @@ public partial class ReaderViewModel : ViewModelBase
     {
         if (Comic is not null && !string.IsNullOrEmpty(Comic.KomgaSeriesId))
         {
+            IsEndOfComicOptionsVisible = false;
             IsInfoPanelVisible = false;
             await SaveProgressAsync();
             ViewSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
@@ -602,17 +630,24 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoToNextPageAsync()
     {
+        if (Comic is null)
+        {
+            return;
+        }
+
         if (!HasNextPage)
         {
+            if (IsLastPage)
+            {
+                await ShowEndOfComicOptionsAsync();
+            }
+
             return;
         }
 
         // In two-page mode, advance 2 pages
         var step = IsTwoPageMode ? 2 : 1;
-        if (Comic is not null)
-        {
-            CurrentPage = Math.Min(Comic.PageCount - 1, CurrentPage + step);
-        }
+        CurrentPage = Math.Min(Comic.PageCount - 1, CurrentPage + step);
         await LoadPageAsync();
         await SaveProgressAsync();
     }
@@ -728,6 +763,34 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         IsInfoPanelVisible = true;
+    }
+
+    [RelayCommand]
+    private void DismissEndOfComicOptions()
+    {
+        IsEndOfComicOptionsVisible = false;
+    }
+
+    [RelayCommand]
+    private async Task OpenNextSeriesComicAsync()
+    {
+        if (NextSeriesComic is null)
+        {
+            return;
+        }
+
+        IsEndOfComicOptionsVisible = false;
+        IsInfoPanelVisible = false;
+        await SaveProgressAsync();
+        ComicOpenRequested?.Invoke(this, NextSeriesComic.Id);
+    }
+
+    [RelayCommand]
+    private async Task ReturnToLibraryAsync()
+    {
+        IsEndOfComicOptionsVisible = false;
+        IsInfoPanelVisible = false;
+        await GoBackAsync();
     }
 
     private async Task SaveProgressAsync()
@@ -1145,6 +1208,10 @@ public partial class ReaderViewModel : ViewModelBase
                 CurrentPanel = CurrentPagePanels.Panels[0];
             }
         }
+        else if (IsLastPage)
+        {
+            await ShowEndOfComicOptionsAsync();
+        }
     }
     
     /// <summary>
@@ -1271,6 +1338,21 @@ public partial class ReaderViewModel : ViewModelBase
     {
         await SaveProgressAsync();
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task RefreshSeriesNavigationTargetsAsync()
+    {
+        NextSeriesComic = Comic is null
+            ? null
+            : await _libraryService.GetNextComicInSeriesAsync(Comic.Id);
+    }
+
+    private async Task ShowEndOfComicOptionsAsync()
+    {
+        IsInfoPanelVisible = false;
+        IsControlsVisible = true;
+        await RefreshSeriesNavigationTargetsAsync();
+        IsEndOfComicOptionsVisible = true;
     }
 }
 

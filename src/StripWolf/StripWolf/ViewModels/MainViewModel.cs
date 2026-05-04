@@ -41,6 +41,7 @@ public partial class MainViewModel : ViewModelBase
         _libraryViewModel.ComicOpenRequested += OnComicOpenRequested;
         _libraryViewModel.ViewKomgaSeriesRequested += OnViewKomgaSeriesRequested;
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
+        _readerViewModel.ComicOpenRequested += OnComicOpenRequested;
         _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
     }
 

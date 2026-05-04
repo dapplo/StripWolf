@@ -142,11 +142,46 @@ public class LibraryService
     }
 
     /// <summary>
+    /// Gets the next locally available comic in the same series, based on library series ordering.
+    /// </summary>
+    public async Task<Comic?> GetNextComicInSeriesAsync(int comicId)
+    {
+        var currentComic = await _databaseService.GetComicAsync(comicId);
+        if (currentComic is null || string.IsNullOrWhiteSpace(currentComic.SeriesName))
+        {
+            return null;
+        }
+
+        var normalizedSeriesName = NormalizeSeriesName(currentComic.SeriesName);
+        var orderedSeriesComics = (await _databaseService.GetComicsAsync())
+            .Where(comic => !string.IsNullOrWhiteSpace(comic.SeriesName) &&
+                            string.Equals(NormalizeSeriesName(comic.SeriesName!), normalizedSeriesName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(comic => comic.Number ?? float.MaxValue)
+            .ThenBy(comic => comic.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(comic => comic.Id)
+            .ToList();
+
+        var currentIndex = orderedSeriesComics.FindIndex(comic => comic.Id == comicId);
+        if (currentIndex < 0 || currentIndex >= orderedSeriesComics.Count - 1)
+        {
+            return null;
+        }
+
+        return orderedSeriesComics[currentIndex + 1];
+    }
+
+    /// <summary>
     /// Searches comics by title, series name, or authors
     /// </summary>
     public Task<List<Comic>> SearchComicsAsync(string searchText)
     {
         return _databaseService.SearchComicsAsync(searchText);
+    }
+
+    private static string NormalizeSeriesName(string seriesName)
+    {
+        return string.Join(' ', seriesName
+            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
     }
 
     /// <summary>
