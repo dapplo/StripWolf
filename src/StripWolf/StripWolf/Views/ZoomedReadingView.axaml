@@ -19,6 +19,7 @@
                         <Image x:Name="OverviewImageLeft" 
                                Source="{Binding CurrentPageImage}" 
                                Stretch="None"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Top"/>
                         <Canvas x:Name="OverviewCanvasLeft" Background="Transparent"/>
@@ -32,6 +33,7 @@
                         <Image x:Name="ZoomedAreaImageLeft" 
                                Source="{Binding CurrentPageImage}"
                                Stretch="Fill"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Top"/>
                     </Canvas>
@@ -48,6 +50,7 @@
                         <Image x:Name="ZoomedAreaImageRight" 
                                Source="{Binding CurrentPageImage}"
                                Stretch="Fill"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Top"/>
                     </Canvas>
@@ -60,6 +63,7 @@
                         <Image x:Name="OverviewImageRight" 
                                Source="{Binding CurrentPageImage}" 
                                Stretch="None"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Top"/>
                         <Canvas x:Name="OverviewCanvasRight" Background="Transparent"/>

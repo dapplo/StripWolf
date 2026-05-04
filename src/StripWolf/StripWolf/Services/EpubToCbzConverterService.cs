@@ -17,6 +17,8 @@ namespace StripWolf.Services;
 /// </summary>
 public sealed class EpubToCbzConverterService
 {
+    private const int DefaultViewportWidth = 700;
+    private const int DefaultViewportHeight = 1050;
     private const string PaginationCss = "body { height: 100vh; overflow: hidden; }";
 
     private const string PaginationScriptTemplate = """
@@ -119,7 +121,10 @@ public sealed class EpubToCbzConverterService
             const computePagination = () => {
                 const pageViewport = document.querySelector(':scope body > .stripwolf-page-viewport') || document.querySelector('body > .stripwolf-page-viewport');
                 const pageContent = pageViewport?.firstElementChild;
-                const viewportWidth = Math.max(pageViewport?.clientWidth || 0, window.innerWidth || 0, document.documentElement.clientWidth || 0, 1);
+                const forcedViewportWidth = Number(window.__stripWolfPaginationViewportWidth) || 0;
+                const viewportWidth = forcedViewportWidth > 0
+                    ? forcedViewportWidth
+                    : Math.max(pageViewport?.clientWidth || 0, window.innerWidth || 0, document.documentElement.clientWidth || 0, 1);
                 if (!pageViewport || !pageContent) {
                     return { pageCount: 1, maxScrollLeft: 0, pageScroller: null, viewportWidth };
                 }
@@ -176,8 +181,8 @@ public sealed class EpubToCbzConverterService
     public async Task<string> ConvertEpubToCbzAsync(
         string epubFilePath,
         string outputDirectory,
-        int viewportWidth = 700,
-        int viewportHeight = 1050,
+        int viewportWidth = DefaultViewportWidth,
+        int viewportHeight = DefaultViewportHeight,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -206,6 +211,7 @@ public sealed class EpubToCbzConverterService
         {
             var settings = _settingsService.LoadSettings();
             var conversionTheme = ResolveConversionTheme(settings.EpubConversionTheme);
+            var renderScale = ResolveRenderScale(settings.EpubOutputResolution);
             var book = await EpubReader.ReadBookAsync(epubFilePath);
             await MaterializeContentAsync(book, tempRoot, cancellationToken);
 
@@ -214,7 +220,8 @@ public sealed class EpubToCbzConverterService
             using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
             await using var paginationSession = await _webViewPaginationService.CreatePaginationSessionAsync(
                 viewportWidth,
-                viewportHeight);
+                viewportHeight,
+                renderScale);
 
             var renderedPageIndex = 0;
             var totalChapterCount = Math.Max(book.ReadingOrder.Count, 1);
@@ -387,6 +394,16 @@ public sealed class EpubToCbzConverterService
         return Application.Current?.ActualThemeVariant == ThemeVariant.Dark
             ? EpubConversionTheme.Dark
             : EpubConversionTheme.Light;
+    }
+
+    private static double ResolveRenderScale(EpubOutputResolution outputResolution)
+    {
+        return outputResolution switch
+        {
+            EpubOutputResolution.Medium => 2,
+            EpubOutputResolution.High => 3,
+            _ => 1
+        };
     }
 
     private static Uri CreateChapterBaseUri(string rootDirectory, string chapterKey)

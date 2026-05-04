@@ -45,7 +45,7 @@ public interface IWebViewPaginationService : IWebViewSnapshotService
     /// <summary>
     /// Creates an empty reusable pagination session for the supplied viewport.
     /// </summary>
-    Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight);
+    Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight, double renderScale = 1);
 
     /// <summary>
     /// Renders the supplied HTML and returns the total number of paged columns.
@@ -55,5 +55,5 @@ public interface IWebViewPaginationService : IWebViewSnapshotService
     /// <summary>
     /// Loads the supplied HTML once and returns a session that can paginate and capture multiple pages.
     /// </summary>
-    Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight);
+    Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight, double renderScale = 1);
 }

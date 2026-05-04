@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Avalonia;
+using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Models;
@@ -74,7 +76,13 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _compactOverview;
 
     [ObservableProperty]
+    private AppThemePreference _selectedAppTheme = AppThemePreference.System;
+
+    [ObservableProperty]
     private EpubConversionTheme _selectedEpubConversionTheme = EpubConversionTheme.System;
+
+    [ObservableProperty]
+    private EpubOutputResolution _selectedEpubOutputResolution = EpubOutputResolution.Low;
 
     [ObservableProperty]
     private ObservableCollection<SectionLayoutPreference> _librarySections = [];
@@ -94,8 +102,14 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<Handedness> AvailableHandednessOptions { get; } = 
         [Handedness.RightHanded, Handedness.LeftHanded];
 
+    public IReadOnlyList<AppThemePreference> AvailableAppThemes { get; } =
+        [AppThemePreference.System, AppThemePreference.Light, AppThemePreference.Dark];
+
     public IReadOnlyList<EpubConversionTheme> AvailableEpubConversionThemes { get; } =
         [EpubConversionTheme.System, EpubConversionTheme.Light, EpubConversionTheme.Dark];
+
+    public IReadOnlyList<EpubOutputResolution> AvailableEpubOutputResolutions { get; } =
+        [EpubOutputResolution.Low, EpubOutputResolution.Medium, EpubOutputResolution.High];
 
     private KomgaServer? _editingServer;
 
@@ -244,13 +258,26 @@ public partial class SettingsViewModel : ViewModelBase
         }
             
         // Load reading mode settings
+        SelectedAppTheme = _appSettings.AppTheme;
         SelectedReadingMode = _appSettings.PreferredReadingMode;
         SelectedHandedness = _appSettings.Handedness;
         CompactOverview = _appSettings.CompactOverview;
         SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
+        SelectedEpubOutputResolution = _appSettings.EpubOutputResolution;
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
+    }
+
+    partial void OnSelectedAppThemeChanged(AppThemePreference value)
+    {
+        ApplyAppTheme(value);
+
+        if (_appSettings is not null)
+        {
+            _appSettings.AppTheme = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
     }
 
     partial void OnCompactOverviewChanged(bool value)
@@ -304,6 +331,30 @@ public partial class SettingsViewModel : ViewModelBase
             _appSettings.EpubConversionTheme = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
+    }
+
+    partial void OnSelectedEpubOutputResolutionChanged(EpubOutputResolution value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.EpubOutputResolution = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    private static void ApplyAppTheme(AppThemePreference theme)
+    {
+        if (Application.Current is null)
+        {
+            return;
+        }
+
+        Application.Current.RequestedThemeVariant = theme switch
+        {
+            AppThemePreference.Light => ThemeVariant.Light,
+            AppThemePreference.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
     }
 
     [RelayCommand]

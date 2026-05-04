@@ -91,6 +91,9 @@ public partial class Comic : ObservableObject
     /// Total number of pages in the comic
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReadingProgress))]
+    [NotifyPropertyChangedFor(nameof(HasReadingProgress))]
+    [NotifyPropertyChangedFor(nameof(ReadingProgressDisplay))]
     private int _pageCount;
 
     /// <summary>
@@ -122,12 +125,16 @@ public partial class Comic : ObservableObject
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ReadingProgress))]
+    [NotifyPropertyChangedFor(nameof(HasReadingProgress))]
+    [NotifyPropertyChangedFor(nameof(ReadingProgressDisplay))]
     private int _currentPage;
 
     /// <summary>
     /// Whether the comic has been read completely
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReadingProgress))]
+    [NotifyPropertyChangedFor(nameof(ReadingProgressDisplay))]
     private bool _isCompleted;
 
     /// <summary>
@@ -141,6 +148,14 @@ public partial class Comic : ObservableObject
     /// </summary>
     [SQLite.Ignore]
     public double ReadingProgress => PageCount > 0 ? (double)CurrentPage / PageCount : 0;
+
+    [SQLite.Ignore]
+    public bool HasReadingProgress => !IsCompleted && CurrentPage > 0 && PageCount > 0;
+
+    [SQLite.Ignore]
+    public string ReadingProgressDisplay => HasReadingProgress
+        ? $"{Math.Min(CurrentPage + 1, PageCount)} / {PageCount} pages"
+        : $"{PageCount} pages";
 
     /// <summary>
     /// Format of the comic file (CBZ, CBR)

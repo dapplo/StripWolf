@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
+using Avalonia.Styling;
 using System.Globalization;
 using Avalonia.Markup.Xaml;
 using StripWolf.Data;
+using StripWolf.Models;
 using StripWolf.Services;
 using StripWolf.ViewModels;
 using StripWolf.Views;
@@ -41,6 +43,7 @@ public partial class App : Application
         
         // Apply saved language settings before creating any UI
         ApplyLanguageSettings();
+        ApplyThemeSettings();
 
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
 
@@ -100,6 +103,30 @@ public partial class App : Application
         }
     }
 
+    private void ApplyThemeSettings()
+    {
+        try
+        {
+            var settingsService = Services!.GetRequiredService<SettingsService>();
+            ApplyTheme(settingsService.LoadSettings().AppTheme);
+            settingsService.SettingsChanged += (_, settings) => ApplyTheme(settings.AppTheme);
+        }
+        catch
+        {
+            // If settings fail to load, use system default
+        }
+    }
+
+    private void ApplyTheme(AppThemePreference theme)
+    {
+        RequestedThemeVariant = theme switch
+        {
+            AppThemePreference.Light => ThemeVariant.Light,
+            AppThemePreference.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
+    }
+
     private static void ConfigureServices(IServiceCollection services)
     {
         // Register services
@@ -146,4 +173,4 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
     }
-    }
+}

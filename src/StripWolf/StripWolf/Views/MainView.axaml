@@ -36,7 +36,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="▤" FontSize="20" HorizontalAlignment="Center"/>
             <TextBlock Text="Library" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
@@ -44,7 +44,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="☁️" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="K" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
             <TextBlock Text="Komga" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
@@ -52,7 +52,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="⚙️" FontSize="20" HorizontalAlignment="Center"/>
+            <TextBlock Text="⚙" FontSize="20" HorizontalAlignment="Center"/>
             <TextBlock Text="Settings" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>

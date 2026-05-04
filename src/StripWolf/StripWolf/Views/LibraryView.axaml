@@ -14,8 +14,9 @@
   
   <UserControl.Styles>
     <Style Selector="Button.icon-btn">
-      <Setter Property="Padding" Value="4"/>
-      <Setter Property="FontSize" Value="22"/>
+      <Setter Property="Padding" Value="4,6"/>
+      <Setter Property="FontSize" Value="20"/>
+      <Setter Property="MinHeight" Value="30"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="VerticalAlignment" Value="Stretch"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -28,7 +29,7 @@
     <converters:FilePathToBitmapConverter x:Key="FilePathToBitmapConverter"/>
     
     <DataTemplate x:Key="ComicTemplate" x:DataType="models:Comic">
-      <Border CornerRadius="8" ClipToBounds="True" Width="150"
+      <Border CornerRadius="8" ClipToBounds="True" Width="150" Margin="0,0,12,12"
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
         <Grid RowDefinitions="200,Auto,Auto,Auto">
           <!-- Cover with click handler -->
@@ -59,31 +60,32 @@
             </StackPanel>
           </Border>
           
-          <Panel Grid.Row="2" Height="16" Margin="8,0,8,4">
-             <!-- Progress bar for in-progress comics -->
+          <StackPanel Grid.Row="2" Height="28" Margin="8,0,8,4" Spacing="3">
              <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
-                          Height="4" VerticalAlignment="Center"
-                          IsVisible="{Binding ReadingProgress, Converter={x:Static converters:FilePathToBitmapConverter.GreaterThanZeroConverter}}"/>
-             
-             <TextBlock Text="{Binding PageCount, StringFormat='{}{0} pages'}"
-                        FontSize="10" Foreground="Gray" VerticalAlignment="Center"
-                        IsVisible="{Binding ReadingProgress, Converter={x:Static converters:FilePathToBitmapConverter.IsZeroConverter}}"/>
-          </Panel>
+                          Height="4"
+                          IsVisible="{Binding HasReadingProgress}"/>
+
+             <TextBlock Text="{Binding ReadingProgressDisplay}"
+                        FontSize="10" Foreground="Gray"
+                        TextTrimming="CharacterEllipsis"/>
+          </StackPanel>
 
           <!-- Actions Grid (2x2) -->
-          <Panel Grid.Row="3" Margin="4" Height="64">
+          <Panel Grid.Row="3" Margin="4" Height="72">
             <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" IsVisible="{Binding !IsDeleting}">
               <!-- Info -->
-              <Button Grid.Column="0" Grid.Row="0" Classes="icon-btn" Content="ℹ️" 
+              <Button Grid.Column="0" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ((vm:LibraryViewModel)DataContext).ShowComicInfoCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Information"/>
+                      CommandParameter="{Binding}" ToolTip.Tip="Information">
+                <TextBlock Text="ⓘ" FontSize="20" LineHeight="22"/>
+              </Button>
               <!-- Favorite -->
               <Button Grid.Column="1" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
                       CommandParameter="{Binding}" ToolTip.Tip="Favorite">
                 <Panel>
-                  <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}"/>
-                  <TextBlock Text="★" IsVisible="{Binding IsFavorite}" Foreground="Gold"/>
+                  <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}" FontSize="20" LineHeight="22"/>
+                  <TextBlock Text="★" IsVisible="{Binding IsFavorite}" Foreground="Gold" FontSize="20" LineHeight="22"/>
                 </Panel>
               </Button>
               <!-- Mark Read -->
@@ -91,14 +93,16 @@
                       Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
                       CommandParameter="{Binding}" ToolTip.Tip="Mark Read/Unread">
                  <Panel>
-                    <TextBlock Text="✓" IsVisible="{Binding !IsCompleted}"/>
-                    <TextBlock Text="📖" IsVisible="{Binding IsCompleted}" Foreground="{DynamicResource SystemAccentColor}"/>
+                    <TextBlock Text="✓" IsVisible="{Binding !IsCompleted}" FontSize="20" LineHeight="22"/>
+                    <TextBlock Text="☑" IsVisible="{Binding IsCompleted}" Foreground="{DynamicResource SystemAccentColor}" FontSize="20" LineHeight="22"/>
                  </Panel>
               </Button>
               <!-- Delete -->
-              <Button Grid.Column="1" Grid.Row="1" Classes="icon-btn" Content="🗑️" 
+              <Button Grid.Column="1" Grid.Row="1" Classes="icon-btn"
                       Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Delete"/>
+                      CommandParameter="{Binding}" ToolTip.Tip="Delete">
+                <TextBlock Text="✕" FontSize="20" LineHeight="22"/>
+              </Button>
             </Grid>
             
             <!-- Undo Button with Timer -->
@@ -254,7 +258,7 @@
             </Expander.Header>
             <StackPanel Spacing="8" Margin="0,8,0,0">
               <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
-                <TextBlock Text="📚" FontSize="64" HorizontalAlignment="Center"/>
+                <TextBlock Text="▤" FontSize="56" HorizontalAlignment="Center"/>
                 <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="Import a comic file or download from Komga to get started" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
                 <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
@@ -412,7 +416,7 @@
                           <TextBlock Text="Favorite" />
                        </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Margin="4,0,0,0" Content="✓ Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}"/>
+                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}"/>
                   </Grid>
                   <Button Content="🗑️ Delete Comic" Background="#D32F2F" Foreground="White" Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                 </StackPanel>

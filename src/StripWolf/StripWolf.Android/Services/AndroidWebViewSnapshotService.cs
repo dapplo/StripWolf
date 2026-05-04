@@ -16,7 +16,6 @@ namespace StripWolf.Android.Services;
 /// </summary>
 public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPaginationService
 {
-    private const double RenderScale = 1.5;
     private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(6);
 
     static AndroidWebViewSnapshotService()
@@ -39,12 +38,12 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         return await session.GetPageCountAsync();
     }
 
-    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight)
+    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight, double renderScale = 1)
     {
         await _gate.WaitAsync();
         try
         {
-            return await PaginationSession.CreateAsync(this, viewportWidth, viewportHeight);
+            return await PaginationSession.CreateAsync(this, viewportWidth, viewportHeight, renderScale);
         }
         catch
         {
@@ -53,9 +52,9 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         }
     }
 
-    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight)
+    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight, double renderScale = 1)
     {
-        var session = await CreatePaginationSessionAsync(viewportWidth, viewportHeight);
+        var session = await CreatePaginationSessionAsync(viewportWidth, viewportHeight, renderScale);
         try
         {
             await session.LoadHtmlAsync(htmlContent);
@@ -232,6 +231,7 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         private string? _temporaryHtmlPath;
         private readonly int _viewportWidth;
         private readonly int _viewportHeight;
+        private readonly double _renderScale;
         private readonly ReadyJavascriptBridge _readyBridge;
         private TaskCompletionSource? _readyCompletionSource;
         private bool _disposed;
@@ -240,19 +240,22 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
             AndroidWebViewSnapshotService owner,
             WebView webView,
             int viewportWidth,
-            int viewportHeight)
+            int viewportHeight,
+            double renderScale)
         {
             _owner = owner;
             _webView = webView;
             _viewportWidth = viewportWidth;
             _viewportHeight = viewportHeight;
+            _renderScale = renderScale;
             _readyBridge = new ReadyJavascriptBridge(this);
         }
 
         public static async Task<PaginationSession> CreateAsync(
             AndroidWebViewSnapshotService owner,
             int viewportWidth,
-            int viewportHeight)
+            int viewportHeight,
+            double renderScale)
         {
             WebView? webView = null;
 
@@ -261,7 +264,7 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
                 return await owner.RunOnUiThreadAsync(async () =>
                 {
                     webView = owner.CreateWebView();
-                    var session = new PaginationSession(owner, webView, viewportWidth, viewportHeight);
+                    var session = new PaginationSession(owner, webView, viewportWidth, viewportHeight, renderScale);
                     webView.AddJavascriptInterface(session._readyBridge, "StripWolfBridge");
                     await Task.CompletedTask;
                     return session;
@@ -361,12 +364,12 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
             var readyTask = PrepareReadyAwaiter();
             await EvaluateJavascriptAsync(_webView, $"window.__stripWolfSetPage({Math.Max(0, pageIndex)});");
             await WaitForReadyAsync(readyTask, "Timed out waiting for Android WebView EPUB pagination to finish paging.");
-            var outputWidth = Math.Max(1, (int)Math.Ceiling(_viewportWidth * RenderScale));
-            var outputHeight = Math.Max(1, (int)Math.Ceiling(_viewportHeight * RenderScale));
+            var outputWidth = Math.Max(1, (int)Math.Ceiling(_viewportWidth * _renderScale));
+            var outputHeight = Math.Max(1, (int)Math.Ceiling(_viewportHeight * _renderScale));
             using var bitmap = Bitmap.CreateBitmap(outputWidth, outputHeight, Bitmap.Config.Argb8888!);
-            bitmap!.Density = (int)Math.Round(((int?)_webView.Resources?.DisplayMetrics?.DensityDpi ?? 160) * RenderScale);
+            bitmap!.Density = (int)Math.Round(((int?)_webView.Resources?.DisplayMetrics?.DensityDpi ?? 160) * _renderScale);
             using var canvas = new Canvas(bitmap!);
-            canvas.Scale((float)RenderScale, (float)RenderScale);
+            canvas.Scale((float)_renderScale, (float)_renderScale);
             bitmap.EraseColor(Color.White);
             _webView.Invalidate();
             _webView.Draw(canvas);

@@ -213,17 +213,17 @@ public partial class ReaderViewModel : ViewModelBase
     public string ReadingModeIcon => ReadingMode switch
     {
         ReadingMode.Normal => "▯",
-        ReadingMode.Zoomed => "🔍",
+        ReadingMode.Zoomed => "⊕",
         ReadingMode.Guided => "⊞",
         _ => "▯"
     };
 
     public string NextReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "🔍",
+        ReadingMode.Normal => "⊕",
         ReadingMode.Zoomed => "⊞",
         ReadingMode.Guided => "▯",
-        _ => "🔍"
+        _ => "⊕"
     };
     
     public string PageDisplay
@@ -250,7 +250,7 @@ public partial class ReaderViewModel : ViewModelBase
         _ => "▣"
     };
 
-    public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "📖";
+    public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "◫";
     
     public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
 

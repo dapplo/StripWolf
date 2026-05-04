@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
   <item>
-    <bitmap
-        android:src="@drawable/strip_flow"
-        android:gravity="center"
-        android:mipMap="false"
-        android:tileMode="disabled" />
+    <inset
+        android:drawable="@drawable/icon"
+        android:insetLeft="48dp"
+        android:insetTop="48dp"
+        android:insetRight="48dp"
+        android:insetBottom="48dp" />
   </item>
 </layer-list>

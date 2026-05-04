@@ -15,12 +15,12 @@ public sealed class UnsupportedWebViewSnapshotService : IWebViewPaginationServic
         throw new PlatformNotSupportedException("No off-screen native WebView snapshot service is registered for this platform.");
     }
 
-    public Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight)
+    public Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight, double renderScale = 1)
     {
         throw new PlatformNotSupportedException("No off-screen native WebView snapshot service is registered for this platform.");
     }
 
-    public Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight)
+    public Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight, double renderScale = 1)
     {
         throw new PlatformNotSupportedException("No off-screen native WebView snapshot service is registered for this platform.");
     }

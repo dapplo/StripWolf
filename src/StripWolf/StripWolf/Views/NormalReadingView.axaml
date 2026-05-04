@@ -16,18 +16,21 @@
                         IsVisible="{Binding IsTwoPageMode}">
                 <Image x:Name="LeftPageImage"
                        Source="{Binding LeftPageImage}"
-                       Stretch="Uniform"/>
+                       Stretch="Uniform"
+                       RenderOptions.BitmapInterpolationMode="HighQuality"/>
                 <Image x:Name="RightPageImage"
                        Source="{Binding RightPageImage}"
-                       Stretch="Uniform"
-                       Margin="4,0,0,0"/>
+                        Stretch="Uniform"
+                       RenderOptions.BitmapInterpolationMode="HighQuality"
+                        Margin="4,0,0,0"/>
             </StackPanel>
             
             <!-- Single-page mode -->
-            <Image x:Name="PageImage"
-                   Source="{Binding CurrentPageImage}" 
-                   Stretch="Uniform"
-                   IsVisible="{Binding !IsTwoPageMode}"/>
+             <Image x:Name="PageImage"
+                    Source="{Binding CurrentPageImage}" 
+                    Stretch="Uniform"
+                    RenderOptions.BitmapInterpolationMode="HighQuality"
+                    IsVisible="{Binding !IsTwoPageMode}"/>
         </Grid>
     </ScrollViewer>
 </UserControl>

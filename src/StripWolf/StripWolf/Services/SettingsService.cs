@@ -341,10 +341,22 @@ public class AppSettings
     public bool CompactOverview { get; set; } = false;
 
     /// <summary>
+    /// Theme to use for the application UI.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AppThemePreference AppTheme { get; set; } = AppThemePreference.System;
+
+    /// <summary>
     /// Theme to use when converting EPUB pages into rendered images.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.System;
+
+    /// <summary>
+    /// Output resolution to use when converting EPUB pages into rendered images.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public EpubOutputResolution EpubOutputResolution { get; set; } = EpubOutputResolution.Low;
 
     public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
 
@@ -374,11 +386,13 @@ public class AppSettings
             ComicsDirectory = ComicsDirectory,
             LanguageCode = LanguageCode,
             UseSystemLanguage = UseSystemLanguage,
+            AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
             CompactOverview = CompactOverview,
             EpubConversionTheme = EpubConversionTheme,
+            EpubOutputResolution = EpubOutputResolution,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList()
         };

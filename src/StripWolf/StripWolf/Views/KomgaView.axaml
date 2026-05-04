@@ -47,7 +47,7 @@
             </Grid>
           </Button>
           <Panel Grid.Row="3" Margin="8,0,8,8">
-            <Button Content="📥 Series" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+            <Button Content="Download Series" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
                     Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                     CommandParameter="{Binding}">
               <Button.IsVisible>
@@ -135,10 +135,10 @@
             </Border>
           </Panel>
           <Grid Grid.Row="4" ColumnDefinitions="*,*,*" Margin="4,0,4,4" Height="32">
-            <Button Grid.Column="0" Classes="icon-btn" Content="ℹ️"
+            <Button Grid.Column="0" Classes="icon-btn" Content="ⓘ"
                     Command="{Binding ((vm:KomgaViewModel)DataContext).ShowBookInfoCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                     CommandParameter="{Binding}" ToolTip.Tip="Information"/>
-            <Button Grid.Column="1" Classes="icon-btn" Content="📝"
+            <Button Grid.Column="1" Classes="icon-btn" Content="≣"
                     Command="{Binding ((vm:KomgaViewModel)DataContext).ShowReadListPickerCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
                     CommandParameter="{Binding}" ToolTip.Tip="Add to read list"/>
             <Button Grid.Column="2" Classes="icon-btn" Content="✓"
