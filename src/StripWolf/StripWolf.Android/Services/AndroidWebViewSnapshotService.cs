@@ -19,6 +19,11 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
     private const int PollDelayMilliseconds = 50;
     private const int MaxReadyChecks = 120;
 
+    static AndroidWebViewSnapshotService()
+    {
+        WebView.EnableSlowWholeDocumentDraw();
+    }
+
     private readonly Handler _handler = new(Looper.MainLooper!);
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -32,10 +37,13 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
                 using var webView = CreateWebView();
                 await LoadHtmlAsync(webView, htmlContent, viewportWidth, viewportHeight);
                 await WaitForReadyAsync(webView);
+                await Task.Delay(50);
 
                 using var bitmap = Bitmap.CreateBitmap(viewportWidth, viewportHeight, Bitmap.Config.Argb8888!);
+                bitmap!.Density = (int?)webView.Resources?.DisplayMetrics?.DensityDpi ?? 160;
                 using var canvas = new Canvas(bitmap!);
                 bitmap!.EraseColor(Color.White);
+                webView.Invalidate();
                 webView.Draw(canvas);
 
                 var output = new MemoryStream();
@@ -86,6 +94,8 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         webView.Settings.DomStorageEnabled = true;
         webView.SetBackgroundColor(Color.White);
         webView.SetInitialScale(100);
+        webView.SetLayerType(LayerType.Software, null);
+        webView.SetWillNotDraw(false);
         webView.HorizontalScrollBarEnabled = false;
         webView.VerticalScrollBarEnabled = false;
 
@@ -102,6 +112,7 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
         var heightSpec = View.MeasureSpec.MakeMeasureSpec(viewportHeight, MeasureSpecMode.Exactly);
         webView.Measure(widthSpec, heightSpec);
         webView.Layout(0, 0, viewportWidth, viewportHeight);
+        webView.ForceLayout();
 
         try
         {
@@ -117,6 +128,8 @@ public sealed class AndroidWebViewSnapshotService : Java.Lang.Object, IWebViewPa
             }
 
             await navigationCompleted.Task;
+            webView.Measure(widthSpec, heightSpec);
+            webView.Layout(0, 0, viewportWidth, viewportHeight);
         }
         finally
         {

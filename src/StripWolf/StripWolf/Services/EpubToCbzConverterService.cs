@@ -90,15 +90,13 @@ public sealed class EpubToCbzConverterService
                 body.appendChild(pageStrip);
             };
             const settlePageOffset = (pageStrip, targetOffset, remainingFrames = 12) => {
-                const transform = pageStrip.style.transform || '';
-                const match = /translateX\((-?\d+(?:\.\d+)?)px\)/.exec(transform);
-                const currentOffset = match ? Math.abs(parseFloat(match[1])) : 0;
+                const currentOffset = Math.abs(parseFloat(pageStrip.style.left || '0'));
                 if (Math.abs(currentOffset - targetOffset) <= 1 || remainingFrames <= 0) {
                     window.__stripWolfReady = true;
                     return;
                 }
 
-                pageStrip.style.transform = `translateX(${-targetOffset}px)`;
+                pageStrip.style.left = `${-targetOffset}px`;
                 requestAnimationFrame(() => settlePageOffset(pageStrip, targetOffset, remainingFrames - 1));
             };
             const applyPagination = () => {
@@ -126,7 +124,7 @@ public sealed class EpubToCbzConverterService
                 const safePageIndex = Math.max(0, Math.min(targetPageIndex, pageCount - 1));
                 const targetScrollLeft = Math.min(safePageIndex * viewportWidth, maxScrollLeft);
                 window.__stripWolfReady = false;
-                pageStrip.style.transform = `translateX(${-targetScrollLeft}px)`;
+                pageStrip.style.left = `${-targetScrollLeft}px`;
                 requestAnimationFrame(() => settlePageOffset(pageStrip, targetScrollLeft));
             };
             window.addEventListener('load', async () => {
@@ -346,7 +344,7 @@ public sealed class EpubToCbzConverterService
             $"body {{ margin: 0; padding: 0; width: 100vw; background: {backgroundColor}; color: {foregroundColor}; -webkit-column-width: 100vw; -webkit-column-gap: 0; -webkit-column-fill: auto; }}" + Environment.NewLine +
             PaginationCss + Environment.NewLine +
             $"body.stripwolf-reading-page {{ font-size: 1.3em; line-height: 1.55; color: {foregroundColor}; background: {backgroundColor}; }}" + Environment.NewLine +
-            "body > .stripwolf-page-strip { width: max-content; min-width: 100vw; will-change: transform; }" + Environment.NewLine +
+            "body > .stripwolf-page-strip { position: relative; left: 0; width: max-content; min-width: 100vw; }" + Environment.NewLine +
             "body.stripwolf-reading-page > .stripwolf-page-strip > .stripwolf-reading-content { width: 100vw; padding: 5vh 6vw; }" + Environment.NewLine +
             $"body.stripwolf-reading-page p, body.stripwolf-reading-page li, body.stripwolf-reading-page div, body.stripwolf-reading-page blockquote {{ color: {foregroundColor}; }}" + Environment.NewLine +
             $"body.stripwolf-reading-page h1, body.stripwolf-reading-page h2, body.stripwolf-reading-page h3, body.stripwolf-reading-page h4, body.stripwolf-reading-page h5, body.stripwolf-reading-page h6 {{ color: {foregroundColor}; margin-top: 0; }}" + Environment.NewLine +
