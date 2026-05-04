@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
+using Avalonia;
+using Avalonia.Styling;
 using StripWolf.Models;
 using VersOne.Epub;
 using VersOne.Epub.Schema;
@@ -13,7 +15,7 @@ namespace StripWolf.Services;
 /// <summary>
 /// Converts EPUB books to CBZ by rendering paginated HTML chapters with a platform-native off-screen WebView.
 /// </summary>
-public sealed class EpubToCbzConverterService : IEpubToCbzConverter
+public sealed class EpubToCbzConverterService
 {
     private const string PaginationCss = "body { column-width: 100vw; column-gap: 0; height: 100vh; overflow: hidden; }";
 
@@ -181,7 +183,7 @@ public sealed class EpubToCbzConverterService : IEpubToCbzConverter
         try
         {
             var settings = _settingsService.LoadSettings();
-            var conversionTheme = settings.EpubConversionTheme;
+            var conversionTheme = ResolveConversionTheme(settings.EpubConversionTheme);
             var book = await EpubReader.ReadBookAsync(epubFilePath);
             await MaterializeContentAsync(book, tempRoot, cancellationToken);
 
@@ -235,7 +237,7 @@ public sealed class EpubToCbzConverterService : IEpubToCbzConverter
                         viewportWidth,
                         viewportHeight);
 
-                    var entry = archive.CreateEntry($"Page_{renderedPageIndex + 1:000}.png", CompressionLevel.Optimal);
+                    var entry = archive.CreateEntry($"Page_{renderedPageIndex + 1:000}.png", CompressionLevel.NoCompression);
                     await using var entryStream = entry.Open();
                     pageStream.Position = 0;
                     await pageStream.CopyToAsync(entryStream, cancellationToken);
@@ -357,6 +359,18 @@ public sealed class EpubToCbzConverterService : IEpubToCbzConverter
             "body.stripwolf-single-visual-page img, body.stripwolf-single-visual-page svg { width: 100%; height: 100vh; object-fit: contain; }" + Environment.NewLine +
             "</style>" + Environment.NewLine +
             paginationScript;
+    }
+
+    private static EpubConversionTheme ResolveConversionTheme(EpubConversionTheme configuredTheme)
+    {
+        if (configuredTheme != EpubConversionTheme.System)
+        {
+            return configuredTheme;
+        }
+
+        return Application.Current?.ActualThemeVariant == ThemeVariant.Dark
+            ? EpubConversionTheme.Dark
+            : EpubConversionTheme.Light;
     }
 
     private static Uri CreateChapterBaseUri(string rootDirectory, string chapterKey)

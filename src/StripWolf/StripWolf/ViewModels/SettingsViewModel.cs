@@ -74,7 +74,7 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _compactOverview;
 
     [ObservableProperty]
-    private EpubConversionTheme _selectedEpubConversionTheme = EpubConversionTheme.Light;
+    private EpubConversionTheme _selectedEpubConversionTheme = EpubConversionTheme.System;
 
     [ObservableProperty]
     private ObservableCollection<SectionLayoutPreference> _librarySections = [];
@@ -95,7 +95,7 @@ public partial class SettingsViewModel : ViewModelBase
         [Handedness.RightHanded, Handedness.LeftHanded];
 
     public IReadOnlyList<EpubConversionTheme> AvailableEpubConversionThemes { get; } =
-        [EpubConversionTheme.Light, EpubConversionTheme.Dark];
+        [EpubConversionTheme.System, EpubConversionTheme.Light, EpubConversionTheme.Dark];
 
     private KomgaServer? _editingServer;
 

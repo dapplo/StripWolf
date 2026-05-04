@@ -136,7 +136,7 @@ public partial class App : Application
         services.AddSingleton<IWebViewSnapshotService>(serviceProvider =>
             serviceProvider.GetRequiredService<IWebViewPaginationService>());
         services.AddSingleton<PdfToCbzConverterService>();
-        services.AddSingleton<IEpubToCbzConverter, EpubToCbzConverterService>();
+        services.AddSingleton<EpubToCbzConverterService>();
         services.AddSingleton<LibraryService>();
 
         // Register view models

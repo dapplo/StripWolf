@@ -144,7 +144,7 @@
                         SelectedItem="{Binding SelectedEpubConversionTheme}"
                         HorizontalAlignment="Stretch"
                         Width="300"/>
-              <TextBlock Text="Controls whether EPUB pages are rendered with a light or dark reading theme during conversion to CBZ."
+              <TextBlock Text="Controls whether EPUB pages are rendered with the system theme, a light theme, or a dark theme during conversion to CBZ."
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
           </StackPanel>

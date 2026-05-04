@@ -14,7 +14,7 @@ public class LibraryService
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
     private readonly PdfToCbzConverterService _pdfConverter;
-    private readonly IEpubToCbzConverter _epubConverter;
+    private readonly EpubToCbzConverterService _epubConverter;
     private readonly ComicConverterService _comicConverter;
     private readonly string _appDataDirectory;
     private readonly string _comicsDirectory;
@@ -30,7 +30,7 @@ public class LibraryService
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
         PdfToCbzConverterService pdfConverter,
-        IEpubToCbzConverter epubConverter,
+        EpubToCbzConverterService epubConverter,
         ComicConverterService comicConverter)
     {
         _databaseService = databaseService;

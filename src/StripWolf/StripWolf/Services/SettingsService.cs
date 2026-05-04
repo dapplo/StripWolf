@@ -344,7 +344,7 @@ public class AppSettings
     /// Theme to use when converting EPUB pages into rendered images.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.Light;
+    public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.System;
 
     public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
 
