@@ -309,7 +309,7 @@ public class LibraryService
     /// <summary>
     /// Downloads a comic from Komga and adds it to the library
     /// </summary>
-    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null)
+    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         // Check if already downloaded by ID or Hash
         var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
@@ -332,141 +332,172 @@ public class LibraryService
 
         var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
         var filePath = Path.Combine(_comicsDirectory, fileName);
-
-        // Download the book
-        var success = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress);
-        if (!success)
-        {
-            throw new Exception("Failed to download comic from Komga");
-        }
-
-        // Check if downloaded file needs conversion (solid RAR, CB7, CBT, PDF)
-        var format = ComicReaderService.GetComicFormat(filePath);
         string actualFilePath = filePath;
-        var needsConversion = format == ComicFormat.Pdf ||
-                              format == ComicFormat.Cb7 || 
-                              format == ComicFormat.Cbt ||
-                              (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
-        var pageCount = book.Media?.PagesCount ?? 0;
-        var fileSize = book.SizeBytes;
+        string? coverPath = null;
 
-        if (needsConversion)
-        {
-            if (format == ComicFormat.Pdf)
-            {
-                actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
-            }
-            else
-            {
-                actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
-            }
-
-            // Delete original file after successful conversion
-            if (actualFilePath != filePath && File.Exists(filePath))
-            {
-                // Add a small delay and retry to allow system to release locks
-                bool deleted = false;
-                for (int i = 0; i < 5; i++)
-                {
-                    try
-                    {
-                        File.Delete(filePath);
-                        deleted = true;
-                        break;
-                    }
-                    catch
-                    {
-                        await Task.Delay(500);
-                    }
-                }
-                
-                if (!deleted)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
-                }
-            }
-            // update the pagecount and filesize after conversion
-            (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
-        }
-
-        // Extract ComicInfo.xml metadata if available
-        ComicInfo? comicInfo = null;
         try
         {
-            comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
-        }
-        catch
-        {
-            // ComicInfo extraction failed, continue without it
-        }
+            // Download the book
+            var success = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, cancellationToken);
+            if (!success)
+            {
+                throw new Exception("Failed to download comic from Komga");
+            }
+            
+            cancellationToken.ThrowIfCancellationRequested();
 
-        // Download thumbnail to unified covers directory
-        string? coverPath = null;
-        var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+            // Check if downloaded file needs conversion (solid RAR, CB7, CBT, PDF)
+            var format = ComicReaderService.GetComicFormat(filePath);
+            var needsConversion = format == ComicFormat.Pdf ||
+                                  format == ComicFormat.Cb7 || 
+                                  format == ComicFormat.Cbt ||
+                                  (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
+            var pageCount = book.Media?.PagesCount ?? 0;
+            var fileSize = book.SizeBytes;
 
-        if (thumbnailData is not null)
-        {
-            coverPath = Path.Combine(_coversDirectory, $"{book.Id}.jpg");
-            await File.WriteAllBytesAsync(coverPath, thumbnailData);
-        }
-        else
-        {
-            // Extract cover if Komga didn't have one
+            if (needsConversion)
+            {
+                if (format == ComicFormat.Pdf)
+                {
+                    actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+                }
+                else
+                {
+                    actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Delete original file after successful conversion
+                if (actualFilePath != filePath && File.Exists(filePath))
+                {
+                    // Add a small delay and retry to allow system to release locks
+                    bool deleted = false;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        try
+                        {
+                            File.Delete(filePath);
+                            deleted = true;
+                            break;
+                        }
+                        catch
+                        {
+                            await Task.Delay(500, cancellationToken);
+                        }
+                    }
+                    
+                    if (!deleted)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
+                    }
+                }
+
+                // update the pagecount and filesize after conversion
+                (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Extract ComicInfo.xml metadata if available
+            ComicInfo? comicInfo = null;
             try
             {
-                coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
+                comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
             }
             catch
             {
-                // Cover extraction failed, continue without cover
+                // ComicInfo extraction failed, continue without it
             }
-        }
 
-        // Parse release date
-        DateTime? releaseDate = null;
-        if (!string.IsNullOrEmpty(book.Metadata?.ReleaseDate))
-        {
-            if (DateTime.TryParse(book.Metadata.ReleaseDate, out var parsed))
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Download thumbnail to unified covers directory
+            var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
+
+            if (thumbnailData is not null)
             {
-                releaseDate = parsed;
+                coverPath = Path.Combine(_coversDirectory, $"{book.Id}.jpg");
+                await File.WriteAllBytesAsync(coverPath, thumbnailData, cancellationToken);
             }
+            else
+            {
+                // Extract cover if Komga didn't have one
+                try
+                {
+                    coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
+                }
+                catch
+                {
+                    // Cover extraction failed, continue without cover
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Parse release date
+            DateTime? releaseDate = null;
+            if (!string.IsNullOrEmpty(book.Metadata?.ReleaseDate))
+            {
+                if (DateTime.TryParse(book.Metadata.ReleaseDate, out var parsed))
+                {
+                    releaseDate = parsed;
+                }
+            }
+
+            var comic = new Comic
+            {
+                KomgaId = book.Id,
+                KomgaHash = book.FileHash,
+                KomgaSeriesId = book.SeriesId,
+                Title = book.Metadata?.Title ?? book.Name,
+                SeriesName = book.SeriesTitle,
+                Number = book.Number,
+                Summary = book.Metadata?.Summary,
+                Authors = book.Metadata?.Authors is not null 
+                    ? string.Join(", ", book.Metadata.Authors.Select(a => a.Name))
+                    : null,
+                ReleaseDate = releaseDate,
+                FilePath = actualFilePath,
+                PageCount = pageCount,
+                FileSize = fileSize,
+                CoverPath = coverPath,
+                Format = needsConversion ? ComicFormat.Cbz : format,
+                Source = ComicSource.Komga,
+                AddedDate = DateTime.UtcNow,
+                CurrentPage = book.ReadProgress?.Page ?? 0,
+                IsCompleted = book.ReadProgress?.Completed ?? false,
+                KomgaServerId = serverId
+            };
+
+            // Create sidecar ComicInfo.xml if not already embedded
+            if (comicInfo == null)
+            {
+                var newInfo = CreateComicInfoFromKomgaBook(book);
+                await WriteComicInfoSidecarAsync(newInfo, actualFilePath);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await _databaseService.SaveComicAsync(comic);
+            OnLibraryChanged();
+            return comic;
         }
-
-        var comic = new Comic
+        catch (OperationCanceledException)
         {
-            KomgaId = book.Id,
-            KomgaHash = book.FileHash,
-            KomgaSeriesId = book.SeriesId,
-            Title = book.Metadata?.Title ?? book.Name,
-            SeriesName = book.SeriesTitle,
-            Number = book.Number,
-            Summary = book.Metadata?.Summary,
-            Authors = book.Metadata?.Authors is not null 
-                ? string.Join(", ", book.Metadata.Authors.Select(a => a.Name))
-                : null,
-            ReleaseDate = releaseDate,
-            FilePath = actualFilePath,
-            PageCount = pageCount,
-            FileSize = fileSize,
-            CoverPath = coverPath,
-            Format = needsConversion ? ComicFormat.Cbz : format,
-            Source = ComicSource.Komga,
-            AddedDate = DateTime.UtcNow,
-            CurrentPage = book.ReadProgress?.Page ?? 0,
-            IsCompleted = book.ReadProgress?.Completed ?? false,
-            KomgaServerId = serverId
-        };
+            CleanupPartialFile(actualFilePath);
+            if (!string.Equals(actualFilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            {
+                CleanupPartialFile(filePath);
+            }
 
-        // Create sidecar ComicInfo.xml if not already embedded
-        if (comicInfo == null)
-        {
-            var newInfo = CreateComicInfoFromKomgaBook(book);
-            await WriteComicInfoSidecarAsync(newInfo, actualFilePath);
+            if (!string.IsNullOrEmpty(coverPath))
+            {
+                CleanupPartialFile(coverPath);
+            }
+
+            throw;
         }
-
-        await _databaseService.SaveComicAsync(comic);
-        OnLibraryChanged();
-        return comic;
     }
 
     /// <summary>
@@ -661,6 +692,23 @@ public class LibraryService
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static void CleanupPartialFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to clean up partial file '{path}': {ex.Message}");
+        }
     }
 
     private void OnLibraryChanged()

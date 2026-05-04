@@ -538,7 +538,7 @@ public partial class ReaderViewModel : ViewModelBase
     /// <summary>
     /// Event raised when a request is made to view a specific Komga series
     /// </summary>
-    public event EventHandler<string>? ViewSeriesRequested;
+    public event EventHandler<KomgaSeriesNavigationRequest>? ViewSeriesRequested;
 
     [RelayCommand]
     private async Task ToggleFavoriteAsync()
@@ -574,10 +574,13 @@ public partial class ReaderViewModel : ViewModelBase
     {
         if (Comic?.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaSeriesId))
         {
-            var seriesId = Comic.KomgaSeriesId;
             // Close reader and navigate
             _ = GoBackAsync();
-            ViewSeriesRequested?.Invoke(this, seriesId);
+            ViewSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
+            {
+                SeriesId = Comic.KomgaSeriesId,
+                ServerId = Comic.KomgaServerId
+            });
         }
     }
 

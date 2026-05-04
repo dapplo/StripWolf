@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StripWolf.ViewModels"
              xmlns:views="using:StripWolf.Views"
+             xmlns:models="using:StripWolf.Models"
              xmlns:komga="using:StripWolf.Models.Komga"
              xmlns:converters="using:StripWolf.Converters"
              xmlns:res="using:StripWolf.Resources"
@@ -11,11 +12,149 @@
              x:Class="StripWolf.Views.KomgaView"
              x:DataType="vm:KomgaViewModel"
              x:Name="Root">
-  
+  <UserControl.Styles>
+    <Style Selector="Button.icon-btn">
+      <Setter Property="Padding" Value="4"/>
+      <Setter Property="FontSize" Value="18"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <DataTemplate x:Key="SeriesCardTemplate" x:DataType="komga:KomgaSeriesDisplay">
+      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+              Width="150" ClipToBounds="True">
+        <Grid RowDefinitions="200,Auto,Auto,Auto">
+          <Button Grid.Row="0" Grid.RowSpan="3" Padding="0" Background="Transparent"
+                  Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                  CommandParameter="{Binding}">
+            <Grid RowDefinitions="200,Auto,Auto">
+              <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <Border Grid.Row="1" Height="34" Margin="8,4">
+                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                           TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                           VerticalAlignment="Center" ToolTip.Tip="{Binding Summary}"/>
+              </Border>
+              <TextBlock Grid.Row="2" Text="{Binding BooksSummary}"
+                          FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+            </Grid>
+          </Button>
+          <Panel Grid.Row="3" Margin="8,0,8,8">
+            <Button Content="📥 Series" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                    Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                    CommandParameter="{Binding}">
+              <Button.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="!IsQueuedForDownload"/>
+                  <Binding Path="!IsDownloading"/>
+                </MultiBinding>
+              </Button.IsVisible>
+            </Button>
+            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueuedForDownload}">
+              <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+            </Border>
+            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloading}">
+              <TextBlock Text="Downloading" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+            </Border>
+          </Panel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="BookCardTemplate" x:DataType="komga:KomgaBookDisplay">
+      <Border CornerRadius="8" Padding="0"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
+              ClipToBounds="True">
+        <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
+          <Button Grid.Row="0" Padding="0" Background="Transparent"
+                  Command="{Binding ((vm:KomgaViewModel)DataContext).ShowBookInfoCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                  CommandParameter="{Binding}">
+            <Border Height="200" Background="Black" ClipToBounds="True">
+              <Panel>
+                <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
+                  <TextBlock Text="✓ READ" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
+                </Border>
+                <Border Background="#80000000" IsVisible="{Binding IsReading}" VerticalAlignment="Bottom" Height="4">
+                  <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}" Height="4" Foreground="#2196F3" BorderThickness="0"/>
+                </Border>
+              </Panel>
+            </Border>
+          </Button>
+          <Border Grid.Row="1" Height="44" Margin="8,4">
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="{Binding SeriesTitle}" FontSize="10" Foreground="Gray"
+                         TextTrimming="CharacterEllipsis" MaxLines="1"
+                         IsVisible="{Binding SeriesTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                         TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+          <Panel Grid.Row="2" Height="16" Margin="8,0,8,4">
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}"
+                         Height="4" VerticalAlignment="Center"
+                         IsVisible="{Binding IsReading}"/>
+            <TextBlock Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
+                       FontSize="10" Foreground="Gray" VerticalAlignment="Center"
+                       IsVisible="{Binding !IsReading}"/>
+          </Panel>
+          <Panel Grid.Row="3" Margin="8,0,8,4">
+            <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
+                    Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                    CommandParameter="{Binding}">
+              <Button.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="!IsQueued"/>
+                  <Binding Path="!IsDownloading"/>
+                  <Binding Path="!IsDownloaded"/>
+                </MultiBinding>
+              </Button.IsVisible>
+            </Button>
+            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
+              <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+            </Border>
+            <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
+              <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
+              <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding IsCancelling}" Spacing="2">
+              <TextBlock Text="Cancelling..." FontSize="10" HorizontalAlignment="Center"/>
+              <ProgressBar IsIndeterminate="True" Height="4"/>
+            </StackPanel>
+            <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
+              <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+            </Border>
+          </Panel>
+          <Grid Grid.Row="4" ColumnDefinitions="*,*,*" Margin="4,0,4,4" Height="32">
+            <Button Grid.Column="0" Classes="icon-btn" Content="ℹ️"
+                    Command="{Binding ((vm:KomgaViewModel)DataContext).ShowBookInfoCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                    CommandParameter="{Binding}" ToolTip.Tip="Information"/>
+            <Button Grid.Column="1" Classes="icon-btn" Content="📝"
+                    Command="{Binding ((vm:KomgaViewModel)DataContext).ShowReadListPickerCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                    CommandParameter="{Binding}" ToolTip.Tip="Add to read list"/>
+            <Button Grid.Column="2" Classes="icon-btn" Content="✓"
+                    Command="{Binding ((vm:KomgaViewModel)DataContext).MarkBookAsReadCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                    CommandParameter="{Binding}" ToolTip.Tip="Mark as read"
+                    IsEnabled="{Binding !IsRead}"/>
+          </Grid>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
-      <Grid ColumnDefinitions="*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <TextBlock Text="{Binding Komga, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
           <TextBlock Text="-" FontSize="24" VerticalAlignment="Center"
@@ -23,7 +162,17 @@
           <TextBlock Text="{Binding ActiveServerName}" FontSize="18" VerticalAlignment="Center" Foreground="Gray"
                      IsVisible="{Binding ActiveServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
-        <Button Grid.Column="1" Content="{Binding Refresh, Source={x:Static res:Loc.Instance}}" Command="{Binding RefreshCommand}" Padding="16,8"/>
+        <ComboBox Grid.Column="1" Width="220"
+                  ItemsSource="{Binding ConfiguredServers}"
+                  SelectedItem="{Binding SelectedServer}"
+                  IsVisible="{Binding HasMultipleServers}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="models:KomgaServer">
+              <TextBlock Text="{Binding Name}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Grid.Column="2" Content="{Binding Refresh, Source={x:Static res:Loc.Instance}}" Command="{Binding RefreshCommand}" Padding="16,8"/>
       </Grid>
     </Border>
     
@@ -62,28 +211,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Padding="0" Background="Transparent"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                            CommandParameter="{Binding}">
-                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-                              Width="150" ClipToBounds="True">
-                        <Grid RowDefinitions="200,Auto,Auto">
-                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                          </Border>
-                          <Border Grid.Row="1" Height="34" Margin="8,4">
-                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                       VerticalAlignment="Center"/>
-                          </Border>
-                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
-                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                        </Grid>
-                      </Border>
-                    </Button>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="SeriesCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -98,58 +226,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border CornerRadius="8" Padding="0"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                            ClipToBounds="True">
-                      <Grid RowDefinitions="200,Auto,Auto,Auto">
-                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                          <Panel>
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <!-- Read Badge -->
-                            <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
-                               <TextBlock Text="✓ READ" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
-                            </Border>
-                            <!-- Progress Overlay -->
-                            <Border Background="#80000000" IsVisible="{Binding IsReading}" VerticalAlignment="Bottom" Height="4">
-                               <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}" Height="4" Foreground="#2196F3" BorderThickness="0"/>
-                            </Border>
-                          </Panel>
-                        </Border>
-                        <Border Grid.Row="1" Height="34" Margin="8,4">
-                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                     VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Panel Grid.Row="3" Margin="8,0,8,8">
-                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                  CommandParameter="{Binding}">
-                            <Button.IsVisible>
-                              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!IsQueued"/>
-                                <Binding Path="!IsDownloading"/>
-                                <Binding Path="!IsDownloaded"/>
-                              </MultiBinding>
-                            </Button.IsVisible>
-                          </Button>
-                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                          </StackPanel>
-                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                        </Panel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="BookCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -214,6 +291,7 @@
               <MultiBinding Converter="{x:Static BoolConverters.And}">
                 <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNull}"/>
                 <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
               </MultiBinding>
             </StackPanel.IsVisible>
             
@@ -231,58 +309,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border CornerRadius="8" Padding="0"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                            ClipToBounds="True">
-                      <Grid RowDefinitions="200,Auto,Auto,Auto">
-                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                          <Panel>
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <!-- Read Badge -->
-                            <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
-                               <TextBlock Text="✓ READ" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
-                            </Border>
-                            <!-- Progress Overlay -->
-                            <Border Background="#80000000" IsVisible="{Binding IsReading}" VerticalAlignment="Bottom" Height="4">
-                               <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}" Height="4" Foreground="#2196F3" BorderThickness="0"/>
-                            </Border>
-                          </Panel>
-                        </Border>
-                        <Border Grid.Row="1" Height="34" Margin="8,4">
-                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                     VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Panel Grid.Row="3" Margin="8,0,8,8">
-                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                  CommandParameter="{Binding}">
-                            <Button.IsVisible>
-                              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!IsQueued"/>
-                                <Binding Path="!IsDownloading"/>
-                                <Binding Path="!IsDownloaded"/>
-                              </MultiBinding>
-                            </Button.IsVisible>
-                          </Button>
-                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                          </StackPanel>
-                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                        </Panel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="BookCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -297,58 +324,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border CornerRadius="8" Padding="0"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                            ClipToBounds="True">
-                      <Grid RowDefinitions="200,Auto,Auto,Auto">
-                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                          <Panel>
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <!-- Read Badge -->
-                            <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
-                               <TextBlock Text="✓ READ" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
-                            </Border>
-                            <!-- Progress Overlay -->
-                            <Border Background="#80000000" IsVisible="{Binding IsReading}" VerticalAlignment="Bottom" Height="4">
-                               <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}" Height="4" Foreground="#2196F3" BorderThickness="0"/>
-                            </Border>
-                          </Panel>
-                        </Border>
-                        <Border Grid.Row="1" Height="34" Margin="8,4">
-                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                     VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Panel Grid.Row="3" Margin="8,0,8,8">
-                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                  CommandParameter="{Binding}">
-                            <Button.IsVisible>
-                              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!IsQueued"/>
-                                <Binding Path="!IsDownloading"/>
-                                <Binding Path="!IsDownloaded"/>
-                              </MultiBinding>
-                            </Button.IsVisible>
-                          </Button>
-                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                          </StackPanel>
-                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                        </Panel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="BookCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -363,58 +339,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                    <Border CornerRadius="8" Padding="0"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                            ClipToBounds="True">
-                      <Grid RowDefinitions="200,Auto,Auto,Auto">
-                        <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                          <Panel>
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <!-- Read Badge -->
-                            <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
-                               <TextBlock Text="✓ READ" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
-                            </Border>
-                            <!-- Progress Overlay -->
-                            <Border Background="#80000000" IsVisible="{Binding IsReading}" VerticalAlignment="Bottom" Height="4">
-                               <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReadingProgress}" Height="4" Foreground="#2196F3" BorderThickness="0"/>
-                            </Border>
-                          </Panel>
-                        </Border>
-                        <Border Grid.Row="1" Height="34" Margin="8,4">
-                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                     TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                     VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                   FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                        <Panel Grid.Row="3" Margin="8,0,8,8">
-                          <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                  Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                  CommandParameter="{Binding}">
-                            <Button.IsVisible>
-                              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!IsQueued"/>
-                                <Binding Path="!IsDownloading"/>
-                                <Binding Path="!IsDownloaded"/>
-                              </MultiBinding>
-                            </Button.IsVisible>
-                          </Button>
-                          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                            <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                          <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                            <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                          </StackPanel>
-                          <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                            <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                          </Border>
-                        </Panel>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="BookCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -429,28 +354,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Padding="0" Background="Transparent"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                            CommandParameter="{Binding}">
-                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-                              Width="150" ClipToBounds="True">
-                        <Grid RowDefinitions="200,Auto,Auto">
-                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                            <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                          </Border>
-                          <Border Grid.Row="1" Height="34" Margin="8,4">
-                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                       VerticalAlignment="Center"/>
-                          </Border>
-                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
-                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                        </Grid>
-                      </Border>
-                    </Button>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="SeriesCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -532,48 +436,7 @@
                 </ItemsPanelTemplate>
               </ListBox.ItemsPanel>
               <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                  <Border CornerRadius="8" Padding="0"
-                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                          ClipToBounds="True">
-                    <Grid RowDefinitions="200,Auto,Auto,Auto">
-                      <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                        <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                      </Border>
-                      <Border Grid.Row="1" Height="34" Margin="8,4">
-                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                   VerticalAlignment="Center"/>
-                      </Border>
-                      <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                 FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                      <Panel Grid.Row="3" Margin="8,0,8,8">
-                        <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}">
-                          <Button.IsVisible>
-                            <MultiBinding Converter="{x:Static BoolConverters.And}">
-                              <Binding Path="!IsQueued"/>
-                              <Binding Path="!IsDownloading"/>
-                              <Binding Path="!IsDownloaded"/>
-                            </MultiBinding>
-                          </Button.IsVisible>
-                        </Button>
-                        <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                          <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                        </Border>
-                        <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                          <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                        </StackPanel>
-                        <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                          <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                        </Border>
-                      </Panel>
-                    </Grid>
-                  </Border>
-                </DataTemplate>
+                <StaticResource ResourceKey="BookCardTemplate"/>
               </ListBox.ItemTemplate>
             </ListBox>
           </StackPanel>
@@ -624,31 +487,7 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaSeriesDisplay">
-                    <Button Padding="0" Background="Transparent"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                            CommandParameter="{Binding}">
-                      <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-                              Width="150" ClipToBounds="True">
-                        <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
-                        <Grid RowDefinitions="200,Auto,Auto">
-                          <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                            <Image Source="{Binding Thumbnail}"
-                                   Stretch="Uniform"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                          </Border>
-                          <Border Grid.Row="1" Height="34" Margin="8,4">
-                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                       TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                       VerticalAlignment="Center"/>
-                          </Border>
-                          <TextBlock Grid.Row="2" Text="{Binding BooksCount, StringFormat='{}{0} books'}"
-                                     FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                        </Grid>
-                      </Border>
-                    </Button>
-                  </DataTemplate>
+                  <StaticResource ResourceKey="SeriesCardTemplate"/>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -663,26 +502,46 @@
               </MultiBinding>
             </StackPanel.IsVisible>
             
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-              <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackToSeriesCommand}"
-                      Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
-              <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-              
-              <!-- Sort Order Toggle -->
-              <Button Grid.Column="2" Command="{Binding CycleSortOrderCommand}"
-                      Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <TextBlock Text="Sort:"/>
-                  <TextBlock Text="{Binding SelectedBookSortOrder}"/>
-                </StackPanel>
-              </Button>
-              
-              <!-- Sort Direction Toggle -->
-              <Button Grid.Column="2" Command="{Binding ToggleSortDirectionCommand}"
-                      Background="Transparent" Padding="8,4" VerticalAlignment="Center">
-                <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
-              </Button>
-            </Grid>
+             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+               <Button Grid.Column="0" Content="← Back" Command="{Binding GoBackToSeriesCommand}"
+                       Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+               <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+
+               <Button Grid.Column="2" Content="📥 Series"
+                       Command="{Binding DownloadSelectedSeriesCommand}"
+                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+                 <Button.IsVisible>
+                   <MultiBinding Converter="{x:Static BoolConverters.And}">
+                     <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                     <Binding Path="!IsSelectedSeriesQueuedForDownload"/>
+                     <Binding Path="!IsSelectedSeriesDownloading"/>
+                   </MultiBinding>
+                 </Button.IsVisible>
+               </Button>
+               <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+                       VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesQueuedForDownload}">
+                 <TextBlock Text="Queued" Foreground="White" FontSize="10"/>
+               </Border>
+               <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+                       VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesDownloading}">
+                 <TextBlock Text="Downloading" Foreground="White" FontSize="10"/>
+               </Border>
+               
+               <!-- Sort Order Toggle -->
+               <Button Grid.Column="3" Command="{Binding CycleSortOrderCommand}"
+                       Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
+                 <StackPanel Orientation="Horizontal" Spacing="4">
+                   <TextBlock Text="Sort:"/>
+                   <TextBlock Text="{Binding SelectedBookSortOrder}"/>
+                 </StackPanel>
+               </Button>
+               
+               <!-- Sort Direction Toggle -->
+               <Button Grid.Column="4" Command="{Binding ToggleSortDirectionCommand}"
+                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+                 <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
+               </Button>
+             </Grid>
 
             <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
               <ListBox.ItemsPanel>
@@ -691,51 +550,7 @@
                 </ItemsPanelTemplate>
               </ListBox.ItemsPanel>
               <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="komga:KomgaBookDisplay">
-                  <Border CornerRadius="8" Padding="0"
-                          Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Width="150"
-                          ClipToBounds="True">
-                    <!-- Use 3:4 aspect ratio typical for comic book covers (150 width = 200 height) -->
-                    <Grid RowDefinitions="200,Auto,Auto,Auto">
-                      <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                        <Image Source="{Binding Thumbnail}"
-                               Stretch="Uniform"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                      </Border>
-                      <Border Grid.Row="1" Height="34" Margin="8,4">
-                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                   VerticalAlignment="Center"/>
-                      </Border>
-                      <TextBlock Grid.Row="2" Text="{Binding PagesCount, StringFormat='{}{0} pages', FallbackValue='? pages'}"
-                                 FontSize="10" Foreground="Gray" Margin="8,0,8,4"/>
-                      <Panel Grid.Row="3" Margin="8,0,8,8">
-                        <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                                CommandParameter="{Binding}">
-                          <Button.IsVisible>
-                            <MultiBinding Converter="{x:Static BoolConverters.And}">
-                              <Binding Path="!IsQueued"/>
-                              <Binding Path="!IsDownloading"/>
-                              <Binding Path="!IsDownloaded"/>
-                            </MultiBinding>
-                          </Button.IsVisible>
-                        </Button>
-                        <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsQueued}">
-                          <TextBlock Text="Queued" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                        </Border>
-                        <StackPanel IsVisible="{Binding IsDownloading}" Spacing="2">
-                          <TextBlock Text="Downloading..." FontSize="10" HorizontalAlignment="Center"/>
-                          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="4"/>
-                        </StackPanel>
-                        <Border Background="Green" CornerRadius="4" Padding="8,4" IsVisible="{Binding IsDownloaded}">
-                          <TextBlock Text="✓ Downloaded" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
-                        </Border>
-                      </Panel>
-                    </Grid>
-                  </Border>
-                </DataTemplate>
+                <StaticResource ResourceKey="BookCardTemplate"/>
               </ListBox.ItemTemplate>
             </ListBox>
           </StackPanel>
@@ -795,24 +610,222 @@
                 Command="{Binding LoadMoreBooksForReadListCommand}"/>
       </Border>
 
-      <!-- Download Progress Floating Indicator -->
+      <!-- Download Queue Floating Panel -->
       <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" 
               Margin="16" Padding="12" CornerRadius="8"
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
               BoxShadow="0 4 12 0 #40000000"
               IsVisible="{Binding IsDownloadQueueActive}">
-        <StackPanel Spacing="8" Width="200">
-          <StackPanel Orientation="Horizontal" Spacing="8">
+        <StackPanel Spacing="10" Width="280">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
             <TextBlock Text="📥" FontSize="16" VerticalAlignment="Center"/>
-            <TextBlock Text="Downloading..." FontWeight="Bold" VerticalAlignment="Center"/>
-            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="10" Padding="6,2" VerticalAlignment="Center">
+            <TextBlock Grid.Column="1" Text="Downloads" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="10" Padding="6,2" VerticalAlignment="Center">
               <TextBlock Text="{Binding QueuedDownloadsCount}" FontSize="10" Foreground="White"/>
             </Border>
+          </Grid>
+          <StackPanel Spacing="4" IsVisible="{Binding IsDownloading}">
+            <TextBlock Text="{Binding DownloadingBookName}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="6"/>
           </StackPanel>
-          <TextBlock Text="{Binding DownloadingBookName}" FontSize="11" TextTrimming="CharacterEllipsis"/>
-          <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="6"/>
+          <Button Content="Cancel All" Command="{Binding CancelAllDownloadsCommand}"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+          <ScrollViewer MaxHeight="240">
+            <ItemsControl ItemsSource="{Binding DownloadQueueItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="komga:KomgaDownloadQueueItem">
+                  <Border Margin="0,0,0,8" Padding="8" CornerRadius="6"
+                          Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                      <StackPanel Grid.Row="0" Grid.Column="0">
+                        <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding SeriesTitle}" FontSize="11" Foreground="Gray"
+                                   TextTrimming="CharacterEllipsis"
+                                   IsVisible="{Binding SeriesTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                      </StackPanel>
+                      <Button Grid.RowSpan="3" Grid.Column="1" Content="✕"
+                              Command="{Binding ((vm:KomgaViewModel)DataContext).CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                              CommandParameter="{Binding}" Padding="8,4"
+                              IsEnabled="{Binding !IsCancelling}"/>
+                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Queued" FontSize="11" Foreground="Gray"
+                                 IsVisible="{Binding IsQueued}"/>
+                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Downloading..." FontSize="11" Foreground="Gray"
+                                 IsVisible="{Binding IsDownloading}"/>
+                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Cancelling..." FontSize="11" Foreground="Gray"
+                                 IsVisible="{Binding IsCancelling}"/>
+                      <ProgressBar Grid.Row="2" Grid.Column="0" Value="{Binding Progress}" Maximum="1" Height="4"
+                                   IsVisible="{Binding IsDownloading}"/>
+                      <ProgressBar Grid.Row="2" Grid.Column="0" IsIndeterminate="True" Height="4"
+                                   IsVisible="{Binding IsCancelling}"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
         </StackPanel>
       </Border>
+
+      <!-- Series Download Picker Overlay -->
+      <Panel IsVisible="{Binding SeriesPendingDownloadSelection, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Button Background="#80000000" Command="{Binding CancelSeriesDownloadSelectionCommand}"
+                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                Padding="0" BorderThickness="0"/>
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                CornerRadius="8" Padding="24" Width="420"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BoxShadow="0 4 20 0 #40000000">
+          <StackPanel Spacing="16">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Download Series" FontSize="20" FontWeight="Bold"/>
+              <Button Grid.Column="1" Content="✕" Command="{Binding CancelSeriesDownloadSelectionCommand}"
+                      Background="Transparent" Padding="8,4"/>
+            </Grid>
+            <TextBlock Text="{Binding SeriesPendingDownloadSelection.Name, StringFormat='Choose what to download for {0}'}"
+                       TextWrapping="Wrap" Foreground="Gray"/>
+            <TextBlock Text="Already-downloaded books are skipped automatically." Foreground="Gray" FontSize="12"/>
+            <Button Content="📥 All missing books" Command="{Binding ConfirmSeriesDownloadAllCommand}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+            <Button Content="📖 Unread missing books" Command="{Binding ConfirmSeriesDownloadUnreadCommand}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Busy Overlay -->
+      <Panel IsVisible="{Binding IsBusy}">
+        <Border Background="#66000000"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"/>
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                CornerRadius="8" Padding="20"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BoxShadow="0 4 20 0 #40000000">
+          <StackPanel Spacing="12" Width="220">
+            <TextBlock Text="Loading Komga..." FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <ProgressBar IsIndeterminate="True" Height="6"/>
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Read List Picker Overlay -->
+      <Panel IsVisible="{Binding BookPendingReadListSelection, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Button Background="#80000000" Command="{Binding CancelReadListSelectionCommand}"
+                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                Padding="0" BorderThickness="0"/>
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                CornerRadius="8" Padding="24" Width="420" MaxHeight="600"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BoxShadow="0 4 20 0 #40000000">
+          <StackPanel Spacing="16">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Add to Read List" FontSize="20" FontWeight="Bold"/>
+              <Button Grid.Column="1" Content="✕" Command="{Binding CancelReadListSelectionCommand}"
+                      Background="Transparent" Padding="8,4"/>
+            </Grid>
+            <TextBlock Text="{Binding BookPendingReadListSelection.Name, StringFormat='Choose a read list for {0}'}"
+                       TextWrapping="Wrap" Foreground="Gray"/>
+            <TextBlock Text="Loading read lists..." IsVisible="{Binding IsLoadingReadListSelection}" HorizontalAlignment="Center"/>
+            <ScrollViewer MaxHeight="360" IsVisible="{Binding !IsLoadingReadListSelection}">
+              <ItemsControl ItemsSource="{Binding AvailableReadLists}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="komga:KomgaReadList">
+                    <Button Padding="12" Margin="0,0,0,8" HorizontalAlignment="Stretch"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).AddBookToReadListCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                            CommandParameter="{Binding}">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                          <TextBlock Text="{Binding Summary}" Foreground="Gray" FontSize="12"
+                                     TextWrapping="Wrap"
+                                     IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding BookIds.Count, StringFormat='{}{0} books'}"
+                                   Foreground="Gray" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Book Info Overlay -->
+      <Panel IsVisible="{Binding SelectedInfoBookDisplay, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Button Background="#80000000" Command="{Binding CloseBookInfoCommand}"
+                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                Padding="0" BorderThickness="0"/>
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                CornerRadius="8" Padding="0" MaxWidth="560" Margin="24"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BoxShadow="0 4 20 0 #40000000">
+          <Grid RowDefinitions="Auto,*">
+            <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="16" CornerRadius="8,8,0,0">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Book Information" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="✕" Command="{Binding CloseBookInfoCommand}"
+                        Background="Transparent" Foreground="White" Padding="8,4"/>
+              </Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" MaxHeight="640">
+              <Border Padding="24">
+                <StackPanel Spacing="16" x:DataType="komga:KomgaBookDisplay"
+                            DataContext="{Binding SelectedInfoBookDisplay}">
+                  <Grid ColumnDefinitions="150,*">
+                    <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
+                      <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
+                      <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>
+                      <StackPanel IsVisible="{Binding SeriesTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="Series" FontSize="12" Foreground="Gray"/>
+                        <TextBlock Text="{Binding SeriesTitle}" FontSize="16"/>
+                      </StackPanel>
+                      <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0">
+                          <TextBlock Text="Number" FontSize="12" Foreground="Gray"/>
+                          <TextBlock Text="{Binding NumberLabel}" FontSize="16"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
+                          <TextBlock Text="{Binding PagesCount}" FontSize="16"/>
+                        </StackPanel>
+                      </Grid>
+                      <StackPanel IsVisible="{Binding AuthorsDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="Authors" FontSize="12" Foreground="Gray"/>
+                        <TextBlock Text="{Binding AuthorsDisplay}" FontSize="14" TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                  <StackPanel IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="Summary" FontSize="12" Foreground="Gray"/>
+                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14"/>
+                  </StackPanel>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Content="{Binding Download, Source={x:Static res:Loc.Instance}}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="✓ Mark Read"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).MarkBookAsReadCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsEnabled="{Binding !IsRead}"/>
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Content="📝 Add to Read List"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).ShowReadListPickerCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="📚 View Series"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).ViewSelectedBookSeriesCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </ScrollViewer>
+          </Grid>
+        </Border>
+      </Panel>
     </Grid>
   </Grid>
 </UserControl>

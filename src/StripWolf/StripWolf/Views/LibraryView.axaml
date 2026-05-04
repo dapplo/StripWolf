@@ -116,6 +116,28 @@
         </Grid>
       </Border>
     </DataTemplate>
+
+    <DataTemplate x:Key="SeriesGroupTemplate" x:DataType="models:ComicSeriesGroup">
+      <Border CornerRadius="8" Padding="16"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Border Grid.Column="1" Background="{DynamicResource SystemAccentColor}" CornerRadius="999" Padding="10,4">
+              <TextBlock Text="{Binding ComicCount, StringFormat='{}{0} comics'}" Foreground="White" FontSize="12"/>
+            </Border>
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding Comics}" ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
   </UserControl.Resources>
   
   <Grid RowDefinitions="Auto,*">
@@ -147,15 +169,14 @@
           <TextBlock Text="Search Results" FontSize="18" FontWeight="Bold"/>
           <TextBlock Text="No comics found" Foreground="Gray" IsVisible="{Binding !SearchResults.Count}" Margin="0,8"/>
           
-          <ListBox ItemsSource="{Binding SearchResults}" IsVisible="{Binding SearchResults.Count}"
-                   ItemTemplate="{StaticResource ComicTemplate}"
-                   Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemsPanel>
+          <ItemsControl ItemsSource="{Binding SearchResults}" IsVisible="{Binding SearchResults.Count}"
+                        ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
               </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-          </ListBox>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
         
         <!-- Error Message -->
@@ -167,8 +188,8 @@
         <!-- Pending Imports Section -->
         <StackPanel Spacing="8" IsVisible="{Binding PendingImports.Count}">
           <TextBlock Text="Importing..." FontSize="18" FontWeight="Bold"/>
-          <ListBox ItemsSource="{Binding PendingImports}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemTemplate>
+          <ItemsControl ItemsSource="{Binding PendingImports}">
+            <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="models:PendingImport">
                 <Border CornerRadius="8" Padding="12"
                         Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
@@ -187,53 +208,60 @@
                   </Grid>
                 </Border>
               </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
 
         <!-- Main Content (hidden when searching) -->
         <StackPanel Spacing="24" IsVisible="{Binding !IsSearching}">
+
+        <!-- Series Section -->
+        <StackPanel Spacing="8" IsVisible="{Binding SeriesGroups.Count}">
+          <TextBlock Text="Series" FontSize="18" FontWeight="Bold"/>
+          <TextBlock Text="Series with multiple comics in your library" Foreground="Gray"/>
+          <ItemsControl ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="16"/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </StackPanel>
           
         <!-- Favorites Section -->
         <StackPanel Spacing="8" IsVisible="{Binding FavoriteComics.Count}">
           <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
-          <ListBox ItemsSource="{Binding FavoriteComics}" Background="Transparent" 
-                   ItemTemplate="{StaticResource ComicTemplate}"
-                   ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemsPanel>
+          <ItemsControl ItemsSource="{Binding FavoriteComics}" ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
               </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-          </ListBox>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
           
         <!-- In Progress Section -->
         <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
           <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
-          <ListBox ItemsSource="{Binding InProgressComics}" Background="Transparent" 
-                   ItemTemplate="{StaticResource ComicTemplate}"
-                   ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemsPanel>
+          <ItemsControl ItemsSource="{Binding InProgressComics}" ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
               </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-          </ListBox>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
 
         <!-- Completed (Read) Section -->
         <StackPanel Spacing="8" IsVisible="{Binding CompletedComics.Count}">
           <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
-          <ListBox ItemsSource="{Binding CompletedComics}" Background="Transparent" 
-                   ItemTemplate="{StaticResource ComicTemplate}"
-                   ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemsPanel>
+          <ItemsControl ItemsSource="{Binding CompletedComics}" ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
               </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-          </ListBox>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
 
         <!-- New Comics Section -->
@@ -246,15 +274,14 @@
             <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
           </StackPanel>
 
-          <ListBox ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}" 
-                   ItemTemplate="{StaticResource ComicTemplate}"
-                   Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-            <ListBox.ItemsPanel>
+          <ItemsControl ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}"
+                        ItemTemplate="{StaticResource ComicTemplate}">
+            <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>
               </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-          </ListBox>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
         </StackPanel>
         
         </StackPanel>

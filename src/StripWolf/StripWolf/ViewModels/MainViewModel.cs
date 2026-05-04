@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StripWolf.Models;
 
 namespace StripWolf.ViewModels;
 
@@ -43,10 +44,10 @@ public partial class MainViewModel : ViewModelBase
         _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
     }
 
-    private async void OnViewKomgaSeriesRequested(object? sender, string seriesId)
+    private async void OnViewKomgaSeriesRequested(object? sender, KomgaSeriesNavigationRequest request)
     {
         SelectedTabIndex = 1; // Switch to Komga tab
-        await _komgaViewModel.LoadSeriesByIdAsync(seriesId);
+        await _komgaViewModel.LoadSeriesByIdAsync(request.SeriesId, request.ServerId);
     }
 
     private async void OnComicOpenRequested(object? sender, int comicId)

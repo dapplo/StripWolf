@@ -33,6 +33,12 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _isConnected;
 
     [ObservableProperty]
+    private ObservableCollection<KomgaServer> _configuredServers = [];
+
+    [ObservableProperty]
+    private KomgaServer? _selectedServer;
+
+    [ObservableProperty]
     private ObservableCollection<KomgaLibrary> _libraries = [];
 
     [ObservableProperty]
@@ -48,7 +54,16 @@ public partial class KomgaViewModel : ViewModelBase
     private KomgaSeries? _selectedSeries;
 
     [ObservableProperty]
+    private bool _isSelectedSeriesQueuedForDownload;
+
+    [ObservableProperty]
+    private bool _isSelectedSeriesDownloading;
+
+    [ObservableProperty]
     private KomgaBook? _selectedBook;
+
+    [ObservableProperty]
+    private KomgaBookDisplay? _selectedInfoBookDisplay;
 
     [ObservableProperty]
     private bool _isRefreshing;
@@ -68,7 +83,13 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDownloadQueueActive;
 
-    private readonly Queue<KomgaBookDisplay> _downloadQueue = new();
+    [ObservableProperty]
+    private ObservableCollection<KomgaDownloadQueueItem> _downloadQueueItems = [];
+
+    private readonly HashSet<string> _downloadPendingBookIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, KomgaDownloadQueueItem> _downloadItemsByBookId = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _activeDownloadCts;
+    private KomgaDownloadQueueItem? _activeDownloadItem;
     private bool _isProcessingQueue;
 
     [ObservableProperty]
@@ -88,6 +109,18 @@ public partial class KomgaViewModel : ViewModelBase
 
     [ObservableProperty]
     private KomgaReadList? _selectedReadList;
+
+    [ObservableProperty]
+    private ObservableCollection<KomgaReadList> _availableReadLists = [];
+
+    [ObservableProperty]
+    private KomgaBookDisplay? _bookPendingReadListSelection;
+
+    [ObservableProperty]
+    private KomgaSeriesDisplay? _seriesPendingDownloadSelection;
+
+    [ObservableProperty]
+    private bool _isLoadingReadListSelection;
 
     [ObservableProperty]
     private bool _hasMoreReadLists = true;
@@ -111,6 +144,11 @@ public partial class KomgaViewModel : ViewModelBase
     partial void OnSelectedSeriesPrefixChanged(string? value)
     {
         _ = SelectPrefixAsync(value);
+    }
+
+    partial void OnSelectedSeriesChanged(KomgaSeries? value)
+    {
+        UpdateSelectedSeriesDownloadState(value?.Id);
     }
 
     [RelayCommand]
@@ -151,6 +189,8 @@ public partial class KomgaViewModel : ViewModelBase
     
     [ObservableProperty]
     private bool _hasRecentSeries;
+
+    private bool _suppressServerSelectionChanged;
 
     // Sorting settings
     public enum BookSortOrder
@@ -200,6 +240,148 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    private IEnumerable<ObservableCollection<KomgaBookDisplay>> GetBookCollections()
+    {
+        yield return SearchBookResults;
+        yield return KeepReadingBooks;
+        yield return OnDeckBooks;
+        yield return RecentlyAddedBooks;
+        yield return Books;
+    }
+
+    private IEnumerable<KomgaBookDisplay> GetTrackedBookDisplays(string bookId)
+    {
+        return GetBookCollections().SelectMany(collection => collection.Where(book => string.Equals(book.Id, bookId, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void UpdateTrackedBookDisplays(string bookId, Action<KomgaBookDisplay> update)
+    {
+        foreach (var bookDisplay in GetTrackedBookDisplays(bookId))
+        {
+            update(bookDisplay);
+        }
+
+        if (SelectedInfoBookDisplay is not null && string.Equals(SelectedInfoBookDisplay.Id, bookId, StringComparison.OrdinalIgnoreCase))
+        {
+            update(SelectedInfoBookDisplay);
+        }
+
+        if (BookPendingReadListSelection is not null && string.Equals(BookPendingReadListSelection.Id, bookId, StringComparison.OrdinalIgnoreCase))
+        {
+            update(BookPendingReadListSelection);
+        }
+    }
+
+    private void SetDownloadState(string bookId, Action<KomgaBookDisplay> update)
+    {
+        UpdateTrackedBookDisplays(bookId, update);
+    }
+
+    private IEnumerable<ObservableCollection<KomgaSeriesDisplay>> GetSeriesCollections()
+    {
+        yield return SearchSeriesResults;
+        yield return RecentlyAddedSeries;
+        yield return Series;
+    }
+
+    private IEnumerable<KomgaSeriesDisplay> GetTrackedSeriesDisplays(string seriesId)
+    {
+        return GetSeriesCollections().SelectMany(collection => collection.Where(series => string.Equals(series.Id, seriesId, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void ApplySeriesDownloadState(KomgaSeriesDisplay seriesDisplay)
+    {
+        var matchingQueueItems = DownloadQueueItems.Where(item => string.Equals(item.BookDisplay.Book.SeriesId, seriesDisplay.Id, StringComparison.OrdinalIgnoreCase)).ToList();
+        seriesDisplay.IsQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued);
+        seriesDisplay.IsDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling);
+    }
+
+    private void RefreshSeriesDownloadState(string? seriesId)
+    {
+        if (string.IsNullOrWhiteSpace(seriesId))
+        {
+            return;
+        }
+
+        foreach (var seriesDisplay in GetTrackedSeriesDisplays(seriesId))
+        {
+            ApplySeriesDownloadState(seriesDisplay);
+        }
+
+        if (SeriesPendingDownloadSelection is not null &&
+            string.Equals(SeriesPendingDownloadSelection.Id, seriesId, StringComparison.OrdinalIgnoreCase))
+        {
+            ApplySeriesDownloadState(SeriesPendingDownloadSelection);
+        }
+
+        UpdateSelectedSeriesDownloadState(seriesId);
+    }
+
+    private void UpdateSelectedSeriesDownloadState(string? seriesId)
+    {
+        if (SelectedSeries is null || string.IsNullOrWhiteSpace(seriesId) || !string.Equals(SelectedSeries.Id, seriesId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (SelectedSeries is null || string.IsNullOrWhiteSpace(seriesId))
+            {
+                IsSelectedSeriesQueuedForDownload = false;
+                IsSelectedSeriesDownloading = false;
+            }
+
+            return;
+        }
+
+        var matchingQueueItems = DownloadQueueItems.Where(item => string.Equals(item.BookDisplay.Book.SeriesId, seriesId, StringComparison.OrdinalIgnoreCase)).ToList();
+        IsSelectedSeriesQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued);
+        IsSelectedSeriesDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling);
+    }
+
+    private void RefreshDownloadQueueState()
+    {
+        QueuedDownloadsCount = DownloadQueueItems.Count;
+        IsDownloadQueueActive = DownloadQueueItems.Count > 0;
+        IsDownloading = _activeDownloadItem is not null;
+    }
+
+    private KomgaBookDisplay CreateBookDisplay(KomgaBook book, Bitmap? thumbnail, bool isDownloaded)
+    {
+        _downloadItemsByBookId.TryGetValue(book.Id, out var queueItem);
+        return new KomgaBookDisplay
+        {
+            Book = book,
+            Thumbnail = thumbnail,
+            IsDownloaded = isDownloaded,
+            IsQueued = queueItem?.IsQueued ?? _downloadPendingBookIds.Contains(book.Id),
+            IsDownloading = queueItem?.IsDownloading ?? false,
+            IsCancelling = queueItem?.IsCancelling ?? false,
+            DownloadProgress = queueItem?.Progress ?? 0
+        };
+    }
+
+    private KomgaSeriesDisplay CreateSeriesDisplay(KomgaSeries series, Bitmap? thumbnail)
+    {
+        var display = new KomgaSeriesDisplay
+        {
+            Series = series,
+            Thumbnail = thumbnail
+        };
+        ApplySeriesDownloadState(display);
+        return display;
+    }
+
+    private static KomgaReadProgress CreateCompletedReadProgress(KomgaBookDisplay bookDisplay)
+    {
+        return new KomgaReadProgress
+        {
+            Page = bookDisplay.PagesCount ?? 0,
+            Completed = true,
+            ReadDate = DateTime.UtcNow,
+            Created = bookDisplay.Book.ReadProgress?.Created ?? DateTime.UtcNow,
+            LastModified = DateTime.UtcNow,
+            DeviceId = bookDisplay.Book.ReadProgress?.DeviceId ?? string.Empty,
+            DeviceName = bookDisplay.Book.ReadProgress?.DeviceName ?? string.Empty
+        };
+    }
+
     /// <summary>
     /// Username for the active server (used for authenticated image loading)
     /// </summary>
@@ -215,6 +397,8 @@ public partial class KomgaViewModel : ViewModelBase
     /// </summary>
     public string? ActiveServerName => _activeServer?.Name;
 
+    public bool HasMultipleServers => ConfiguredServers.Count > 1;
+
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
@@ -224,11 +408,22 @@ public partial class KomgaViewModel : ViewModelBase
         _libraryService = libraryService;
         _settingsService = settingsService;
         Title = "Komga";
+        DownloadQueueItems.CollectionChanged += (_, _) => RefreshDownloadQueueState();
     }
 
     partial void OnSearchTextChanged(string value)
     {
         _ = SearchAsync();
+    }
+
+    partial void OnSelectedServerChanged(KomgaServer? value)
+    {
+        if (_suppressServerSelectionChanged || value is null || value.Id == _activeServer?.Id)
+        {
+            return;
+        }
+
+        _ = SwitchServerAsync(value);
     }
 
     [RelayCommand]
@@ -297,7 +492,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    SearchSeriesResults.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = thumbnail });
+                    SearchSeriesResults.Add(CreateSeriesDisplay(series, thumbnail));
                 }
                 else
                 {
@@ -313,7 +508,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        SearchSeriesResults.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = null });
+                        SearchSeriesResults.Add(CreateSeriesDisplay(series, null));
                     }
                 });
             }
@@ -357,12 +552,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    SearchBookResults.Add(new KomgaBookDisplay 
-                    { 
-                        Book = book, 
-                        Thumbnail = thumbnail,
-                        IsDownloaded = isDownloaded
-                    });
+                    SearchBookResults.Add(CreateBookDisplay(book, thumbnail, isDownloaded));
                 }
                 else
                 {
@@ -379,12 +569,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        SearchBookResults.Add(new KomgaBookDisplay 
-                        { 
-                            Book = book, 
-                            Thumbnail = null,
-                            IsDownloaded = isDownloaded
-                        });
+                        SearchBookResults.Add(CreateBookDisplay(book, null, isDownloaded));
                     }
                 });
             }
@@ -406,27 +591,12 @@ public partial class KomgaViewModel : ViewModelBase
         try
         {
             var settings = _settingsService.LoadSettings();
-            
-            // Try to find the active server by ID first, then fallback to IsActive flag
-            _activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId) 
-                            ?? settings.Servers.FirstOrDefault(s => s.IsActive);
-            
-            OnPropertyChanged(nameof(ServerUsername));
-            OnPropertyChanged(nameof(ServerPassword));
-            OnPropertyChanged(nameof(ActiveServerName));
-            
-            if (_activeServer is not null)
-            {
-                _komgaApiService.Configure(_activeServer);
-                IsConnected = await _komgaApiService.TestConnectionAsync();
-                
-                if (IsConnected)
-                {
-                    await LoadLibrariesAsync();
-                    await LoadReadListsAsync(useCache: true);
-                    await LoadSmartListsAsync(useCache: true);
-                }
-            }
+            RefreshConfiguredServers(settings);
+
+            var activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId)
+                               ?? settings.Servers.FirstOrDefault(s => s.IsActive);
+
+            await ApplyServerAsync(activeServer, useCache: true, persistSelection: false);
         }
         catch (Exception ex)
         {
@@ -439,12 +609,7 @@ public partial class KomgaViewModel : ViewModelBase
     private async Task RefreshAsync()
     {
         IsRefreshing = true;
-        // Force refresh by clearing cache
-        _readListsCacheTime = DateTime.MinValue;
-        _keepReadingCacheTime = DateTime.MinValue;
-        _onDeckCacheTime = DateTime.MinValue;
-        _recentBooksCacheTime = DateTime.MinValue;
-        _recentSeriesCacheTime = DateTime.MinValue;
+        ResetCaches();
         
         await InitializeAsync();
         IsRefreshing = false;
@@ -599,12 +764,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    collection.Add(new KomgaBookDisplay 
-                    { 
-                        Book = book, 
-                        Thumbnail = thumbnail,
-                        IsDownloaded = isDownloaded
-                    });
+                    collection.Add(CreateBookDisplay(book, thumbnail, isDownloaded));
                 }
                 else
                 {
@@ -621,12 +781,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        collection.Add(new KomgaBookDisplay 
-                        { 
-                            Book = book, 
-                            Thumbnail = null,
-                            IsDownloaded = isDownloaded
-                        });
+                        collection.Add(CreateBookDisplay(book, null, isDownloaded));
                     }
                 });
             }
@@ -658,7 +813,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    collection.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = thumbnail });
+                    collection.Add(CreateSeriesDisplay(series, thumbnail));
                 }
                 else
                 {
@@ -674,7 +829,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        collection.Add(new KomgaSeriesDisplay { Series = series, Thumbnail = null });
+                        collection.Add(CreateSeriesDisplay(series, null));
                     }
                 });
             }
@@ -705,22 +860,34 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
-    public async Task LoadSeriesByIdAsync(string seriesId)
+    public async Task LoadSeriesByIdAsync(string seriesId, int? serverId = null)
     {
         // Cancel any ongoing loading
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
         _loadingCts = new CancellationTokenSource();
-
-        SelectedLibrary = null;
-        SelectedSeries = null;
-        _currentPage = 0;
-        Series.Clear();
-        Books.Clear();
+        IsBusy = true;
 
         try
         {
-            IsBusy = true;
+            if (serverId.HasValue && serverId.Value != _activeServer?.Id)
+            {
+                var settings = _settingsService.LoadSettings();
+                RefreshConfiguredServers(settings);
+
+                var requestedServer = settings.Servers.FirstOrDefault(server => server.Id == serverId.Value);
+                if (requestedServer is not null)
+                {
+                    await ApplyServerAsync(requestedServer, useCache: false, persistSelection: true);
+                }
+            }
+
+            SelectedLibrary = null;
+            SelectedSeries = null;
+            _currentPage = 0;
+            Series.Clear();
+            Books.Clear();
+
             var series = await _komgaApiService.GetSeriesAsync(seriesId);
             if (series != null)
             {
@@ -728,7 +895,7 @@ public partial class KomgaViewModel : ViewModelBase
                 if (Libraries.Count == 0) await LoadLibrariesAsync();
                 SelectedLibrary = Libraries.FirstOrDefault(l => l.Id == series.LibraryId);
                 
-                await SelectSeriesAsync(new KomgaSeriesDisplay { Series = series });
+                await SelectSeriesAsync(CreateSeriesDisplay(series, null));
             }
         }
         catch (Exception ex)
@@ -760,6 +927,133 @@ public partial class KomgaViewModel : ViewModelBase
         {
             await LoadSeriesAsync();
         }
+    }
+
+    [RelayCommand]
+    private async Task SwitchServerAsync(KomgaServer? server)
+    {
+        if (server is null || server.Id == _activeServer?.Id)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            await ApplyServerAsync(server, useCache: false, persistSelection: true);
+        }, "Failed to switch Komga server");
+    }
+
+    private async Task ApplyServerAsync(KomgaServer? server, bool useCache, bool persistSelection)
+    {
+        _activeServer = server;
+        UpdateSelectedServer(server);
+
+        OnPropertyChanged(nameof(ServerUsername));
+        OnPropertyChanged(nameof(ServerPassword));
+        OnPropertyChanged(nameof(ActiveServerName));
+
+        ResetNavigationState();
+        ErrorMessage = string.Empty;
+
+        if (server is null)
+        {
+            IsConnected = false;
+            return;
+        }
+
+        if (persistSelection)
+        {
+            await PersistActiveServerSelectionAsync(server.Id);
+            var settings = _settingsService.LoadSettings();
+            RefreshConfiguredServers(settings);
+            var refreshedServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id);
+            if (refreshedServer is not null)
+            {
+                _activeServer = refreshedServer;
+                UpdateSelectedServer(refreshedServer);
+            }
+        }
+
+        var activeServer = _activeServer ?? server;
+        _activeServer = activeServer;
+        _komgaApiService.Configure(activeServer);
+        IsConnected = await _komgaApiService.TestConnectionAsync();
+
+        if (!IsConnected)
+        {
+            return;
+        }
+
+        if (!useCache)
+        {
+            ResetCaches();
+        }
+
+        await LoadLibrariesAsync();
+        await LoadReadListsAsync(useCache);
+        await LoadSmartListsAsync(useCache);
+    }
+
+    private void RefreshConfiguredServers(AppSettings settings)
+    {
+        ConfiguredServers.Clear();
+        foreach (var server in settings.Servers)
+        {
+            ConfiguredServers.Add(server);
+        }
+
+        OnPropertyChanged(nameof(HasMultipleServers));
+    }
+
+    private void UpdateSelectedServer(KomgaServer? server)
+    {
+        _suppressServerSelectionChanged = true;
+        SelectedServer = server;
+        _suppressServerSelectionChanged = false;
+    }
+
+    private void ResetCaches()
+    {
+        _readListsCacheTime = DateTime.MinValue;
+        _keepReadingCacheTime = DateTime.MinValue;
+        _onDeckCacheTime = DateTime.MinValue;
+        _recentBooksCacheTime = DateTime.MinValue;
+        _recentSeriesCacheTime = DateTime.MinValue;
+    }
+
+    private void ResetNavigationState()
+    {
+        _loadingCts?.Cancel();
+        _loadingCts?.Dispose();
+        _loadingCts = new CancellationTokenSource();
+
+        ClearSearch();
+        SelectedInfoBookDisplay = null;
+        BookPendingReadListSelection = null;
+        SeriesPendingDownloadSelection = null;
+        GoBackToLibraries();
+        Libraries.Clear();
+        ReadLists.Clear();
+        KeepReadingBooks.Clear();
+        OnDeckBooks.Clear();
+        RecentlyAddedBooks.Clear();
+        RecentlyAddedSeries.Clear();
+        HasKeepReading = false;
+        HasOnDeck = false;
+        HasRecentBooks = false;
+        HasRecentSeries = false;
+    }
+
+    private async Task PersistActiveServerSelectionAsync(int serverId)
+    {
+        var settings = _settingsService.LoadSettings();
+        foreach (var server in settings.Servers)
+        {
+            server.IsActive = server.Id == serverId;
+        }
+
+        settings.ActiveServerId = serverId;
+        await _settingsService.SaveSettingsAsync(settings);
     }
 
     [RelayCommand]
@@ -834,11 +1128,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    Series.Add(new KomgaSeriesDisplay
-                    {
-                        Series = series,
-                        Thumbnail = thumbnail
-                    });
+                    Series.Add(CreateSeriesDisplay(series, thumbnail));
                 }
                 else
                 {
@@ -857,11 +1147,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        Series.Add(new KomgaSeriesDisplay
-                        {
-                            Series = series,
-                            Thumbnail = null
-                        });
+                        Series.Add(CreateSeriesDisplay(series, null));
                     }
                 });
             }
@@ -881,7 +1167,18 @@ public partial class KomgaViewModel : ViewModelBase
         _loadingCts?.Cancel();
         _loadingCts?.Dispose();
         _loadingCts = new CancellationTokenSource();
-        
+
+        if (seriesDisplay?.Series is not null)
+        {
+            if (Libraries.Count == 0)
+            {
+                await LoadLibrariesAsync();
+            }
+
+            SelectedLibrary = Libraries.FirstOrDefault(library => library.Id == seriesDisplay.Series.LibraryId);
+        }
+
+        SelectedReadList = null;
         SelectedSeries = seriesDisplay?.Series;
         _currentPage = 0;
         HasMoreBooks = true;
@@ -900,6 +1197,17 @@ public partial class KomgaViewModel : ViewModelBase
         {
             await LoadBooksAsync();
         }
+    }
+
+    [RelayCommand]
+    private void DownloadSelectedSeries()
+    {
+        if (SelectedSeries is null || IsSelectedSeriesQueuedForDownload || IsSelectedSeriesDownloading)
+        {
+            return;
+        }
+
+        SeriesPendingDownloadSelection = CreateSeriesDisplay(SelectedSeries, null);
     }
 
     [RelayCommand]
@@ -983,12 +1291,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    Books.Add(new KomgaBookDisplay
-                    {
-                        Book = book,
-                        Thumbnail = thumbnail,
-                        IsDownloaded = isDownloaded
-                    });
+                    Books.Add(CreateBookDisplay(book, thumbnail, isDownloaded));
                     ApplyLocalSorting();
                 }
                 else
@@ -1009,12 +1312,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        Books.Add(new KomgaBookDisplay
-                        {
-                            Book = book,
-                            Thumbnail = null,
-                            IsDownloaded = isDownloaded
-                        });
+                        Books.Add(CreateBookDisplay(book, null, isDownloaded));
                         ApplyLocalSorting();
                     }
                 });
@@ -1031,15 +1329,263 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task DownloadBookAsync(KomgaBookDisplay? bookDisplay)
     {
-        if (bookDisplay?.Book is null || bookDisplay.IsQueued || bookDisplay.IsDownloading || bookDisplay.IsDownloaded)
+        if (bookDisplay?.Book is null || bookDisplay.IsDownloaded || _downloadPendingBookIds.Contains(bookDisplay.Id))
         {
             return;
         }
 
-        bookDisplay.IsQueued = true;
-        _downloadQueue.Enqueue(bookDisplay);
-        QueuedDownloadsCount = _downloadQueue.Count;
-        
+        QueueBookDownload(bookDisplay);
+        await Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private void DownloadSeries(KomgaSeriesDisplay? seriesDisplay)
+    {
+        if (seriesDisplay?.Series is null || seriesDisplay.IsDownloading || seriesDisplay.IsQueuedForDownload)
+        {
+            return;
+        }
+
+        SeriesPendingDownloadSelection = seriesDisplay;
+    }
+
+    [RelayCommand]
+    private void CancelSeriesDownloadSelection()
+    {
+        SeriesPendingDownloadSelection = null;
+    }
+
+    [RelayCommand]
+    private async Task ConfirmSeriesDownloadAllAsync()
+    {
+        if (SeriesPendingDownloadSelection is null)
+        {
+            return;
+        }
+
+        var seriesDisplay = SeriesPendingDownloadSelection;
+        SeriesPendingDownloadSelection = null;
+        await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
+    }
+
+    [RelayCommand]
+    private async Task ConfirmSeriesDownloadUnreadAsync()
+    {
+        if (SeriesPendingDownloadSelection is null)
+        {
+            return;
+        }
+
+        var seriesDisplay = SeriesPendingDownloadSelection;
+        SeriesPendingDownloadSelection = null;
+        await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: true);
+    }
+
+    private async Task QueueSeriesDownloadAsync(KomgaSeriesDisplay seriesDisplay, bool unreadOnly)
+    {
+        await ExecuteAsync(async () =>
+        {
+            var seriesBooks = await _komgaApiService.GetAllBooksForSeriesAsync(seriesDisplay.Id);
+            var candidateBooks = unreadOnly
+                ? seriesBooks.Where(book => !(book.ReadProgress?.Completed ?? false)).ToList()
+                : seriesBooks;
+            var booksToQueue = new List<KomgaBookDisplay>();
+
+            foreach (var book in candidateBooks)
+            {
+                if (_downloadPendingBookIds.Contains(book.Id))
+                {
+                    continue;
+                }
+
+                if (await CheckIfDownloadedAsync(book))
+                {
+                    continue;
+                }
+
+                var existingDisplay = GetTrackedBookDisplays(book.Id).FirstOrDefault();
+                booksToQueue.Add(existingDisplay ?? CreateBookDisplay(book, null, false));
+            }
+
+            if (booksToQueue.Count == 0)
+            {
+                ErrorMessage = unreadOnly
+                    ? candidateBooks.Count == 0
+                        ? $"'{seriesDisplay.Name}' has no unread books to download."
+                        : $"All unread books in '{seriesDisplay.Name}' are already downloaded."
+                    : $"All books in '{seriesDisplay.Name}' are already downloaded.";
+                return;
+            }
+
+            foreach (var bookDisplay in booksToQueue)
+            {
+                QueueBookDownload(bookDisplay);
+            }
+        }, $"Failed to queue series '{seriesDisplay.Name}' for download");
+    }
+
+    [RelayCommand]
+    private async Task MarkBookAsReadAsync(KomgaBookDisplay? bookDisplay)
+    {
+        if (bookDisplay is null || bookDisplay.IsRead)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            var success = await _komgaApiService.MarkBookAsReadAsync(bookDisplay.Id);
+            if (!success)
+            {
+                throw new InvalidOperationException($"Komga rejected marking '{bookDisplay.Name}' as read.");
+            }
+
+            UpdateTrackedBookDisplays(bookDisplay.Id, trackedBook =>
+            {
+                trackedBook.Book.ReadProgress = CreateCompletedReadProgress(trackedBook);
+                trackedBook.RefreshComputedProperties();
+            });
+        }, $"Failed to mark '{bookDisplay.Name}' as read");
+    }
+
+    [RelayCommand]
+    private void ShowBookInfo(KomgaBookDisplay? bookDisplay)
+    {
+        if (bookDisplay is null)
+        {
+            return;
+        }
+
+        SelectedInfoBookDisplay = bookDisplay;
+    }
+
+    [RelayCommand]
+    private void CloseBookInfo()
+    {
+        SelectedInfoBookDisplay = null;
+    }
+
+    [RelayCommand]
+    private async Task ViewSelectedBookSeriesAsync()
+    {
+        if (SelectedInfoBookDisplay is null)
+        {
+            return;
+        }
+
+        var seriesId = SelectedInfoBookDisplay.Book.SeriesId;
+        SelectedInfoBookDisplay = null;
+        await LoadSeriesByIdAsync(seriesId);
+    }
+
+    [RelayCommand]
+    private async Task ShowReadListPickerAsync(KomgaBookDisplay? bookDisplay)
+    {
+        if (bookDisplay is null)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            IsLoadingReadListSelection = true;
+            try
+            {
+                var readLists = await _komgaApiService.GetAllReadListsAsync();
+                AvailableReadLists.Clear();
+                foreach (var readList in readLists.OrderBy(readList => readList.Name, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    AvailableReadLists.Add(readList);
+                }
+            }
+            finally
+            {
+                IsLoadingReadListSelection = false;
+            }
+
+            if (AvailableReadLists.Count == 0)
+            {
+                ErrorMessage = "No Komga read lists are available on the active server.";
+                return;
+            }
+
+            BookPendingReadListSelection = bookDisplay;
+        }, $"Failed to load read lists for '{bookDisplay.Name}'");
+    }
+
+    [RelayCommand]
+    private void CancelReadListSelection()
+    {
+        BookPendingReadListSelection = null;
+    }
+
+    [RelayCommand]
+    private async Task AddBookToReadListAsync(KomgaReadList? readList)
+    {
+        if (readList is null || BookPendingReadListSelection is null)
+        {
+            return;
+        }
+
+        var pendingBook = BookPendingReadListSelection;
+
+        await ExecuteAsync(async () =>
+        {
+            var latestReadList = await _komgaApiService.GetReadListAsync(readList.Id) ?? readList;
+            var updatedBookIds = latestReadList.BookIds.ToList();
+
+            if (!updatedBookIds.Contains(pendingBook.Id, StringComparer.OrdinalIgnoreCase))
+            {
+                updatedBookIds.Add(pendingBook.Id);
+            }
+
+            var success = await _komgaApiService.UpdateReadListAsync(
+                latestReadList.Id,
+                latestReadList.Name,
+                latestReadList.Summary,
+                updatedBookIds,
+                latestReadList.Ordered);
+
+            if (!success)
+            {
+                throw new InvalidOperationException($"Komga rejected adding '{pendingBook.Name}' to '{latestReadList.Name}'.");
+            }
+
+            BookPendingReadListSelection = null;
+        }, $"Failed to add '{pendingBook.Name}' to '{readList.Name}'");
+    }
+
+    private void QueueBookDownload(KomgaBookDisplay bookDisplay)
+    {
+        if (!_downloadPendingBookIds.Add(bookDisplay.Id))
+        {
+            return;
+        }
+
+        var queueItem = new KomgaDownloadQueueItem
+        {
+            BookDisplay = bookDisplay,
+            IsQueued = true,
+            Progress = 0
+        };
+
+        _downloadItemsByBookId[bookDisplay.Id] = queueItem;
+        DownloadQueueItems.Add(queueItem);
+        UpdateTrackedBookDisplays(bookDisplay.Id, trackedBook =>
+        {
+            trackedBook.IsQueued = true;
+            trackedBook.IsDownloading = false;
+            trackedBook.IsCancelling = false;
+            trackedBook.DownloadProgress = 0;
+        });
+
+        if (!GetTrackedBookDisplays(bookDisplay.Id).Any())
+        {
+            bookDisplay.IsQueued = true;
+        }
+
+        RefreshSeriesDownloadState(bookDisplay.Book.SeriesId);
+
         if (!_isProcessingQueue)
         {
             _isProcessingQueue = true;
@@ -1047,54 +1593,164 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    private void ResetDownloadState(string bookId)
+    {
+        SetDownloadState(bookId, trackedBook =>
+        {
+            trackedBook.IsQueued = false;
+            trackedBook.IsDownloading = false;
+            trackedBook.IsCancelling = false;
+            if (!trackedBook.IsDownloaded)
+            {
+                trackedBook.DownloadProgress = 0;
+            }
+        });
+    }
+
     private async Task ProcessDownloadQueueAsync()
     {
-        while (_downloadQueue.Count > 0)
+        try
         {
-            var bookDisplay = _downloadQueue.Dequeue();
-            QueuedDownloadsCount = _downloadQueue.Count;
-            
-            bookDisplay.IsQueued = false;
-            bookDisplay.IsDownloading = true;
-            
-            IsDownloading = true;
-            IsDownloadQueueActive = true;
-            DownloadingBookName = bookDisplay.Name;
-            DownloadProgress = 0;
-
-            try
+            while (true)
             {
-                var progress = new Progress<double>(p => 
+                var queueItem = DownloadQueueItems.FirstOrDefault(item => item.IsQueued && !item.IsCancelling);
+                if (queueItem is null)
                 {
-                    DownloadProgress = p;
-                    bookDisplay.DownloadProgress = p;
-                });
-                await _libraryService.DownloadFromKomgaAsync(bookDisplay.Book, _activeServer?.Id, progress);
-                bookDisplay.IsDownloaded = true;
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = $"Failed to download '{bookDisplay.Name}': {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
-            }
-            finally
-            {
-                bookDisplay.IsDownloading = false;
-                DownloadingBookName = string.Empty;
-                DownloadProgress = 0;
-                
-                if (_downloadQueue.Count == 0)
-                {
-                    IsDownloading = false;
-                    IsDownloadQueueActive = false;
+                    break;
                 }
+
+                _activeDownloadItem = queueItem;
+                _activeDownloadCts?.Dispose();
+                _activeDownloadCts = new CancellationTokenSource();
+
+                SetDownloadState(queueItem.Id, trackedBook =>
+                {
+                    trackedBook.IsQueued = false;
+                    trackedBook.IsDownloading = true;
+                    trackedBook.IsCancelling = false;
+                    trackedBook.DownloadProgress = 0;
+                });
+                queueItem.IsQueued = false;
+                queueItem.IsDownloading = true;
+                queueItem.IsCancelling = false;
+                queueItem.Progress = 0;
+
+                DownloadingBookName = queueItem.Name;
+                DownloadProgress = 0;
+                RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                RefreshDownloadQueueState();
+
+                try
+                {
+                    var progress = new Progress<double>(p =>
+                    {
+                        DownloadProgress = p;
+                        queueItem.Progress = p;
+                        SetDownloadState(queueItem.Id, trackedBook => trackedBook.DownloadProgress = p);
+                    });
+
+                    await _libraryService.DownloadFromKomgaAsync(queueItem.BookDisplay.Book, _activeServer?.Id, progress, _activeDownloadCts.Token);
+                    SetDownloadState(queueItem.Id, trackedBook =>
+                    {
+                        trackedBook.IsDownloaded = true;
+                        trackedBook.DownloadProgress = 1.0;
+                    });
+                    queueItem.BookDisplay.IsDownloaded = true;
+                    queueItem.Progress = 1.0;
+                }
+                catch (OperationCanceledException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Download cancelled for '{queueItem.Name}'.");
+                }
+                catch (Exception ex)
+                {
+                    ErrorMessage = $"Failed to download '{queueItem.Name}': {ex.Message}";
+                    System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
+                }
+                finally
+                {
+                    _downloadPendingBookIds.Remove(queueItem.Id);
+                    _downloadItemsByBookId.Remove(queueItem.Id);
+                    ResetDownloadState(queueItem.Id);
+                    queueItem.IsDownloading = false;
+                    queueItem.IsCancelling = false;
+                    DownloadQueueItems.Remove(queueItem);
+                    DownloadingBookName = string.Empty;
+                    DownloadProgress = 0;
+                    RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                    _activeDownloadItem = null;
+                    _activeDownloadCts?.Dispose();
+                    _activeDownloadCts = null;
+                }
+
+                await Task.Delay(100);
             }
-            
-            // Wait a short bit between downloads
-            await Task.Delay(100);
         }
-        
-        _isProcessingQueue = false;
+        finally
+        {
+            _activeDownloadItem = null;
+            _activeDownloadCts?.Dispose();
+            _activeDownloadCts = null;
+            _isProcessingQueue = false;
+            DownloadingBookName = string.Empty;
+            DownloadProgress = 0;
+            RefreshDownloadQueueState();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelDownload(KomgaDownloadQueueItem? queueItem)
+    {
+        if (queueItem is null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(queueItem, _activeDownloadItem) || queueItem.IsDownloading)
+        {
+            queueItem.IsCancelling = true;
+            queueItem.IsDownloading = false;
+            SetDownloadState(queueItem.Id, trackedBook =>
+            {
+                trackedBook.IsCancelling = true;
+                trackedBook.IsDownloading = false;
+            });
+            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            _activeDownloadCts?.Cancel();
+            return;
+        }
+
+        _downloadPendingBookIds.Remove(queueItem.Id);
+        _downloadItemsByBookId.Remove(queueItem.Id);
+        ResetDownloadState(queueItem.Id);
+        DownloadQueueItems.Remove(queueItem);
+        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+    }
+
+    [RelayCommand]
+    private void CancelAllDownloads()
+    {
+        foreach (var queueItem in DownloadQueueItems.Where(item => !ReferenceEquals(item, _activeDownloadItem) && !item.IsDownloading).ToList())
+        {
+            _downloadPendingBookIds.Remove(queueItem.Id);
+            _downloadItemsByBookId.Remove(queueItem.Id);
+            ResetDownloadState(queueItem.Id);
+            DownloadQueueItems.Remove(queueItem);
+            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+        }
+
+        if (_activeDownloadItem is not null)
+        {
+            _activeDownloadItem.IsCancelling = true;
+            _activeDownloadItem.IsDownloading = false;
+            SetDownloadState(_activeDownloadItem.Id, trackedBook =>
+            {
+                trackedBook.IsCancelling = true;
+                trackedBook.IsDownloading = false;
+            });
+            RefreshSeriesDownloadState(_activeDownloadItem.BookDisplay.Book.SeriesId);
+            _activeDownloadCts?.Cancel();
+        }
     }
 
     [RelayCommand]

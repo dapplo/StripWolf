@@ -28,6 +28,9 @@ public partial class LibraryViewModel : ViewModelBase
     private ObservableCollection<Comic> _favoriteComics = [];
 
     [ObservableProperty]
+    private ObservableCollection<ComicSeriesGroup> _seriesGroups = [];
+
+    [ObservableProperty]
     private ObservableCollection<PendingImport> _pendingImports = [];
 
 
@@ -61,7 +64,7 @@ public partial class LibraryViewModel : ViewModelBase
     /// <summary>
     /// Event raised when a request is made to view a specific Komga series
     /// </summary>
-    public event EventHandler<string>? ViewKomgaSeriesRequested;
+    public event EventHandler<KomgaSeriesNavigationRequest>? ViewKomgaSeriesRequested;
 
     [ObservableProperty]
     private Comic? _selectedInfoComic;
@@ -93,7 +96,11 @@ public partial class LibraryViewModel : ViewModelBase
     {
         if (comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaSeriesId))
         {
-            ViewKomgaSeriesRequested?.Invoke(this, comic.KomgaSeriesId);
+            ViewKomgaSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
+            {
+                SeriesId = comic.KomgaSeriesId,
+                ServerId = comic.KomgaServerId
+            });
             SelectedInfoComic = null;
         }
     }
@@ -164,6 +171,8 @@ public partial class LibraryViewModel : ViewModelBase
             var completed = await _libraryService.GetCompletedComicsAsync();
             MergeComics(CompletedComics, completed);
 
+            RefreshSeriesGroups();
+
             // Defer cleanup to background after initial load is done
             _ = Task.Run(async () => 
             {
@@ -212,6 +221,74 @@ public partial class LibraryViewModel : ViewModelBase
                     currentList.Move(currentIndex, i);
                 }
             }
+        }
+    }
+
+    private void RefreshSeriesGroups()
+    {
+        var groups = NewComics
+            .Concat(InProgressComics)
+            .Concat(CompletedComics)
+            .Where(comic => !string.IsNullOrWhiteSpace(comic.SeriesName))
+            .GroupBy(comic => NormalizeSeriesName(comic.SeriesName!), StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var orderedComics = group
+                    .OrderBy(comic => comic.Number ?? float.MaxValue)
+                    .ThenBy(comic => comic.Title, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+
+                return new ComicSeriesGroup
+                {
+                    Name = group.Key,
+                    Comics = new ObservableCollection<Comic>(orderedComics)
+                };
+            })
+            .Where(group => group.ComicCount > 1)
+            .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        SeriesGroups.Clear();
+        foreach (var group in groups)
+        {
+            SeriesGroups.Add(group);
+        }
+    }
+
+    private static string NormalizeSeriesName(string seriesName)
+    {
+        return string.Join(' ', seriesName
+            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private IEnumerable<ObservableCollection<Comic>> GetComicCollections()
+    {
+        yield return NewComics;
+        yield return InProgressComics;
+        yield return CompletedComics;
+        yield return FavoriteComics;
+        yield return SearchResults;
+    }
+
+    private void UpdateTrackedComics(int comicId, Action<Comic> update)
+    {
+        foreach (var comic in GetComicCollections().SelectMany(collection => collection.Where(item => item.Id == comicId)))
+        {
+            update(comic);
+        }
+    }
+
+    private static bool ContainsComic(ObservableCollection<Comic> collection, int comicId)
+    {
+        return collection.Any(comic => comic.Id == comicId);
+    }
+
+    private static void RemoveComic(ObservableCollection<Comic> collection, int comicId)
+    {
+        var existing = collection.FirstOrDefault(comic => comic.Id == comicId);
+        if (existing is not null)
+        {
+            collection.Remove(existing);
         }
     }
 
@@ -316,6 +393,8 @@ public partial class LibraryViewModel : ViewModelBase
                 {
                     NewComics.Insert(0, comic);
                 }
+
+                RefreshSeriesGroups();
 
                 // Remove completed item after a short delay
                 await RemoveCompletedImportAfterDelayAsync(pending);
@@ -466,11 +545,12 @@ public partial class LibraryViewModel : ViewModelBase
             
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                NewComics.Remove(comic);
-                InProgressComics.Remove(comic);
-                CompletedComics.Remove(comic);
-                FavoriteComics.Remove(comic);
-                SearchResults.Remove(comic);
+                RemoveComic(NewComics, comic.Id);
+                RemoveComic(InProgressComics, comic.Id);
+                RemoveComic(CompletedComics, comic.Id);
+                RemoveComic(FavoriteComics, comic.Id);
+                RemoveComic(SearchResults, comic.Id);
+                RefreshSeriesGroups();
             });
         }
         catch (Exception ex)
@@ -511,24 +591,27 @@ public partial class LibraryViewModel : ViewModelBase
         {
             // Store old state for UI update
             var wasCompleted = comic.IsCompleted;
-            
+            var newIsCompleted = !wasCompleted;
+             
             // Save to database first (this updates the comic state in the database)
             await _libraryService.ToggleReadStatusAsync(comic.Id);
-            
-            // Update the local comic object to match what the database now has
-            comic.IsCompleted = !wasCompleted;
-            if (!comic.IsCompleted)
+
+            UpdateTrackedComics(comic.Id, trackedComic =>
             {
-                comic.CurrentPage = 0;
-                comic.LastReadDate = null;
-            }
-            
+                trackedComic.IsCompleted = newIsCompleted;
+                if (!newIsCompleted)
+                {
+                    trackedComic.CurrentPage = 0;
+                    trackedComic.LastReadDate = null;
+                }
+            });
+             
             // Move comic between collections for immediate UI feedback
             if (wasCompleted)
             {
                 // Was completed, now unread -> move to New Comics
-                CompletedComics.Remove(comic);
-                if (!NewComics.Contains(comic))
+                RemoveComic(CompletedComics, comic.Id);
+                if (!ContainsComic(NewComics, comic.Id))
                 {
                     NewComics.Insert(0, comic);
                 }
@@ -536,13 +619,15 @@ public partial class LibraryViewModel : ViewModelBase
             else
             {
                 // Was not completed, now completed -> move to Read
-                NewComics.Remove(comic);
-                InProgressComics.Remove(comic);
-                if (!CompletedComics.Contains(comic))
+                RemoveComic(NewComics, comic.Id);
+                RemoveComic(InProgressComics, comic.Id);
+                if (!ContainsComic(CompletedComics, comic.Id))
                 {
                     CompletedComics.Insert(0, comic);
                 }
             }
+
+            RefreshSeriesGroups();
         }, "Failed to update read status");
     }
 
@@ -558,24 +643,24 @@ public partial class LibraryViewModel : ViewModelBase
         {
             // Store old state for UI update
             var wasFavorite = comic.IsFavorite;
-            
+            var newIsFavorite = !wasFavorite;
+             
             // Save to database first
             await _libraryService.ToggleFavoriteAsync(comic.Id);
-            
-            // Update the local comic object
-            comic.IsFavorite = !wasFavorite;
-            
+             
+            UpdateTrackedComics(comic.Id, trackedComic => trackedComic.IsFavorite = newIsFavorite);
+             
             // Update the favorites collection
-            if (comic.IsFavorite)
+            if (newIsFavorite)
             {
-                if (!FavoriteComics.Contains(comic))
+                if (!ContainsComic(FavoriteComics, comic.Id))
                 {
                     FavoriteComics.Insert(0, comic);
                 }
             }
             else
             {
-                FavoriteComics.Remove(comic);
+                RemoveComic(FavoriteComics, comic.Id);
             }
         }, "Failed to update favorite status");
     }

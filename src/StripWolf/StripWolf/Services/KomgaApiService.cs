@@ -267,6 +267,32 @@ public class KomgaApiService : IDisposable
     }
 
     /// <summary>
+    /// Gets all books for a series across all pages.
+    /// </summary>
+    public async Task<List<KomgaBook>> GetAllBooksForSeriesAsync(string seriesId, int pageSize = 100)
+    {
+        EnsureConfigured();
+
+        var books = new List<KomgaBook>();
+        var page = 0;
+
+        while (true)
+        {
+            var result = await GetBooksForSeriesAsync(seriesId, page, pageSize);
+            books.AddRange(result.Content);
+
+            if (result.Last)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        return books;
+    }
+
+    /// <summary>
     /// Gets all books with pagination
     /// </summary>
     public async Task<KomgaPage<KomgaBook>> GetBooksAsync(int page = 0, int size = 20, string? libraryId = null)
@@ -375,14 +401,14 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Downloads a book file to a local path using System.IO.Pipelines for maximum performance.
     /// </summary>
-    public async Task<bool> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null)
+    public async Task<bool> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
         
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         
-        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return false;
@@ -391,53 +417,57 @@ public class KomgaApiService : IDisposable
         var totalBytes = response.Content.Headers.ContentLength ?? 0;
         var bytesRead = 0L;
         
-        await using var contentStream = await response.Content.ReadAsStreamAsync();
+        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
         
         var reader = PipeReader.Create(contentStream);
         var writer = PipeWriter.Create(fileStream);
-
-        while (true)
+        try
         {
-            var result = await reader.ReadAsync();
-            var buffer = result.Buffer;
-
-            if (buffer.IsEmpty && result.IsCompleted)
+            while (true)
             {
-                break;
-            }
+                var result = await reader.ReadAsync(cancellationToken);
+                var buffer = result.Buffer;
 
-            double lastReportedProgress = -1;
-            foreach (var segment in buffer)
-            {
-                await writer.WriteAsync(segment);
-                bytesRead += segment.Length;
-                
-                if (totalBytes > 0 && progress != null)
+                if (buffer.IsEmpty && result.IsCompleted)
                 {
-                    double currentProgress = (double)bytesRead / totalBytes;
-                    // Only report if progress increased by at least 1% to avoid overwhelming UI thread
-                    if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                    break;
+                }
+
+                double lastReportedProgress = -1;
+                foreach (var segment in buffer)
+                {
+                    await writer.WriteAsync(segment, cancellationToken);
+                    bytesRead += segment.Length;
+                    
+                    if (totalBytes > 0 && progress != null)
                     {
-                        progress.Report(currentProgress);
-                        lastReportedProgress = currentProgress;
+                        double currentProgress = (double)bytesRead / totalBytes;
+                        // Only report if progress increased by at least 1% to avoid overwhelming UI thread
+                        if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                        {
+                            progress.Report(currentProgress);
+                            lastReportedProgress = currentProgress;
+                        }
                     }
+                }
+
+                reader.AdvanceTo(buffer.End);
+
+                if (result.IsCompleted)
+                {
+                    break;
                 }
             }
 
-            reader.AdvanceTo(buffer.End);
-
-            if (result.IsCompleted)
-            {
-                break;
-            }
+            await writer.FlushAsync(cancellationToken);
+            return true;
         }
-
-        await writer.FlushAsync();
-        await writer.CompleteAsync();
-        await reader.CompleteAsync();
-        
-        return true;
+        finally
+        {
+            await writer.CompleteAsync();
+            await reader.CompleteAsync();
+        }
     }
 
     #endregion
@@ -507,6 +537,32 @@ public class KomgaApiService : IDisposable
     }
 
     /// <summary>
+    /// Gets all read lists across all pages.
+    /// </summary>
+    public async Task<List<KomgaReadList>> GetAllReadListsAsync(int pageSize = 100)
+    {
+        EnsureConfigured();
+
+        var readLists = new List<KomgaReadList>();
+        var page = 0;
+
+        while (true)
+        {
+            var result = await GetReadListsAsync(page, pageSize);
+            readLists.AddRange(result.Content);
+
+            if (result.Last)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        return readLists;
+    }
+
+    /// <summary>
     /// Gets a specific read list by ID
     /// </summary>
     public async Task<KomgaReadList?> GetReadListAsync(string readListId)
@@ -523,6 +579,28 @@ public class KomgaApiService : IDisposable
         
         using var stream = await response.Content.ReadAsStreamAsync();
         return await JsonSerializer.DeserializeAsync<KomgaReadList>(stream, _jsonOptions);
+    }
+
+    /// <summary>
+    /// Updates a read list.
+    /// </summary>
+    public async Task<bool> UpdateReadListAsync(string readListId, string? name = null, string? summary = null, IReadOnlyCollection<string>? bookIds = null, bool? ordered = null)
+    {
+        EnsureConfigured();
+
+        var payload = new
+        {
+            name,
+            summary,
+            bookIds,
+            ordered
+        };
+
+        var json = JsonSerializer.Serialize(payload, _jsonOptions);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>
