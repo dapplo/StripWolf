@@ -190,6 +190,60 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasRecentSeries;
 
+    [ObservableProperty]
+    private int _keepReadingSectionOrder;
+
+    [ObservableProperty]
+    private bool _isKeepReadingSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isKeepReadingSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _onDeckSectionOrder;
+
+    [ObservableProperty]
+    private bool _isOnDeckSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isOnDeckSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _recentBooksSectionOrder;
+
+    [ObservableProperty]
+    private bool _isRecentBooksSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isRecentBooksSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _recentSeriesSectionOrder;
+
+    [ObservableProperty]
+    private bool _isRecentSeriesSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isRecentSeriesSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _librariesSectionOrder;
+
+    [ObservableProperty]
+    private bool _isLibrariesSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isLibrariesSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _readListsSectionOrder;
+
+    [ObservableProperty]
+    private bool _isReadListsSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isReadListsSectionExpanded = true;
+
     private bool _suppressServerSelectionChanged;
 
     // Sorting settings
@@ -342,6 +396,45 @@ public partial class KomgaViewModel : ViewModelBase
         IsDownloading = _activeDownloadItem is not null;
     }
 
+    private void ApplySectionLayout(AppSettings settings)
+    {
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.KeepReading, order => KeepReadingSectionOrder = order, visible => IsKeepReadingSectionVisible = visible, expanded => IsKeepReadingSectionExpanded = expanded);
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.OnDeck, order => OnDeckSectionOrder = order, visible => IsOnDeckSectionVisible = visible, expanded => IsOnDeckSectionExpanded = expanded);
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.RecentlyAddedBooks, order => RecentBooksSectionOrder = order, visible => IsRecentBooksSectionVisible = visible, expanded => IsRecentBooksSectionExpanded = expanded);
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.RecentlyAddedSeries, order => RecentSeriesSectionOrder = order, visible => IsRecentSeriesSectionVisible = visible, expanded => IsRecentSeriesSectionExpanded = expanded);
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.Libraries, order => LibrariesSectionOrder = order, visible => IsLibrariesSectionVisible = visible, expanded => IsLibrariesSectionExpanded = expanded);
+        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.ReadLists, order => ReadListsSectionOrder = order, visible => IsReadListsSectionVisible = visible, expanded => IsReadListsSectionExpanded = expanded);
+        RefreshHomeSectionVisibilityState();
+    }
+
+    private static void ApplyPreference(
+        IEnumerable<SectionLayoutPreference> preferences,
+        string key,
+        Action<int> setOrder,
+        Action<bool> setVisible,
+        Action<bool> setExpanded)
+    {
+        var preference = preferences.FirstOrDefault(section => string.Equals(section.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (preference is null)
+        {
+            return;
+        }
+
+        setOrder(preference.Order);
+        setVisible(preference.IsVisible);
+        setExpanded(preference.IsExpanded);
+    }
+
+    private void RefreshHomeSectionVisibilityState()
+    {
+        OnPropertyChanged(nameof(ShowKeepReadingSection));
+        OnPropertyChanged(nameof(ShowOnDeckSection));
+        OnPropertyChanged(nameof(ShowRecentBooksSection));
+        OnPropertyChanged(nameof(ShowRecentSeriesSection));
+        OnPropertyChanged(nameof(ShowLibrariesSection));
+        OnPropertyChanged(nameof(ShowReadListsSection));
+    }
+
     private KomgaBookDisplay CreateBookDisplay(KomgaBook book, Bitmap? thumbnail, bool isDownloaded)
     {
         _downloadItemsByBookId.TryGetValue(book.Id, out var queueItem);
@@ -398,6 +491,12 @@ public partial class KomgaViewModel : ViewModelBase
     public string? ActiveServerName => _activeServer?.Name;
 
     public bool HasMultipleServers => ConfiguredServers.Count > 1;
+    public bool ShowKeepReadingSection => IsKeepReadingSectionVisible && HasKeepReading;
+    public bool ShowOnDeckSection => IsOnDeckSectionVisible && HasOnDeck;
+    public bool ShowRecentBooksSection => IsRecentBooksSectionVisible && HasRecentBooks;
+    public bool ShowRecentSeriesSection => IsRecentSeriesSectionVisible && HasRecentSeries;
+    public bool ShowLibrariesSection => IsLibrariesSectionVisible && Libraries.Count > 0;
+    public bool ShowReadListsSection => IsReadListsSectionVisible && ReadLists.Count > 0;
 
     public KomgaViewModel(
         KomgaApiService komgaApiService,
@@ -408,6 +507,11 @@ public partial class KomgaViewModel : ViewModelBase
         _libraryService = libraryService;
         _settingsService = settingsService;
         Title = "Komga";
+        ApplySectionLayout(_settingsService.LoadSettings());
+        _settingsService.SettingsChanged += (_, settings) =>
+        {
+            Dispatcher.UIThread.Post(() => ApplySectionLayout(settings));
+        };
         DownloadQueueItems.CollectionChanged += (_, _) => RefreshDownloadQueueState();
     }
 
@@ -664,6 +768,7 @@ public partial class KomgaViewModel : ViewModelBase
                     _ = LoadSmartListBookThumbnailAsync(book, KeepReadingBooks, ct);
                 }
                 _keepReadingCacheTime = DateTime.UtcNow;
+                RefreshHomeSectionVisibilityState();
             }
             catch (Exception ex)
             {
@@ -686,6 +791,7 @@ public partial class KomgaViewModel : ViewModelBase
                     _ = LoadSmartListBookThumbnailAsync(book, OnDeckBooks, ct);
                 }
                 _onDeckCacheTime = DateTime.UtcNow;
+                RefreshHomeSectionVisibilityState();
             }
             catch (Exception ex)
             {
@@ -708,6 +814,7 @@ public partial class KomgaViewModel : ViewModelBase
                     _ = LoadSmartListBookThumbnailAsync(book, RecentlyAddedBooks, ct);
                 }
                 _recentBooksCacheTime = DateTime.UtcNow;
+                RefreshHomeSectionVisibilityState();
             }
             catch (Exception ex)
             {
@@ -730,6 +837,7 @@ public partial class KomgaViewModel : ViewModelBase
                     _ = LoadSmartListSeriesThumbnailAsync(s, RecentlyAddedSeries, ct);
                 }
                 _recentSeriesCacheTime = DateTime.UtcNow;
+                RefreshHomeSectionVisibilityState();
             }
             catch (Exception ex)
             {
@@ -852,6 +960,8 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 Libraries.Add(lib);
             }
+
+            RefreshHomeSectionVisibilityState();
         }
         catch (Exception ex)
         {
@@ -1042,6 +1152,7 @@ public partial class KomgaViewModel : ViewModelBase
         HasOnDeck = false;
         HasRecentBooks = false;
         HasRecentSeries = false;
+        RefreshHomeSectionVisibilityState();
     }
 
     private async Task PersistActiveServerSelectionAsync(int serverId)
@@ -1838,6 +1949,7 @@ public partial class KomgaViewModel : ViewModelBase
                 // Start background thumbnail loading
                 _ = LoadReadListThumbnailAsync(rl, ct);
             }
+            RefreshHomeSectionVisibilityState();
         }
         catch (Exception ex)
         {
@@ -1883,6 +1995,7 @@ public partial class KomgaViewModel : ViewModelBase
                         ReadList = readList,
                         Thumbnail = thumbnail
                     });
+                    RefreshHomeSectionVisibilityState();
                 }
                 else
                 {
@@ -1906,6 +2019,7 @@ public partial class KomgaViewModel : ViewModelBase
                             ReadList = readList,
                             Thumbnail = null
                         });
+                        RefreshHomeSectionVisibilityState();
                     }
                 });
             }

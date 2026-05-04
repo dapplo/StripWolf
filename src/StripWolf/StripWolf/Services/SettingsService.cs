@@ -21,6 +21,8 @@ public class SettingsService
     
     private AppSettings? _cachedSettings;
 
+    public event EventHandler<AppSettings>? SettingsChanged;
+
     public SettingsService()
     {
         _settingsDir = GetAppDataDirectory();
@@ -120,6 +122,8 @@ public class SettingsService
             }
         }
 
+        NormalizeSectionPreferences(_cachedSettings);
+
         // Load passwords separately and decrypt them
         LoadPasswords(_cachedSettings);
 
@@ -131,6 +135,7 @@ public class SettingsService
     /// </summary>
     public async Task SaveSettingsAsync(AppSettings settings)
     {
+        NormalizeSectionPreferences(settings);
         _cachedSettings = settings;
 
         // Save settings without sensitive data
@@ -149,6 +154,8 @@ public class SettingsService
 
         // Save sensitive data separately encrypted
         await SavePasswordsAsync(settings);
+
+        SettingsChanged?.Invoke(this, settings.Clone());
     }
 
     /// <summary>
@@ -275,6 +282,17 @@ public class SettingsService
 
         return Encoding.UTF8.GetString(plainBytes);
     }
+
+    private static void NormalizeSectionPreferences(AppSettings settings)
+    {
+        settings.LibrarySections = SectionLayoutPreference.MergeWithDefaults(
+            settings.LibrarySections,
+            SectionLayoutPreference.CreateDefaultLibrarySections());
+
+        settings.KomgaSections = SectionLayoutPreference.MergeWithDefaults(
+            settings.KomgaSections,
+            SectionLayoutPreference.CreateDefaultKomgaSections());
+    }
 }
 
 /// <summary>
@@ -322,6 +340,10 @@ public class AppSettings
     /// </summary>
     public bool CompactOverview { get; set; } = false;
 
+    public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
+
+    public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
+
     /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
@@ -349,7 +371,9 @@ public class AppSettings
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
-            CompactOverview = CompactOverview
+            CompactOverview = CompactOverview,
+            LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
+            KomgaSections = KomgaSections.Select(section => section.Clone()).ToList()
         };
     }
 }

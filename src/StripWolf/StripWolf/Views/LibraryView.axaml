@@ -118,25 +118,39 @@
     </DataTemplate>
 
     <DataTemplate x:Key="SeriesGroupTemplate" x:DataType="models:ComicSeriesGroup">
-      <Border CornerRadius="8" Padding="16"
-              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-        <StackPanel Spacing="12">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
-            <Border Grid.Column="1" Background="{DynamicResource SystemAccentColor}" CornerRadius="999" Padding="10,4">
-              <TextBlock Text="{Binding ComicCount, StringFormat='{}{0} comics'}" Foreground="White" FontSize="12"/>
-            </Border>
-          </Grid>
+      <Expander IsExpanded="{Binding IsExpanded}" Margin="0,0,0,16">
+        <Expander.Header>
+          <Border CornerRadius="8" Padding="12"
+                  Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <Border Width="72" Height="96" CornerRadius="8" ClipToBounds="True" Background="Black">
+                <Image Source="{Binding RepresentativeComic.CoverPath, Converter={StaticResource FilePathToBitmapConverter}}" Stretch="Uniform"
+                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
+              </Border>
 
-          <ItemsControl ItemsSource="{Binding Comics}" ItemTemplate="{StaticResource ComicTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
+              <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding RepresentativeComic.Title}" FontSize="12" Foreground="Gray"
+                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                <TextBlock Text="{Binding ReadCount, StringFormat='{}{0} read'}" FontSize="12" Foreground="Gray"/>
+              </StackPanel>
+
+              <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="999" Padding="10,4"
+                      VerticalAlignment="Top">
+                <TextBlock Text="{Binding ComicCount, StringFormat='{}{0} comics'}" Foreground="White" FontSize="12"/>
+              </Border>
+            </Grid>
+          </Border>
+        </Expander.Header>
+
+        <ItemsControl ItemsSource="{Binding Comics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,12,0,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal"/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </Expander>
     </DataTemplate>
   </UserControl.Resources>
   
@@ -153,7 +167,7 @@
     
     <!-- Content -->
     <ScrollViewer Grid.Row="1" Padding="16">
-      <StackPanel Spacing="24" Margin="0,0,0,20">
+      <StackPanel Spacing="24" Margin="0,0,0,76">
         
         <!-- Search Box -->
         <Grid ColumnDefinitions="*,Auto">
@@ -213,78 +227,102 @@
         </StackPanel>
 
         <!-- Main Content (hidden when searching) -->
-        <StackPanel Spacing="24" IsVisible="{Binding !IsSearching}">
+        <Grid IsVisible="{Binding !IsSearching}" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="24">
 
-        <!-- Series Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding SeriesGroups.Count}">
-          <TextBlock Text="Series" FontSize="18" FontWeight="Bold"/>
-          <TextBlock Text="Series with multiple comics in your library" Foreground="Gray"/>
-          <ItemsControl ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Spacing="16"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
-          
-        <!-- Favorites Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding FavoriteComics.Count}">
-          <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding FavoriteComics}" ItemTemplate="{StaticResource ComicTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
-          
-        <!-- In Progress Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding InProgressComics.Count}">
-          <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding InProgressComics}" ItemTemplate="{StaticResource ComicTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
+          <!-- Continue Reading Section -->
+          <Expander Grid.Row="{Binding ContinueReadingSectionOrder}"
+                    IsVisible="{Binding ShowContinueReadingSection}"
+                    IsExpanded="{Binding IsContinueReadingSectionExpanded}">
+            <Expander.Header>
+              <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <ItemsControl ItemsSource="{Binding InProgressComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </Expander>
 
-        <!-- Completed (Read) Section -->
-        <StackPanel Spacing="8" IsVisible="{Binding CompletedComics.Count}">
-          <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding CompletedComics}" ItemTemplate="{StaticResource ComicTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
+          <!-- New Comics Section -->
+          <Expander Grid.Row="{Binding NewComicsSectionOrder}"
+                    IsVisible="{Binding ShowNewComicsSection}"
+                    IsExpanded="{Binding IsNewComicsSectionExpanded}">
+            <Expander.Header>
+              <TextBlock Text="New Comics" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+              <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
+                <TextBlock Text="📚" FontSize="64" HorizontalAlignment="Center"/>
+                <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="Import a comic file or download from Komga to get started" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
+                <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
+              </StackPanel>
 
-        <!-- New Comics Section -->
-        <StackPanel Spacing="8">
-          <TextBlock Text="New Comics" FontSize="18" FontWeight="Bold"/>
-          <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
-            <TextBlock Text="📚" FontSize="64" HorizontalAlignment="Center"/>
-            <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <TextBlock Text="Import a comic file or download from Komga to get started" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
-            <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
-          </StackPanel>
+              <ItemsControl ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}"
+                            ItemTemplate="{StaticResource ComicTemplate}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+            </StackPanel>
+          </Expander>
 
-          <ItemsControl ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}"
-                        ItemTemplate="{StaticResource ComicTemplate}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-          </ItemsControl>
-        </StackPanel>
-        
-        </StackPanel>
+          <!-- Favorites Section -->
+          <Expander Grid.Row="{Binding FavoritesSectionOrder}"
+                    IsVisible="{Binding ShowFavoritesSection}"
+                    IsExpanded="{Binding IsFavoritesSectionExpanded}">
+            <Expander.Header>
+              <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <ItemsControl ItemsSource="{Binding FavoriteComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </Expander>
+
+          <!-- Series Section -->
+          <Expander Grid.Row="{Binding SeriesSectionOrder}"
+                    IsVisible="{Binding ShowSeriesSection}"
+                    IsExpanded="{Binding IsSeriesSectionExpanded}">
+            <Expander.Header>
+              <TextBlock Text="Series" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+              <TextBlock Text="Series with multiple comics in your library" Foreground="Gray"/>
+              <ItemsControl ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="16"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+            </StackPanel>
+          </Expander>
+
+          <!-- Read Section -->
+          <Expander Grid.Row="{Binding ReadSectionOrder}"
+                    IsVisible="{Binding ShowReadSection}"
+                    IsExpanded="{Binding IsReadSectionExpanded}">
+            <Expander.Header>
+              <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <ItemsControl ItemsSource="{Binding CompletedComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </Expander>
+
+        </Grid>
       </StackPanel>
     </ScrollViewer>
 

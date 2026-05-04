@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Models;
@@ -71,6 +72,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _compactOverview;
+
+    [ObservableProperty]
+    private ObservableCollection<SectionLayoutPreference> _librarySections = [];
+
+    [ObservableProperty]
+    private ObservableCollection<SectionLayoutPreference> _komgaSections = [];
     
     /// <summary>
     /// Available reading modes
@@ -92,6 +99,97 @@ public partial class SettingsViewModel : ViewModelBase
         _komgaApiService = komgaApiService;
         _localizationService = localizationService;
         Title = "Settings";
+    }
+
+    private void ReplaceSectionCollection(
+        ObservableCollection<SectionLayoutPreference> target,
+        IEnumerable<SectionLayoutPreference> source)
+    {
+        foreach (var item in target)
+        {
+            item.PropertyChanged -= OnSectionPreferenceChanged;
+        }
+
+        target.Clear();
+        foreach (var item in source.OrderBy(section => section.Order))
+        {
+            item.Label = GetSectionLabel(item.Key);
+            item.PropertyChanged += OnSectionPreferenceChanged;
+            target.Add(item);
+        }
+    }
+
+    private void OnSectionPreferenceChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_appSettings is null || sender is not SectionLayoutPreference section)
+        {
+            return;
+        }
+
+        if (e.PropertyName == nameof(SectionLayoutPreference.Label))
+        {
+            return;
+        }
+
+        section.Label = GetSectionLabel(section.Key);
+        _ = _settingsService.SaveSettingsAsync(_appSettings);
+    }
+
+    private string GetSectionLabel(string key)
+    {
+        return key switch
+        {
+            LibrarySectionKeys.ContinueReading => "Continue Reading",
+            LibrarySectionKeys.NewComics => "New Comics",
+            LibrarySectionKeys.Favorites => "Favorites",
+            LibrarySectionKeys.Series => "Series",
+            LibrarySectionKeys.Read => "Read",
+            KomgaSectionKeys.KeepReading => "Keep Reading",
+            KomgaSectionKeys.OnDeck => "On Deck",
+            KomgaSectionKeys.RecentlyAddedBooks => "Recently Added Books",
+            KomgaSectionKeys.RecentlyAddedSeries => "Recently Added Series",
+            KomgaSectionKeys.Libraries => "Libraries",
+            KomgaSectionKeys.ReadLists => "Read Lists",
+            _ => key
+        };
+    }
+
+    private async Task SaveSectionLayoutAsync()
+    {
+        if (_appSettings is null)
+        {
+            return;
+        }
+
+        await _settingsService.SaveSettingsAsync(_appSettings);
+    }
+
+    private ObservableCollection<SectionLayoutPreference>? GetSectionCollection(SectionLayoutPreference? section)
+    {
+        if (section is null)
+        {
+            return null;
+        }
+
+        if (LibrarySections.Contains(section))
+        {
+            return LibrarySections;
+        }
+
+        if (KomgaSections.Contains(section))
+        {
+            return KomgaSections;
+        }
+
+        return null;
+    }
+
+    private static void SyncSectionOrder(IReadOnlyList<SectionLayoutPreference> sections)
+    {
+        for (var index = 0; index < sections.Count; index++)
+        {
+            sections[index].Order = index;
+        }
     }
 
     [RelayCommand]
@@ -143,6 +241,9 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedReadingMode = _appSettings.PreferredReadingMode;
         SelectedHandedness = _appSettings.Handedness;
         CompactOverview = _appSettings.CompactOverview;
+
+        ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
+        ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
     }
 
     partial void OnCompactOverviewChanged(bool value)
@@ -418,5 +519,45 @@ public partial class SettingsViewModel : ViewModelBase
         {
             IsTestingConnection = false;
         }
+    }
+
+    [RelayCommand]
+    private async Task MoveSectionUpAsync(SectionLayoutPreference? section)
+    {
+        var collection = GetSectionCollection(section);
+        if (section is null || collection is null)
+        {
+            return;
+        }
+
+        var index = collection.IndexOf(section);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        collection.Move(index, index - 1);
+        SyncSectionOrder(collection);
+        await SaveSectionLayoutAsync();
+    }
+
+    [RelayCommand]
+    private async Task MoveSectionDownAsync(SectionLayoutPreference? section)
+    {
+        var collection = GetSectionCollection(section);
+        if (section is null || collection is null)
+        {
+            return;
+        }
+
+        var index = collection.IndexOf(section);
+        if (index < 0 || index >= collection.Count - 1)
+        {
+            return;
+        }
+
+        collection.Move(index, index + 1);
+        SyncSectionOrder(collection);
+        await SaveSectionLayoutAsync();
     }
 }

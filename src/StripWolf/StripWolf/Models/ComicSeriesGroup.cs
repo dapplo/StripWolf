@@ -1,15 +1,26 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Models;
 
 /// <summary>
 /// Represents a source-agnostic comic series grouping in the local library.
 /// </summary>
-public class ComicSeriesGroup
+public partial class ComicSeriesGroup : ObservableObject
 {
-    public required string Name { get; init; }
+    [ObservableProperty]
+    private string _name = string.Empty;
 
-    public required ObservableCollection<Comic> Comics { get; init; }
+    [ObservableProperty]
+    private ObservableCollection<Comic> _comics = [];
+
+    [ObservableProperty]
+    private Comic? _representativeComic;
+
+    [ObservableProperty]
+    private bool _isExpanded;
 
     public int ComicCount => Comics.Count;
+
+    public int ReadCount => Comics.Count(comic => comic.IsCompleted);
 }

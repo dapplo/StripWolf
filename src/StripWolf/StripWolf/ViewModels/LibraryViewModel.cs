@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Models;
@@ -14,6 +15,7 @@ public partial class LibraryViewModel : ViewModelBase
 {
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
+    private readonly SettingsService _settingsService;
 
     [ObservableProperty]
     private ObservableCollection<Comic> _newComics = [];
@@ -49,6 +51,51 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSearching;
 
+    [ObservableProperty]
+    private int _continueReadingSectionOrder;
+
+    [ObservableProperty]
+    private bool _isContinueReadingSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isContinueReadingSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _newComicsSectionOrder;
+
+    [ObservableProperty]
+    private bool _isNewComicsSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isNewComicsSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _favoritesSectionOrder;
+
+    [ObservableProperty]
+    private bool _isFavoritesSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isFavoritesSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _seriesSectionOrder;
+
+    [ObservableProperty]
+    private bool _isSeriesSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isSeriesSectionExpanded = true;
+
+    [ObservableProperty]
+    private int _readSectionOrder;
+
+    [ObservableProperty]
+    private bool _isReadSectionVisible = true;
+
+    [ObservableProperty]
+    private bool _isReadSectionExpanded = true;
+
     private const int DeleteUndoTimeoutSeconds = 10; // 10 seconds
 
     /// <summary>
@@ -69,11 +116,24 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private Comic? _selectedInfoComic;
 
-    public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService)
+    public bool ShowContinueReadingSection => IsContinueReadingSectionVisible && InProgressComics.Count > 0;
+    public bool ShowNewComicsSection => IsNewComicsSectionVisible;
+    public bool ShowFavoritesSection => IsFavoritesSectionVisible && FavoriteComics.Count > 0;
+    public bool ShowSeriesSection => IsSeriesSectionVisible && SeriesGroups.Count > 0;
+    public bool ShowReadSection => IsReadSectionVisible && CompletedComics.Count > 0;
+
+    public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService, SettingsService settingsService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
+        _settingsService = settingsService;
         Title = "Library";
+
+        ApplySectionLayout(_settingsService.LoadSettings());
+        _settingsService.SettingsChanged += (_, settings) =>
+        {
+            Dispatcher.UIThread.Post(() => ApplySectionLayout(settings));
+        };
         
         // Refresh when library changes
         _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
@@ -172,6 +232,7 @@ public partial class LibraryViewModel : ViewModelBase
             MergeComics(CompletedComics, completed);
 
             RefreshSeriesGroups();
+            RefreshSectionVisibilityState();
 
             // Defer cleanup to background after initial load is done
             _ = Task.Run(async () => 
@@ -226,9 +287,16 @@ public partial class LibraryViewModel : ViewModelBase
 
     private void RefreshSeriesGroups()
     {
+        var expansionStates = SeriesGroups.ToDictionary(
+            group => NormalizeSeriesName(group.Name),
+            group => group.IsExpanded,
+            StringComparer.OrdinalIgnoreCase);
+
         var groups = NewComics
             .Concat(InProgressComics)
             .Concat(CompletedComics)
+            .GroupBy(comic => comic.Id)
+            .Select(group => group.First())
             .Where(comic => !string.IsNullOrWhiteSpace(comic.SeriesName))
             .GroupBy(comic => NormalizeSeriesName(comic.SeriesName!), StringComparer.OrdinalIgnoreCase)
             .Select(group =>
@@ -240,8 +308,10 @@ public partial class LibraryViewModel : ViewModelBase
 
                 return new ComicSeriesGroup
                 {
-                    Name = group.Key,
-                    Comics = new ObservableCollection<Comic>(orderedComics)
+                    Name = orderedComics.First().SeriesName ?? group.Key,
+                    Comics = new ObservableCollection<Comic>(orderedComics),
+                    RepresentativeComic = orderedComics.First(),
+                    IsExpanded = expansionStates.TryGetValue(group.Key, out var isExpanded) && isExpanded
                 };
             })
             .Where(group => group.ComicCount > 1)
@@ -253,6 +323,45 @@ public partial class LibraryViewModel : ViewModelBase
         {
             SeriesGroups.Add(group);
         }
+
+        RefreshSectionVisibilityState();
+    }
+
+    private void ApplySectionLayout(AppSettings settings)
+    {
+        ApplyPreference(settings.LibrarySections, LibrarySectionKeys.ContinueReading, order => ContinueReadingSectionOrder = order, visible => IsContinueReadingSectionVisible = visible, expanded => IsContinueReadingSectionExpanded = expanded);
+        ApplyPreference(settings.LibrarySections, LibrarySectionKeys.NewComics, order => NewComicsSectionOrder = order, visible => IsNewComicsSectionVisible = visible, expanded => IsNewComicsSectionExpanded = expanded);
+        ApplyPreference(settings.LibrarySections, LibrarySectionKeys.Favorites, order => FavoritesSectionOrder = order, visible => IsFavoritesSectionVisible = visible, expanded => IsFavoritesSectionExpanded = expanded);
+        ApplyPreference(settings.LibrarySections, LibrarySectionKeys.Series, order => SeriesSectionOrder = order, visible => IsSeriesSectionVisible = visible, expanded => IsSeriesSectionExpanded = expanded);
+        ApplyPreference(settings.LibrarySections, LibrarySectionKeys.Read, order => ReadSectionOrder = order, visible => IsReadSectionVisible = visible, expanded => IsReadSectionExpanded = expanded);
+        RefreshSectionVisibilityState();
+    }
+
+    private static void ApplyPreference(
+        IEnumerable<SectionLayoutPreference> preferences,
+        string key,
+        Action<int> setOrder,
+        Action<bool> setVisible,
+        Action<bool> setExpanded)
+    {
+        var preference = preferences.FirstOrDefault(section => string.Equals(section.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (preference is null)
+        {
+            return;
+        }
+
+        setOrder(preference.Order);
+        setVisible(preference.IsVisible);
+        setExpanded(preference.IsExpanded);
+    }
+
+    private void RefreshSectionVisibilityState()
+    {
+        OnPropertyChanged(nameof(ShowContinueReadingSection));
+        OnPropertyChanged(nameof(ShowNewComicsSection));
+        OnPropertyChanged(nameof(ShowFavoritesSection));
+        OnPropertyChanged(nameof(ShowSeriesSection));
+        OnPropertyChanged(nameof(ShowReadSection));
     }
 
     private static string NormalizeSeriesName(string seriesName)
