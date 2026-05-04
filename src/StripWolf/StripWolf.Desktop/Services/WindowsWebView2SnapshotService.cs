@@ -31,113 +31,43 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 
     public async Task<Stream> CapturePageAsync(string htmlContent, int viewportWidth, int viewportHeight)
     {
-        await _gate.WaitAsync();
-        try
-        {
-            return await ExecuteWithWebViewAsync(
-                htmlContent,
-                viewportWidth,
-                viewportHeight,
-                async coreWebView =>
-                {
-                    var output = new MemoryStream();
-                    await coreWebView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, output);
-                    output.Position = 0;
-                    return output;
-                });
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        await using var session = await CreatePaginationSessionAsync(htmlContent, viewportWidth, viewportHeight);
+        return await session.CapturePageAsync(0);
     }
 
     public async Task<int> GetPageCountAsync(string htmlContent, int viewportWidth, int viewportHeight)
     {
+        await using var session = await CreatePaginationSessionAsync(htmlContent, viewportWidth, viewportHeight);
+        return await session.GetPageCountAsync();
+    }
+
+    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(int viewportWidth, int viewportHeight)
+    {
         await _gate.WaitAsync();
         try
         {
-            return await ExecuteWithWebViewAsync(
-                htmlContent,
-                viewportWidth,
-                viewportHeight,
-                async coreWebView =>
-                {
-                    var pageCountJson = await coreWebView.ExecuteScriptAsync("window.__stripWolfPageCount ?? 1");
-                    var parsed = JsonSerializer.Deserialize<int?>(pageCountJson);
-                    return Math.Max(1, parsed ?? 1);
-                });
+            var environment = _environment ??= await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+            return await PaginationSession.CreateAsync(this, environment, viewportWidth, viewportHeight);
         }
-        finally
+        catch
         {
             _gate.Release();
+            throw;
         }
     }
 
-    private async Task<TResult> ExecuteWithWebViewAsync<TResult>(
-        string htmlContent,
-        int viewportWidth,
-        int viewportHeight,
-        Func<CoreWebView2, Task<TResult>> action)
+    public async Task<IWebViewPaginationSession> CreatePaginationSessionAsync(string htmlContent, int viewportWidth, int viewportHeight)
     {
-        var hostWindow = CreateHostWindow(viewportWidth, viewportHeight);
-        CoreWebView2Controller? controller = null;
-        string? temporaryHtmlPath = null;
-
+        var session = await CreatePaginationSessionAsync(viewportWidth, viewportHeight);
         try
         {
-            var environment = _environment ??= await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
-            controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
-            controller.Bounds = new Rectangle(0, 0, viewportWidth, viewportHeight);
-            controller.IsVisible = true;
-            controller.DefaultBackgroundColor = DrawingColor.White;
-
-            var coreWebView = controller.CoreWebView2;
-            coreWebView.Settings.IsStatusBarEnabled = false;
-            coreWebView.Settings.AreDefaultContextMenusEnabled = false;
-            coreWebView.Settings.AreDevToolsEnabled = false;
-            coreWebView.Settings.IsZoomControlEnabled = false;
-
-            var navigationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
-            {
-                if (args.IsSuccess)
-                {
-                    navigationCompleted.TrySetResult();
-                }
-                else
-                {
-                    navigationCompleted.TrySetException(new InvalidOperationException($"WebView2 navigation failed with status {args.WebErrorStatus}."));
-                }
-            }
-
-            coreWebView.NavigationCompleted += OnNavigationCompleted;
-            try
-            {
-                temporaryHtmlPath = EpubSnapshotHtmlHelper.CreateTemporaryHtmlFile(htmlContent);
-                if (!string.IsNullOrEmpty(temporaryHtmlPath))
-                {
-                    coreWebView.Navigate(new Uri(temporaryHtmlPath).AbsoluteUri);
-                }
-                else
-                {
-                    coreWebView.NavigateToString(htmlContent);
-                }
-
-                await navigationCompleted.Task;
-                await WaitForReadyAsync(coreWebView);
-                return await action(coreWebView);
-            }
-            finally
-            {
-                coreWebView.NavigationCompleted -= OnNavigationCompleted;
-            }
+            await session.LoadHtmlAsync(htmlContent);
+            return session;
         }
-        finally
+        catch
         {
-            controller?.Close();
-            DestroyWindow(hostWindow);
-            CleanupTemporaryHtmlFile(temporaryHtmlPath);
+            await session.DisposeAsync();
+            throw;
         }
     }
 
@@ -184,6 +114,19 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         throw new TimeoutException("Timed out waiting for WebView2 EPUB pagination to finish.");
     }
 
+    private static async Task<int> GetPageCountAsync(CoreWebView2 coreWebView)
+    {
+        var pageCountJson = await coreWebView.ExecuteScriptAsync("window.__stripWolfPageCount ?? 1");
+        var parsed = JsonSerializer.Deserialize<int?>(pageCountJson);
+        return Math.Max(1, parsed ?? 1);
+    }
+
+    private static async Task SetPageAsync(CoreWebView2 coreWebView, int pageIndex)
+    {
+        await coreWebView.ExecuteScriptAsync($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
+        await WaitForReadyAsync(coreWebView);
+    }
+
     private static void CleanupTemporaryHtmlFile(string? temporaryHtmlPath)
     {
         if (string.IsNullOrWhiteSpace(temporaryHtmlPath) || !File.Exists(temporaryHtmlPath))
@@ -223,4 +166,144 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    private sealed class PaginationSession : IWebViewPaginationSession
+    {
+        private readonly WindowsWebView2SnapshotService _owner;
+        private readonly IntPtr _hostWindow;
+        private readonly CoreWebView2Controller _controller;
+        private readonly CoreWebView2 _coreWebView;
+        private string? _temporaryHtmlPath;
+        private bool _disposed;
+
+        private PaginationSession(
+            WindowsWebView2SnapshotService owner,
+            IntPtr hostWindow,
+            CoreWebView2Controller controller,
+            CoreWebView2 coreWebView)
+        {
+            _owner = owner;
+            _hostWindow = hostWindow;
+            _controller = controller;
+            _coreWebView = coreWebView;
+        }
+
+        public static async Task<PaginationSession> CreateAsync(
+            WindowsWebView2SnapshotService owner,
+            CoreWebView2Environment environment,
+            int viewportWidth,
+            int viewportHeight)
+        {
+            var hostWindow = CreateHostWindow(viewportWidth, viewportHeight);
+            CoreWebView2Controller? controller = null;
+
+            try
+            {
+                controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
+                controller.Bounds = new Rectangle(0, 0, viewportWidth, viewportHeight);
+                controller.IsVisible = true;
+                controller.DefaultBackgroundColor = DrawingColor.White;
+
+                var coreWebView = controller.CoreWebView2;
+                coreWebView.Settings.IsStatusBarEnabled = false;
+                coreWebView.Settings.AreDefaultContextMenusEnabled = false;
+                coreWebView.Settings.AreDevToolsEnabled = false;
+                coreWebView.Settings.IsZoomControlEnabled = false;
+                return new PaginationSession(owner, hostWindow, controller, coreWebView);
+            }
+            catch
+            {
+                controller?.Close();
+                DestroyWindow(hostWindow);
+                throw;
+            }
+        }
+
+        public async Task LoadHtmlAsync(string htmlContent)
+        {
+            ThrowIfDisposed();
+
+            var navigationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
+            {
+                if (args.IsSuccess)
+                {
+                    navigationCompleted.TrySetResult();
+                }
+                else
+                {
+                    navigationCompleted.TrySetException(new InvalidOperationException($"WebView2 navigation failed with status {args.WebErrorStatus}."));
+                }
+            }
+
+            string? nextTemporaryHtmlPath = null;
+            _coreWebView.NavigationCompleted += OnNavigationCompleted;
+            try
+            {
+                nextTemporaryHtmlPath = EpubSnapshotHtmlHelper.CreateTemporaryHtmlFile(htmlContent);
+                if (!string.IsNullOrEmpty(nextTemporaryHtmlPath))
+                {
+                    _coreWebView.Navigate(new Uri(nextTemporaryHtmlPath).AbsoluteUri);
+                }
+                else
+                {
+                    _coreWebView.NavigateToString(htmlContent);
+                }
+
+                await navigationCompleted.Task;
+                await WaitForReadyAsync(_coreWebView);
+
+                CleanupTemporaryHtmlFile(_temporaryHtmlPath);
+                _temporaryHtmlPath = nextTemporaryHtmlPath;
+                nextTemporaryHtmlPath = null;
+            }
+            finally
+            {
+                _coreWebView.NavigationCompleted -= OnNavigationCompleted;
+                CleanupTemporaryHtmlFile(nextTemporaryHtmlPath);
+            }
+        }
+
+        public Task<int> GetPageCountAsync()
+        {
+            ThrowIfDisposed();
+            return WindowsWebView2SnapshotService.GetPageCountAsync(_coreWebView);
+        }
+
+        public async Task<Stream> CapturePageAsync(int pageIndex)
+        {
+            ThrowIfDisposed();
+            var output = RecyclableStreamManagerProvider.Manager.GetStream(nameof(WindowsWebView2SnapshotService));
+            await CapturePageToStreamAsync(pageIndex, output);
+            output.Position = 0;
+            return output;
+        }
+
+        public async Task CapturePageToStreamAsync(int pageIndex, Stream outputStream)
+        {
+            ThrowIfDisposed();
+            await SetPageAsync(_coreWebView, pageIndex);
+            await _coreWebView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, outputStream);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _disposed = true;
+            _controller.Close();
+            DestroyWindow(_hostWindow);
+            CleanupTemporaryHtmlFile(_temporaryHtmlPath);
+            _owner._gate.Release();
+            return ValueTask.CompletedTask;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+        }
+    }
 }

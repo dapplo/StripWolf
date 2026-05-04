@@ -25,7 +25,6 @@ public sealed class EpubToCbzConverterService
         window.__stripWolfPageCount = 1;
         window.__stripWolfGetPageCount = () => window.__stripWolfPageCount;
         (() => {
-            const targetPageIndex = __STRIPWOLF_PAGE_INDEX__;
             const waitForAssets = async () => {
                 const images = Array.from(document.images || []);
                 await Promise.all(images.map(image => {
@@ -99,14 +98,11 @@ public sealed class EpubToCbzConverterService
                 pageStrip.style.left = `${-targetOffset}px`;
                 requestAnimationFrame(() => settlePageOffset(pageStrip, targetOffset, remainingFrames - 1));
             };
-            const applyPagination = () => {
+            const computePagination = () => {
                 const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0, 1);
                 const pageStrip = document.querySelector(':scope body > .stripwolf-page-strip') || document.querySelector('body > .stripwolf-page-strip');
                 if (!pageStrip) {
-                    window.__stripWolfPageCount = 1;
-                    window.__stripWolfGetPageCount = () => 1;
-                    window.__stripWolfReady = true;
-                    return;
+                    return { pageCount: 1, maxScrollLeft: 0, pageStrip: null, viewportWidth };
                 }
 
                 const totalScrollWidth = Math.max(
@@ -119,19 +115,30 @@ public sealed class EpubToCbzConverterService
                 const pageCount = maxScrollLeft <= trailingOverflowTolerance
                     ? 1
                     : Math.ceil((maxScrollLeft - trailingOverflowTolerance) / viewportWidth) + 1;
+                return { pageCount, maxScrollLeft, pageStrip, viewportWidth };
+            };
+            window.__stripWolfSetPage = (requestedPageIndex) => {
+                const pagination = computePagination();
+                const pageCount = pagination.pageCount || 1;
                 window.__stripWolfPageCount = pageCount;
                 window.__stripWolfGetPageCount = () => pageCount;
-                const safePageIndex = Math.max(0, Math.min(targetPageIndex, pageCount - 1));
-                const targetScrollLeft = Math.min(safePageIndex * viewportWidth, maxScrollLeft);
+                const safePageIndex = Math.max(0, Math.min(Number(requestedPageIndex) || 0, pageCount - 1));
+                if (!pagination.pageStrip) {
+                    window.__stripWolfReady = true;
+                    return safePageIndex;
+                }
+
+                const targetScrollLeft = Math.min(safePageIndex * pagination.viewportWidth, pagination.maxScrollLeft);
                 window.__stripWolfReady = false;
-                pageStrip.style.left = `${-targetScrollLeft}px`;
-                requestAnimationFrame(() => settlePageOffset(pageStrip, targetScrollLeft));
+                pagination.pageStrip.style.left = `${-targetScrollLeft}px`;
+                requestAnimationFrame(() => settlePageOffset(pagination.pageStrip, targetScrollLeft));
+                return safePageIndex;
             };
             window.addEventListener('load', async () => {
                 await waitForAssets();
                 markSingleVisualPage();
                 wrapReadingContent();
-                requestAnimationFrame(() => requestAnimationFrame(applyPagination));
+                requestAnimationFrame(() => requestAnimationFrame(() => window.__stripWolfSetPage(0)));
             }, { once: true });
         })();
         </script>
@@ -185,11 +192,18 @@ public sealed class EpubToCbzConverterService
             var book = await EpubReader.ReadBookAsync(epubFilePath);
             await MaterializeContentAsync(book, tempRoot, cancellationToken);
 
-            var paginatedChapters = new List<PaginatedChapter>(book.ReadingOrder.Count);
             var totalPages = 0;
 
-            foreach (var chapter in book.ReadingOrder)
+            using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
+            await using var paginationSession = await _webViewPaginationService.CreatePaginationSessionAsync(
+                viewportWidth,
+                viewportHeight);
+
+            var renderedPageIndex = 0;
+            var totalChapterCount = Math.Max(book.ReadingOrder.Count, 1);
+            for (var chapterIndex = 0; chapterIndex < book.ReadingOrder.Count; chapterIndex++)
             {
+                var chapter = book.ReadingOrder[chapterIndex];
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (string.IsNullOrWhiteSpace(chapter.Content))
@@ -199,21 +213,28 @@ public sealed class EpubToCbzConverterService
 
                 var chapterRelativePath = GetChapterRelativePath(chapter);
                 var baseUri = CreateChapterBaseUri(tempRoot, chapterRelativePath);
-                var pageCount = await _webViewPaginationService.GetPageCountAsync(
-                    BuildPaginatedHtml(chapter.Content, baseUri, 0, conversionTheme),
-                    viewportWidth,
-                    viewportHeight);
+                await paginationSession.LoadHtmlAsync(BuildPaginatedHtml(chapter.Content, baseUri, conversionTheme));
 
+                var pageCount = await paginationSession.GetPageCountAsync();
                 if (pageCount <= 0)
                 {
                     continue;
                 }
 
-                paginatedChapters.Add(new PaginatedChapter(chapter, baseUri, pageCount));
                 totalPages += pageCount;
-            }
 
-            using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
+                for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var entry = archive.CreateEntry($"Page_{renderedPageIndex + 1:000}.png", CompressionLevel.NoCompression);
+                    await using var entryStream = entry.Open();
+                    await paginationSession.CapturePageToStreamAsync(pageIndex, entryStream);
+
+                    renderedPageIndex++;
+                    progress?.Report((chapterIndex + ((double)pageIndex + 1) / pageCount) / totalChapterCount);
+                }
+            }
 
             var comicInfoXml = CreateComicInfoXml(book, totalPages);
             var comicInfoEntry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
@@ -221,28 +242,6 @@ public sealed class EpubToCbzConverterService
             await using (var comicInfoWriter = new StreamWriter(comicInfoStream, new UTF8Encoding(false)))
             {
                 await comicInfoWriter.WriteAsync(comicInfoXml);
-            }
-
-            var renderedPageIndex = 0;
-            foreach (var chapter in paginatedChapters)
-            {
-                for (var pageIndex = 0; pageIndex < chapter.PageCount; pageIndex++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    using var pageStream = await _webViewPaginationService.CapturePageAsync(
-                        BuildPaginatedHtml(chapter.ContentFile.Content, chapter.BaseUri, pageIndex, conversionTheme),
-                        viewportWidth,
-                        viewportHeight);
-
-                    var entry = archive.CreateEntry($"Page_{renderedPageIndex + 1:000}.png", CompressionLevel.NoCompression);
-                    await using var entryStream = entry.Open();
-                    pageStream.Position = 0;
-                    await pageStream.CopyToAsync(entryStream, cancellationToken);
-
-                    renderedPageIndex++;
-                    progress?.Report(totalPages == 0 ? 1 : (double)renderedPageIndex / totalPages);
-                }
             }
 
             progress?.Report(1);
@@ -301,9 +300,9 @@ public sealed class EpubToCbzConverterService
         }
     }
 
-    private static string BuildPaginatedHtml(string htmlContent, Uri baseUri, int pageIndex, EpubConversionTheme conversionTheme)
+    private static string BuildPaginatedHtml(string htmlContent, Uri baseUri, EpubConversionTheme conversionTheme)
     {
-        var injection = BuildHeadInjection(baseUri, pageIndex, conversionTheme);
+        var injection = BuildHeadInjection(baseUri, conversionTheme);
 
         if (HeadTagRegex.IsMatch(htmlContent))
         {
@@ -327,10 +326,9 @@ public sealed class EpubToCbzConverterService
             """;
     }
 
-    private static string BuildHeadInjection(Uri baseUri, int pageIndex, EpubConversionTheme conversionTheme)
+    private static string BuildHeadInjection(Uri baseUri, EpubConversionTheme conversionTheme)
     {
         var escapedBaseUri = SecurityElement.Escape(baseUri.AbsoluteUri) ?? baseUri.AbsoluteUri;
-        var paginationScript = PaginationScriptTemplate.Replace("__STRIPWOLF_PAGE_INDEX__", pageIndex.ToString());
         var backgroundColor = conversionTheme == EpubConversionTheme.Dark ? "#000000" : "#ffffff";
         var foregroundColor = conversionTheme == EpubConversionTheme.Dark ? "#f5f5f5" : "#111111";
         var mutedForegroundColor = conversionTheme == EpubConversionTheme.Dark ? "#d0d0d0" : "#333333";
@@ -356,7 +354,7 @@ public sealed class EpubToCbzConverterService
             "body.stripwolf-single-visual-page > .stripwolf-page-strip > .stripwolf-visual-content { display: flex; align-items: center; justify-content: center; width: 100vw; min-height: 100vh; }" + Environment.NewLine +
             "body.stripwolf-single-visual-page img, body.stripwolf-single-visual-page svg { width: 100%; height: 100vh; object-fit: contain; }" + Environment.NewLine +
             "</style>" + Environment.NewLine +
-            paginationScript;
+            PaginationScriptTemplate;
     }
 
     private static EpubConversionTheme ResolveConversionTheme(EpubConversionTheme configuredTheme)
@@ -499,8 +497,6 @@ public sealed class EpubToCbzConverterService
 
         return string.IsNullOrWhiteSpace(refinedIndex?.Content) ? null : refinedIndex.Content;
     }
-
-    private sealed record PaginatedChapter(EpubLocalTextContentFile ContentFile, Uri BaseUri, int PageCount);
 
     private sealed class Utf8StringWriter : StringWriter
     {

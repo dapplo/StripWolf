@@ -26,6 +26,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="VersOne.Epub" />
