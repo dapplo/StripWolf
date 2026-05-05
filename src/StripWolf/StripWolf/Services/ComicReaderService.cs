@@ -108,6 +108,36 @@ public class ComicReaderService
 
         var sortedNames = await GetCachedPageNamesAsync(filePath);
 
+        var data = await ReadPageAsync(filePath, pageIndex, sortedNames);
+
+        lock (_cacheLock)
+        {
+            _pageCache[(filePath, pageIndex)] = data;
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// Extracts a specific page from the comic without populating the page cache.
+    /// Useful for one-off work such as thumbnail generation during import.
+    /// </summary>
+    public async Task<byte[]> GetPageWithoutCacheAsync(string filePath, int pageIndex)
+    {
+        lock (_cacheLock)
+        {
+            if (_pageCache.TryGetValue((filePath, pageIndex), out var cached))
+            {
+                return cached;
+            }
+        }
+
+        var sortedNames = await GetCachedPageNamesAsync(filePath);
+        return await ReadPageAsync(filePath, pageIndex, sortedNames);
+    }
+
+    private static async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
+    {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
@@ -116,7 +146,7 @@ public class ComicReaderService
         var entryName = sortedNames[pageIndex];
         var format = GetComicFormat(filePath);
 
-        byte[] data = format switch
+        return format switch
         {
             ComicFormat.Cbz => await ReadCbzPageAsync(filePath, entryName),
             ComicFormat.Cbr => await ReadCbrPageAsync(filePath, pageIndex, entryName, sortedNames),
@@ -124,13 +154,6 @@ public class ComicReaderService
             ComicFormat.Cbt => await ReadCbtPageAsync(filePath, entryName),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
-
-        lock (_cacheLock)
-        {
-            _pageCache[(filePath, pageIndex)] = data;
-        }
-
-        return data;
     }
 
     public void ClearCache()
@@ -147,7 +170,7 @@ public class ComicReaderService
     /// </summary>
     public async Task<string> ExtractCoverAsync(string filePath, string outputPath)
     {
-        var coverData = await GetPageAsync(filePath, 0);
+        var coverData = await GetPageWithoutCacheAsync(filePath, 0);
         var pageNames = await GetPageNamesAsync(filePath);
         
         if (pageNames.Count == 0)

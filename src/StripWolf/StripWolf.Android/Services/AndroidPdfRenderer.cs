@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Android.Graphics;
 using Android.Graphics.Pdf;
@@ -18,6 +19,21 @@ public class AndroidPdfRenderer : IPdfRenderer
 
     /// <inheritdoc />
     public int JpegQuality { get; set; } = 85;
+
+    public Task<IPdfRenderSession> CreateRenderSessionAsync(string pdfFilePath)
+    {
+        var fileDescriptor = ParcelFileDescriptor.Open(
+            new Java.IO.File(pdfFilePath),
+            ParcelFileMode.ReadOnly);
+
+        if (fileDescriptor == null)
+        {
+            throw new InvalidOperationException($"Failed to open PDF file: {System.IO.Path.GetFileName(pdfFilePath)}");
+        }
+
+        var pdfRenderer = new PdfRenderer(fileDescriptor);
+        return Task.FromResult<IPdfRenderSession>(new AndroidPdfRenderSession(fileDescriptor, pdfRenderer, RenderDpi, JpegQuality));
+    }
 
     /// <inheritdoc />
     public int GetPageCount(string pdfFilePath)
@@ -50,60 +66,65 @@ public class AndroidPdfRenderer : IPdfRenderer
         string outputDir,
         IProgress<double>? progress)
     {
-        await Task.Run(() =>
+        using var renderSession = await CreateRenderSessionAsync(pdfFilePath);
+        var pageCount = renderSession.GetPageCount();
+        for (var i = 0; i < pageCount; i++)
         {
-            using var fileDescriptor = ParcelFileDescriptor.Open(
-                new Java.IO.File(pdfFilePath),
-                ParcelFileMode.ReadOnly);
-
-            if (fileDescriptor == null)
-            {
-                throw new InvalidOperationException($"Failed to open PDF file: {System.IO.Path.GetFileName(pdfFilePath)}");
-            }
-
-            using var pdfRenderer = new PdfRenderer(fileDescriptor);
-            var pageCount = pdfRenderer.PageCount;
-
-            for (var i = 0; i < pageCount; i++)
-            {
-                RenderPage(pdfRenderer, i, outputDir);
-                progress?.Report((double)(i + 1) / pageCount);
-            }
-        });
+            await using var outputStream = File.OpenWrite(System.IO.Path.Combine(outputDir, $"{i + 1:D5}.jpg"));
+            await renderSession.RenderPageToJpegAsync(i, outputStream);
+            progress?.Report((double)(i + 1) / pageCount);
+        }
     }
 
-    private void RenderPage(PdfRenderer pdfRenderer, int pageIndex, string outputDir)
+    private sealed class AndroidPdfRenderSession(
+        ParcelFileDescriptor fileDescriptor,
+        PdfRenderer pdfRenderer,
+        int renderDpi,
+        int jpegQuality) : IPdfRenderSession
     {
-        using var page = pdfRenderer.OpenPage(pageIndex);
-        if (page == null)
+        public int GetPageCount()
         {
-            throw new InvalidOperationException($"Failed to load page {pageIndex}");
+            return pdfRenderer.PageCount;
         }
 
-        // Get page dimensions in points (1 point = 1/72 inch)
-        var widthInPoints = page.Width;
-        var heightInPoints = page.Height;
-
-        // Calculate pixel dimensions based on DPI
-        var widthInPixels = (int)(widthInPoints * RenderDpi / 72.0);
-        var heightInPixels = (int)(heightInPoints * RenderDpi / 72.0);
-
-        // Create bitmap with white background
-        using var bitmap = Bitmap.CreateBitmap(widthInPixels, heightInPixels, Bitmap.Config.Argb8888!);
-        if (bitmap == null)
+        public PdfMetadata? GetMetadata()
         {
-            throw new InvalidOperationException($"Failed to create bitmap for page {pageIndex}");
+            return null;
         }
 
-        // Fill with white background
-        bitmap.EraseColor(Color.White);
+        public Task RenderPageToJpegAsync(int pageIndex, Stream outputStream)
+        {
+            return Task.Run(() => RenderPageToJpeg(pageIndex, outputStream));
+        }
 
-        // Render page to bitmap
-        page.Render(bitmap, null, null, PdfRenderMode.ForDisplay);
+        public void Dispose()
+        {
+            pdfRenderer.Dispose();
+            fileDescriptor.Dispose();
+        }
 
-        // Save as JPEG
-        var outputPath = System.IO.Path.Combine(outputDir, $"{pageIndex + 1:D5}.jpg");
-        using var outputStream = System.IO.File.OpenWrite(outputPath);
-        bitmap.Compress(Bitmap.CompressFormat.Jpeg!, JpegQuality, outputStream);
+        private void RenderPageToJpeg(int pageIndex, Stream outputStream)
+        {
+            using var page = pdfRenderer.OpenPage(pageIndex);
+            if (page == null)
+            {
+                throw new InvalidOperationException($"Failed to load page {pageIndex}");
+            }
+
+            var widthInPoints = page.Width;
+            var heightInPoints = page.Height;
+            var widthInPixels = (int)(widthInPoints * renderDpi / 72.0);
+            var heightInPixels = (int)(heightInPoints * renderDpi / 72.0);
+
+            using var bitmap = Bitmap.CreateBitmap(widthInPixels, heightInPixels, Bitmap.Config.Argb8888!);
+            if (bitmap == null)
+            {
+                throw new InvalidOperationException($"Failed to create bitmap for page {pageIndex}");
+            }
+
+            bitmap.EraseColor(Color.White);
+            page.Render(bitmap, null, null, PdfRenderMode.ForDisplay);
+            bitmap.Compress(Bitmap.CompressFormat.Jpeg!, jpegQuality, outputStream);
+        }
     }
 }

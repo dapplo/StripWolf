@@ -136,35 +136,52 @@ public class ComicConverterService
         // Ensure output directory exists
         Directory.CreateDirectory(outputDirectory);
 
-        // Create a temporary directory for extraction with a unique random name
-        var tempDir = Path.Combine(Path.GetTempPath(), $"StripWolf_Convert_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        await using var inputStream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await ConvertArchiveToCbzAsync(inputStream, archiveType, cbzFilePath, progress);
+        return cbzFilePath;
+    }
 
-        try
+    /// <summary>
+    /// Converts a comic book archive stream to CBZ format.
+    /// </summary>
+    public async Task<string> ConvertToCbzAsync(
+        Stream inputStream,
+        string sourceFileName,
+        ComicArchiveType archiveType,
+        string outputDirectory,
+        IProgress<double>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(inputStream);
+
+        if (archiveType == ComicArchiveType.Unknown)
         {
-            // Extract files to temp directory
-            await ExtractArchiveAsync(inputPath, archiveType, tempDir, progress);
+            throw new NotSupportedException("Unsupported comic archive format.");
+        }
 
-            // Create CBZ from extracted files
-            await CreateCbzFromDirectoryAsync(tempDir, cbzFilePath);
+        if (archiveType == ComicArchiveType.Ace)
+        {
+            throw new NotSupportedException("ACE format is not supported. Please convert the file manually.");
+        }
 
+        Directory.CreateDirectory(outputDirectory);
+        var cbzFileName = Path.GetFileNameWithoutExtension(sourceFileName) + ".cbz";
+        var cbzFilePath = Path.Combine(outputDirectory, cbzFileName);
+
+        if (archiveType == ComicArchiveType.Zip)
+        {
+            if (File.Exists(cbzFilePath))
+            {
+                File.Delete(cbzFilePath);
+            }
+
+            await using var outputStream = new FileStream(cbzFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await inputStream.CopyToAsync(outputStream);
+            progress?.Report(1);
             return cbzFilePath;
         }
-        finally
-        {
-            // Clean up temporary directory
-            try
-            {
-                if (Directory.Exists(tempDir))
-                {
-                    Directory.Delete(tempDir, true);
-                }
-            }
-            catch
-            {
-                // Temporary directory cleanup is best-effort
-            }
-        }
+
+        await ConvertArchiveToCbzAsync(inputStream, archiveType, cbzFilePath, progress);
+        return cbzFilePath;
     }
 
     /// <summary>
@@ -209,152 +226,107 @@ public class ComicConverterService
         }
     }
 
-    private async Task ExtractArchiveAsync(
-        string inputPath, 
-        ComicArchiveType archiveType, 
-        string outputDir,
+    private async Task ConvertArchiveToCbzAsync(
+        Stream inputStream,
+        ComicArchiveType archiveType,
+        string cbzFilePath,
         IProgress<double>? progress)
     {
+        if (File.Exists(cbzFilePath))
+        {
+            File.Delete(cbzFilePath);
+        }
+
         await Task.Run(() =>
         {
-            switch (archiveType)
-            {
-                case ComicArchiveType.Rar:
-                    ExtractRar(inputPath, outputDir, progress);
-                    break;
-                case ComicArchiveType.SevenZip:
-                    ExtractSevenZip(inputPath, outputDir, progress);
-                    break;
-                case ComicArchiveType.Tar:
-                    ExtractTar(inputPath, outputDir, progress);
-                    break;
-                default:
-                    throw new NotSupportedException($"Archive type {archiveType} is not supported for extraction");
-            }
+            using var outputStream = new FileStream(cbzFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+            using var archive = new ZipArchive(outputStream, ZipArchiveMode.Create);
+            ConvertArchiveStreamToCbz(inputStream, archiveType, archive, progress);
         });
     }
 
-    private static void ExtractRar(string inputPath, string outputDir, IProgress<double>? progress)
+    private static void ConvertArchiveStreamToCbz(
+        Stream inputStream,
+        ComicArchiveType archiveType,
+        ZipArchive outputArchive,
+        IProgress<double>? progress)
     {
-        // For solid RAR archives, we must use the Reader interface (forward-only stream)
-        // For non-solid archives, we can use the Archive interface (random access)
-        using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var archive = RarArchive.OpenArchive(stream);
-        
-        if (archive.IsSolid)
+        if (inputStream.CanSeek)
         {
-            // Use reader for solid archives - extract all entries sequentially
-            using var reader = archive.ExtractAllEntries();
-            var totalEntries = archive.Entries.Count(e => !e.IsDirectory);
-            var processedEntries = 0;
-            
-            while (reader.MoveToNextEntry())
-            {
-                if (!reader.Entry.IsDirectory)
-                {
-                    var entryPath = GetSafeEntryPath(reader.Entry.Key ?? string.Empty, outputDir);
-                    var entryDir = Path.GetDirectoryName(entryPath);
-                    if (!string.IsNullOrEmpty(entryDir))
-                    {
-                        Directory.CreateDirectory(entryDir);
-                    }
-
-                    using var entryStream = reader.OpenEntryStream();
-                    using var fileStream = File.Create(entryPath);
-                    entryStream.CopyTo(fileStream);
-                    
-                    processedEntries++;
-                    progress?.Report((double)processedEntries / totalEntries);
-                }
-            }
+            inputStream.Position = 0;
         }
-        else
+
+        using var reader = ReaderFactory.OpenReader(inputStream, new ReaderOptions
         {
-            // Use archive interface for non-solid archives
-            var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
-            var totalEntries = entries.Count;
-            var processedEntries = 0;
-
-            foreach (var entry in entries)
-            {
-                var entryPath = GetSafeEntryPath(entry.Key ?? string.Empty, outputDir);
-                var entryDir = Path.GetDirectoryName(entryPath);
-                if (!string.IsNullOrEmpty(entryDir))
-                {
-                    Directory.CreateDirectory(entryDir);
-                }
-
-                using var entryStream = entry.OpenEntryStream();
-                using var fileStream = File.Create(entryPath);
-                entryStream.CopyTo(fileStream);
-                
-                processedEntries++;
-                progress?.Report((double)processedEntries / totalEntries);
-            }
-        }
-    }
-
-    private static void ExtractSevenZip(string inputPath, string outputDir, IProgress<double>? progress)
-    {
-        using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var archive = SevenZipArchive.OpenArchive(stream);
-        // 7z archives may be solid, so use ExtractAllEntries which handles this
-        using var reader = archive.ExtractAllEntries();
-        var totalEntries = archive.Entries.Count(e => !e.IsDirectory);
-        var processedEntries = 0;
-
+            LeaveStreamOpen = true,
+            ExtensionHint = GetExtensionHint(archiveType)
+        });
         while (reader.MoveToNextEntry())
         {
-            if (!reader.Entry.IsDirectory)
+            if (reader.Entry.IsDirectory)
             {
-                var entryPath = GetSafeEntryPath(reader.Entry.Key ?? string.Empty, outputDir);
-                var entryDir = Path.GetDirectoryName(entryPath);
-                if (!string.IsNullOrEmpty(entryDir))
-                {
-                    Directory.CreateDirectory(entryDir);
-                }
-
-                using var entryStream = reader.OpenEntryStream();
-                using var fileStream = File.Create(entryPath);
-                entryStream.CopyTo(fileStream);
-                
-                processedEntries++;
-                progress?.Report((double)processedEntries / totalEntries);
+                continue;
             }
+
+            var safeEntryName = GetSafeEntryName(reader.Entry.Key ?? string.Empty);
+            if (!ShouldIncludeEntry(safeEntryName))
+            {
+                continue;
+            }
+
+            using var entryStream = reader.OpenEntryStream();
+            CopyEntryToZip(entryStream, outputArchive, safeEntryName);
+            ReportStreamingProgress(progress, inputStream);
         }
+
+        progress?.Report(1);
     }
 
-    private static void ExtractTar(string inputPath, string outputDir, IProgress<double>? progress)
+    private static bool ShouldIncludeEntry(string safeEntryName)
     {
-        using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var archive = TarArchive.OpenArchive(stream);
-        var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
-        var totalEntries = entries.Count;
-        var processedEntries = 0;
-
-        foreach (var entry in entries)
-        {
-            var entryPath = GetSafeEntryPath(entry.Key ?? string.Empty, outputDir);
-            var entryDir = Path.GetDirectoryName(entryPath);
-            if (!string.IsNullOrEmpty(entryDir))
-            {
-                Directory.CreateDirectory(entryDir);
-            }
-
-            using var entryStream = entry.OpenEntryStream();
-            using var fileStream = File.Create(entryPath);
-            entryStream.CopyTo(fileStream);
-            
-            processedEntries++;
-            progress?.Report((double)processedEntries / totalEntries);
-        }
+        return ComicConstants.IsImageFile(safeEntryName) || ComicConstants.IsComicInfoFile(safeEntryName);
     }
 
-    private static string GetSafeEntryPath(string entryKey, string outputDir)
+    private static void CopyEntryToZip(Stream entryStream, ZipArchive outputArchive, string safeEntryName)
+    {
+        var zipEntry = outputArchive.CreateEntry(safeEntryName, CompressionLevel.Optimal);
+        using var zipEntryStream = zipEntry.Open();
+        entryStream.CopyTo(zipEntryStream);
+    }
+
+    private static void ReportStreamingProgress(IProgress<double>? progress, Stream inputStream)
+    {
+        if (progress is null || !inputStream.CanSeek)
+        {
+            return;
+        }
+
+        var length = inputStream.Length;
+        if (length <= 0)
+        {
+            return;
+        }
+
+        progress.Report(Math.Min(1, (double)inputStream.Position / length));
+    }
+
+    private static string GetExtensionHint(ComicArchiveType archiveType)
+    {
+        return archiveType switch
+        {
+            ComicArchiveType.Rar => ".cbr",
+            ComicArchiveType.SevenZip => ".cb7",
+            ComicArchiveType.Tar => ".cbt",
+            ComicArchiveType.Zip => ".cbz",
+            _ => string.Empty
+        };
+    }
+
+    private static string GetSafeEntryName(string entryKey)
     {
         // Sanitize the entry path to prevent path traversal
         var safePath = entryKey.Replace('\\', '/');
-        
+
         // Remove any leading slashes or parent directory references with loop protection
         var previousLength = -1;
         while (safePath.Length != previousLength && (safePath.StartsWith('/') || safePath.StartsWith("../")))
@@ -376,35 +348,8 @@ public class ComicConverterService
             safePath = "extracted_file";
         }
 
-        return Path.Combine(outputDir, safePath);
+        return safePath;
     }
-
-    private static async Task CreateCbzFromDirectoryAsync(string sourceDir, string cbzPath)
-    {
-        // Delete existing CBZ if it exists
-        if (File.Exists(cbzPath))
-        {
-            File.Delete(cbzPath);
-        }
-
-        await Task.Run(() =>
-        {
-            using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
-
-            // Get all files maintaining directory structure
-            var allFiles = Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories)
-                .Where(f => ComicConstants.IsImageFile(f) || ComicConstants.IsComicInfoFile(f))
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var file in allFiles)
-            {
-                // Get relative path from source directory
-                var relativePath = Path.GetRelativePath(sourceDir, file);
-                archive.CreateEntryFromFile(file, relativePath, CompressionLevel.Optimal);
-            }
-        });
-    }
-
     #region ComicInfo Extraction
 
     private static async Task<ComicInfo?> ExtractComicInfoFromZipAsync(string filePath)

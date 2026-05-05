@@ -1,4 +1,8 @@
 using System.Xml.Serialization;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using StripWolf.Data;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
@@ -10,6 +14,10 @@ namespace StripWolf.Services;
 /// </summary>
 public class LibraryService
 {
+    private const int CoverThumbnailMaxWidth = 300;
+    private const int CoverThumbnailMaxHeight = 400;
+    private const int CoverThumbnailJpegQuality = 85;
+
     private readonly DatabaseService _databaseService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
@@ -679,19 +687,35 @@ public class LibraryService
     /// </summary>
     private async Task<string> ExtractCoverToUnifiedDirectoryAsync(string comicFilePath, string coverId)
     {
-        var coverData = await _comicReaderService.GetPageAsync(comicFilePath, 0);
-        var pageNames = await _comicReaderService.GetPageNamesAsync(comicFilePath);
-        
-        if (pageNames.Count == 0)
-        {
-            throw new InvalidOperationException("Comic has no pages");
-        }
+        var coverData = await _comicReaderService.GetPageWithoutCacheAsync(comicFilePath, 0);
+        return await CreateCoverThumbnailAsync(coverData, coverId);
+    }
 
-        var extension = Path.GetExtension(pageNames[0]);
-        var coverPath = Path.Combine(_coversDirectory, $"{coverId}{extension}");
-        
-        await File.WriteAllBytesAsync(coverPath, coverData);
-        
+    private async Task<string> CreateCoverThumbnailAsync(byte[] imageData, string coverId)
+    {
+        var coverPath = Path.Combine(_coversDirectory, $"{coverId}.jpg");
+
+        await using var inputStream = new MemoryStream(imageData, writable: false);
+        using var sourceImage = await Image.LoadAsync<Rgba32>(inputStream);
+        sourceImage.Mutate(context => context.AutoOrient());
+
+        var resizeOptions = new ResizeOptions
+        {
+            Mode = ResizeMode.Max,
+            Size = new Size(CoverThumbnailMaxWidth, CoverThumbnailMaxHeight),
+            Sampler = KnownResamplers.Lanczos3
+        };
+
+        using var resizedImage = sourceImage.Clone(context => context.Resize(resizeOptions));
+        using var flattenedImage = new Image<Rgba32>(resizedImage.Width, resizedImage.Height, Color.White);
+        flattenedImage.Mutate(context => context.DrawImage(resizedImage, 1f));
+
+        await using var outputStream = File.Create(coverPath);
+        await flattenedImage.SaveAsJpegAsync(outputStream, new JpegEncoder
+        {
+            Quality = CoverThumbnailJpegQuality
+        });
+
         return coverPath;
     }
 

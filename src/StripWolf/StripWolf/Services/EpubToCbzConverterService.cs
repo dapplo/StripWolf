@@ -21,8 +21,7 @@ public sealed class EpubToCbzConverterService
     private const int DefaultViewportHeight = 1050;
     private const string PaginationCss = "body { height: 100vh; overflow: hidden; }";
 
-    private const string PaginationScriptTemplate = """
-        <script>
+    private const string PaginationScriptBody = """
         window.__stripWolfReady = false;
         window.__stripWolfPageCount = 1;
         window.__stripWolfGetPageCount = () => window.__stripWolfPageCount;
@@ -163,11 +162,16 @@ public sealed class EpubToCbzConverterService
                 requestAnimationFrame(() => requestAnimationFrame(() => window.__stripWolfSetPage(0)));
             }, { once: true });
         })();
-        </script>
         """;
 
     private static readonly Regex HeadTagRegex = new("<head\\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex HtmlTagRegex = new("<html\\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ScriptTagRegex = new("<script\\b[^>]*>[\\s\\S]*?</script\\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DangerousTagRegex = new("<(?:iframe|object|embed|applet|form)\\b[^>]*>[\\s\\S]*?</(?:iframe|object|embed|applet|form)\\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SelfClosingDangerousTagRegex = new("<(?:iframe|object|embed|applet|form)\\b[^>]*/?>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex EventHandlerAttributeRegex = new("\\s+on[\\w:-]+\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s>]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex JavascriptUriAttributeRegex = new("(\\s+(?:href|src|xlink:href|action|formaction|poster)\\s*=\\s*)(?<quote>['\"]?)(?<value>[^'\"\\s>]*)(?:\\k<quote>)?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MetaRefreshTagRegex = new("<meta\\b[^>]*http-equiv\\s*=\\s*(['\"]?)refresh\\1[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly IWebViewPaginationService _webViewPaginationService;
     private readonly SettingsService _settingsService;
@@ -326,16 +330,17 @@ public sealed class EpubToCbzConverterService
 
     private static string BuildPaginatedHtml(string htmlContent, Uri baseUri, EpubConversionTheme conversionTheme)
     {
+        var sanitizedHtml = SanitizeChapterHtml(htmlContent);
         var injection = BuildHeadInjection(baseUri, conversionTheme);
 
-        if (HeadTagRegex.IsMatch(htmlContent))
+        if (HeadTagRegex.IsMatch(sanitizedHtml))
         {
-            return HeadTagRegex.Replace(htmlContent, match => $"{match.Value}{injection}", 1);
+            return HeadTagRegex.Replace(sanitizedHtml, match => $"{match.Value}{injection}", 1);
         }
 
-        if (HtmlTagRegex.IsMatch(htmlContent))
+        if (HtmlTagRegex.IsMatch(sanitizedHtml))
         {
-            return HtmlTagRegex.Replace(htmlContent, match => $"{match.Value}<head>{injection}</head>", 1);
+            return HtmlTagRegex.Replace(sanitizedHtml, match => $"{match.Value}<head>{injection}</head>", 1);
         }
 
         return $"""
@@ -344,7 +349,7 @@ public sealed class EpubToCbzConverterService
             {injection}
             </head>
             <body>
-            {htmlContent}
+            {sanitizedHtml}
             </body>
             </html>
             """;
@@ -356,10 +361,13 @@ public sealed class EpubToCbzConverterService
         var backgroundColor = conversionTheme == EpubConversionTheme.Dark ? "#000000" : "#ffffff";
         var foregroundColor = conversionTheme == EpubConversionTheme.Dark ? "#f5f5f5" : "#111111";
         var mutedForegroundColor = conversionTheme == EpubConversionTheme.Dark ? "#d0d0d0" : "#333333";
+        var scriptNonce = Convert.ToHexString(Guid.NewGuid().ToByteArray());
+        var csp = BuildContentSecurityPolicy(scriptNonce);
 
         return
             $"<base href=\"{escapedBaseUri}\" />{Environment.NewLine}" +
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\" />" + Environment.NewLine +
+            $"<meta http-equiv=\"Content-Security-Policy\" content=\"{SecurityElement.Escape(csp)}\" />" + Environment.NewLine +
             "<style id=\"stripwolf-pagination-style\">" + Environment.NewLine +
             "* { box-sizing: border-box; }" + Environment.NewLine +
             $"html {{ margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: {backgroundColor}; color: {foregroundColor}; }}" + Environment.NewLine +
@@ -381,7 +389,44 @@ public sealed class EpubToCbzConverterService
             "body.stripwolf-single-visual-page > .stripwolf-page-viewport > .stripwolf-visual-content { display: flex; align-items: center; justify-content: center; width: 100vw; min-height: 100vh; }" + Environment.NewLine +
             "body.stripwolf-single-visual-page img, body.stripwolf-single-visual-page svg { width: 100%; height: 100vh; object-fit: contain; }" + Environment.NewLine +
             "</style>" + Environment.NewLine +
-            PaginationScriptTemplate;
+            $"<script nonce=\"{scriptNonce}\">{Environment.NewLine}{PaginationScriptBody}{Environment.NewLine}</script>";
+    }
+
+    private static string SanitizeChapterHtml(string htmlContent)
+    {
+        var sanitizedHtml = ScriptTagRegex.Replace(htmlContent, string.Empty);
+        sanitizedHtml = DangerousTagRegex.Replace(sanitizedHtml, string.Empty);
+        sanitizedHtml = SelfClosingDangerousTagRegex.Replace(sanitizedHtml, string.Empty);
+        sanitizedHtml = MetaRefreshTagRegex.Replace(sanitizedHtml, string.Empty);
+        sanitizedHtml = EventHandlerAttributeRegex.Replace(sanitizedHtml, string.Empty);
+        sanitizedHtml = JavascriptUriAttributeRegex.Replace(sanitizedHtml, match =>
+        {
+            var value = match.Groups["value"].Value.TrimStart();
+            return value.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : match.Value;
+        });
+
+        return sanitizedHtml;
+    }
+
+    private static string BuildContentSecurityPolicy(string scriptNonce)
+    {
+        return
+            "default-src 'none'; " +
+            "base-uri 'self' file: data: blob:; " +
+            "img-src file: data: blob:; " +
+            "style-src 'unsafe-inline' file: data: blob:; " +
+            "font-src file: data: blob:; " +
+            "media-src file: data: blob:; " +
+            "object-src 'none'; " +
+            "frame-src 'none'; " +
+            "child-src 'none'; " +
+            "connect-src 'none'; " +
+            "manifest-src 'none'; " +
+            "worker-src 'none'; " +
+            "form-action 'none'; " +
+            $"script-src 'nonce-{scriptNonce}'";
     }
 
     private static EpubConversionTheme ResolveConversionTheme(EpubConversionTheme configuredTheme)

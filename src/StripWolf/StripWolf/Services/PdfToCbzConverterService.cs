@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using System.Xml.Serialization;
 using StripWolf.Models;
 
@@ -62,49 +63,35 @@ public class PdfToCbzConverterService
         // Ensure output directory exists
         Directory.CreateDirectory(outputDirectory);
 
-        // Create a temporary directory for extracted pages with a unique random name
-        var tempDir = Path.Combine(Path.GetTempPath(), $"StripWolf_PDF_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
+        using var renderSession = await _pdfRenderer.CreateRenderSessionAsync(pdfFilePath);
 
-        try
+        if (File.Exists(cbzFilePath))
         {
-            // Extract PDF metadata before rendering pages
-            var pdfMetadata = _pdfRenderer.GetMetadata(pdfFilePath);
-            
-            // Render PDF pages to JPG files
-            await RenderPdfPagesToJpgAsync(pdfFilePath, tempDir, progress);
-
-            // Generate ComicInfo.xml from PDF metadata if available
-            if (pdfMetadata is not null)
-            {
-                var comicInfo = CreateComicInfoFromPdfMetadata(pdfMetadata, pdfFileName);
-                await WriteComicInfoAsync(comicInfo, tempDir);
-            }
-
-            // Create CBZ file from the JPG files and ComicInfo.xml
-            await CreateCbzFromImagesAsync(tempDir, cbzFilePath);
-
-            return cbzFilePath;
+            File.Delete(cbzFilePath);
         }
-        finally
+
+        using var archive = ZipFile.Open(cbzFilePath, ZipArchiveMode.Create);
+        var pdfMetadata = renderSession.GetMetadata();
+
+        if (pdfMetadata is not null)
         {
-            // Clean up temporary directory - best effort, non-critical
-            try
-            {
-                if (Directory.Exists(tempDir))
-                {
-                    Directory.Delete(tempDir, true);
-                }
-            }
-            catch (IOException)
-            {
-                // Temporary directory cleanup is best-effort; files will be cleaned up by OS temp cleanup
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // Temporary directory cleanup is best-effort; files will be cleaned up by OS temp cleanup
-            }
+            var comicInfo = CreateComicInfoFromPdfMetadata(pdfMetadata, pdfFileName);
+            var comicInfoEntry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
+            await using var comicInfoStream = comicInfoEntry.Open();
+            await WriteComicInfoAsync(comicInfo, comicInfoStream);
         }
+
+        var pageCount = renderSession.GetPageCount();
+
+        for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
+        {
+            var pageEntry = archive.CreateEntry($"Page_{pageIndex + 1:D5}.jpg", CompressionLevel.NoCompression);
+            await using var pageStream = pageEntry.Open();
+            await renderSession.RenderPageToJpegAsync(pageIndex, pageStream);
+            progress?.Report((double)(pageIndex + 1) / pageCount);
+        }
+
+        return cbzFilePath;
     }
 
     /// <summary>
@@ -151,69 +138,25 @@ public class PdfToCbzConverterService
     }
 
     /// <summary>
-    /// Writes a ComicInfo.xml file to the specified directory
+    /// Writes a ComicInfo.xml file to the specified stream.
     /// </summary>
-    private static async Task WriteComicInfoAsync(ComicInfo comicInfo, string directory)
+    private static async Task WriteComicInfoAsync(ComicInfo comicInfo, Stream outputStream)
     {
-        var comicInfoPath = Path.Combine(directory, "ComicInfo.xml");
-        
         await Task.Run(() =>
         {
-            // Configure XmlSerializer to not emit null elements
             var serializer = new XmlSerializer(typeof(ComicInfo));
-            
-            // Create namespaces without xsi to avoid xsi:nil attributes
             var namespaces = new System.Xml.Serialization.XmlSerializerNamespaces();
-            namespaces.Add("", ""); // Removes default xsi and xsd namespaces
-            
+            namespaces.Add("", "");
+
             var settings = new System.Xml.XmlWriterSettings
             {
                 Indent = true,
-                Encoding = System.Text.Encoding.UTF8,
+                Encoding = Encoding.UTF8,
                 OmitXmlDeclaration = false
             };
-            
-            using var writer = System.Xml.XmlWriter.Create(comicInfoPath, settings);
+
+            using var writer = System.Xml.XmlWriter.Create(outputStream, settings);
             serializer.Serialize(writer, comicInfo, namespaces);
-        });
-    }
-
-    private async Task RenderPdfPagesToJpgAsync(
-        string pdfFilePath, 
-        string outputDir,
-        IProgress<double>? progress)
-    {
-        await _pdfRenderer.RenderPdfPagesToJpgAsync(pdfFilePath, outputDir, progress);
-    }
-
-    private static async Task CreateCbzFromImagesAsync(string sourceDir, string cbzPath)
-    {
-        // Delete existing CBZ if it exists
-        if (File.Exists(cbzPath))
-        {
-            File.Delete(cbzPath);
-        }
-
-        await Task.Run(() =>
-        {
-            using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
-            
-            // First add ComicInfo.xml if it exists
-            var comicInfoPath = Path.Combine(sourceDir, "ComicInfo.xml");
-            if (File.Exists(comicInfoPath))
-            {
-                archive.CreateEntryFromFile(comicInfoPath, "ComicInfo.xml", CompressionLevel.Optimal);
-            }
-            
-            // Then add all image files
-            var imageFiles = Directory.GetFiles(sourceDir, "*.jpg")
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var imageFile in imageFiles)
-            {
-                var entryName = Path.GetFileName(imageFile);
-                archive.CreateEntryFromFile(imageFile, entryName, CompressionLevel.Optimal);
-            }
         });
     }
 }

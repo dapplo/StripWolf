@@ -17,6 +17,12 @@ public interface IPdfRenderer
     int JpegQuality { get; set; }
 
     /// <summary>
+    /// Creates a reusable PDF render session for a document.
+    /// </summary>
+    /// <param name="pdfFilePath">Path to the PDF file</param>
+    Task<IPdfRenderSession> CreateRenderSessionAsync(string pdfFilePath);
+
+    /// <summary>
     /// Gets the number of pages in a PDF file
     /// </summary>
     /// <param name="pdfFilePath">Path to the PDF file</param>
@@ -37,6 +43,27 @@ public interface IPdfRenderer
     /// <param name="pdfFilePath">Path to the PDF file</param>
     /// <returns>PDF metadata, or null if no metadata is available</returns>
     PdfMetadata? GetMetadata(string pdfFilePath);
+}
+
+/// <summary>
+/// Represents a reusable PDF render session for a single open document.
+/// </summary>
+public interface IPdfRenderSession : IDisposable
+{
+    /// <summary>
+    /// Gets the number of pages in the open PDF document.
+    /// </summary>
+    int GetPageCount();
+
+    /// <summary>
+    /// Gets the PDF metadata from the open document, if available.
+    /// </summary>
+    PdfMetadata? GetMetadata();
+
+    /// <summary>
+    /// Renders the specified zero-based page index directly into the supplied JPEG output stream.
+    /// </summary>
+    Task RenderPageToJpegAsync(int pageIndex, Stream outputStream);
 }
 
 /// <summary>
