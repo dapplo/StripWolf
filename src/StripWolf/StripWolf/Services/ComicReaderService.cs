@@ -51,11 +51,44 @@ public class ComicReaderService
     }
 
     /// <summary>
+    /// Gets information about a comic file without populating reader caches.
+    /// Useful for import/scan workflows that should not retain archive metadata in memory.
+    /// </summary>
+    public async Task<(int pageCount, long fileSize)> GetComicInfoWithoutCacheAsync(string filePath)
+    {
+        var fileInfo = new FileInfo(filePath);
+
+        if (!fileInfo.Exists)
+        {
+            throw new FileNotFoundException("Comic file not found", filePath);
+        }
+
+        var pageNames = await GetPageNamesWithoutCacheAsync(filePath);
+        return (pageNames.Count, fileInfo.Length);
+    }
+
+    /// <summary>
     /// Gets all page file names from a comic archive (cached after the first call)
     /// </summary>
     public async Task<List<string>> GetPageNamesAsync(string filePath)
     {
         return await GetCachedPageNamesAsync(filePath);
+    }
+
+    /// <summary>
+    /// Gets all page file names from a comic archive without populating reader caches.
+    /// </summary>
+    public async Task<List<string>> GetPageNamesWithoutCacheAsync(string filePath)
+    {
+        var format = GetComicFormat(filePath);
+        return format switch
+        {
+            ComicFormat.Cbz => await BuildCbzPageNamesAsync(filePath),
+            ComicFormat.Cbr => await BuildCbrPageNamesAsync(filePath),
+            ComicFormat.Cb7 => await BuildCb7PageNamesAsync(filePath),
+            ComicFormat.Cbt => await BuildCbtPageNamesAsync(filePath),
+            _ => throw new NotSupportedException($"Unsupported comic format: {format}")
+        };
     }
 
     /// <summary>
@@ -132,7 +165,7 @@ public class ComicReaderService
             }
         }
 
-        var sortedNames = await GetCachedPageNamesAsync(filePath);
+        var sortedNames = await GetPageNamesWithoutCacheAsync(filePath);
         return await ReadPageAsync(filePath, pageIndex, sortedNames);
     }
 
@@ -141,7 +174,7 @@ public class ComicReaderService
     /// </summary>
     public async Task CopyPageWithoutCacheAsync(string filePath, int pageIndex, Stream outputStream)
     {
-        var sortedNames = await GetCachedPageNamesAsync(filePath);
+        var sortedNames = await GetPageNamesWithoutCacheAsync(filePath);
         await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream);
     }
 
@@ -209,7 +242,7 @@ public class ComicReaderService
     public async Task<string> ExtractCoverAsync(string filePath, string outputPath)
     {
         var coverData = await GetPageWithoutCacheAsync(filePath, 0);
-        var pageNames = await GetPageNamesAsync(filePath);
+        var pageNames = await GetPageNamesWithoutCacheAsync(filePath);
         
         if (pageNames.Count == 0)
         {

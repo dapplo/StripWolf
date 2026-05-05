@@ -41,6 +41,7 @@ public class DatabaseService : IAsyncDisposable
         
         await _database.CreateTableAsync<Comic>();
         await _database.CreateTableAsync<KomgaServer>();
+        await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
         
         return _database;
     }

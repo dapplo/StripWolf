@@ -467,6 +467,8 @@ public partial class LibraryViewModel : ViewModelBase
             PendingImports.Add(pending);
         }
 
+        using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
+
         // Process files sequentially
         foreach (var pending in pendingItems)
         {

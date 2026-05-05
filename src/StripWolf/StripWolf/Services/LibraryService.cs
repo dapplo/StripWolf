@@ -27,6 +27,9 @@ public class LibraryService
     private readonly string _appDataDirectory;
     private readonly string _comicsDirectory;
     private readonly string _coversDirectory;
+    private readonly object _libraryChangedLock = new();
+    private int _deferredLibraryChangedCount;
+    private bool _libraryChangedPending;
 
     /// <summary>
     /// Event raised when the library content changes (add, delete, import)
@@ -60,6 +63,20 @@ public class LibraryService
     /// Gets the comics directory path
     /// </summary>
     public string ComicsDirectory => _comicsDirectory;
+
+    /// <summary>
+    /// Defers LibraryChanged notifications until the returned scope is disposed.
+    /// Nested scopes are supported and only raise a single change event when the outermost scope completes.
+    /// </summary>
+    public IDisposable DeferLibraryChanged()
+    {
+        lock (_libraryChangedLock)
+        {
+            _deferredLibraryChangedCount++;
+        }
+
+        return new DeferredLibraryChangedScope(this);
+    }
 
     private static string GetAppDataDirectory()
     {
@@ -654,6 +671,7 @@ public class LibraryService
                         f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".epub", StringComparison.OrdinalIgnoreCase));
 
+        using var deferredLibraryChanged = DeferLibraryChanged();
         foreach (var file in files)
         {
             try
@@ -822,6 +840,61 @@ public class LibraryService
 
     private void OnLibraryChanged()
     {
-        LibraryChanged?.Invoke(this, EventArgs.Empty);
+        bool shouldRaise;
+        lock (_libraryChangedLock)
+        {
+            if (_deferredLibraryChangedCount > 0)
+            {
+                _libraryChangedPending = true;
+                return;
+            }
+
+            shouldRaise = true;
+        }
+
+        if (shouldRaise)
+        {
+            LibraryChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void EndDeferredLibraryChanged()
+    {
+        bool shouldRaise = false;
+        lock (_libraryChangedLock)
+        {
+            if (_deferredLibraryChangedCount == 0)
+            {
+                return;
+            }
+
+            _deferredLibraryChangedCount--;
+            if (_deferredLibraryChangedCount == 0 && _libraryChangedPending)
+            {
+                _libraryChangedPending = false;
+                shouldRaise = true;
+            }
+        }
+
+        if (shouldRaise)
+        {
+            LibraryChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class DeferredLibraryChangedScope : IDisposable
+    {
+        private LibraryService? _owner;
+
+        public DeferredLibraryChangedScope(LibraryService owner)
+        {
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.EndDeferredLibraryChanged();
+        }
     }
 }

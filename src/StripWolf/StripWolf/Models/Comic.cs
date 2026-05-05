@@ -85,6 +85,7 @@ public partial class Comic : ObservableObject
     /// File path on the device
     /// </summary>
     [ObservableProperty]
+    [property: Indexed]
     private string _filePath = string.Empty;
 
     /// <summary>
