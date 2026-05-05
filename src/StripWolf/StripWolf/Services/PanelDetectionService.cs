@@ -301,28 +301,10 @@ public class PanelDetectionService
                 }
 
                 var rect = new Rect(columnStart, rowStart, width, height);
-                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+                var candidate = CreateRecoveredCandidate(pageIndex, rect, panels, 0.55, 0.20, 0.45, grayFull, edges, imgW, imgH, pageArea);
+                if (candidate is not null)
                 {
-                    continue;
-                }
-
-                if (panels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.55))
-                {
-                    continue;
-                }
-
-                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
-                double confidence =
-                    (stats.GutterContrast * 0.30) +
-                    (stats.BorderEdgeDensity * 0.15) +
-                    (stats.InteriorVarianceScore * 0.15) +
-                    (stats.AreaScore * 0.10) +
-                    (stats.EdgeTouchScore * 0.05) +
-                    0.15; // row recovery already implies structural evidence
-
-                if (confidence >= 0.45)
-                {
-                    candidates.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
+                    candidates.Add(candidate);
                 }
             }
         }
@@ -473,6 +455,40 @@ public class PanelDetectionService
             InteriorStdDev = innerStdDev,
             InteriorVarianceScore = interiorVarianceScore
         };
+    }
+
+    private ComicPanel? CreateRecoveredCandidate(int pageIndex, Rect rect, List<ComicPanel> existingPanels, double overlapThreshold, double confidenceBias, double confidenceThreshold, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (!IsSensibleCandidate(rect, imgW, imgH, pageArea) ||
+            existingPanels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > overlapThreshold))
+        {
+            return null;
+        }
+
+        if (!HasStrongCandidateBorderSupport(rect, rect.Y, rect.Bottom, grayFull, edges, imgW, imgH))
+        {
+            return null;
+        }
+
+        var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+        double confidence = ComputeRecoveredCandidateConfidence(stats, confidenceBias);
+        if (confidence < confidenceThreshold)
+        {
+            return null;
+        }
+
+        return CreatePanel(pageIndex, rect, imgW, imgH, confidence);
+    }
+
+    private static double ComputeRecoveredCandidateConfidence(CandidateStats stats, double confidenceBias)
+    {
+        return
+            (stats.GutterContrast * 0.22) +
+            (stats.BorderEdgeDensity * 0.20) +
+            (stats.InteriorVarianceScore * 0.14) +
+            (stats.AreaScore * 0.10) +
+            (stats.EdgeTouchScore * 0.06) +
+            confidenceBias;
     }
 
     private static double ComputeOuterRingMean(Mat grayFull, Rect rect, int imgW, int imgH)
@@ -1951,29 +1967,10 @@ public class PanelDetectionService
                 int gapStart = Math.Max(0, (int)Math.Round(gap.Start * imgW));
                 int gapEnd = Math.Min(imgW, (int)Math.Round(gap.End * imgW));
                 var rect = new Rect(gapStart, rowStart, Math.Max(1, gapEnd - gapStart), Math.Max(1, rowEnd - rowStart));
-                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea) ||
-                    adjustedPanels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.45))
+                var candidate = CreateRecoveredCandidate(rowPanels[0].PageIndex, rect, adjustedPanels, 0.45, 0.22, 0.48, grayFull, edges, imgW, imgH, pageArea);
+                if (candidate is not null)
                 {
-                    continue;
-                }
-
-                if (!HasStrongCandidateBorderSupport(rect, rowStart, rowEnd, grayFull, edges, imgW, imgH))
-                {
-                    continue;
-                }
-
-                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
-                double confidence =
-                    (stats.GutterContrast * 0.22) +
-                    (stats.BorderEdgeDensity * 0.20) +
-                    (stats.InteriorVarianceScore * 0.14) +
-                    (stats.AreaScore * 0.10) +
-                    (stats.EdgeTouchScore * 0.06) +
-                    0.22;
-
-                if (confidence >= 0.48)
-                {
-                    adjustedPanels.Add(CreatePanel(rowPanels[0].PageIndex, rect, imgW, imgH, confidence));
+                    adjustedPanels.Add(candidate);
                     break;
                 }
             }
