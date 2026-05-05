@@ -802,22 +802,19 @@ public class PanelDetectionService
 
     private List<ComicPanel> DetectEvidenceLayoutCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
     {
-        var horizontalSeparators = FindEvidenceHorizontalSeparators(grayFull, edges, imgW, imgH);
+        using var darkMask = CreateDarkSeparatorMask(grayFull);
+        var horizontalSeparators = FindEvidenceHorizontalSeparators(grayFull, edges, darkMask, imgW, imgH);
         var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
         if (rowBands.Count < 2)
         {
             return [];
         }
 
-        var rows = new List<LayoutRowCandidate>();
-        foreach (var (rowStart, rowEnd) in rowBands)
-        {
-            int rowHeight = rowEnd - rowStart;
-            if (rowHeight < Math.Max(40, imgH / 14))
+        var rows = CreateLayoutRowsFromBands(
+            rowBands,
+            imgH,
+            (rowStart, rowEnd) =>
             {
-                continue;
-            }
-
             double topSupport = GetMaxHorizontalBorderScore(
                 Math.Max(0, rowStart - Math.Max(4, imgH / 240)),
                 Math.Min(imgH, rowStart + Math.Max(5, imgH / 220)),
@@ -836,47 +833,34 @@ public class PanelDetectionService
             bool touchesPageEdge = rowStart <= Math.Max(4, imgH / 240) || rowEnd >= imgH - Math.Max(4, imgH / 240);
             if (!touchesPageEdge && Math.Max(topSupport, bottomSupport) < 0.24)
             {
-                continue;
+                return [];
             }
 
-            var verticalSeparators = FindEvidenceVerticalSeparators(grayFull, edges, imgW, rowStart, rowEnd);
-            var columnBands = BuildSegments(verticalSeparators, imgW, Math.Max(40, imgW / 10));
-            if (columnBands.Count == 0)
-            {
-                continue;
-            }
-
-            var rowPanels = new List<ComicPanel>();
-            foreach (var (columnStart, columnEnd) in columnBands)
-            {
-                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowHeight);
-                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+            var verticalSeparators = FindEvidenceVerticalSeparators(grayFull, edges, darkMask, imgW, rowStart, rowEnd);
+            double separatorSupport = Math.Clamp((topSupport + bottomSupport) / 2.0, 0.0, 1.0);
+            return CreateLayoutPanelsForRow(
+                pageIndex,
+                rowStart,
+                rowEnd,
+                verticalSeparators,
+                imgW,
+                imgH,
+                pageArea,
+                rect =>
                 {
-                    continue;
-                }
+                    var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                    double confidence =
+                        (stats.GutterContrast * 0.24) +
+                        (stats.BorderEdgeDensity * 0.20) +
+                        (stats.InteriorVarianceScore * 0.15) +
+                        (stats.AreaScore * 0.10) +
+                        (stats.EdgeTouchScore * 0.06) +
+                        (separatorSupport * 0.15) +
+                        0.16;
 
-                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
-                double separatorSupport = Math.Clamp((topSupport + bottomSupport) / 2.0, 0.0, 1.0);
-                double confidence =
-                    (stats.GutterContrast * 0.24) +
-                    (stats.BorderEdgeDensity * 0.20) +
-                    (stats.InteriorVarianceScore * 0.15) +
-                    (stats.AreaScore * 0.10) +
-                    (stats.EdgeTouchScore * 0.06) +
-                    (separatorSupport * 0.15) +
-                    0.16;
-
-                if (confidence >= 0.43)
-                {
-                    rowPanels.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
-                }
-            }
-
-            if (rowPanels.Count > 0)
-            {
-                rows.Add(new LayoutRowCandidate(rowStart / (double)imgH, rowHeight / (double)imgH, rowPanels));
-            }
-        }
+                    return confidence >= 0.43 ? confidence : null;
+                });
+            });
 
         if (rows.Count < 2)
         {
@@ -889,11 +873,7 @@ public class PanelDetectionService
 
     private List<ComicPanel> DetectBorderLayoutCandidates(int pageIndex, Mat grayFull, int imgW, int imgH, double pageArea)
     {
-        using var darkMask = new Mat();
-        Cv2.AdaptiveThreshold(grayFull, darkMask, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 21, 7);
-
-        using var cleanupKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
-        Cv2.MorphologyEx(darkMask, darkMask, MorphTypes.Close, cleanupKernel, iterations: 1);
+        using var darkMask = CreateDarkSeparatorMask(grayFull);
 
         var horizontalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55);
         var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
@@ -902,34 +882,25 @@ public class PanelDetectionService
             return [];
         }
 
-        var candidates = new List<ComicPanel>();
-        foreach (var (rowStart, rowEnd) in rowBands)
-        {
-            int rowHeight = rowEnd - rowStart;
-            if (rowHeight < Math.Max(40, imgH / 14))
+        var rows = CreateLayoutRowsFromBands(
+            rowBands,
+            imgH,
+            (rowStart, rowEnd) =>
             {
-                continue;
-            }
+                int rowHeight = rowEnd - rowStart;
+                var verticalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: rowHeight, minPeakRatio: 0.60);
+                return CreateLayoutPanelsForRow(
+                    pageIndex,
+                    rowStart,
+                    rowEnd,
+                    verticalSeparators,
+                    imgW,
+                    imgH,
+                    pageArea,
+                    _ => 0.80);
+            });
 
-            var verticalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: rowHeight, minPeakRatio: 0.60);
-            var columnBands = BuildSegments(verticalSeparators, imgW, Math.Max(40, imgW / 10));
-            if (columnBands.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var (columnStart, columnEnd) in columnBands)
-            {
-                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowHeight);
-                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
-                {
-                    continue;
-                }
-
-                candidates.Add(CreatePanel(pageIndex, rect, imgW, imgH, 0.80));
-            }
-        }
-
+        var candidates = rows.SelectMany(row => row.Panels).ToList();
         return candidates.Count >= 3 ? candidates : [];
     }
 
@@ -1123,7 +1094,17 @@ public class PanelDetectionService
         return merged;
     }
 
-    private List<(int Start, int End)> FindEvidenceHorizontalSeparators(Mat grayFull, Mat edges, int imgW, int imgH)
+    private static Mat CreateDarkSeparatorMask(Mat grayFull)
+    {
+        var darkMask = new Mat();
+        Cv2.AdaptiveThreshold(grayFull, darkMask, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 21, 7);
+
+        using var cleanupKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
+        Cv2.MorphologyEx(darkMask, darkMask, MorphTypes.Close, cleanupKernel, iterations: 1);
+        return darkMask;
+    }
+
+    private List<(int Start, int End)> FindEvidenceHorizontalSeparators(Mat grayFull, Mat edges, Mat darkMask, int imgW, int imgH)
     {
         var separators = new List<(int Start, int End)>();
         separators.AddRange(FindHorizontalGuttersForLayout(grayFull, edges, imgW, imgH));
@@ -1133,10 +1114,11 @@ public class PanelDetectionService
             threshold: 0.34,
             minRunLength: Math.Max(2, imgH / 220),
             mergeGap: 10));
+        separators.AddRange(FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55));
         return MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 12);
     }
 
-    private List<(int Start, int End)> FindEvidenceVerticalSeparators(Mat grayFull, Mat edges, int imgW, int rowStart, int rowEnd)
+    private List<(int Start, int End)> FindEvidenceVerticalSeparators(Mat grayFull, Mat edges, Mat darkMask, int imgW, int rowStart, int rowEnd)
     {
         var separators = new List<(int Start, int End)>();
         separators.AddRange(FindVerticalGuttersForLayout(grayFull, edges, imgW, rowStart, rowEnd));
@@ -1146,6 +1128,7 @@ public class PanelDetectionService
             threshold: 0.31,
             minRunLength: Math.Max(2, imgW / 220),
             mergeGap: 8));
+        separators.AddRange(FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: Math.Max(1, rowEnd - rowStart), minPeakRatio: 0.60));
 
         var merged = MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 10);
         return merged
@@ -1418,6 +1401,66 @@ public class PanelDetectionService
         }
 
         return segments;
+    }
+
+    private List<ComicPanel> CreateLayoutPanelsForRow(
+        int pageIndex,
+        int rowStart,
+        int rowEnd,
+        List<(int Start, int End)> verticalSeparators,
+        int imgW,
+        int imgH,
+        double pageArea,
+        Func<Rect, double?> confidenceSelector)
+    {
+        int rowHeight = rowEnd - rowStart;
+        var columnBands = BuildSegments(verticalSeparators, imgW, Math.Max(40, imgW / 10));
+        if (columnBands.Count == 0)
+        {
+            return [];
+        }
+
+        var rowPanels = new List<ComicPanel>();
+        foreach (var (columnStart, columnEnd) in columnBands)
+        {
+            var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowHeight);
+            if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+            {
+                continue;
+            }
+
+            double? confidence = confidenceSelector(rect);
+            if (confidence.HasValue)
+            {
+                rowPanels.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence.Value));
+            }
+        }
+
+        return rowPanels;
+    }
+
+    private static List<LayoutRowCandidate> CreateLayoutRowsFromBands(
+        List<(int Start, int End)> rowBands,
+        int imgH,
+        Func<int, int, List<ComicPanel>> rowPanelFactory)
+    {
+        var rows = new List<LayoutRowCandidate>();
+        foreach (var (rowStart, rowEnd) in rowBands)
+        {
+            int rowHeight = rowEnd - rowStart;
+            if (rowHeight < Math.Max(40, imgH / 14))
+            {
+                continue;
+            }
+
+            var rowPanels = rowPanelFactory(rowStart, rowEnd);
+            if (rowPanels.Count > 0)
+            {
+                rows.Add(new LayoutRowCandidate(rowStart / (double)imgH, rowHeight / (double)imgH, rowPanels));
+            }
+        }
+
+        return rows;
     }
 
 
