@@ -157,6 +157,12 @@ public class PanelDetectionService
                 panels = FilterOverlappingPanels(panels.Concat(gutterCandidates).ToList());
             }
 
+            var evidenceLayoutCandidates = DetectEvidenceLayoutCandidates(pageIndex, grayFull, edgesFull, imgW, imgH, pageArea);
+            if (ShouldUseEvidenceLayout(panels, evidenceLayoutCandidates))
+            {
+                panels = FilterOverlappingPanels(evidenceLayoutCandidates);
+            }
+
             bool usedBorderLayoutFallback = false;
             if (ShouldRunPageLayoutFallback(panels))
             {
@@ -191,10 +197,10 @@ public class PanelDetectionService
                 panels = RefinePanelsToHorizontalBorders(panels, grayFull, edgesFull, imgW, imgH);
             }
             panels = RefinePanelsAcrossVerticalGaps(panels, grayFull, edgesFull, imgW, imgH);
+            panels = RefinePanelsFromUncoveredRegions(panels, grayFull, edgesFull, imgW, imgH, pageArea);
             panels = RefineWidePanelsToInternalGutters(panels, grayFull, edgesFull, imgW, imgH, pageArea);
             panels = RefineSingleTopPlusBottomWideRow(panels, grayFull, edgesFull, imgW, imgH, pageArea);
             panels = RefineMissingLeadingPanels(panels, grayFull, edgesFull, imgW, imgH, pageArea);
-            panels = RefinePatternedMissingLeadingPanel(panels, imgW, imgH);
             panels = RefineMissingTopRow(panels, grayFull, edgesFull, imgW, imgH);
 
             // 6. Final Reading Order
@@ -603,6 +609,75 @@ public class PanelDetectionService
                panels[0].Height >= 0.85;
     }
 
+    private bool ShouldUseEvidenceLayout(List<ComicPanel> currentPanels, List<ComicPanel> evidencePanels)
+    {
+        if (evidencePanels.Count < 2)
+        {
+            return false;
+        }
+
+        double currentCoverage = CalculatePanelCoverage(currentPanels);
+        double evidenceCoverage = CalculatePanelCoverage(evidencePanels);
+        double currentScore = ScoreLayoutSupport(currentPanels);
+        double evidenceScore = ScoreLayoutSupport(evidencePanels);
+        bool currentMissesTop = !currentPanels.Any(panel => panel.Y <= 0.05);
+        bool evidenceRestoresTop = evidencePanels.Any(panel => panel.Y <= 0.02 && panel.Width >= 0.85);
+        bool currentHasLargeGap = GetLargestVerticalGap(currentPanels) >= 0.14;
+        bool currentSparse = currentPanels.Count <= 2 || currentCoverage < 0.72;
+
+        if (evidenceScore <= currentScore + 0.05)
+        {
+            return false;
+        }
+
+        return evidenceCoverage >= currentCoverage + 0.12 ||
+               (currentMissesTop && evidenceRestoresTop) ||
+               currentHasLargeGap ||
+               currentSparse;
+    }
+
+    private static double CalculatePanelCoverage(List<ComicPanel> panels)
+    {
+        return panels.Sum(panel => panel.Width * panel.Height);
+    }
+
+    private static double ScoreLayoutSupport(List<ComicPanel> panels)
+    {
+        if (panels.Count == 0)
+        {
+            return 0;
+        }
+
+        double coverage = CalculatePanelCoverage(panels);
+        double averageConfidence = panels.Average(panel => panel.Confidence);
+        bool hasTopPanel = panels.Any(panel => panel.Y <= 0.03 && panel.Width >= 0.55);
+        double rowCountScore = Math.Min(0.08, BuildRows(panels).Count * 0.02);
+
+        return (coverage * 0.48) +
+               (averageConfidence * 0.36) +
+               (hasTopPanel ? 0.08 : 0.0) +
+               rowCountScore;
+    }
+
+    private static double GetLargestVerticalGap(List<ComicPanel> panels)
+    {
+        var rows = BuildRows(panels)
+            .OrderBy(row => row.MinY)
+            .ToList();
+        if (rows.Count == 0)
+        {
+            return 1.0;
+        }
+
+        double largestGap = rows[0].MinY;
+        for (int i = 0; i < rows.Count - 1; i++)
+        {
+            largestGap = Math.Max(largestGap, rows[i + 1].MinY - rows[i].MaxY);
+        }
+
+        return Math.Max(largestGap, 1.0 - rows[^1].MaxY);
+    }
+
     private static bool ShouldCollapseToSplashPage(List<ComicPanel> panels)
     {
         if (panels.Count == 0 || panels.Count > 3)
@@ -782,6 +857,93 @@ public class PanelDetectionService
             rows = rows
                 .Where(row => row.Panels.Count == 1 || row.Height >= medianMultiPanelHeight * 0.65)
                 .ToList();
+        }
+
+        rows = NormalizeLayoutRows(rows);
+        return rows.SelectMany(row => row.Panels).ToList();
+    }
+
+    private List<ComicPanel> DetectEvidenceLayoutCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var horizontalSeparators = FindEvidenceHorizontalSeparators(grayFull, edges, imgW, imgH);
+        var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
+        if (rowBands.Count < 2)
+        {
+            return [];
+        }
+
+        var rows = new List<LayoutRowCandidate>();
+        foreach (var (rowStart, rowEnd) in rowBands)
+        {
+            int rowHeight = rowEnd - rowStart;
+            if (rowHeight < Math.Max(40, imgH / 14))
+            {
+                continue;
+            }
+
+            double topSupport = GetMaxHorizontalBorderScore(
+                Math.Max(0, rowStart - Math.Max(4, imgH / 240)),
+                Math.Min(imgH, rowStart + Math.Max(5, imgH / 220)),
+                0,
+                imgW,
+                grayFull,
+                edges);
+            double bottomSupport = GetMaxHorizontalBorderScore(
+                Math.Max(0, rowEnd - Math.Max(5, imgH / 220)),
+                Math.Min(imgH, rowEnd + Math.Max(4, imgH / 240)),
+                0,
+                imgW,
+                grayFull,
+                edges);
+
+            bool touchesPageEdge = rowStart <= Math.Max(4, imgH / 240) || rowEnd >= imgH - Math.Max(4, imgH / 240);
+            if (!touchesPageEdge && Math.Max(topSupport, bottomSupport) < 0.24)
+            {
+                continue;
+            }
+
+            var verticalSeparators = FindEvidenceVerticalSeparators(grayFull, edges, imgW, rowStart, rowEnd);
+            var columnBands = BuildSegments(verticalSeparators, imgW, Math.Max(40, imgW / 10));
+            if (columnBands.Count == 0)
+            {
+                continue;
+            }
+
+            var rowPanels = new List<ComicPanel>();
+            foreach (var (columnStart, columnEnd) in columnBands)
+            {
+                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowHeight);
+                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+                {
+                    continue;
+                }
+
+                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                double separatorSupport = Math.Clamp((topSupport + bottomSupport) / 2.0, 0.0, 1.0);
+                double confidence =
+                    (stats.GutterContrast * 0.24) +
+                    (stats.BorderEdgeDensity * 0.20) +
+                    (stats.InteriorVarianceScore * 0.15) +
+                    (stats.AreaScore * 0.10) +
+                    (stats.EdgeTouchScore * 0.06) +
+                    (separatorSupport * 0.15) +
+                    0.16;
+
+                if (confidence >= 0.43)
+                {
+                    rowPanels.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
+                }
+            }
+
+            if (rowPanels.Count > 0)
+            {
+                rows.Add(new LayoutRowCandidate(rowStart / (double)imgH, rowHeight / (double)imgH, rowPanels));
+            }
+        }
+
+        if (rows.Count < 2)
+        {
+            return [];
         }
 
         rows = NormalizeLayoutRows(rows);
@@ -1022,6 +1184,65 @@ public class PanelDetectionService
 
         merged.Add(current);
         return merged;
+    }
+
+    private List<(int Start, int End)> FindEvidenceHorizontalSeparators(Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        var separators = new List<(int Start, int End)>();
+        separators.AddRange(FindHorizontalGuttersForLayout(grayFull, edges, imgW, imgH));
+        separators.AddRange(FindStrongScoreBands(
+            imgH,
+            y => ScoreHorizontalBorderRow(grayFull, edges, y, 0, imgW),
+            threshold: 0.34,
+            minRunLength: Math.Max(2, imgH / 220),
+            mergeGap: 10));
+        return MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 12);
+    }
+
+    private List<(int Start, int End)> FindEvidenceVerticalSeparators(Mat grayFull, Mat edges, int imgW, int rowStart, int rowEnd)
+    {
+        var separators = new List<(int Start, int End)>();
+        separators.AddRange(FindVerticalGuttersForLayout(grayFull, edges, imgW, rowStart, rowEnd));
+        separators.AddRange(FindStrongScoreBands(
+            imgW,
+            x => ScoreVerticalBorderColumn(grayFull, edges, x, rowStart, rowEnd),
+            threshold: 0.31,
+            minRunLength: Math.Max(2, imgW / 220),
+            mergeGap: 8));
+
+        var merged = MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 10);
+        return merged
+            .Where(band => (band.End - band.Start) >= Math.Max(2, imgW / 280))
+            .ToList();
+    }
+
+    private static List<(int Start, int End)> FindStrongScoreBands(int scanLength, Func<int, double> scorer, double threshold, int minRunLength, int mergeGap)
+    {
+        var bands = new List<(int Start, int End)>();
+        int? runStart = null;
+        for (int i = 0; i < scanLength; i++)
+        {
+            if (scorer(i) >= threshold)
+            {
+                runStart ??= i;
+            }
+            else if (runStart.HasValue)
+            {
+                if (i - runStart.Value >= minRunLength)
+                {
+                    bands.Add((runStart.Value, i));
+                }
+
+                runStart = null;
+            }
+        }
+
+        if (runStart.HasValue && scanLength - runStart.Value >= minRunLength)
+        {
+            bands.Add((runStart.Value, scanLength));
+        }
+
+        return MergeNearbyBands(bands, mergeGap);
     }
 
     private static List<(int Start, int End)> FindHorizontalGuttersForLayout(Mat grayFull, Mat edges, int imgW, int imgH)
@@ -1707,6 +1928,62 @@ public class PanelDetectionService
         return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
     }
 
+    private List<ComicPanel> RefinePanelsFromUncoveredRegions(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (panels.Count < 3)
+        {
+            return panels;
+        }
+
+        var adjustedPanels = new List<ComicPanel>(panels);
+        foreach (var row in GroupPanelsIntoRowsForWideSplit(panels).OrderBy(row => row.MinY))
+        {
+            var rowPanels = row.Panels
+                .OrderBy(panel => panel.X)
+                .ToList();
+            if (rowPanels.Count < 2 || row.Coverage >= 0.84)
+            {
+                continue;
+            }
+
+            int rowStart = Math.Max(0, (int)Math.Round(row.MinY * imgH));
+            int rowEnd = Math.Min(imgH, (int)Math.Round(row.MaxY * imgH));
+            foreach (var gap in FindRowGapCandidates(rowPanels))
+            {
+                int gapStart = Math.Max(0, (int)Math.Round(gap.Start * imgW));
+                int gapEnd = Math.Min(imgW, (int)Math.Round(gap.End * imgW));
+                var rect = new Rect(gapStart, rowStart, Math.Max(1, gapEnd - gapStart), Math.Max(1, rowEnd - rowStart));
+                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea) ||
+                    adjustedPanels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.45))
+                {
+                    continue;
+                }
+
+                if (!HasStrongCandidateBorderSupport(rect, rowStart, rowEnd, grayFull, edges, imgW, imgH))
+                {
+                    continue;
+                }
+
+                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                double confidence =
+                    (stats.GutterContrast * 0.22) +
+                    (stats.BorderEdgeDensity * 0.20) +
+                    (stats.InteriorVarianceScore * 0.14) +
+                    (stats.AreaScore * 0.10) +
+                    (stats.EdgeTouchScore * 0.06) +
+                    0.22;
+
+                if (confidence >= 0.48)
+                {
+                    adjustedPanels.Add(CreatePanel(rowPanels[0].PageIndex, rect, imgW, imgH, confidence));
+                    break;
+                }
+            }
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
     private List<ComicPanel> RefineWidePanelsToInternalGutters(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
     {
         var adjustedPanels = new List<ComicPanel>();
@@ -2127,6 +2404,77 @@ public class PanelDetectionService
         return overlap / Math.Max(0.0001, Math.Min(panel.Width, other.Width));
     }
 
+    private static List<(double Start, double End)> FindRowGapCandidates(List<ComicPanel> rowPanels)
+    {
+        var gaps = new List<(double Start, double End)>();
+        double leftGap = rowPanels[0].X;
+        if (leftGap >= 0.16)
+        {
+            gaps.Add((0, rowPanels[0].X));
+        }
+
+        for (int i = 0; i < rowPanels.Count - 1; i++)
+        {
+            double start = rowPanels[i].X + rowPanels[i].Width;
+            double end = rowPanels[i + 1].X;
+            if (end - start >= 0.18)
+            {
+                gaps.Add((start, end));
+            }
+        }
+
+        double rightStart = rowPanels[^1].X + rowPanels[^1].Width;
+        if (1.0 - rightStart >= 0.16)
+        {
+            gaps.Add((rightStart, 1.0));
+        }
+
+        return gaps
+            .OrderByDescending(gap => gap.End - gap.Start)
+            .ToList();
+    }
+
+    private static bool HasStrongCandidateBorderSupport(Rect rect, int rowStart, int rowEnd, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        int xPadding = Math.Max(6, rect.Width / 16);
+        int yPadding = Math.Max(6, rect.Height / 16);
+        int xStart = Math.Max(0, rect.X + xPadding / 2);
+        int xEnd = Math.Min(imgW, rect.Right - xPadding / 2);
+        if (xEnd <= xStart)
+        {
+            return false;
+        }
+
+        double topSupport = GetMaxHorizontalBorderScore(
+            Math.Max(0, rowStart - yPadding),
+            Math.Min(imgH, rowStart + yPadding + 1),
+            xStart,
+            xEnd,
+            grayFull,
+            edges);
+        double bottomSupport = GetMaxHorizontalBorderScore(
+            Math.Max(0, rowEnd - yPadding),
+            Math.Min(imgH, rowEnd + yPadding + 1),
+            xStart,
+            xEnd,
+            grayFull,
+            edges);
+
+        bool touchesLeftEdge = rect.X <= Math.Max(3, imgW / 300);
+        bool touchesRightEdge = rect.Right >= imgW - Math.Max(3, imgW / 300);
+        double leftSupport = touchesLeftEdge
+            ? 0.35
+            : GetMaxVerticalBorderScore(Math.Max(0, rect.X - xPadding), Math.Min(imgW, rect.X + xPadding + 1), rowStart, rowEnd, grayFull, edges);
+        double rightSupport = touchesRightEdge
+            ? 0.35
+            : GetMaxVerticalBorderScore(Math.Max(0, rect.Right - xPadding), Math.Min(imgW, rect.Right + xPadding + 1), rowStart, rowEnd, grayFull, edges);
+
+        return topSupport >= 0.24 &&
+               bottomSupport >= 0.24 &&
+               leftSupport >= 0.22 &&
+               rightSupport >= 0.22;
+    }
+
     private static bool TouchesPageEdge(ComicPanel panel)
     {
         return panel.X <= 0.01 || panel.Y <= 0.01 || panel.X + panel.Width >= 0.99 || panel.Y + panel.Height >= 0.99;
@@ -2287,6 +2635,17 @@ public class PanelDetectionService
         for (int x = searchStart; x < searchEnd; x++)
         {
             bestScore = Math.Max(bestScore, ScoreVerticalBorderColumn(grayFull, edges, x, rowStart, rowEnd));
+        }
+
+        return bestScore;
+    }
+
+    private static double GetMaxHorizontalBorderScore(int searchStart, int searchEnd, int xStart, int xEnd, Mat grayFull, Mat edges)
+    {
+        double bestScore = double.MinValue;
+        for (int y = searchStart; y < searchEnd; y++)
+        {
+            bestScore = Math.Max(bestScore, ScoreHorizontalBorderRow(grayFull, edges, y, xStart, xEnd));
         }
 
         return bestScore;
