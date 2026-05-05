@@ -198,10 +198,8 @@ public class PanelDetectionService
             }
             panels = RefinePanelsAcrossVerticalGaps(panels, grayFull, edgesFull, imgW, imgH);
             panels = RefinePanelsFromUncoveredRegions(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            panels = RefineRowsFromUncoveredBands(panels, grayFull, edgesFull, imgW, imgH, pageArea);
             panels = RefineWidePanelsToInternalGutters(panels, grayFull, edgesFull, imgW, imgH, pageArea);
-            panels = RefineSingleTopPlusBottomWideRow(panels, grayFull, edgesFull, imgW, imgH, pageArea);
-            panels = RefineMissingLeadingPanels(panels, grayFull, edgesFull, imgW, imgH, pageArea);
-            panels = RefineMissingTopRow(panels, grayFull, edgesFull, imgW, imgH);
 
             // 6. Final Reading Order
             var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
@@ -1984,10 +1982,63 @@ public class PanelDetectionService
         return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
     }
 
+    private List<ComicPanel> RefineRowsFromUncoveredBands(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (panels.Count < 4)
+        {
+            return panels;
+        }
+
+        var rows = GroupPanelsIntoRowsForWideSplit(panels)
+            .OrderBy(row => row.MinY)
+            .ToList();
+        if (rows.Count < 2)
+        {
+            return panels;
+        }
+
+        var adjustedPanels = new List<ComicPanel>(panels);
+        foreach (var band in FindUncoveredRowBands(rows))
+        {
+            int rowStart = Math.Max(0, (int)Math.Round(band.StartY * imgH));
+            int rowEnd = Math.Min(imgH, (int)Math.Round(band.EndY * imgH));
+            int xStart = Math.Max(0, (int)Math.Round(band.X * imgW));
+            int xEnd = Math.Min(imgW, (int)Math.Round((band.X + band.Width) * imgW));
+            var rect = new Rect(xStart, rowStart, Math.Max(1, xEnd - xStart), Math.Max(1, rowEnd - rowStart));
+            if (!IsSensibleCandidate(rect, imgW, imgH, pageArea) ||
+                adjustedPanels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.40))
+            {
+                continue;
+            }
+
+            if (!HasStrongRowBandSupport(band, grayFull, edges, imgW, imgH))
+            {
+                continue;
+            }
+
+            var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+            double confidence =
+                (stats.GutterContrast * 0.22) +
+                (stats.BorderEdgeDensity * 0.20) +
+                (stats.InteriorVarianceScore * 0.15) +
+                (stats.AreaScore * 0.10) +
+                (stats.EdgeTouchScore * 0.07) +
+                0.20;
+            if (confidence < 0.47)
+            {
+                continue;
+            }
+
+            adjustedPanels.Add(CreatePanel(rows[0].Panels[0].PageIndex, rect, imgW, imgH, confidence));
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
     private List<ComicPanel> RefineWidePanelsToInternalGutters(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
     {
         var adjustedPanels = new List<ComicPanel>();
-        foreach (var row in GroupPanelsIntoRows(panels).OrderBy(row => row.MinY))
+        foreach (var row in GroupPanelsIntoRowsForWideSplit(panels).OrderBy(row => row.MinY))
         {
             var rowPanels = row.Panels
                 .OrderBy(panel => panel.X)
@@ -2480,6 +2531,85 @@ public class PanelDetectionService
         return panel.X <= 0.01 || panel.Y <= 0.01 || panel.X + panel.Width >= 0.99 || panel.Y + panel.Height >= 0.99;
     }
 
+    private static List<RowBandCandidate> FindUncoveredRowBands(List<PanelRow> rows)
+    {
+        var bands = new List<RowBandCandidate>();
+
+        var firstRow = rows[0];
+        double firstMinX = firstRow.Panels.Min(panel => panel.X);
+        double firstMaxRight = firstRow.Panels.Max(panel => panel.X + panel.Width);
+        if (firstRow.MinY >= 0.16 &&
+            firstRow.MinY <= 0.38 &&
+            firstRow.Coverage >= 0.85 &&
+            firstMinX <= 0.06 &&
+            firstMaxRight >= 0.94)
+        {
+            bands.Add(new RowBandCandidate(0, firstRow.MinY, firstMinX, firstMaxRight - firstMinX, touchesTopEdge: true, touchesBottomEdge: false));
+        }
+
+        for (int i = 0; i < rows.Count - 1; i++)
+        {
+            var upper = rows[i];
+            var lower = rows[i + 1];
+            double gapStart = upper.MaxY;
+            double gapEnd = lower.MinY;
+            double gapHeight = gapEnd - gapStart;
+            if (gapHeight < 0.12 || gapHeight > 0.34)
+            {
+                continue;
+            }
+
+            double upperMinX = upper.Panels.Min(panel => panel.X);
+            double upperMaxRight = upper.Panels.Max(panel => panel.X + panel.Width);
+            double lowerMinX = lower.Panels.Min(panel => panel.X);
+            double lowerMaxRight = lower.Panels.Max(panel => panel.X + panel.Width);
+            double overlapLeft = Math.Max(upperMinX, lowerMinX);
+            double overlapRight = Math.Min(upperMaxRight, lowerMaxRight);
+            double overlapWidth = overlapRight - overlapLeft;
+            if (upper.Coverage < 0.85 || lower.Coverage < 0.85 || overlapWidth < 0.85)
+            {
+                continue;
+            }
+
+            bands.Add(new RowBandCandidate(gapStart, gapEnd, overlapLeft, overlapWidth, touchesTopEdge: false, touchesBottomEdge: false));
+        }
+
+        return bands;
+    }
+
+    private static bool HasStrongRowBandSupport(RowBandCandidate band, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        int rowStart = Math.Max(0, (int)Math.Round(band.StartY * imgH));
+        int rowEnd = Math.Min(imgH, (int)Math.Round(band.EndY * imgH));
+        int xStart = Math.Max(0, (int)Math.Round(band.X * imgW));
+        int xEnd = Math.Min(imgW, (int)Math.Round((band.X + band.Width) * imgW));
+        if (rowEnd <= rowStart || xEnd <= xStart)
+        {
+            return false;
+        }
+
+        int yPadding = Math.Max(8, (rowEnd - rowStart) / 10);
+        int xPadding = Math.Max(8, (xEnd - xStart) / 14);
+        double topSupport = band.TouchesTopEdge
+            ? 0.35
+            : GetMaxHorizontalBorderScore(Math.Max(0, rowStart - yPadding), Math.Min(imgH, rowStart + yPadding + 1), xStart, xEnd, grayFull, edges);
+        double bottomSupport = band.TouchesBottomEdge
+            ? 0.35
+            : GetMaxHorizontalBorderScore(Math.Max(0, rowEnd - yPadding), Math.Min(imgH, rowEnd + yPadding + 1), xStart, xEnd, grayFull, edges);
+        double leftSupport = band.X <= 0.06
+            ? 0.30
+            : GetMaxVerticalBorderScore(Math.Max(0, xStart - xPadding), Math.Min(imgW, xStart + xPadding + 1), rowStart, rowEnd, grayFull, edges);
+        double rightEdge = band.X + band.Width;
+        double rightSupport = rightEdge >= 0.94
+            ? 0.30
+            : GetMaxVerticalBorderScore(Math.Max(0, xEnd - xPadding), Math.Min(imgW, xEnd + xPadding + 1), rowStart, rowEnd, grayFull, edges);
+
+        return topSupport >= 0.24 &&
+               bottomSupport >= 0.24 &&
+               leftSupport >= 0.20 &&
+               rightSupport >= 0.20;
+    }
+
     private (double Start, double End)? FindLocalGutterRun(ComicPanel leftPanel, ComicPanel rightPanel, int rowStart, int rowEnd, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
     {
         int currentRight = (int)Math.Round((leftPanel.X + leftPanel.Width) * imgW);
@@ -2929,6 +3059,16 @@ public class PanelDetectionService
         public double Y { get; set; } = y;
         public double Height { get; set; } = height;
         public List<ComicPanel> Panels { get; } = panels;
+    }
+
+    private sealed class RowBandCandidate(double startY, double endY, double x, double width, bool touchesTopEdge, bool touchesBottomEdge)
+    {
+        public double StartY { get; } = startY;
+        public double EndY { get; } = endY;
+        public double X { get; } = x;
+        public double Width { get; } = width;
+        public bool TouchesTopEdge { get; } = touchesTopEdge;
+        public bool TouchesBottomEdge { get; } = touchesBottomEdge;
     }
 
     private static List<LayoutRowCandidate> NormalizeLayoutRows(List<LayoutRowCandidate> rows)
