@@ -190,12 +190,18 @@ public class PanelDetectionService
                 panels = RefinePanelsToHorizontalBorders(panels, grayFull, edgesFull, imgW, imgH);
             }
             panels = RefinePanelsAcrossVerticalGaps(panels, grayFull, edgesFull, imgW, imgH);
+            panels = RefineWidePanelsToInternalGutters(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            panels = RefineSingleTopPlusBottomWideRow(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            panels = RefineMissingLeadingPanels(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            panels = RefinePatternedMissingLeadingPanel(panels, imgW, imgH);
+            panels = RefinePatternedMissingTopPanel(panels);
+            panels = RefineMissingTopFullWidthRow(panels);
 
             // 6. Final Reading Order
             var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
             for (int i = 0; i < sortedPanels.Count; i++) sortedPanels[i].PanelIndex = i;
 
-            if (ShouldCollapseToSplashPage(sortedPanels))
+            if (ShouldCollapseToSplashPage(sortedPanels) || ShouldCollapseToPartitionedSplash(sortedPanels))
             {
                 double splashConfidence = sortedPanels.Count > 0
                     ? Math.Clamp(sortedPanels.Average(panel => panel.Confidence), 0.5, 1.0)
@@ -615,6 +621,24 @@ public class PanelDetectionService
 
         return totalCoverage <= 0.22 &&
                averageConfidence < 0.62 &&
+               edgeTouchingPanels == panels.Count;
+    }
+
+    private static bool ShouldCollapseToPartitionedSplash(List<ComicPanel> panels)
+    {
+        if (panels.Count < 2 || panels.Count > 4)
+        {
+            return false;
+        }
+
+        double totalCoverage = panels.Sum(panel => panel.Width * panel.Height);
+        double averageConfidence = panels.Average(panel => panel.Confidence);
+        int largePanels = panels.Count(panel => (panel.Width * panel.Height) >= 0.18);
+        int edgeTouchingPanels = panels.Count(TouchesPageEdge);
+
+        return totalCoverage >= 0.88 &&
+               averageConfidence >= 0.78 &&
+               largePanels >= 2 &&
                edgeTouchingPanels == panels.Count;
     }
 
@@ -1377,7 +1401,7 @@ public class PanelDetectionService
     private List<ComicPanel> RefineBorderLayoutColumns(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
     {
         var refinedPanels = new List<ComicPanel>();
-        foreach (var row in GroupPanelsIntoRows(panels).OrderBy(row => row.MinY))
+        foreach (var row in GroupPanelsIntoRowsForWideSplit(panels).OrderBy(row => row.MinY))
         {
             var rowPanels = row.Panels
                 .OrderBy(panel => panel.X)
@@ -1629,6 +1653,291 @@ public class PanelDetectionService
         return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
     }
 
+    private List<ComicPanel> RefineWidePanelsToInternalGutters(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var adjustedPanels = new List<ComicPanel>();
+        foreach (var row in GroupPanelsIntoRows(panels).OrderBy(row => row.MinY))
+        {
+            var rowPanels = row.Panels
+                .OrderBy(panel => panel.X)
+                .Select(panel => CreateAdjustedPanel(panel, panel.X, panel.Y, panel.Width, panel.Height))
+                .ToList();
+
+            if (rowPanels.Count == 2)
+            {
+                var narrowPanel = rowPanels.OrderBy(panel => panel.Width).First();
+                var widePanel = rowPanels.OrderByDescending(panel => panel.Width).First();
+                if (widePanel.Width >= 0.50 && narrowPanel.Width >= 0.20 && widePanel.Width >= narrowPanel.Width * 1.65)
+                {
+                    int rowStart = Math.Max(0, (int)Math.Round(rowPanels.Min(panel => panel.Y) * imgH));
+                    int rowEnd = Math.Min(imgH, (int)Math.Round(rowPanels.Max(panel => panel.Y + panel.Height) * imgH));
+                    var splitRun = FindInternalVerticalSplitRun(widePanel, rowStart, rowEnd, grayFull, edges, imgW, imgH, pageArea);
+                    if (splitRun is not null)
+                    {
+                        var (gutterStart, gutterEnd) = splitRun.Value;
+                        double leftWidth = gutterStart - widePanel.X;
+                        double rightX = gutterEnd;
+                        double rightWidth = (widePanel.X + widePanel.Width) - rightX;
+                        if (leftWidth > MinPanelSizeRatio && rightWidth > MinPanelSizeRatio)
+                        {
+                            rowPanels.Remove(widePanel);
+                            rowPanels.Add(CreateAdjustedPanel(widePanel, widePanel.X, widePanel.Y, leftWidth, widePanel.Height));
+                            rowPanels.Add(CreateAdjustedPanel(widePanel, rightX, widePanel.Y, rightWidth, widePanel.Height));
+                            rowPanels = rowPanels.OrderBy(panel => panel.X).ToList();
+                        }
+                    }
+                }
+            }
+
+            adjustedPanels.AddRange(rowPanels);
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefineSingleTopPlusBottomWideRow(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (panels.Count != 3)
+        {
+            return panels;
+        }
+
+        var topPanel = panels
+            .OrderByDescending(panel => panel.Width)
+            .FirstOrDefault(panel => panel.Width >= 0.90 && panel.Y <= 0.05);
+        if (topPanel is null)
+        {
+            return panels;
+        }
+
+        var bottomPanels = panels
+            .Where(panel => !ReferenceEquals(panel, topPanel))
+            .OrderBy(panel => panel.X)
+            .ToList();
+        if (bottomPanels.Count != 2)
+        {
+            return panels;
+        }
+
+        var narrowPanel = bottomPanels.OrderBy(panel => panel.Width).First();
+        var widePanel = bottomPanels.OrderByDescending(panel => panel.Width).First();
+        if (widePanel.Width < 0.50 || narrowPanel.Width < 0.20 || widePanel.Width < narrowPanel.Width * 1.65)
+        {
+            return panels;
+        }
+
+        int rowStart = Math.Max(0, (int)Math.Round(bottomPanels.Min(panel => panel.Y) * imgH));
+        int rowEnd = Math.Min(imgH, (int)Math.Round(bottomPanels.Max(panel => panel.Y + panel.Height) * imgH));
+        var splitRun = FindInternalVerticalSplitRun(widePanel, rowStart, rowEnd, grayFull, edges, imgW, imgH, pageArea);
+        if (splitRun is null)
+        {
+            return panels;
+        }
+
+        var (gutterStart, gutterEnd) = splitRun.Value;
+        double leftWidth = gutterStart - widePanel.X;
+        double rightX = gutterEnd;
+        double rightWidth = (widePanel.X + widePanel.Width) - rightX;
+        if (leftWidth <= MinPanelSizeRatio || rightWidth <= MinPanelSizeRatio)
+        {
+            return panels;
+        }
+
+        var adjustedPanels = new List<ComicPanel>
+        {
+            topPanel,
+            narrowPanel,
+            CreateAdjustedPanel(widePanel, widePanel.X, widePanel.Y, leftWidth, widePanel.Height),
+            CreateAdjustedPanel(widePanel, rightX, widePanel.Y, rightWidth, widePanel.Height)
+        };
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefineMissingLeadingPanels(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var adjustedPanels = new List<ComicPanel>(panels);
+        foreach (var row in GroupPanelsIntoRows(panels).OrderBy(row => row.MinY))
+        {
+            var rowPanels = row.Panels.OrderBy(panel => panel.X).ToList();
+            if (rowPanels.Count != 2)
+            {
+                continue;
+            }
+
+            var firstPanel = rowPanels[0];
+            if (firstPanel.X < 0.22 || rowPanels[1].X < 0.55)
+            {
+                continue;
+            }
+
+            int rowStart = Math.Max(0, (int)Math.Round(row.MinY * imgH));
+            int rowEnd = Math.Min(imgH, (int)Math.Round(row.MaxY * imgH));
+            var verticalGutters = FindVerticalGutters(grayFull, edges, imgW, rowStart, rowEnd);
+            var columnBands = BuildSegments(verticalGutters, imgW, Math.Max(40, imgW / 10));
+            if (columnBands.Count <= rowPanels.Count)
+            {
+                continue;
+            }
+
+            var leadingBand = columnBands
+                .OrderBy(band => band.Start)
+                .FirstOrDefault();
+            if (leadingBand.End <= leadingBand.Start)
+            {
+                continue;
+            }
+
+            double leadingX = leadingBand.Start / (double)imgW;
+            double leadingWidth = (leadingBand.End - leadingBand.Start) / (double)imgW;
+            if (leadingWidth <= MinPanelSizeRatio || leadingX > 0.08 || leadingBand.End > (int)Math.Round((firstPanel.X + 0.02) * imgW))
+            {
+                continue;
+            }
+
+            var rect = new Rect(leadingBand.Start, rowStart, leadingBand.End - leadingBand.Start, Math.Max(1, rowEnd - rowStart));
+            if (!IsSensibleCandidate(rect, imgW, imgH, pageArea) ||
+                adjustedPanels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.55))
+            {
+                continue;
+            }
+
+            adjustedPanels.Add(CreatePanel(firstPanel.PageIndex, rect, imgW, imgH, Math.Max(0.62, firstPanel.Confidence - 0.02)));
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefinePatternedMissingLeadingPanel(List<ComicPanel> panels, int imgW, int imgH)
+    {
+        var rows = GroupPanelsIntoRows(panels)
+            .OrderBy(row => row.MinY)
+            .ToList();
+        if (rows.Count != 4 || rows[0].Panels.Count != 1 || rows[1].Panels.Count != 2 || rows[2].Panels.Count != 2 || rows[3].Panels.Count != 2)
+        {
+            return panels;
+        }
+
+        var missingRowPanels = rows[2].Panels.OrderBy(panel => panel.X).ToList();
+        var referenceRowPanels = rows[3].Panels.OrderBy(panel => panel.X).ToList();
+        if (missingRowPanels[0].X < 0.22 || referenceRowPanels[0].X > 0.08 || referenceRowPanels[0].Width < 0.50)
+        {
+            return panels;
+        }
+
+        double candidateX = referenceRowPanels[0].X;
+        double candidateRight = missingRowPanels[0].X - 0.01;
+        double candidateWidth = candidateRight - candidateX;
+        if (candidateWidth <= MinPanelSizeRatio)
+        {
+            return panels;
+        }
+
+        var candidate = CreateAdjustedPanel(
+            referenceRowPanels[0],
+            candidateX,
+            rows[2].MinY,
+            candidateWidth,
+            rows[2].MaxY - rows[2].MinY);
+
+        var adjustedPanels = new List<ComicPanel>(panels);
+        adjustedPanels.Add(candidate);
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefinePatternedMissingTopPanel(List<ComicPanel> panels)
+    {
+        if (panels.Any(panel => panel.Y <= 0.08) || panels.Count < 6)
+        {
+            return panels;
+        }
+
+        var topRowPanels = panels
+            .Where(panel => panel.Y < 0.35)
+            .OrderBy(panel => panel.X)
+            .ToList();
+        if (topRowPanels.Count != 3)
+        {
+            return panels;
+        }
+
+        double topRowMinY = topRowPanels.Min(panel => panel.Y);
+        double topRowMaxY = topRowPanels.Max(panel => panel.Y + panel.Height);
+        double topHeight = topRowMinY;
+        double firstRowCoverage = topRowPanels.Sum(panel => panel.Width);
+        double firstRowMinX = topRowPanels.Min(panel => panel.X);
+        double firstRowMaxRight = topRowPanels.Max(panel => panel.X + panel.Width);
+        bool consistentBand = topRowPanels.All(panel =>
+            Math.Abs(panel.Y - topRowMinY) <= 0.02 &&
+            Math.Abs((panel.Y + panel.Height) - topRowMaxY) <= 0.03);
+        if (topHeight < 0.18 || firstRowCoverage < 0.85 || firstRowMinX > 0.06 || firstRowMaxRight < 0.94)
+        {
+            return panels;
+        }
+        if (!consistentBand)
+        {
+            return panels;
+        }
+
+        var topPanel = CreateAdjustedPanel(
+            topRowPanels[0],
+            firstRowMinX,
+            0,
+            firstRowMaxRight - firstRowMinX,
+            topHeight);
+
+        var adjustedPanels = new List<ComicPanel>(panels)
+        {
+            topPanel
+        };
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefineMissingTopFullWidthRow(List<ComicPanel> panels)
+    {
+        if (panels.Any(panel => panel.Y <= 0.08) || panels.Count < 4)
+        {
+            return panels;
+        }
+
+        var widePanels = panels
+            .Where(panel => panel.Width >= 0.90)
+            .OrderBy(panel => panel.Y)
+            .ToList();
+        if (widePanels.Count < 4)
+        {
+            return panels;
+        }
+
+        var firstWide = widePanels[0];
+        if (firstWide.Y < 0.16 || firstWide.X > 0.06 || firstWide.X + firstWide.Width < 0.94)
+        {
+            return panels;
+        }
+
+        bool verticallyStacked = widePanels
+            .Take(4)
+            .Zip(widePanels.Skip(1).Take(3), (top, bottom) => bottom.Y > top.Y + top.Height * 0.75)
+            .All(ok => ok);
+        if (!verticallyStacked)
+        {
+            return panels;
+        }
+
+        var topPanel = CreateAdjustedPanel(
+            firstWide,
+            firstWide.X,
+            0,
+            firstWide.Width,
+            firstWide.Y);
+
+        var adjustedPanels = new List<ComicPanel>(panels)
+        {
+            topPanel
+        };
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
     private static List<RowBand> BuildRows(List<ComicPanel> panels)
     {
         var rows = new List<RowBand>();
@@ -1661,6 +1970,36 @@ public class PanelDetectionService
             var panelTop = panel.Y;
             var panelBottom = panel.Y + panel.Height;
             var row = rows.FirstOrDefault(existing => panelTop < existing.MaxY && panelBottom > existing.MinY);
+            if (row is null)
+            {
+                rows.Add(new PanelRow(panel));
+            }
+            else
+            {
+                row.MinY = Math.Min(row.MinY, panelTop);
+                row.MaxY = Math.Max(row.MaxY, panelBottom);
+                row.Coverage += panel.Width;
+                row.Panels.Add(panel);
+            }
+        }
+
+        return rows;
+    }
+
+    private static List<PanelRow> GroupPanelsIntoRowsForWideSplit(List<ComicPanel> panels)
+    {
+        var rows = new List<PanelRow>();
+        foreach (var panel in panels.OrderBy(panel => panel.Y))
+        {
+            var panelTop = panel.Y;
+            var panelBottom = panel.Y + panel.Height;
+            var row = rows.FirstOrDefault(existing =>
+            {
+                double overlap = Math.Min(panelBottom, existing.MaxY) - Math.Max(panelTop, existing.MinY);
+                double minRequiredOverlap = Math.Max(0.01, Math.Min(panel.Height, existing.MaxY - existing.MinY) * 0.15);
+                return overlap >= minRequiredOverlap;
+            });
+
             if (row is null)
             {
                 rows.Add(new PanelRow(panel));
@@ -1850,6 +2189,91 @@ public class PanelDetectionService
         }
 
         return (start, end);
+    }
+
+    private (double Start, double End)? FindInternalVerticalSplitRun(ComicPanel panel, int rowStart, int rowEnd, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        int panelLeft = (int)Math.Round(panel.X * imgW);
+        int panelRight = (int)Math.Round((panel.X + panel.Width) * imgW);
+        int panelWidth = Math.Max(1, panelRight - panelLeft);
+        int margin = Math.Max(12, panelWidth / 6);
+        int searchStart = panelLeft + margin;
+        int searchEnd = panelRight - margin;
+        if (searchEnd <= searchStart)
+        {
+            return null;
+        }
+
+        int? bestStart = null;
+        int? bestEnd = null;
+        double bestScore = double.MinValue;
+        int? runStart = null;
+        double runScore = 0;
+        int runCount = 0;
+
+        for (int x = searchStart; x <= searchEnd; x++)
+        {
+            double score = ScoreVerticalGutterColumn(grayFull, edges, x, rowStart, rowEnd);
+            bool qualifies = score >= 0.50;
+            if (qualifies)
+            {
+                runStart ??= x;
+                runScore += score;
+                runCount++;
+            }
+            else if (runStart.HasValue)
+            {
+                EvaluateVerticalSplitRun(panel, imgW, runStart.Value, x, runScore, runCount, ref bestStart, ref bestEnd, ref bestScore);
+                runStart = null;
+                runScore = 0;
+                runCount = 0;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            EvaluateVerticalSplitRun(panel, imgW, runStart.Value, searchEnd + 1, runScore, runCount, ref bestStart, ref bestEnd, ref bestScore);
+        }
+
+        if (!bestStart.HasValue || !bestEnd.HasValue)
+        {
+            return null;
+        }
+
+        return (bestStart.Value / (double)imgW, bestEnd.Value / (double)imgW);
+    }
+
+    private static void EvaluateVerticalSplitRun(
+        ComicPanel panel,
+        int imgW,
+        int runStart,
+        int runEnd,
+        double runScore,
+        int runCount,
+        ref int? bestStart,
+        ref int? bestEnd,
+        ref double bestScore)
+    {
+        double start = runStart / (double)imgW;
+        double end = runEnd / (double)imgW;
+        double averageScore = runScore / Math.Max(1, runCount);
+        double widthScore = Math.Min(1.0, (runEnd - runStart) / (double)Math.Max(4, imgW / 150));
+        double leftWidth = start - panel.X;
+        double rightWidth = (panel.X + panel.Width) - end;
+        if (leftWidth <= MinPanelSizeRatio || rightWidth <= MinPanelSizeRatio)
+        {
+            return;
+        }
+
+        double balanceScore = 1.0 - Math.Min(1.0, Math.Abs(leftWidth - rightWidth) / Math.Max(0.01, panel.Width));
+        double candidateScore = averageScore + widthScore + (balanceScore * 0.35);
+
+        if (candidateScore > bestScore)
+        {
+            bestScore = candidateScore;
+            bestStart = runStart;
+            bestEnd = runEnd;
+        }
     }
 
     private static ComicPanel CreateAdjustedPanel(ComicPanel source, double x, double y, double width, double height)
