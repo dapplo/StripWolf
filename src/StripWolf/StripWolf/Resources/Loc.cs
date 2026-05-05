@@ -54,6 +54,7 @@ public class Loc
     public string Completed => GetString();
     public string Favorites => GetString();
     public string ImportComic => GetString();
+    public string ImportFolder => GetString();
     public string NoComicsFound => GetString();
     public string NoComicsInLibrary => GetString();
     public string Pages => GetString();

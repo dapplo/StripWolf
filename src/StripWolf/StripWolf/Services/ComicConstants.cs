@@ -33,6 +33,15 @@ public static class ComicConstants
     }
 
     /// <summary>
+    /// Checks if a filename is a supported comic file.
+    /// </summary>
+    public static bool IsSupportedComicFile(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return ComicExtensions.Contains(extension);
+    }
+
+    /// <summary>
     /// Checks if a filename is a ComicInfo.xml file
     /// </summary>
     public static bool IsComicInfoFile(string fileName)

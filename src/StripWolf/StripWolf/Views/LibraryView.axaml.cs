@@ -56,6 +56,11 @@ public partial class LibraryView : UserControl
         await OpenFilePickerAsync();
     }
 
+    private async void OnImportFolderClicked(object? sender, RoutedEventArgs e)
+    {
+        await OpenFolderPickerAsync();
+    }
+
     private void OnComicInfoBackdropPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is LibraryViewModel viewModel && viewModel.SelectedInfoComic is not null)
@@ -130,6 +135,32 @@ public partial class LibraryView : UserControl
             {
                 await viewModel.ImportFilesCommand.ExecuteAsync(paths);
             }
+        }
+    }
+
+    public async Task OpenFolderPickerAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null)
+        {
+            return;
+        }
+
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select Comic Folder",
+            AllowMultiple = false
+        });
+
+        if (folders.Count == 0 || DataContext is not LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        var localPath = folders[0].TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath))
+        {
+            await viewModel.ImportDirectoryCommand.ExecuteAsync(localPath);
         }
     }
 

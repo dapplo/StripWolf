@@ -51,6 +51,9 @@
   <data name="ImportComic" xml:space="preserve">
     <value>Strip importeren</value>
   </data>
+  <data name="ImportFolder" xml:space="preserve">
+    <value>Map importeren</value>
+  </data>
   <data name="NoComicsFound" xml:space="preserve">
     <value>Geen strips gevonden</value>
   </data>

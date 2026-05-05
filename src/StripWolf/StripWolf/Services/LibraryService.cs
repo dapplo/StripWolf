@@ -241,8 +241,13 @@ public class LibraryService
         return _databaseService.SearchComicsAsync(searchText);
     }
 
-    private static string NormalizeSeriesName(string seriesName)
+    private static string? NormalizeSeriesName(string? seriesName)
     {
+        if (string.IsNullOrWhiteSpace(seriesName))
+        {
+            return null;
+        }
+
         return string.Join(' ', seriesName
             .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
     }
@@ -284,7 +289,7 @@ public class LibraryService
     /// <summary>
     /// Imports a local comic file into the library
     /// </summary>
-    public async Task<Comic> ImportLocalComicAsync(string filePath, IProgress<double>? progress = null)
+    public async Task<Comic> ImportLocalComicAsync(string filePath, IProgress<double>? progress = null, string? seriesNameFallback = null)
     {
         // Check if already imported
         var existing = await _databaseService.GetComicByFilePathAsync(filePath);
@@ -331,7 +336,9 @@ public class LibraryService
 
         // Build comic metadata - prefer ComicInfo.xml data over filename
         var title = comicInfo?.Title ?? Path.GetFileNameWithoutExtension(filePath);
-        var seriesName = comicInfo?.Series;
+        var seriesName = !string.IsNullOrWhiteSpace(comicInfo?.Series)
+            ? comicInfo.Series
+            : NormalizeSeriesName(seriesNameFallback);
         float? number = null;
         if (!string.IsNullOrEmpty(comicInfo?.Number) && float.TryParse(comicInfo.Number, out var parsedNumber))
         {
@@ -663,21 +670,14 @@ public class LibraryService
             return comics;
         }
 
-        var files = Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories)
-            .Where(f => !ComicConstants.IsIgnoredImportPath(f) &&
-                        (f.EndsWith(".cbz", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cbr", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cb7", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".cbt", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)));
+        var files = GetSupportedComicFilesInDirectory(directoryPath);
 
         using var deferredLibraryChanged = DeferLibraryChanged();
         foreach (var file in files)
         {
             try
             {
-                var comic = await ImportLocalComicAsync(file);
+                var comic = await ImportLocalComicAsync(file, seriesNameFallback: GetDirectorySeriesNameFallback(file, directoryPath));
                 comics.Add(comic);
             }
             catch
@@ -687,6 +687,43 @@ public class LibraryService
         }
 
         return comics;
+    }
+
+    public List<string> GetSupportedComicFilesInDirectory(string directoryPath)
+    {
+        if (!Directory.Exists(directoryPath))
+        {
+            return [];
+        }
+
+        return Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories)
+            .Where(filePath => !ComicConstants.IsIgnoredImportPath(filePath) && ComicConstants.IsSupportedComicFile(filePath))
+            .OrderBy(filePath => filePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static string? GetDirectorySeriesNameFallback(string filePath, string rootDirectoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || string.IsNullOrWhiteSpace(rootDirectoryPath))
+        {
+            return null;
+        }
+
+        var relativeDirectory = Path.GetRelativePath(rootDirectoryPath, Path.GetDirectoryName(filePath) ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(relativeDirectory) ||
+            relativeDirectory == "." ||
+            relativeDirectory.StartsWith("..", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var segments = relativeDirectory
+            .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries)
+            .Where(segment => !segment.Equals(".", StringComparison.Ordinal) &&
+                              !segment.Equals("..", StringComparison.Ordinal))
+            .ToArray();
+
+        return segments.Length == 0 ? null : string.Join(" / ", segments);
     }
 
     /// <summary>

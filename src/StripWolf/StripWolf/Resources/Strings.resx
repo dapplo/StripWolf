@@ -84,6 +84,9 @@
   <data name="ImportComic" xml:space="preserve">
     <value>Import Comic</value>
   </data>
+  <data name="ImportFolder" xml:space="preserve">
+    <value>Import Folder</value>
+  </data>
   <data name="NoComicsFound" xml:space="preserve">
     <value>No comics found</value>
   </data>

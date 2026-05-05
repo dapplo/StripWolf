@@ -161,11 +161,12 @@
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
-      <Grid ColumnDefinitions="*,Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
         <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="📁 Open Folder" Command="{Binding OpenComicsDirectoryCommand}" 
                 Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
-        <Button Grid.Column="2" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
+        <Button Grid.Column="2" Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
+        <Button Grid.Column="3" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
       </Grid>
     </Border>
     
@@ -261,7 +262,10 @@
                 <TextBlock Text="▤" FontSize="56" HorizontalAlignment="Center"/>
                 <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="Import a comic file or download from Komga to get started" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
-                <Button Content="Import Comic" Click="OnImportClicked" HorizontalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                  <Button Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" HorizontalAlignment="Center"/>
+                  <Button Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" HorizontalAlignment="Center" IsVisible="{Binding IsDesktop}"/>
+                </StackPanel>
               </StackPanel>
 
               <ItemsControl ItemsSource="{Binding NewComics}" IsVisible="{Binding NewComics.Count}"

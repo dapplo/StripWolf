@@ -442,7 +442,7 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        await ImportFilesAsync([filePath]);
+        await ImportFilesCoreAsync([filePath], null);
     }
 
     [RelayCommand]
@@ -453,6 +453,31 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
+        await ImportFilesCoreAsync(filePaths, null);
+    }
+
+    [RelayCommand]
+    private async Task ImportDirectoryAsync(string? directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            return;
+        }
+
+        var filePaths = _libraryService.GetSupportedComicFilesInDirectory(directoryPath);
+        if (filePaths.Count == 0)
+        {
+            ErrorMessage = "No supported comic files were found in the selected folder.";
+            return;
+        }
+
+        await ImportFilesCoreAsync(filePaths, directoryPath);
+    }
+
+    private async Task ImportFilesCoreAsync(IList<string> filePaths, string? importRootDirectory)
+    {
+        ErrorMessage = null;
+
         // Create pending import items for each file
         var pendingItems = new List<PendingImport>();
         foreach (var filePath in filePaths)
@@ -460,7 +485,7 @@ public partial class LibraryViewModel : ViewModelBase
             var pending = new PendingImport
             {
                 FilePath = filePath,
-                FileName = Path.GetFileName(filePath),
+                FileName = GetImportDisplayName(filePath, importRootDirectory),
                 Status = "Waiting..."
             };
             pendingItems.Add(pending);
@@ -494,7 +519,10 @@ public partial class LibraryViewModel : ViewModelBase
                     });
                 });
 
-                var comic = await _libraryService.ImportLocalComicAsync(pending.FilePath, progress);
+                var comic = await _libraryService.ImportLocalComicAsync(
+                    pending.FilePath,
+                    progress,
+                    LibraryService.GetDirectorySeriesNameFallback(pending.FilePath, importRootDirectory ?? string.Empty));
                 
                 pending.IsProcessing = false;
                 pending.IsCompleted = true;
@@ -519,6 +547,24 @@ public partial class LibraryViewModel : ViewModelBase
                 pending.ErrorMessage = ex.Message;
             }
         }
+    }
+
+    private static string GetImportDisplayName(string filePath, string? importRootDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(importRootDirectory))
+        {
+            return Path.GetFileName(filePath);
+        }
+
+        var relativePath = Path.GetRelativePath(importRootDirectory, filePath);
+        if (string.IsNullOrWhiteSpace(relativePath) ||
+            relativePath == "." ||
+            relativePath.StartsWith("..", StringComparison.Ordinal))
+        {
+            return Path.GetFileName(filePath);
+        }
+
+        return relativePath;
     }
 
     [RelayCommand]
