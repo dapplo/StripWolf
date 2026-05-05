@@ -187,11 +187,21 @@ public class PanelDetectionService
             {
                 panels = RefineBorderLayoutColumns(panels, grayFull, edgesFull, imgW, imgH, pageArea);
                 panels = RefineRowsToHorizontalBorders(panels, grayFull, edgesFull, imgW, imgH);
+                panels = RefinePanelsToHorizontalBorders(panels, grayFull, edgesFull, imgW, imgH);
             }
+            panels = RefinePanelsAcrossVerticalGaps(panels, grayFull, edgesFull, imgW, imgH);
 
             // 6. Final Reading Order
             var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
             for (int i = 0; i < sortedPanels.Count; i++) sortedPanels[i].PanelIndex = i;
+
+            if (ShouldCollapseToSplashPage(sortedPanels))
+            {
+                double splashConfidence = sortedPanels.Count > 0
+                    ? Math.Clamp(sortedPanels.Average(panel => panel.Confidence), 0.5, 1.0)
+                    : 1.0;
+                return CreateSplashPageResult(pageIndex, splashConfidence);
+            }
 
             if (sortedPanels.Count > 0)
             {
@@ -585,6 +595,27 @@ public class PanelDetectionService
         return panels.Count == 1 &&
                panels[0].Width >= 0.90 &&
                panels[0].Height >= 0.85;
+    }
+
+    private static bool ShouldCollapseToSplashPage(List<ComicPanel> panels)
+    {
+        if (panels.Count == 0 || panels.Count > 3)
+        {
+            return false;
+        }
+
+        if (panels.Any(panel => panel.Width >= 0.45 || panel.Height >= 0.45))
+        {
+            return false;
+        }
+
+        double totalCoverage = panels.Sum(panel => panel.Width * panel.Height);
+        double averageConfidence = panels.Average(panel => panel.Confidence);
+        int edgeTouchingPanels = panels.Count(TouchesPageEdge);
+
+        return totalCoverage <= 0.22 &&
+               averageConfidence < 0.62 &&
+               edgeTouchingPanels == panels.Count;
     }
 
     private List<ComicPanel> FilterOverlappingPanels(List<ComicPanel> candidates)
@@ -1433,6 +1464,171 @@ public class PanelDetectionService
         return RemoveNestedInsetPanels(FilterOverlappingPanels(refinedPanels));
     }
 
+    private List<ComicPanel> RefinePanelsToHorizontalBorders(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        var rows = new List<PanelRow>();
+        const int rowSnapTolerance = 3;
+        foreach (var panel in panels.OrderBy(panel => panel.Y).ThenBy(panel => panel.X))
+        {
+            int panelTop = (int)Math.Round(panel.Y * imgH);
+            int panelBottom = (int)Math.Round((panel.Y + panel.Height) * imgH);
+            var existingRow = rows.FirstOrDefault(row =>
+                Math.Abs((int)Math.Round(row.MinY * imgH) - panelTop) <= rowSnapTolerance &&
+                Math.Abs((int)Math.Round(row.MaxY * imgH) - panelBottom) <= rowSnapTolerance);
+            if (existingRow is null)
+            {
+                rows.Add(new PanelRow(panel));
+            }
+            else
+            {
+                existingRow.MinY = Math.Min(existingRow.MinY, panel.Y);
+                existingRow.MaxY = Math.Max(existingRow.MaxY, panel.Y + panel.Height);
+                existingRow.Coverage += panel.Width;
+                existingRow.Panels.Add(panel);
+            }
+        }
+
+        rows = rows
+            .OrderBy(row => row.MinY)
+            .ToList();
+        if (rows.Count == 0)
+        {
+            return panels;
+        }
+
+        int minPanelHeightPixels = Math.Max(24, (int)Math.Round(MinPanelSizeRatio * imgH));
+        var adjustedPanels = new List<ComicPanel>();
+
+        foreach (var row in rows)
+        {
+            int rowTop = Math.Max(0, (int)Math.Round(row.MinY * imgH));
+            int rowBottom = Math.Min(imgH, (int)Math.Round(row.MaxY * imgH));
+            int rowHeight = Math.Max(1, rowBottom - rowTop);
+            int topPadding = Math.Max(18, rowHeight / 3);
+            int bottomPadding = Math.Max(18, rowHeight / 3);
+
+            foreach (var panel in row.Panels)
+            {
+                int panelLeft = Math.Max(0, (int)Math.Round(panel.X * imgW));
+                int panelRight = Math.Min(imgW, (int)Math.Round((panel.X + panel.Width) * imgW));
+                int panelWidth = Math.Max(1, panelRight - panelLeft);
+                int xPadding = Math.Max(8, panelWidth / 14);
+                int xStart = Math.Max(0, panelLeft + xPadding / 2);
+                int xEnd = Math.Min(imgW, panelRight - xPadding / 2);
+                if (xEnd <= xStart)
+                {
+                    adjustedPanels.Add(panel);
+                    continue;
+                }
+
+                int currentTop = Math.Max(rowTop, (int)Math.Round(panel.Y * imgH));
+                int currentBottom = Math.Min(rowBottom, (int)Math.Round((panel.Y + panel.Height) * imgH));
+
+                int topSearchStart = rowTop;
+                int topSearchEnd = Math.Min(rowBottom - minPanelHeightPixels, currentTop + topPadding);
+                int bottomSearchStart = Math.Max(rowTop + minPanelHeightPixels, currentBottom - bottomPadding);
+                int bottomSearchEnd = rowBottom;
+
+                int snappedTop = FindBestHorizontalBorder(topSearchStart, topSearchEnd, xStart, xEnd, grayFull, edges) ?? currentTop;
+                int snappedBottom = FindBestHorizontalBorder(bottomSearchStart, bottomSearchEnd, xStart, xEnd, grayFull, edges) ?? currentBottom;
+
+                snappedTop = Math.Max(rowTop, Math.Min(snappedTop, rowBottom - minPanelHeightPixels));
+                snappedBottom = Math.Min(rowBottom, Math.Max(snappedBottom, snappedTop + minPanelHeightPixels));
+
+                double newY = snappedTop / (double)imgH;
+                double newHeight = (snappedBottom - snappedTop) / (double)imgH;
+                if (newHeight <= MinPanelSizeRatio)
+                {
+                    adjustedPanels.Add(panel);
+                    continue;
+                }
+
+                adjustedPanels.Add(CreateAdjustedPanel(panel, panel.X, newY, panel.Width, newHeight));
+            }
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefinePanelsAcrossVerticalGaps(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        if (panels.Count <= 1)
+        {
+            return panels;
+        }
+
+        const double minGapRatio = 0.08;
+        const double minConfidence = 0.62;
+        int minPanelHeightPixels = Math.Max(24, (int)Math.Round(MinPanelSizeRatio * imgH));
+
+        var adjustedPanels = panels
+            .Select(panel => CreateAdjustedPanel(panel, panel.X, panel.Y, panel.Width, panel.Height))
+            .ToList();
+
+        for (int i = 0; i < adjustedPanels.Count; i++)
+        {
+            var panel = adjustedPanels[i];
+            if (panel.Confidence < minConfidence)
+            {
+                continue;
+            }
+
+            double panelBottom = panel.Y + panel.Height;
+            var nextOverlappingPanel = panels
+                .Where((other, index) => index != i &&
+                    other.Y >= panelBottom - 0.01 &&
+                    GetHorizontalOverlapRatio(panel, other) >= 0.20)
+                .OrderBy(other => other.Y)
+                .FirstOrDefault();
+
+            if (nextOverlappingPanel is null)
+            {
+                continue;
+            }
+
+            double nextTop = nextOverlappingPanel.Y;
+            double gap = nextTop - panelBottom;
+            if (gap < minGapRatio)
+            {
+                continue;
+            }
+
+            int panelTopPx = Math.Max(0, (int)Math.Round(panel.Y * imgH));
+            int panelBottomPx = Math.Min(imgH, (int)Math.Round(panelBottom * imgH));
+            int nextTopPx = Math.Max(panelBottomPx + 1, (int)Math.Round(nextTop * imgH));
+            int panelLeftPx = Math.Max(0, (int)Math.Round(panel.X * imgW));
+            int panelRightPx = Math.Min(imgW, (int)Math.Round((panel.X + panel.Width) * imgW));
+            int xPadding = Math.Max(8, (panelRightPx - panelLeftPx) / 14);
+            int xStart = Math.Max(0, panelLeftPx + xPadding / 2);
+            int xEnd = Math.Min(imgW, panelRightPx - xPadding / 2);
+            if (xEnd <= xStart || nextTopPx <= panelBottomPx + 1)
+            {
+                continue;
+            }
+
+            int? snappedBottom = FindBestHorizontalBorder(panelBottomPx, nextTopPx, xStart, xEnd, grayFull, edges);
+            if (!snappedBottom.HasValue || snappedBottom.Value <= panelBottomPx + minPanelHeightPixels / 3)
+            {
+                continue;
+            }
+
+            int newBottomPx = Math.Min(nextTopPx - 1, snappedBottom.Value);
+            if (newBottomPx - panelTopPx < minPanelHeightPixels)
+            {
+                continue;
+            }
+
+            adjustedPanels[i] = CreateAdjustedPanel(
+                panel,
+                panel.X,
+                panel.Y,
+                panel.Width,
+                (newBottomPx - panelTopPx) / (double)imgH);
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
     private static List<RowBand> BuildRows(List<ComicPanel> panels)
     {
         var rows = new List<RowBand>();
@@ -1542,6 +1738,17 @@ public class PanelDetectionService
 
         double intersectionArea = (x2 - x1) * (y2 - y1);
         return intersectionArea / (panel.Width * panel.Height);
+    }
+
+    private static double GetHorizontalOverlapRatio(ComicPanel panel, ComicPanel other)
+    {
+        double overlap = Math.Min(panel.X + panel.Width, other.X + other.Width) - Math.Max(panel.X, other.X);
+        if (overlap <= 0)
+        {
+            return 0;
+        }
+
+        return overlap / Math.Max(0.0001, Math.Min(panel.Width, other.Width));
     }
 
     private static bool TouchesPageEdge(ComicPanel panel)
