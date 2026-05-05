@@ -15,11 +15,13 @@
 
   <!-- Release signing configuration -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <AndroidKeyStore>true</AndroidKeyStore>
-    <AndroidSigningKeyStore>StripWolf.keystore</AndroidSigningKeyStore>
-    <AndroidSigningKeyAlias>StripWolf</AndroidSigningKeyAlias>
-    <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
-    <AndroidSigningStorePass>$(ANDROID_SIGNING_STORE_PASS)</AndroidSigningStorePass>
+    <StripWolfSigningKeyStore Condition="'$(STRIPWOLF_KEYSTORE_PATH)' != ''">$(STRIPWOLF_KEYSTORE_PATH)</StripWolfSigningKeyStore>
+    <StripWolfSigningKeyStore Condition="'$(StripWolfSigningKeyStore)' == ''">$(MSBuildProjectDirectory)\StripWolf.keystore</StripWolfSigningKeyStore>
+    <AndroidKeyStore Condition="Exists('$(StripWolfSigningKeyStore)')">true</AndroidKeyStore>
+    <AndroidSigningKeyStore Condition="Exists('$(StripWolfSigningKeyStore)')">$(StripWolfSigningKeyStore)</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias Condition="Exists('$(StripWolfSigningKeyStore)')">StripWolf</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass Condition="Exists('$(StripWolfSigningKeyStore)')">$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
+    <AndroidSigningStorePass Condition="Exists('$(StripWolfSigningKeyStore)')">$(ANDROID_SIGNING_STORE_PASS)</AndroidSigningStorePass>
   </PropertyGroup>
 
   <ItemGroup>

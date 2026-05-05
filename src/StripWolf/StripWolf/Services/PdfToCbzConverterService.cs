@@ -52,6 +52,15 @@ public class PdfToCbzConverterService
         string outputDirectory,
         IProgress<double>? progress = null)
     {
+        using var importData = await ConvertPdfToCbzForImportAsync(pdfFilePath, outputDirectory, progress);
+        return importData.FilePath;
+    }
+
+    public async Task<ComicImportData> ConvertPdfToCbzForImportAsync(
+        string pdfFilePath,
+        string outputDirectory,
+        IProgress<double>? progress = null)
+    {
         if (!File.Exists(pdfFilePath))
         {
             throw new FileNotFoundException("PDF file not found", pdfFilePath);
@@ -70,28 +79,61 @@ public class PdfToCbzConverterService
             File.Delete(cbzFilePath);
         }
 
+        Stream? coverImageStream = null;
+        ComicInfo? comicInfo = null;
         using var archive = ZipFile.Open(cbzFilePath, ZipArchiveMode.Create);
         var pdfMetadata = renderSession.GetMetadata();
+        var pageCount = renderSession.GetPageCount();
 
         if (pdfMetadata is not null)
         {
-            var comicInfo = CreateComicInfoFromPdfMetadata(pdfMetadata, pdfFileName);
+            comicInfo = CreateComicInfoFromPdfMetadata(pdfMetadata, pdfFileName);
             var comicInfoEntry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
             await using var comicInfoStream = comicInfoEntry.Open();
             await WriteComicInfoAsync(comicInfo, comicInfoStream);
         }
 
-        var pageCount = renderSession.GetPageCount();
-
         for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
         {
             var pageEntry = archive.CreateEntry($"Page_{pageIndex + 1:D5}.jpg", CompressionLevel.NoCompression);
-            await using var pageStream = pageEntry.Open();
-            await renderSession.RenderPageToJpegAsync(pageIndex, pageStream);
+            if (pageIndex == 0)
+            {
+                var firstPageStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(PdfToCbzConverterService));
+                try
+                {
+                    await renderSession.RenderPageToJpegAsync(pageIndex, firstPageStream);
+                    firstPageStream.Position = 0;
+                    await using var pageStream = pageEntry.Open();
+                    await firstPageStream.CopyToAsync(pageStream);
+                    firstPageStream.Position = 0;
+                    coverImageStream = firstPageStream;
+                }
+                catch
+                {
+                    firstPageStream.Dispose();
+                    throw;
+                }
+            }
+            else
+            {
+                await using var pageStream = pageEntry.Open();
+                await renderSession.RenderPageToJpegAsync(pageIndex, pageStream);
+            }
+
             progress?.Report((double)(pageIndex + 1) / pageCount);
         }
 
-        return cbzFilePath;
+        archive.Dispose();
+
+        return new ComicImportData
+        {
+            FilePath = cbzFilePath,
+            Format = ComicFormat.Cbz,
+            ComicInfo = comicInfo,
+            PageCount = pageCount,
+            FileSize = new FileInfo(cbzFilePath).Length,
+            CoverImageStream = coverImageStream
+        };
     }
 
     /// <summary>

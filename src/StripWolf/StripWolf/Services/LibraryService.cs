@@ -282,62 +282,34 @@ public class LibraryService
             throw new NotSupportedException("Unsupported comic format. Only CBZ, CBR, CB7, CBT, PDF, and EPUB files are supported.");
         }
 
-        // Determine if conversion to CBZ is needed
-        string actualFilePath = filePath;
-        var needsConversion = format == ComicFormat.Pdf ||
-                              format == ComicFormat.Epub ||
-                              format == ComicFormat.Cb7 || 
-                              format == ComicFormat.Cbt ||
-                              (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
-
-        if (needsConversion)
+        using var importData = await PrepareLocalImportAsync(filePath, format, progress);
+        var actualFilePath = importData.FilePath;
+        if (!string.Equals(actualFilePath, filePath, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(filePath) &&
+            IsAppOwnedSourcePath(filePath))
         {
-            if (format == ComicFormat.Pdf)
-            {
-                // PDF conversion
-                actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
-            }
-            else if (format == ComicFormat.Epub)
-            {
-                actualFilePath = await _epubConverter.ConvertEpubToCbzAsync(filePath, _comicsDirectory, progress: progress);
-            }
-            else
-            {
-                // Convert CB7, CBT, or solid CBR to CBZ
-                actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, progress);
-            }
-
-            if (actualFilePath != filePath && File.Exists(filePath) && IsAppOwnedSourcePath(filePath))
-            {
-                await DeleteManagedSourceFileAsync(filePath);
-            }
+            await DeleteManagedSourceFileAsync(filePath);
         }
 
-        // Extract ComicInfo.xml metadata if available
-        ComicInfo? comicInfo = null;
-        try
-        {
-            comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
-        }
-        catch
-        {
-            // ComicInfo extraction failed, continue without it
-        }
-
-        var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
+        var comicInfo = importData.ComicInfo;
+        var pageCount = importData.PageCount;
+        var fileSize = importData.FileSize;
         
         // Generate a unique ID for the cover filename
         var coverId = Guid.NewGuid().ToString();
         
         // Extract cover to the unified covers directory with unique filename
         string? coverPath = null;
-        try
+        if (importData.CoverImageStream is not null)
         {
-            coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, coverId);
-        }
-        catch
-        {
-            // Cover extraction failed, continue without cover
+            try
+            {
+                coverPath = await CreateCoverThumbnailAsync(importData.CoverImageStream, coverId);
+            }
+            catch
+            {
+                // Cover extraction failed, continue without cover
+            }
         }
 
         // Build comic metadata - prefer ComicInfo.xml data over filename
@@ -362,7 +334,7 @@ public class LibraryService
             PageCount = pageCount,
             FileSize = fileSize,
             CoverPath = coverPath,
-            Format = needsConversion ? ComicFormat.Cbz : format,
+            Format = importData.Format,
             Source = ComicSource.Local,
             AddedDate = DateTime.UtcNow
         };
@@ -401,6 +373,7 @@ public class LibraryService
         var filePath = Path.Combine(_comicsDirectory, fileName);
         string actualFilePath = filePath;
         string? coverPath = null;
+        ComicImportData? convertedImportData = null;
 
         try
         {
@@ -427,17 +400,18 @@ public class LibraryService
             {
                 if (format == ComicFormat.Pdf)
                 {
-                    actualFilePath = await _pdfConverter.ConvertPdfToCbzAsync(filePath, _comicsDirectory, progress);
+                    convertedImportData = await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
                 }
                 else if (format == ComicFormat.Epub)
                 {
-                    actualFilePath = await _epubConverter.ConvertEpubToCbzAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
+                    convertedImportData = await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    actualFilePath = await _comicConverter.ConvertToCbzAsync(filePath, _comicsDirectory, null);
+                    convertedImportData = await _comicConverter.ConvertToCbzForImportAsync(filePath, _comicsDirectory, null);
                 }
 
+                actualFilePath = convertedImportData.FilePath;
                 cancellationToken.ThrowIfCancellationRequested();
 
                 // Delete original file after successful conversion
@@ -465,21 +439,24 @@ public class LibraryService
                     }
                 }
 
-                // update the pagecount and filesize after conversion
-                (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(actualFilePath);
+                pageCount = convertedImportData.PageCount;
+                fileSize = convertedImportData.FileSize;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
 
             // Extract ComicInfo.xml metadata if available
-            ComicInfo? comicInfo = null;
-            try
+            var comicInfo = convertedImportData?.ComicInfo;
+            if (comicInfo is null)
             {
-                comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
-            }
-            catch
-            {
-                // ComicInfo extraction failed, continue without it
+                try
+                {
+                    comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
+                }
+                catch
+                {
+                    // ComicInfo extraction failed, continue without it
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -497,7 +474,14 @@ public class LibraryService
                 // Extract cover if Komga didn't have one
                 try
                 {
-                    coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
+                    if (convertedImportData?.CoverImageStream is not null)
+                    {
+                        coverPath = await CreateCoverThumbnailAsync(convertedImportData.CoverImageStream, book.Id);
+                    }
+                    else
+                    {
+                        coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
+                    }
                 }
                 catch
                 {
@@ -569,6 +553,10 @@ public class LibraryService
             }
 
             throw;
+        }
+        finally
+        {
+            convertedImportData?.Dispose();
         }
     }
 
@@ -685,18 +673,50 @@ public class LibraryService
     /// <summary>
     /// Extracts a cover to the unified covers directory with the specified ID as filename
     /// </summary>
-    private async Task<string> ExtractCoverToUnifiedDirectoryAsync(string comicFilePath, string coverId)
+    private async Task<ComicImportData> PrepareLocalImportAsync(string filePath, ComicFormat format, IProgress<double>? progress)
     {
-        var coverData = await _comicReaderService.GetPageWithoutCacheAsync(comicFilePath, 0);
-        return await CreateCoverThumbnailAsync(coverData, coverId);
+        var needsConversion = format == ComicFormat.Pdf ||
+                              format == ComicFormat.Epub ||
+                              format == ComicFormat.Cb7 ||
+                              format == ComicFormat.Cbt ||
+                              (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
+
+        if (needsConversion)
+        {
+            if (format == ComicFormat.Pdf)
+            {
+                return await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
+            }
+
+            if (format == ComicFormat.Epub)
+            {
+                return await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress);
+            }
+
+            return await _comicConverter.ConvertToCbzForImportAsync(filePath, _comicsDirectory, progress);
+        }
+
+        return await _comicConverter.AnalyzeArchiveForImportAsync(filePath);
     }
 
-    private async Task<string> CreateCoverThumbnailAsync(byte[] imageData, string coverId)
+    private async Task<string> ExtractCoverToUnifiedDirectoryAsync(string comicFilePath, string coverId)
+    {
+        using var coverStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(LibraryService));
+        await _comicReaderService.CopyPageWithoutCacheAsync(comicFilePath, 0, coverStream);
+        coverStream.Position = 0;
+        return await CreateCoverThumbnailAsync(coverStream, coverId);
+    }
+
+    private async Task<string> CreateCoverThumbnailAsync(Stream imageStream, string coverId)
     {
         var coverPath = Path.Combine(_coversDirectory, $"{coverId}.jpg");
 
-        await using var inputStream = new MemoryStream(imageData, writable: false);
-        using var sourceImage = await Image.LoadAsync<Rgba32>(inputStream);
+        if (imageStream.CanSeek)
+        {
+            imageStream.Position = 0;
+        }
+
+        using var sourceImage = await Image.LoadAsync<Rgba32>(imageStream);
         sourceImage.Mutate(context => context.AutoOrient());
 
         var resizeOptions = new ResizeOptions

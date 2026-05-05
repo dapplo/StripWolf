@@ -190,6 +190,24 @@ public sealed class EpubToCbzConverterService
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        using var importData = await ConvertEpubToCbzForImportAsync(
+            epubFilePath,
+            outputDirectory,
+            viewportWidth,
+            viewportHeight,
+            progress,
+            cancellationToken);
+        return importData.FilePath;
+    }
+
+    public async Task<ComicImportData> ConvertEpubToCbzForImportAsync(
+        string epubFilePath,
+        string outputDirectory,
+        int viewportWidth = DefaultViewportWidth,
+        int viewportHeight = DefaultViewportHeight,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
         if (!File.Exists(epubFilePath))
         {
             throw new FileNotFoundException("EPUB file not found.", epubFilePath);
@@ -220,6 +238,8 @@ public sealed class EpubToCbzConverterService
             await MaterializeContentAsync(book, tempRoot, cancellationToken);
 
             var totalPages = 0;
+            Stream? coverImageStream = null;
+            ComicInfo? comicInfo = null;
 
             using var archive = ZipFile.Open(cbzPath, ZipArchiveMode.Create);
             await using var paginationSession = await _webViewPaginationService.CreatePaginationSessionAsync(
@@ -256,15 +276,37 @@ public sealed class EpubToCbzConverterService
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var entry = archive.CreateEntry($"Page_{renderedPageIndex + 1:000}.png", CompressionLevel.NoCompression);
-                    await using var entryStream = entry.Open();
-                    await paginationSession.CapturePageToStreamAsync(pageIndex, entryStream);
+                    if (renderedPageIndex == 0)
+                    {
+                        var firstPageStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(EpubToCbzConverterService));
+                        try
+                        {
+                            await paginationSession.CapturePageToStreamAsync(pageIndex, firstPageStream);
+                            firstPageStream.Position = 0;
+                            await using var entryStream = entry.Open();
+                            await firstPageStream.CopyToAsync(entryStream, cancellationToken);
+                            firstPageStream.Position = 0;
+                            coverImageStream = firstPageStream;
+                        }
+                        catch
+                        {
+                            firstPageStream.Dispose();
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        await using var entryStream = entry.Open();
+                        await paginationSession.CapturePageToStreamAsync(pageIndex, entryStream);
+                    }
 
                     renderedPageIndex++;
                     progress?.Report((chapterIndex + ((double)pageIndex + 1) / pageCount) / totalChapterCount);
                 }
             }
 
-            var comicInfoXml = CreateComicInfoXml(book, totalPages);
+            comicInfo = CreateComicInfo(book, totalPages);
+            var comicInfoXml = CreateComicInfoXml(comicInfo);
             var comicInfoEntry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
             await using (var comicInfoStream = comicInfoEntry.Open())
             await using (var comicInfoWriter = new StreamWriter(comicInfoStream, new UTF8Encoding(false)))
@@ -273,7 +315,16 @@ public sealed class EpubToCbzConverterService
             }
 
             progress?.Report(1);
-            return cbzPath;
+            archive.Dispose();
+            return new ComicImportData
+            {
+                FilePath = cbzPath,
+                Format = ComicFormat.Cbz,
+                ComicInfo = comicInfo,
+                PageCount = totalPages,
+                FileSize = new FileInfo(cbzPath).Length,
+                CoverImageStream = coverImageStream
+            };
         }
         finally
         {
@@ -504,14 +555,14 @@ public sealed class EpubToCbzConverterService
             : chapter.Key;
     }
 
-    private static string CreateComicInfoXml(EpubBook book, int pageCount)
+    private static ComicInfo CreateComicInfo(EpubBook book, int pageCount)
     {
         var metadata = book.Schema.Package.Metadata;
         var seriesName = ExtractSeriesName(metadata);
         var seriesIndex = ExtractSeriesIndex(metadata);
         var authors = book.AuthorList?.Where(author => !string.IsNullOrWhiteSpace(author)).ToList() ?? [];
 
-        var comicInfo = new ComicInfo
+        return new ComicInfo
         {
             Title = book.Title,
             Series = seriesName,
@@ -521,7 +572,10 @@ public sealed class EpubToCbzConverterService
             PageCount = pageCount > 0 ? pageCount : null,
             Notes = $"Converted from EPUB with off-screen native WebView pagination."
         };
+    }
 
+    private static string CreateComicInfoXml(ComicInfo comicInfo)
+    {
         var serializer = new XmlSerializer(typeof(ComicInfo));
         var namespaces = new XmlSerializerNamespaces();
         namespaces.Add("", "");

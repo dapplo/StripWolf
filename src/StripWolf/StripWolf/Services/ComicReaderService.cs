@@ -136,6 +136,15 @@ public class ComicReaderService
         return await ReadPageAsync(filePath, pageIndex, sortedNames);
     }
 
+    /// <summary>
+    /// Copies a specific page to the supplied stream without populating the page cache.
+    /// </summary>
+    public async Task CopyPageWithoutCacheAsync(string filePath, int pageIndex, Stream outputStream)
+    {
+        var sortedNames = await GetCachedPageNamesAsync(filePath);
+        await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream);
+    }
+
     private static async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
@@ -154,6 +163,35 @@ public class ComicReaderService
             ComicFormat.Cbt => await ReadCbtPageAsync(filePath, entryName),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
+    }
+
+    private static async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream)
+    {
+        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+        }
+
+        var entryName = sortedNames[pageIndex];
+        var format = GetComicFormat(filePath);
+
+        switch (format)
+        {
+            case ComicFormat.Cbz:
+                await CopyCbzPageAsync(filePath, entryName, outputStream);
+                break;
+            case ComicFormat.Cbr:
+                await CopyCbrPageAsync(filePath, pageIndex, entryName, sortedNames, outputStream);
+                break;
+            case ComicFormat.Cb7:
+                await CopyCb7PageAsync(filePath, entryName, outputStream);
+                break;
+            case ComicFormat.Cbt:
+                await CopyCbtPageAsync(filePath, entryName, outputStream);
+                break;
+            default:
+                throw new NotSupportedException($"Unsupported comic format: {format}");
+        }
     }
 
     public void ClearCache()
@@ -222,6 +260,24 @@ public class ComicReaderService
         });
     }
 
+    private static async Task CopyCbzPageAsync(string filePath, string entryName, Stream outputStream)
+    {
+        await Task.Run(() =>
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            var entry = archive.GetEntry(entryName);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
+            }
+
+            using var entryStream = entry.Open();
+            entryStream.CopyTo(outputStream);
+        });
+    }
+
     #endregion
 
     #region CBR (RAR) Operations
@@ -271,6 +327,35 @@ public class ComicReaderService
         });
     }
 
+    private static async Task CopyCbrPageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames, Stream outputStream)
+    {
+        await Task.Run(() =>
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = RarArchive.OpenArchive(stream);
+
+            if (archive.IsSolid)
+            {
+                CopyPageFromSolidRar(archive, pageIndex, entryName, sortedNames, outputStream);
+                return;
+            }
+
+            var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
+            }
+
+            using var entryStream = entry.OpenEntryStream();
+            if (entryStream is null)
+            {
+                throw new InvalidOperationException($"Could not extract entry '{entryName}' from CBR archive. The entry may be corrupted or use an unsupported compression method.");
+            }
+
+            entryStream.CopyTo(outputStream);
+        });
+    }
+
     private static byte[] ReadPageFromSolidRar(IRarArchive archive, int pageIndex, string targetName, List<string> sortedNames)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
@@ -288,6 +373,27 @@ public class ComicReaderService
                 using var memoryStream = new MemoryStream();
                 entryStream.CopyTo(memoryStream);
                 return memoryStream.ToArray();
+            }
+        }
+
+        throw new InvalidOperationException($"Could not find page {pageIndex} in solid RAR archive");
+    }
+
+    private static void CopyPageFromSolidRar(IRarArchive archive, int pageIndex, string targetName, List<string> sortedNames, Stream outputStream)
+    {
+        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+        }
+
+        using var reader = archive.ExtractAllEntries();
+        while (reader.MoveToNextEntry())
+        {
+            if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
+            {
+                using var entryStream = reader.OpenEntryStream();
+                entryStream.CopyTo(outputStream);
+                return;
             }
         }
 
@@ -336,6 +442,28 @@ public class ComicReaderService
         });
     }
 
+    private static async Task CopyCb7PageAsync(string filePath, string entryName, Stream outputStream)
+    {
+        await Task.Run(() =>
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(stream);
+
+            using var reader = archive.ExtractAllEntries();
+            while (reader.MoveToNextEntry())
+            {
+                if (!reader.Entry.IsDirectory && reader.Entry.Key == entryName)
+                {
+                    using var entryStream = reader.OpenEntryStream();
+                    entryStream.CopyTo(outputStream);
+                    return;
+                }
+            }
+
+            throw new InvalidOperationException($"Could not find entry '{entryName}' in CB7 archive");
+        });
+    }
+
     #endregion
 
     #region CBT (TAR) Operations
@@ -373,6 +501,26 @@ public class ComicReaderService
             using var memoryStream = new MemoryStream();
             entryStream.CopyTo(memoryStream);
             return memoryStream.ToArray();
+        });
+    }
+
+    private static async Task CopyCbtPageAsync(string filePath, string entryName, Stream outputStream)
+    {
+        await Task.Run(() =>
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = TarArchive.OpenArchive(stream);
+
+            var entry = archive.Entries
+                .FirstOrDefault(e => !e.IsDirectory && e.Key == entryName);
+
+            if (entry is null)
+            {
+                throw new InvalidOperationException($"Could not find entry '{entryName}' in CBT archive");
+            }
+
+            using var entryStream = entry.OpenEntryStream();
+            entryStream.CopyTo(outputStream);
         });
     }
 
