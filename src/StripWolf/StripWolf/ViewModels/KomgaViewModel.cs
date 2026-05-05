@@ -754,7 +754,7 @@ public partial class KomgaViewModel : ViewModelBase
         var ct = _loadingCts?.Token ?? CancellationToken.None;
 
         // Load Keep Reading books (in progress)
-        if (!useCache || DateTime.UtcNow - _keepReadingCacheTime > CacheExpiration)
+        if (ShouldRefreshCachedCollection(useCache, _keepReadingCacheTime, KeepReadingBooks.Count))
         {
             try
             {
@@ -777,7 +777,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         // Load On Deck books
-        if (!useCache || DateTime.UtcNow - _onDeckCacheTime > CacheExpiration)
+        if (ShouldRefreshCachedCollection(useCache, _onDeckCacheTime, OnDeckBooks.Count))
         {
             try
             {
@@ -800,7 +800,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         // Load Recently Added Books
-        if (!useCache || DateTime.UtcNow - _recentBooksCacheTime > CacheExpiration)
+        if (ShouldRefreshCachedCollection(useCache, _recentBooksCacheTime, RecentlyAddedBooks.Count))
         {
             try
             {
@@ -823,7 +823,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         // Load Recently Added Series
-        if (!useCache || DateTime.UtcNow - _recentSeriesCacheTime > CacheExpiration)
+        if (ShouldRefreshCachedCollection(useCache, _recentSeriesCacheTime, RecentlyAddedSeries.Count))
         {
             try
             {
@@ -1925,8 +1925,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         // Check cache if using cache and this is the first page
-        if (useCache && _currentReadListPage == 0 && ReadLists.Count > 0 && 
-            DateTime.UtcNow - _readListsCacheTime < CacheExpiration)
+        if (_currentReadListPage == 0 && !ShouldRefreshCachedCollection(useCache, _readListsCacheTime, ReadLists.Count))
         {
             return;
         }
@@ -1968,6 +1967,11 @@ public partial class KomgaViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    private static bool ShouldRefreshCachedCollection(bool useCache, DateTime cacheTime, int itemCount)
+    {
+        return !useCache || itemCount == 0 || DateTime.UtcNow - cacheTime > CacheExpiration;
     }
 
     /// <summary>
