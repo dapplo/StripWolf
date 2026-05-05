@@ -1,6 +1,20 @@
+using System.Text.Json;
 using SQLite;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Models;
+
+/// <summary>
+/// Represents a custom HTTP header
+/// </summary>
+public partial class KomgaHeader : ObservableObject
+{
+    [ObservableProperty]
+    private string _name = string.Empty;
+
+    [ObservableProperty]
+    private string _value = string.Empty;
+}
 
 /// <summary>
 /// Represents a Komga server connection configuration
@@ -34,6 +48,21 @@ public class KomgaServer
     /// API Key for authentication (preferred over username/password)
     /// </summary>
     public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Custom HTTP headers to be sent with every request
+    /// </summary>
+    [Ignore]
+    public List<KomgaHeader> CustomHeaders { get; set; } = [];
+
+    /// <summary>
+    /// JSON representation of custom headers for SQLite storage
+    /// </summary>
+    public string CustomHeadersJson
+    {
+        get => JsonSerializer.Serialize(CustomHeaders);
+        set => CustomHeaders = string.IsNullOrEmpty(value) ? [] : JsonSerializer.Deserialize<List<KomgaHeader>>(value) ?? [];
+    }
 
     /// <summary>
     /// Whether this is the active/default server

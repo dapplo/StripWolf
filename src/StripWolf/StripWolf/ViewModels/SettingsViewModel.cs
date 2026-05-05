@@ -43,6 +43,9 @@ public partial class SettingsViewModel : ViewModelBase
     private string _apiKey = string.Empty;
 
     [ObservableProperty]
+    private ObservableCollection<KomgaHeader> _customHeaders = [];
+
+    [ObservableProperty]
     private bool _isEditing;
 
     [ObservableProperty]
@@ -358,6 +361,21 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void AddHeader()
+    {
+        CustomHeaders.Add(new KomgaHeader());
+    }
+
+    [RelayCommand]
+    private void RemoveHeader(KomgaHeader? header)
+    {
+        if (header is not null)
+        {
+            CustomHeaders.Remove(header);
+        }
+    }
+
+    [RelayCommand]
     private void AddServer()
     {
         _editingServer = null;
@@ -366,6 +384,7 @@ public partial class SettingsViewModel : ViewModelBase
         Username = string.Empty;
         Password = string.Empty;
         ApiKey = string.Empty;
+        CustomHeaders.Clear();
         ConnectionStatus = null;
         IsPasswordVisible = false;
         IsEditing = true;
@@ -385,6 +404,11 @@ public partial class SettingsViewModel : ViewModelBase
         Username = server.Username;
         Password = server.Password;
         ApiKey = server.ApiKey;
+        CustomHeaders.Clear();
+        foreach (var header in server.CustomHeaders)
+        {
+            CustomHeaders.Add(new KomgaHeader { Name = header.Name, Value = header.Value });
+        }
         ConnectionStatus = null;
         IsPasswordVisible = false;
         IsEditing = true;
@@ -396,6 +420,7 @@ public partial class SettingsViewModel : ViewModelBase
         IsEditing = false;
         IsPasswordVisible = false;
         _editingServer = null;
+        CustomHeaders.Clear();
     }
 
     [RelayCommand]
@@ -447,6 +472,7 @@ public partial class SettingsViewModel : ViewModelBase
             server.Username = Username;
             server.Password = Password;
             server.ApiKey = ApiKey;
+            server.CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList();
             
             // Ensure we have an active server ID set if this is the only server or if none is active
             if (_appSettings.ActiveServerId == null || _appSettings.Servers.Count == 0)
@@ -481,6 +507,7 @@ public partial class SettingsViewModel : ViewModelBase
 
             IsEditing = false;
             _editingServer = null;
+            CustomHeaders.Clear();
         }, "Failed to save server");
     }
 
@@ -570,7 +597,8 @@ public partial class SettingsViewModel : ViewModelBase
                 BaseUrl = ServerUrl.TrimEnd('/'),
                 Username = Username,
                 Password = Password,
-                ApiKey = ApiKey
+                ApiKey = ApiKey,
+                CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList()
             };
 
             _komgaApiService.Configure(testServer);

@@ -217,6 +217,21 @@
   <data name="InvalidUrl" xml:space="preserve">
     <value>Bitte geben Sie eine gültige URL ein (z.B. https://komga.example.com)</value>
   </data>
+  <data name="CustomHttpHeaders" xml:space="preserve">
+    <value>Benutzerdefinierte HTTP-Header</value>
+  </data>
+  <data name="CustomHeadersHint" xml:space="preserve">
+    <value>Wird für Authentik, Proxys oder andere benutzerdefinierte Auth-Header verwendet.</value>
+  </data>
+  <data name="HeaderName" xml:space="preserve">
+    <value>Header-Name</value>
+  </data>
+  <data name="Value" xml:space="preserve">
+    <value>Wert</value>
+  </data>
+  <data name="AddHeader" xml:space="preserve">
+    <value>Header hinzufügen</value>
+  </data>
   
   <!-- Language Settings -->
   <data name="LanguageSettings" xml:space="preserve">

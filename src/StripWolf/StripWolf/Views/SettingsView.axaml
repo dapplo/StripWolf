@@ -343,6 +343,27 @@
           </Border>
         </StackPanel>
 
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding CustomHttpHeaders, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold" FontSize="14" Margin="0,8,0,0"/>
+          <TextBlock Text="{Binding CustomHeadersHint, Source={x:Static res:Loc.Instance}}" FontSize="10" Foreground="Gray"/>
+
+          <ItemsControl ItemsSource="{Binding CustomHeaders}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:KomgaHeader">
+                <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+                  <TextBox Text="{Binding Name}" PlaceholderText="{Binding HeaderName, Source={x:Static res:Loc.Instance}}"/>
+                  <TextBox Grid.Column="1" Text="{Binding Value}" PlaceholderText="{Binding Value, Source={x:Static res:Loc.Instance}}"/>
+                  <Button Grid.Column="2" Content="🗑️" 
+                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveHeaderCommand}"
+                          CommandParameter="{Binding}" Background="Transparent"/>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Button Content="{Binding AddHeader, Source={x:Static res:Loc.Instance}}" Command="{Binding AddHeaderCommand}" HorizontalAlignment="Left" FontSize="12"/>
+        </StackPanel>
+
 
         <!-- Connection Status -->
         <TextBlock Text="{Binding ConnectionStatus}" HorizontalAlignment="Center"

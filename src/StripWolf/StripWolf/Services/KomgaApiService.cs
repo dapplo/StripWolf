@@ -84,6 +84,15 @@ public class KomgaApiService : IDisposable
         _httpClient.DefaultRequestHeaders.Accept.Clear();
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
+        // Add custom headers
+        foreach (var header in server.CustomHeaders)
+        {
+            if (!string.IsNullOrWhiteSpace(header.Name) && !string.IsNullOrWhiteSpace(header.Value))
+            {
+                _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Name, header.Value);
+            }
+        }
+
         // Set up authentication
         if (!string.IsNullOrEmpty(server.ApiKey))
         {
