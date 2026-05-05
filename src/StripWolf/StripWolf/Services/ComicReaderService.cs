@@ -266,7 +266,7 @@ public class ComicReaderService
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             return archive.Entries
-                .Where(e => IsImageFile(e.FullName))
+                .Where(e => !ComicConstants.IsIgnoredImportPath(e.FullName) && IsImageFile(e.FullName))
                 .Select(e => e.FullName)
                 .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
@@ -322,7 +322,9 @@ public class ComicReaderService
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = RarArchive.OpenArchive(stream);
             return archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Where(e => !e.IsDirectory &&
+                    !ComicConstants.IsIgnoredImportPath(e.Key ?? string.Empty) &&
+                    IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
                 .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
@@ -444,7 +446,9 @@ public class ComicReaderService
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = SevenZipArchive.OpenArchive(stream);
             return archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Where(e => !e.IsDirectory &&
+                    !ComicConstants.IsIgnoredImportPath(e.Key ?? string.Empty) &&
+                    IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
                 .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
@@ -508,7 +512,9 @@ public class ComicReaderService
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = TarArchive.OpenArchive(stream);
             return archive.Entries
-                .Where(e => !e.IsDirectory && IsImageFile(e.Key ?? string.Empty))
+                .Where(e => !e.IsDirectory &&
+                    !ComicConstants.IsIgnoredImportPath(e.Key ?? string.Empty) &&
+                    IsImageFile(e.Key ?? string.Empty))
                 .Select(e => e.Key ?? string.Empty)
                 .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();

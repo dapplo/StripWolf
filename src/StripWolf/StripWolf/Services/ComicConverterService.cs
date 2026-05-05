@@ -372,6 +372,11 @@ public class ComicConverterService
 
     private static bool ShouldIncludeEntry(string safeEntryName)
     {
+        if (ComicConstants.IsIgnoredImportPath(safeEntryName))
+        {
+            return false;
+        }
+
         return ComicConstants.IsImageFile(safeEntryName) || ComicConstants.IsComicInfoFile(safeEntryName);
     }
 
@@ -526,6 +531,7 @@ public class ComicConverterService
             using (var archive = ZipFile.OpenRead(filePath))
             {
                 var entry = archive.Entries.FirstOrDefault(e => 
+                    !ComicConstants.IsIgnoredImportPath(e.FullName) &&
                     Path.GetFileName(e.FullName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
                 
                 if (entry is null)
@@ -558,6 +564,7 @@ public class ComicConverterService
                         while (reader.MoveToNextEntry())
                         {
                             if (!reader.Entry.IsDirectory && 
+                                !ComicConstants.IsIgnoredImportPath(reader.Entry.Key ?? string.Empty) &&
                                 Path.GetFileName(reader.Entry.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase))
                             {
                                 using (var entryStream = reader.OpenEntryStream())
@@ -573,7 +580,9 @@ public class ComicConverterService
                 else
                 {
                     var entry = archive.Entries.FirstOrDefault(e => 
-                        !e.IsDirectory && Path.GetFileName(e.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
+                        !e.IsDirectory &&
+                        !ComicConstants.IsIgnoredImportPath(e.Key ?? string.Empty) &&
+                        Path.GetFileName(e.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
                     
                     if (entry is not null)
                     {
@@ -603,6 +612,7 @@ public class ComicConverterService
                     while (reader.MoveToNextEntry())
                     {
                         if (!reader.Entry.IsDirectory && 
+                            !ComicConstants.IsIgnoredImportPath(reader.Entry.Key ?? string.Empty) &&
                             Path.GetFileName(reader.Entry.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase))
                         {
                             using (var entryStream = reader.OpenEntryStream())
@@ -628,7 +638,9 @@ public class ComicConverterService
             using (var archive = TarArchive.OpenArchive(stream))
             {
                 var entry = archive.Entries.FirstOrDefault(e => 
-                    !e.IsDirectory && Path.GetFileName(e.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
+                    !e.IsDirectory &&
+                    !ComicConstants.IsIgnoredImportPath(e.Key ?? string.Empty) &&
+                    Path.GetFileName(e.Key ?? string.Empty).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
                 
                 if (entry is null)
                 {

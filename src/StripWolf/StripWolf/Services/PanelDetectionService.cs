@@ -164,15 +164,18 @@ public class PanelDetectionService
             }
 
             bool usedBorderLayoutFallback = false;
-            if (ShouldRunPageLayoutFallback(panels))
+            bool shouldRunBorderLayoutFallback = ShouldRunPageLayoutFallback(panels);
+            bool shouldConsiderBorderLayout = shouldRunBorderLayoutFallback || ShouldConsiderBorderLayout(panels);
+            if (shouldConsiderBorderLayout)
             {
                 var borderLayoutCandidates = DetectBorderLayoutCandidates(pageIndex, grayFull, imgW, imgH, pageArea);
-                if (borderLayoutCandidates.Count > 0)
+                if (borderLayoutCandidates.Count > 0 &&
+                    (shouldRunBorderLayoutFallback || ShouldUseBorderLayout(panels, borderLayoutCandidates)))
                 {
                     panels = FilterOverlappingPanels(borderLayoutCandidates);
                     usedBorderLayoutFallback = true;
                 }
-                else if (evidenceLayoutCandidates.Count > 0)
+                else if (shouldRunBorderLayoutFallback && evidenceLayoutCandidates.Count > 0)
                 {
                     panels = FilterOverlappingPanels(evidenceLayoutCandidates);
                 }
@@ -646,6 +649,60 @@ public class PanelDetectionService
                currentSparse;
     }
 
+    private bool ShouldUseBorderLayout(List<ComicPanel> currentPanels, List<ComicPanel> borderPanels)
+    {
+        if (borderPanels.Count < 3)
+        {
+            return false;
+        }
+
+        var currentRows = BuildRows(currentPanels);
+        var borderRows = BuildRows(borderPanels);
+        bool borderRestoresRows = borderRows.Count >= currentRows.Count + 1;
+        double currentScore = ScoreLayoutSupport(currentPanels);
+        double borderScore = ScoreLayoutSupport(borderPanels);
+
+        return borderScore >= currentScore - 0.02 &&
+               borderRestoresRows;
+    }
+
+    private static bool ShouldConsiderBorderLayout(List<ComicPanel> panels)
+    {
+        if (panels.Count < 5)
+        {
+            return false;
+        }
+
+        return HasSevereRowMisalignment(panels) ||
+               (BuildRows(panels).Count <= 2 && panels.Any(panel => panel.Height >= 0.45 && panel.Width <= 0.40));
+    }
+
+    private static bool HasSevereRowMisalignment(List<ComicPanel> panels)
+    {
+        var rows = GroupPanelsIntoRows(panels)
+            .OrderBy(row => row.MinY)
+            .ToList();
+
+        foreach (var row in rows)
+        {
+            if (row.Panels.Count < 2 || row.Coverage < 0.65)
+            {
+                continue;
+            }
+
+            double minTop = row.Panels.Min(panel => panel.Y);
+            double maxTop = row.Panels.Max(panel => panel.Y);
+            double minBottom = row.Panels.Min(panel => panel.Y + panel.Height);
+            double maxBottom = row.Panels.Max(panel => panel.Y + panel.Height);
+            if ((maxTop - minTop) >= 0.08 || (maxBottom - minBottom) >= 0.16)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static double CalculatePanelCoverage(List<ComicPanel> panels)
     {
         return panels.Sum(panel => panel.Width * panel.Height);
@@ -805,90 +862,60 @@ public class PanelDetectionService
         using var darkMask = CreateDarkSeparatorMask(grayFull);
         var horizontalSeparators = FindEvidenceHorizontalSeparators(grayFull, edges, darkMask, imgW, imgH);
         var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
-        if (rowBands.Count < 2)
-        {
-            return [];
-        }
-
-        var rows = CreateLayoutRowsFromBands(
+        return CreateLayoutCandidatesFromBands(
             rowBands,
             imgH,
             (rowStart, rowEnd) =>
             {
-            double topSupport = GetMaxHorizontalBorderScore(
-                Math.Max(0, rowStart - Math.Max(4, imgH / 240)),
-                Math.Min(imgH, rowStart + Math.Max(5, imgH / 220)),
-                0,
-                imgW,
-                grayFull,
-                edges);
-            double bottomSupport = GetMaxHorizontalBorderScore(
-                Math.Max(0, rowEnd - Math.Max(5, imgH / 220)),
-                Math.Min(imgH, rowEnd + Math.Max(4, imgH / 240)),
-                0,
-                imgW,
-                grayFull,
-                edges);
-
-            bool touchesPageEdge = rowStart <= Math.Max(4, imgH / 240) || rowEnd >= imgH - Math.Max(4, imgH / 240);
-            if (!touchesPageEdge && Math.Max(topSupport, bottomSupport) < 0.24)
-            {
-                return [];
-            }
-
-            var verticalSeparators = FindEvidenceVerticalSeparators(grayFull, edges, darkMask, imgW, rowStart, rowEnd);
-            double separatorSupport = Math.Clamp((topSupport + bottomSupport) / 2.0, 0.0, 1.0);
-            return CreateLayoutPanelsForRow(
-                pageIndex,
-                rowStart,
-                rowEnd,
-                verticalSeparators,
-                imgW,
-                imgH,
-                pageArea,
-                rect =>
+                var rowSupport = GetEvidenceRowSupport(rowStart, rowEnd, grayFull, edges, imgW, imgH);
+                if (!rowSupport.HasStrongSupport)
                 {
-                    var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
-                    double confidence =
-                        (stats.GutterContrast * 0.24) +
-                        (stats.BorderEdgeDensity * 0.20) +
-                        (stats.InteriorVarianceScore * 0.15) +
-                        (stats.AreaScore * 0.10) +
-                        (stats.EdgeTouchScore * 0.06) +
-                        (separatorSupport * 0.15) +
-                        0.16;
+                    return [];
+                }
 
-                    return confidence >= 0.43 ? confidence : null;
-                });
-            });
+                var verticalSeparators = FindEvidenceVerticalSeparators(grayFull, edges, darkMask, imgW, rowStart, rowEnd);
+                double separatorSupport = rowSupport.SeparatorSupport;
+                return CreateLayoutPanelsForRow(
+                    pageIndex,
+                    rowStart,
+                    rowEnd,
+                    verticalSeparators,
+                    imgW,
+                    imgH,
+                    pageArea,
+                    rect =>
+                    {
+                        var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                        double confidence =
+                            (stats.GutterContrast * 0.24) +
+                            (stats.BorderEdgeDensity * 0.20) +
+                            (stats.InteriorVarianceScore * 0.15) +
+                            (stats.AreaScore * 0.10) +
+                            (stats.EdgeTouchScore * 0.06) +
+                            (separatorSupport * 0.15) +
+                            0.16;
 
-        if (rows.Count < 2)
-        {
-            return [];
-        }
-
-        rows = NormalizeLayoutRows(rows);
-        return rows.SelectMany(row => row.Panels).ToList();
+                        return confidence >= 0.43 ? confidence : null;
+                    });
+            },
+            normalizeRows: true,
+            minBandCount: 2,
+            minRowCount: 2,
+            minPanelCount: 0);
     }
 
     private List<ComicPanel> DetectBorderLayoutCandidates(int pageIndex, Mat grayFull, int imgW, int imgH, double pageArea)
     {
         using var darkMask = CreateDarkSeparatorMask(grayFull);
 
-        var horizontalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55);
+        var horizontalSeparators = FindHorizontalProjectionSeparators(darkMask, imgW, imgH);
         var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
-        if (rowBands.Count < 2)
-        {
-            return [];
-        }
-
-        var rows = CreateLayoutRowsFromBands(
+        return CreateLayoutCandidatesFromBands(
             rowBands,
             imgH,
             (rowStart, rowEnd) =>
             {
-                int rowHeight = rowEnd - rowStart;
-                var verticalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: rowHeight, minPeakRatio: 0.60);
+                var verticalSeparators = FindVerticalProjectionSeparators(darkMask, imgW, rowStart, rowEnd);
                 return CreateLayoutPanelsForRow(
                     pageIndex,
                     rowStart,
@@ -898,10 +925,11 @@ public class PanelDetectionService
                     imgH,
                     pageArea,
                     _ => 0.80);
-            });
-
-        var candidates = rows.SelectMany(row => row.Panels).ToList();
-        return candidates.Count >= 3 ? candidates : [];
+            },
+            normalizeRows: false,
+            minBandCount: 2,
+            minRowCount: 0,
+            minPanelCount: 3);
     }
 
     private static PagePanelInfo CreateSplashPageResult(int pageIndex, double confidence = 1.0)
@@ -1104,6 +1132,22 @@ public class PanelDetectionService
         return darkMask;
     }
 
+    private static List<(int Start, int End)> FindHorizontalProjectionSeparators(Mat darkMask, int imgW, int imgH)
+    {
+        return FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55);
+    }
+
+    private static List<(int Start, int End)> FindVerticalProjectionSeparators(Mat darkMask, int imgW, int rowStart, int rowEnd)
+    {
+        return FindStrongProjectionSeparators(
+            darkMask,
+            horizontal: false,
+            scanLength: imgW,
+            sliceStart: rowStart,
+            sliceLength: Math.Max(1, rowEnd - rowStart),
+            minPeakRatio: 0.60);
+    }
+
     private List<(int Start, int End)> FindEvidenceHorizontalSeparators(Mat grayFull, Mat edges, Mat darkMask, int imgW, int imgH)
     {
         var separators = new List<(int Start, int End)>();
@@ -1114,7 +1158,7 @@ public class PanelDetectionService
             threshold: 0.34,
             minRunLength: Math.Max(2, imgH / 220),
             mergeGap: 10));
-        separators.AddRange(FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55));
+        separators.AddRange(FindHorizontalProjectionSeparators(darkMask, imgW, imgH));
         return MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 12);
     }
 
@@ -1128,7 +1172,7 @@ public class PanelDetectionService
             threshold: 0.31,
             minRunLength: Math.Max(2, imgW / 220),
             mergeGap: 8));
-        separators.AddRange(FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: Math.Max(1, rowEnd - rowStart), minPeakRatio: 0.60));
+        separators.AddRange(FindVerticalProjectionSeparators(darkMask, imgW, rowStart, rowEnd));
 
         var merged = MergeNearbyBands(separators.OrderBy(band => band.Start).ToList(), 10);
         return merged
@@ -1461,6 +1505,35 @@ public class PanelDetectionService
         }
 
         return rows;
+    }
+
+    private static List<ComicPanel> CreateLayoutCandidatesFromBands(
+        List<(int Start, int End)> rowBands,
+        int imgH,
+        Func<int, int, List<ComicPanel>> rowPanelFactory,
+        bool normalizeRows,
+        int minBandCount,
+        int minRowCount,
+        int minPanelCount)
+    {
+        if (rowBands.Count < minBandCount)
+        {
+            return [];
+        }
+
+        var rows = CreateLayoutRowsFromBands(rowBands, imgH, rowPanelFactory);
+        if (rows.Count < minRowCount)
+        {
+            return [];
+        }
+
+        if (normalizeRows)
+        {
+            rows = NormalizeLayoutRows(rows);
+        }
+
+        var candidates = rows.SelectMany(row => row.Panels).ToList();
+        return candidates.Count >= minPanelCount ? candidates : [];
     }
 
 
@@ -1853,6 +1926,17 @@ public class PanelDetectionService
             }
 
             double panelBottom = panel.Y + panel.Height;
+            bool hasAlignedRowPeer = panels
+                .Select((other, index) => (other, index))
+                .Any(candidate => candidate.index != i &&
+                    GetHorizontalOverlapRatio(panel, candidate.other) <= 0.10 &&
+                    Math.Abs(candidate.other.Y - panel.Y) <= 0.04 &&
+                    Math.Abs((candidate.other.Y + candidate.other.Height) - panelBottom) <= 0.05);
+            if (hasAlignedRowPeer)
+            {
+                continue;
+            }
+
             var nextOverlappingPanel = panels
                 .Where((other, index) => index != i &&
                     other.Y >= panelBottom - 0.01 &&
@@ -1881,6 +1965,18 @@ public class PanelDetectionService
             int xStart = Math.Max(0, panelLeftPx + xPadding / 2);
             int xEnd = Math.Min(imgW, panelRightPx - xPadding / 2);
             if (xEnd <= xStart || nextTopPx <= panelBottomPx + 1)
+            {
+                continue;
+            }
+
+            double currentBottomSupport = GetMaxHorizontalBorderScore(
+                Math.Max(0, panelBottomPx - Math.Max(6, imgH / 240)),
+                Math.Min(imgH, panelBottomPx + Math.Max(7, imgH / 220)),
+                xStart,
+                xEnd,
+                grayFull,
+                edges);
+            if (currentBottomSupport >= 0.24)
             {
                 continue;
             }
@@ -2764,6 +2860,29 @@ public class PanelDetectionService
         return (darkRatio * 0.55) + (edgeRatio * 0.35) - (brightRatio * 0.15);
     }
 
+    private static EvidenceRowSupport GetEvidenceRowSupport(int rowStart, int rowEnd, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        double topSupport = GetMaxHorizontalBorderScore(
+            Math.Max(0, rowStart - Math.Max(4, imgH / 240)),
+            Math.Min(imgH, rowStart + Math.Max(5, imgH / 220)),
+            0,
+            imgW,
+            grayFull,
+            edges);
+        double bottomSupport = GetMaxHorizontalBorderScore(
+            Math.Max(0, rowEnd - Math.Max(5, imgH / 220)),
+            Math.Min(imgH, rowEnd + Math.Max(4, imgH / 240)),
+            0,
+            imgW,
+            grayFull,
+            edges);
+
+        bool touchesPageEdge = rowStart <= Math.Max(4, imgH / 240) || rowEnd >= imgH - Math.Max(4, imgH / 240);
+        bool hasStrongSupport = touchesPageEdge || Math.Max(topSupport, bottomSupport) >= 0.24;
+        double separatorSupport = Math.Clamp((topSupport + bottomSupport) / 2.0, 0.0, 1.0);
+        return new EvidenceRowSupport(hasStrongSupport, separatorSupport);
+    }
+
     private sealed class CandidateStats
     {
         public double AreaRatio { get; init; }
@@ -2797,6 +2916,8 @@ public class PanelDetectionService
         public double Height { get; set; } = height;
         public List<ComicPanel> Panels { get; } = panels;
     }
+
+    private readonly record struct EvidenceRowSupport(bool HasStrongSupport, double SeparatorSupport);
 
     private sealed class RowBandCandidate(double startY, double endY, double x, double width, bool touchesTopEdge, bool touchesBottomEdge)
     {

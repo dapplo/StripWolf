@@ -664,12 +664,13 @@ public class LibraryService
         }
 
         var files = Directory.GetFiles(directoryPath, "*.*", SearchOption.AllDirectories)
-            .Where(f => f.EndsWith(".cbz", StringComparison.OrdinalIgnoreCase) ||
+            .Where(f => !ComicConstants.IsIgnoredImportPath(f) &&
+                        (f.EndsWith(".cbz", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".cbr", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".cb7", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".cbt", StringComparison.OrdinalIgnoreCase) ||
                         f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".epub", StringComparison.OrdinalIgnoreCase));
+                        f.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)));
 
         using var deferredLibraryChanged = DeferLibraryChanged();
         foreach (var file in files)

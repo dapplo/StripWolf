@@ -5,6 +5,8 @@ namespace StripWolf.Services;
 /// </summary>
 public static class ComicConstants
 {
+    private const string IgnoredImportDirectoryName = "__MACOSX";
+
     /// <summary>
     /// Supported image file extensions for comic pages
     /// </summary>
@@ -36,5 +38,21 @@ public static class ComicConstants
     public static bool IsComicInfoFile(string fileName)
     {
         return Path.GetFileName(fileName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Checks if a path points to content inside an ignored import directory.
+    /// </summary>
+    public static bool IsIgnoredImportPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        return path
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment.Equals(IgnoredImportDirectoryName, StringComparison.OrdinalIgnoreCase));
     }
 }
