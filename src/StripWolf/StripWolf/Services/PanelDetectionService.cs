@@ -172,12 +172,9 @@ public class PanelDetectionService
                     panels = FilterOverlappingPanels(borderLayoutCandidates);
                     usedBorderLayoutFallback = true;
                 }
-                else
+                else if (evidenceLayoutCandidates.Count > 0)
                 {
-                    if (evidenceLayoutCandidates.Count > 0)
-                    {
-                        panels = FilterOverlappingPanels(evidenceLayoutCandidates);
-                    }
+                    panels = FilterOverlappingPanels(evidenceLayoutCandidates);
                 }
             }
 
