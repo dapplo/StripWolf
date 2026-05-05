@@ -14,6 +14,9 @@ public class PanelDetectionService
     private readonly object _cacheLock = new();
     
     private const double MinPanelSizeRatio = 0.04;
+    private const double MinPanelAreaRatio = 0.015;
+    private const double MinPanelConfidence = 0.48;
+    private const double LowConfidenceFallbackThreshold = 0.66;
 
     public async Task<PagePanelInfo> DetectPanelsAsync(string comicFilePath, int pageIndex, byte[] pageData, bool isManga = false)
     {
@@ -94,6 +97,7 @@ public class PanelDetectionService
             // 2. Edge & Structure Detection
             using var edges = new Mat();
             Cv2.Canny(blurred, edges, 50, 150);
+            using var edgesFull = new Mat(edges, new Rect(pad, pad, imgW, imgH));
 
             using var thresh = new Mat();
             Cv2.AdaptiveThreshold(blurred, thresh, 255, AdaptiveThresholdTypes.MeanC, ThresholdTypes.BinaryInv, 15, 4);
@@ -109,18 +113,21 @@ public class PanelDetectionService
             // 4. Hierarchical Contour Analysis (CComp)
             Cv2.FindContours(morph, out var contours, out var hierarchy, RetrievalModes.CComp, ContourApproximationModes.ApproxSimple);
 
-            var candidates = new List<ComicPanel>();
-            double minW = imgW * MinPanelSizeRatio;
-            double minH = imgH * MinPanelSizeRatio;
+            var contourCandidates = new List<ComicPanel>();
 
             for (int i = 0; i < contours.Length; i++)
             {
                 // CComp Hierarchy: [Next, Previous, First_Child, Parent]
-                // We only want top-level components (Parent == -1)
-                // This ignores text/details that are inside a frame
-                if (hierarchy[i].Parent != -1) continue;
-
                 var rect = Cv2.BoundingRect(contours[i]);
+                double area = Cv2.ContourArea(contours[i]);
+                double rectArea = (double)rect.Width * rect.Height;
+
+                // Prefer top-level contours, but still allow large child contours.
+                // Border-touching or broken-frame panels can end up nested in CComp.
+                if (hierarchy[i].Parent != -1 && rectArea < pageArea * 0.025 && area < pageArea * 0.015)
+                {
+                    continue;
+                }
                 
                 // Remove padding
                 int adjX = rect.X - pad;
@@ -134,30 +141,53 @@ public class PanelDetectionService
                 if (adjX + adjW > imgW) adjW = imgW - adjX;
                 if (adjY + adjH > imgH) adjH = imgH - adjY;
 
-                double area = Cv2.ContourArea(contours[i]);
-                double rectArea = (double)rect.Width * rect.Height;
-                
-                if (adjW < minW || adjH < minH) continue;
-                if (rectArea < pageArea * 0.015) continue; // Slightly stricter area
-                if (adjW > imgW * 0.98 && adjH > imgH * 0.98) continue; // Whole page is splash
-
-                // Solidity Check: Panels are rectangular boxes
-                double solidity = area / rectArea;
-                if (solidity < 0.80) continue; // Stricter solidity to ignore non-boxes
-
-                candidates.Add(new ComicPanel
+                var adjustedRect = new Rect(adjX, adjY, adjW, adjH);
+                var contourCandidate = CreateContourCandidate(pageIndex, adjustedRect, area, rectArea, grayFull, edgesFull, imgW, imgH, pageArea);
+                if (contourCandidate is not null)
                 {
-                    PageIndex = pageIndex,
-                    X = (double)adjX / imgW,
-                    Y = (double)adjY / imgH,
-                    Width = (double)adjW / imgW,
-                    Height = (double)adjH / imgH,
-                    Confidence = solidity
-                });
+                    contourCandidates.Add(contourCandidate);
+                }
             }
 
-            // 5. Filter overlaps and small artifacts
-            var panels = FilterOverlappingPanels(candidates);
+            var panels = FilterOverlappingPanels(contourCandidates);
+
+            if (ShouldRunGutterFallback(panels))
+            {
+                var gutterCandidates = DetectGutterCandidates(pageIndex, grayFull, edgesFull, imgW, imgH, pageArea);
+                panels = FilterOverlappingPanels(panels.Concat(gutterCandidates).ToList());
+            }
+
+            bool usedBorderLayoutFallback = false;
+            if (ShouldRunPageLayoutFallback(panels))
+            {
+                var borderLayoutCandidates = DetectBorderLayoutCandidates(pageIndex, grayFull, imgW, imgH, pageArea);
+                if (borderLayoutCandidates.Count > 0)
+                {
+                    panels = FilterOverlappingPanels(borderLayoutCandidates);
+                    usedBorderLayoutFallback = true;
+                }
+                else
+                {
+                    var layoutCandidates = DetectPageLayoutCandidates(pageIndex, grayFull, edgesFull, imgW, imgH, pageArea);
+                    if (layoutCandidates.Count > 0)
+                    {
+                        panels = FilterOverlappingPanels(layoutCandidates);
+                    }
+                }
+            }
+
+            panels = RemoveNestedInsetPanels(panels);
+            var recoveredPanels = RecoverMissingPanelsFromSparseRows(pageIndex, panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            if (recoveredPanels.Count > 0)
+            {
+                panels = RemoveNestedInsetPanels(FilterOverlappingPanels(panels.Concat(recoveredPanels).ToList()));
+            }
+            panels = RefinePanelsToLocalGutters(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+            if (usedBorderLayoutFallback)
+            {
+                panels = RefineBorderLayoutColumns(panels, grayFull, edgesFull, imgW, imgH, pageArea);
+                panels = RefineRowsToHorizontalBorders(panels, grayFull, edgesFull, imgW, imgH);
+            }
 
             // 6. Final Reading Order
             var sortedPanels = SortPanelsByReadingOrder(panels, isManga);
@@ -182,11 +212,389 @@ public class PanelDetectionService
         return result;
     }
 
+    private List<ComicPanel> DetectGutterCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        using var gutterMask = new Mat();
+        Cv2.AdaptiveThreshold(grayFull, gutterMask, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 31, 8);
+
+        int kernelWidth = Math.Max(5, MakeOdd(Math.Max(imgW / 90, 5)));
+        int kernelHeight = Math.Max(5, MakeOdd(Math.Max(imgH / 90, 5)));
+
+        using var mergeKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(kernelWidth, kernelHeight));
+        using var mergedContent = new Mat();
+        Cv2.MorphologyEx(gutterMask, mergedContent, MorphTypes.Close, mergeKernel, iterations: 2);
+
+        using var cleanupKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
+        using var cleanedContent = new Mat();
+        Cv2.MorphologyEx(mergedContent, cleanedContent, MorphTypes.Open, cleanupKernel, iterations: 1);
+
+        Cv2.FindContours(cleanedContent, out var contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+        var candidates = new List<ComicPanel>();
+        foreach (var contour in contours)
+        {
+            var rect = Cv2.BoundingRect(contour);
+            double area = Cv2.ContourArea(contour);
+            double rectArea = (double)rect.Width * rect.Height;
+            var candidate = CreateGutterCandidate(pageIndex, rect, area, rectArea, grayFull, edges, imgW, imgH, pageArea);
+            if (candidate is not null)
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        return candidates;
+    }
+
+    private List<ComicPanel> RecoverMissingPanelsFromSparseRows(int pageIndex, List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var candidates = new List<ComicPanel>();
+        foreach (var row in BuildRows(panels))
+        {
+            int rowStart = (int)Math.Round(row.MinY * imgH);
+            int rowEnd = (int)Math.Round(row.MaxY * imgH);
+            int rowHeight = rowEnd - rowStart;
+            if (rowHeight < Math.Max(40, imgH / 18))
+            {
+                continue;
+            }
+
+            if (row.PanelCount > 1 && row.Coverage >= 0.82)
+            {
+                continue;
+            }
+
+            var verticalGutters = FindVerticalGutters(grayFull, edges, imgW, rowStart, rowEnd);
+            var columnBands = BuildSegments(verticalGutters, imgW, Math.Max(40, imgW / 10));
+            if (columnBands.Count <= row.PanelCount)
+            {
+                continue;
+            }
+
+            foreach (var (columnStart, columnEnd) in columnBands)
+            {
+                int width = columnEnd - columnStart;
+                int height = rowHeight;
+                if (width < Math.Max(40, imgW / 12))
+                {
+                    continue;
+                }
+
+                var rect = new Rect(columnStart, rowStart, width, height);
+                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+                {
+                    continue;
+                }
+
+                if (panels.Any(existing => GetIntersectionRatio(existing, rect, imgW, imgH) > 0.55))
+                {
+                    continue;
+                }
+
+                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                double confidence =
+                    (stats.GutterContrast * 0.30) +
+                    (stats.BorderEdgeDensity * 0.15) +
+                    (stats.InteriorVarianceScore * 0.15) +
+                    (stats.AreaScore * 0.10) +
+                    (stats.EdgeTouchScore * 0.05) +
+                    0.15; // row recovery already implies structural evidence
+
+                if (confidence >= 0.45)
+                {
+                    candidates.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
+                }
+            }
+        }
+
+        return candidates;
+    }
+
+    private ComicPanel? CreateContourCandidate(int pageIndex, Rect rect, double contourArea, double rectArea, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+        {
+            return null;
+        }
+
+        double solidity = rectArea > 0 ? contourArea / rectArea : 0;
+        if (solidity < 0.65)
+        {
+            return null;
+        }
+
+        var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+        if (stats.InteriorStdDev < 6 && stats.AreaRatio < 0.08)
+        {
+            return null;
+        }
+
+        double confidence =
+            (solidity * 0.32) +
+            (stats.BorderEdgeDensity * 0.23) +
+            (stats.GutterContrast * 0.20) +
+            (stats.InteriorVarianceScore * 0.15) +
+            (stats.AreaScore * 0.05) +
+            (stats.EdgeTouchScore * 0.05);
+
+        if (confidence < MinPanelConfidence)
+        {
+            return null;
+        }
+
+        return CreatePanel(pageIndex, rect, imgW, imgH, confidence);
+    }
+
+    private ComicPanel? CreateGutterCandidate(int pageIndex, Rect rect, double contourArea, double rectArea, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+        {
+            return null;
+        }
+
+        double fillRatio = rectArea > 0 ? contourArea / rectArea : 0;
+        if (fillRatio < 0.25)
+        {
+            return null;
+        }
+
+        var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+        if (stats.GutterContrast < 0.10 && stats.BorderEdgeDensity < 0.08 && stats.EdgeTouchScore < 0.25)
+        {
+            return null;
+        }
+
+        double confidence =
+            (fillRatio * 0.15) +
+            (stats.GutterContrast * 0.35) +
+            (stats.BorderEdgeDensity * 0.15) +
+            (stats.InteriorVarianceScore * 0.20) +
+            (stats.AreaScore * 0.10) +
+            (stats.EdgeTouchScore * 0.05);
+
+        if (confidence < 0.52)
+        {
+            return null;
+        }
+
+        return CreatePanel(pageIndex, rect, imgW, imgH, confidence);
+    }
+
+    private static bool IsSensibleCandidate(Rect rect, int imgW, int imgH, double pageArea)
+    {
+        if (rect.Width <= 0 || rect.Height <= 0)
+        {
+            return false;
+        }
+
+        double minW = imgW * MinPanelSizeRatio;
+        double minH = imgH * MinPanelSizeRatio;
+        if (rect.Width < minW || rect.Height < minH)
+        {
+            return false;
+        }
+
+        double areaRatio = (rect.Width * (double)rect.Height) / pageArea;
+        if (areaRatio < MinPanelAreaRatio)
+        {
+            return false;
+        }
+
+        if (rect.Width > imgW * 0.98 && rect.Height > imgH * 0.98)
+        {
+            return false;
+        }
+
+        double aspect = Math.Max(rect.Width / (double)rect.Height, rect.Height / (double)rect.Width);
+        bool spansPage = rect.Width > imgW * 0.78 || rect.Height > imgH * 0.78;
+        if (aspect > 8.5 && !spansPage)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static ComicPanel CreatePanel(int pageIndex, Rect rect, int imgW, int imgH, double confidence)
+    {
+        return new ComicPanel
+        {
+            PageIndex = pageIndex,
+            X = (double)rect.X / imgW,
+            Y = (double)rect.Y / imgH,
+            Width = (double)rect.Width / imgW,
+            Height = (double)rect.Height / imgH,
+            Confidence = Math.Clamp(confidence, 0.0, 1.0)
+        };
+    }
+
+    private static CandidateStats MeasureCandidateStats(Rect rect, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        using var roi = new Mat(grayFull, rect);
+        Cv2.MeanStdDev(roi, out var mean, out var stdDev);
+
+        double innerMean = mean.Val0;
+        double innerStdDev = stdDev.Val0;
+        double outerMean = ComputeOuterRingMean(grayFull, rect, imgW, imgH);
+        double gutterContrast = Math.Clamp((outerMean - innerMean) / 64.0, 0.0, 1.0);
+        double borderEdgeDensity = ComputeBorderEdgeDensity(edges, rect, imgW, imgH);
+        double edgeTouchScore = ComputeEdgeTouchScore(rect, imgW, imgH);
+        double areaRatio = (rect.Width * (double)rect.Height) / pageArea;
+        double areaScore = Math.Clamp((areaRatio - MinPanelAreaRatio) / 0.12, 0.0, 1.0);
+        double interiorVarianceScore = Math.Clamp((innerStdDev - 8.0) / 32.0, 0.0, 1.0);
+
+        return new CandidateStats
+        {
+            AreaRatio = areaRatio,
+            AreaScore = areaScore,
+            BorderEdgeDensity = borderEdgeDensity,
+            EdgeTouchScore = edgeTouchScore,
+            GutterContrast = gutterContrast,
+            InteriorStdDev = innerStdDev,
+            InteriorVarianceScore = interiorVarianceScore
+        };
+    }
+
+    private static double ComputeOuterRingMean(Mat grayFull, Rect rect, int imgW, int imgH)
+    {
+        int marginX = Math.Max(4, rect.Width / 14);
+        int marginY = Math.Max(4, rect.Height / 14);
+
+        double weightedSum = 0;
+        double totalArea = 0;
+        AddRegionMean(ExpandTop(rect, marginY), grayFull, ref weightedSum, ref totalArea, imgW, imgH, countMissingAsWhite: true);
+        AddRegionMean(ExpandBottom(rect, marginY), grayFull, ref weightedSum, ref totalArea, imgW, imgH, countMissingAsWhite: true);
+        AddRegionMean(ExpandLeft(rect, marginX), grayFull, ref weightedSum, ref totalArea, imgW, imgH, countMissingAsWhite: true);
+        AddRegionMean(ExpandRight(rect, marginX), grayFull, ref weightedSum, ref totalArea, imgW, imgH, countMissingAsWhite: true);
+
+        if (totalArea <= 0)
+        {
+            return 255;
+        }
+
+        return weightedSum / totalArea;
+    }
+
+    private static void AddRegionMean(Rect rect, Mat grayFull, ref double weightedSum, ref double totalArea, int imgW, int imgH, bool countMissingAsWhite = false)
+    {
+        double expectedArea = Math.Max(0, rect.Width) * (double)Math.Max(0, rect.Height);
+        var clipped = ClipRect(rect, imgW, imgH);
+        if (clipped.Width <= 0 || clipped.Height <= 0)
+        {
+            if (countMissingAsWhite && expectedArea > 0)
+            {
+                weightedSum += 255 * expectedArea;
+                totalArea += expectedArea;
+            }
+
+            return;
+        }
+
+        using var roi = new Mat(grayFull, clipped);
+        double area = clipped.Width * (double)clipped.Height;
+        weightedSum += Cv2.Mean(roi).Val0 * area;
+        totalArea += area;
+
+        if (countMissingAsWhite && expectedArea > area)
+        {
+            double missingArea = expectedArea - area;
+            weightedSum += 255 * missingArea;
+            totalArea += missingArea;
+        }
+    }
+
+    private static Rect ExpandTop(Rect rect, int marginY) => new(rect.X, rect.Y - marginY, rect.Width, marginY);
+    private static Rect ExpandBottom(Rect rect, int marginY) => new(rect.X, rect.Bottom, rect.Width, marginY);
+    private static Rect ExpandLeft(Rect rect, int marginX) => new(rect.X - marginX, rect.Y, marginX, rect.Height);
+    private static Rect ExpandRight(Rect rect, int marginX) => new(rect.Right, rect.Y, marginX, rect.Height);
+
+    private static double ComputeEdgeTouchScore(Rect rect, int imgW, int imgH)
+    {
+        const int edgeMargin = 3;
+        double score = 0;
+
+        if (rect.X <= edgeMargin || rect.Right >= imgW - edgeMargin)
+        {
+            score += 0.5;
+        }
+
+        if (rect.Y <= edgeMargin || rect.Bottom >= imgH - edgeMargin)
+        {
+            score += 0.5;
+        }
+
+        return score;
+    }
+
+    private static double ComputeBorderEdgeDensity(Mat edges, Rect rect, int imgW, int imgH)
+    {
+        int thickness = Math.Max(2, Math.Min(6, Math.Min(rect.Width, rect.Height) / 18));
+        double edgePixels = 0;
+        double totalPixels = 0;
+
+        AddEdgeDensity(ExpandTop(rect, thickness), edges, ref edgePixels, ref totalPixels, imgW, imgH);
+        AddEdgeDensity(ExpandBottom(rect, thickness), edges, ref edgePixels, ref totalPixels, imgW, imgH);
+        AddEdgeDensity(ExpandLeft(rect, thickness), edges, ref edgePixels, ref totalPixels, imgW, imgH);
+        AddEdgeDensity(ExpandRight(rect, thickness), edges, ref edgePixels, ref totalPixels, imgW, imgH);
+
+        if (totalPixels <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(edgePixels / totalPixels, 0.0, 1.0);
+    }
+
+    private static void AddEdgeDensity(Rect rect, Mat edges, ref double edgePixels, ref double totalPixels, int imgW, int imgH)
+    {
+        var clipped = ClipRect(rect, imgW, imgH);
+        if (clipped.Width <= 0 || clipped.Height <= 0)
+        {
+            return;
+        }
+
+        using var roi = new Mat(edges, clipped);
+        double area = clipped.Width * (double)clipped.Height;
+        edgePixels += Cv2.CountNonZero(roi);
+        totalPixels += area;
+    }
+
+    private static Rect ClipRect(Rect rect, int imgW, int imgH)
+    {
+        int x = Math.Max(0, rect.X);
+        int y = Math.Max(0, rect.Y);
+        int right = Math.Min(imgW, rect.Right);
+        int bottom = Math.Min(imgH, rect.Bottom);
+        return new Rect(x, y, Math.Max(0, right - x), Math.Max(0, bottom - y));
+    }
+
+    private static int MakeOdd(int value) => value % 2 == 0 ? value + 1 : value;
+
+    private static bool ShouldRunGutterFallback(List<ComicPanel> contourPanels)
+    {
+        if (contourPanels.Count < 2)
+        {
+            return true;
+        }
+
+        return contourPanels.Average(panel => panel.Confidence) < LowConfidenceFallbackThreshold;
+    }
+
+    private static bool ShouldRunPageLayoutFallback(List<ComicPanel> panels)
+    {
+        return panels.Count == 1 &&
+               panels[0].Width >= 0.90 &&
+               panels[0].Height >= 0.85;
+    }
+
     private List<ComicPanel> FilterOverlappingPanels(List<ComicPanel> candidates)
     {
         if (candidates.Count <= 1) return candidates;
 
-        var sorted = candidates.OrderByDescending(p => p.Width * p.Height).ToList();
+        var sorted = candidates
+            .OrderByDescending(p => p.Confidence)
+            .ThenByDescending(p => p.Width * p.Height)
+            .ToList();
         var result = new List<ComicPanel>();
 
         foreach (var p in sorted)
@@ -212,8 +620,8 @@ public class PanelDetectionService
                 {
                     double intersectionArea = (x2 - x1) * (y2 - y1);
                     double pArea = p.Width * p.Height;
-                    // If p is 70% inside existing, it's likely redundant
-                    if (intersectionArea / pArea > 0.7)
+                    double existingArea = existing.Width * existing.Height;
+                    if (intersectionArea / pArea > 0.7 || intersectionArea / existingArea > 0.85)
                     {
                         keep = false;
                         break;
@@ -252,6 +660,125 @@ public class PanelDetectionService
         return result;
     }
 
+    private List<ComicPanel> DetectPageLayoutCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var horizontalGutters = FindHorizontalGuttersForLayout(grayFull, edges, imgW, imgH);
+        var rowBands = BuildSegments(horizontalGutters, imgH, Math.Max(40, imgH / 12));
+        if (rowBands.Count < 2)
+        {
+            return [];
+        }
+
+        var rows = new List<LayoutRowCandidate>();
+        foreach (var (rowStart, rowEnd) in rowBands)
+        {
+            int rowHeight = rowEnd - rowStart;
+            if (rowHeight < Math.Max(40, imgH / 14))
+            {
+                continue;
+            }
+
+            var verticalGutters = FindVerticalGuttersForLayout(grayFull, edges, imgW, rowStart, rowEnd);
+            var columnBands = BuildSegments(verticalGutters, imgW, Math.Max(40, imgW / 10));
+            if (columnBands.Count == 0)
+            {
+                continue;
+            }
+
+            var rowPanels = new List<ComicPanel>();
+            foreach (var (columnStart, columnEnd) in columnBands)
+            {
+                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowEnd - rowStart);
+                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+                {
+                    continue;
+                }
+
+                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
+                double confidence =
+                    (stats.GutterContrast * 0.30) +
+                    (stats.BorderEdgeDensity * 0.15) +
+                    (stats.InteriorVarianceScore * 0.15) +
+                    (stats.AreaScore * 0.10) +
+                    (stats.EdgeTouchScore * 0.05) +
+                    0.20;
+
+                if (confidence >= 0.42)
+                {
+                    rowPanels.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
+                }
+            }
+
+            if (rowPanels.Count > 0)
+            {
+                rows.Add(new LayoutRowCandidate(rowStart / (double)imgH, rowHeight / (double)imgH, rowPanels));
+            }
+        }
+
+        var multiPanelHeights = rows
+            .Where(row => row.Panels.Count > 1)
+            .Select(row => row.Height)
+            .OrderBy(height => height)
+            .ToList();
+
+        if (multiPanelHeights.Count > 1)
+        {
+            double medianMultiPanelHeight = multiPanelHeights[multiPanelHeights.Count / 2];
+            rows = rows
+                .Where(row => row.Panels.Count == 1 || row.Height >= medianMultiPanelHeight * 0.65)
+                .ToList();
+        }
+
+        rows = NormalizeLayoutRows(rows);
+        return rows.SelectMany(row => row.Panels).ToList();
+    }
+
+    private List<ComicPanel> DetectBorderLayoutCandidates(int pageIndex, Mat grayFull, int imgW, int imgH, double pageArea)
+    {
+        using var darkMask = new Mat();
+        Cv2.AdaptiveThreshold(grayFull, darkMask, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 21, 7);
+
+        using var cleanupKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
+        Cv2.MorphologyEx(darkMask, darkMask, MorphTypes.Close, cleanupKernel, iterations: 1);
+
+        var horizontalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: true, scanLength: imgH, sliceStart: 0, sliceLength: imgW, minPeakRatio: 0.55);
+        var rowBands = BuildSegments(horizontalSeparators, imgH, Math.Max(40, imgH / 12));
+        if (rowBands.Count < 2)
+        {
+            return [];
+        }
+
+        var candidates = new List<ComicPanel>();
+        foreach (var (rowStart, rowEnd) in rowBands)
+        {
+            int rowHeight = rowEnd - rowStart;
+            if (rowHeight < Math.Max(40, imgH / 14))
+            {
+                continue;
+            }
+
+            var verticalSeparators = FindStrongProjectionSeparators(darkMask, horizontal: false, scanLength: imgW, sliceStart: rowStart, sliceLength: rowHeight, minPeakRatio: 0.60);
+            var columnBands = BuildSegments(verticalSeparators, imgW, Math.Max(40, imgW / 10));
+            if (columnBands.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var (columnStart, columnEnd) in columnBands)
+            {
+                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowHeight);
+                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
+                {
+                    continue;
+                }
+
+                candidates.Add(CreatePanel(pageIndex, rect, imgW, imgH, 0.80));
+            }
+        }
+
+        return candidates.Count >= 3 ? candidates : [];
+    }
+
     private static PagePanelInfo CreateSplashPageResult(int pageIndex, double confidence = 1.0)
     {
         return new PagePanelInfo
@@ -269,5 +796,1082 @@ public class PanelDetectionService
                 }
             }
         };
+    }
+
+    private static List<(int Start, int End)> FindHorizontalGutters(Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        var gutters = new List<(int Start, int End)>();
+        int? runStart = null;
+        for (int y = 0; y < imgH; y++)
+        {
+            bool isGutter = IsHorizontalGutterRow(grayFull, edges, y, imgW);
+            if (isGutter)
+            {
+                runStart ??= y;
+            }
+            else if (runStart.HasValue)
+            {
+                int runEnd = y;
+                if (runEnd - runStart.Value >= Math.Max(6, imgH / 120))
+                {
+                    gutters.Add((runStart.Value, runEnd));
+                }
+
+                runStart = null;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            int runEnd = imgH;
+            if (runEnd - runStart.Value >= Math.Max(6, imgH / 120))
+            {
+                gutters.Add((runStart.Value, runEnd));
+            }
+        }
+
+        return gutters;
+    }
+
+    private static List<(int Start, int End)> FindStrongProjectionSeparators(Mat darkMask, bool horizontal, int scanLength, int sliceStart, int sliceLength, double minPeakRatio)
+    {
+        if (scanLength <= 0 || sliceLength <= 0)
+        {
+            return [];
+        }
+
+        var ratios = new double[scanLength];
+        for (int i = 0; i < scanLength; i++)
+        {
+            if (horizontal)
+            {
+                using var line = new Mat(darkMask, new Rect(0, i, sliceLength, 1));
+                ratios[i] = Cv2.CountNonZero(line) / (double)sliceLength;
+            }
+            else
+            {
+                using var line = new Mat(darkMask, new Rect(i, sliceStart, 1, sliceLength));
+                ratios[i] = Cv2.CountNonZero(line) / (double)sliceLength;
+            }
+        }
+
+        var smoothed = SmoothProjection(ratios);
+        var bands = new List<(int Start, int End)>();
+
+        for (int i = 1; i < smoothed.Length - 1; i++)
+        {
+            double value = smoothed[i];
+            if (value < minPeakRatio || value < smoothed[i - 1] || value < smoothed[i + 1])
+            {
+                continue;
+            }
+
+            double bandThreshold = Math.Max(minPeakRatio * 0.60, 0.25);
+            int bandStart = i;
+            while (bandStart > 0 && smoothed[bandStart - 1] >= bandThreshold)
+            {
+                bandStart--;
+            }
+
+            int bandEnd = i;
+            while (bandEnd < smoothed.Length - 1 && smoothed[bandEnd + 1] >= bandThreshold)
+            {
+                bandEnd++;
+            }
+
+            var band = (bandStart, bandEnd + 1);
+            if (bands.Count == 0 || band.Item1 > bands[^1].End)
+            {
+                bands.Add(band);
+            }
+        }
+
+        if (bands.Count == 0)
+        {
+            int? runStart = null;
+            for (int i = 0; i < smoothed.Length; i++)
+            {
+                if (smoothed[i] >= minPeakRatio)
+                {
+                    runStart ??= i;
+                }
+                else if (runStart.HasValue)
+                {
+                    bands.Add((runStart.Value, i));
+                    runStart = null;
+                }
+            }
+
+            if (runStart.HasValue)
+            {
+                bands.Add((runStart.Value, scanLength));
+            }
+        }
+
+        return MergeNearbyBands(bands, horizontal ? 12 : 18);
+    }
+
+    private static double[] SmoothProjection(double[] values)
+    {
+        if (values.Length <= 2)
+        {
+            return values;
+        }
+
+        var result = new double[values.Length];
+        for (int i = 0; i < values.Length; i++)
+        {
+            double sum = 0;
+            int count = 0;
+            for (int offset = -2; offset <= 2; offset++)
+            {
+                int index = i + offset;
+                if (index < 0 || index >= values.Length)
+                {
+                    continue;
+                }
+
+                sum += values[index];
+                count++;
+            }
+
+            result[i] = sum / count;
+        }
+
+        return result;
+    }
+
+    private static List<(int Start, int End)> MergeNearbyBands(List<(int Start, int End)> bands, int maxGap)
+    {
+        if (bands.Count <= 1)
+        {
+            return bands;
+        }
+
+        var merged = new List<(int Start, int End)>();
+        var ordered = bands.OrderBy(band => band.Start).ToList();
+        var current = ordered[0];
+        for (int i = 1; i < ordered.Count; i++)
+        {
+            var next = ordered[i];
+            if (next.Start - current.End <= maxGap)
+            {
+                current = (current.Start, Math.Max(current.End, next.End));
+            }
+            else
+            {
+                merged.Add(current);
+                current = next;
+            }
+        }
+
+        merged.Add(current);
+        return merged;
+    }
+
+    private static List<(int Start, int End)> FindHorizontalGuttersForLayout(Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        var gutters = new List<(int Start, int End)>();
+        int? runStart = null;
+        for (int y = 0; y < imgH; y++)
+        {
+            bool isGutter = IsHorizontalLayoutGutterRow(grayFull, edges, y, imgW);
+            if (isGutter)
+            {
+                runStart ??= y;
+            }
+            else if (runStart.HasValue)
+            {
+                int runEnd = y;
+                if (runEnd - runStart.Value >= Math.Max(4, imgH / 180))
+                {
+                    gutters.Add((runStart.Value, runEnd));
+                }
+
+                runStart = null;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            int runEnd = imgH;
+            if (runEnd - runStart.Value >= Math.Max(4, imgH / 180))
+            {
+                gutters.Add((runStart.Value, runEnd));
+            }
+        }
+
+        return gutters;
+    }
+
+    private static List<(int Start, int End)> FindVerticalGutters(Mat grayFull, Mat edges, int imgW, int rowStart, int rowEnd)
+    {
+        var gutters = new List<(int Start, int End)>();
+        int? runStart = null;
+        for (int x = 0; x < imgW; x++)
+        {
+            bool isGutter = IsVerticalGutterColumn(grayFull, edges, x, rowStart, rowEnd);
+            if (isGutter)
+            {
+                runStart ??= x;
+            }
+            else if (runStart.HasValue)
+            {
+                int runEnd = x;
+                if (runEnd - runStart.Value >= Math.Max(6, imgW / 160))
+                {
+                    gutters.Add((runStart.Value, runEnd));
+                }
+
+                runStart = null;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            int runEnd = imgW;
+            if (runEnd - runStart.Value >= Math.Max(6, imgW / 160))
+            {
+                gutters.Add((runStart.Value, runEnd));
+            }
+        }
+
+        return gutters;
+    }
+
+    private static List<(int Start, int End)> FindVerticalGuttersForLayout(Mat grayFull, Mat edges, int imgW, int rowStart, int rowEnd)
+    {
+        var gutters = new List<(int Start, int End)>();
+        int? runStart = null;
+        for (int x = 0; x < imgW; x++)
+        {
+            bool isGutter = IsVerticalLayoutGutterColumn(grayFull, edges, x, rowStart, rowEnd);
+            if (isGutter)
+            {
+                runStart ??= x;
+            }
+            else if (runStart.HasValue)
+            {
+                int runEnd = x;
+                if (runEnd - runStart.Value >= Math.Max(4, imgW / 220))
+                {
+                    gutters.Add((runStart.Value, runEnd));
+                }
+
+                runStart = null;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            int runEnd = imgW;
+            if (runEnd - runStart.Value >= Math.Max(4, imgW / 220))
+            {
+                gutters.Add((runStart.Value, runEnd));
+            }
+        }
+
+        return gutters;
+    }
+
+    private static bool IsHorizontalGutterRow(Mat grayFull, Mat edges, int y, int imgW)
+    {
+        int brightPixels = 0;
+        int edgePixels = 0;
+
+        for (int x = 0; x < imgW; x++)
+        {
+            if (grayFull.At<byte>(y, x) >= 220)
+            {
+                brightPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)imgW;
+        double edgeRatio = edgePixels / (double)imgW;
+        return brightRatio >= 0.85 && edgeRatio <= 0.06;
+    }
+
+    private static bool IsHorizontalLayoutGutterRow(Mat grayFull, Mat edges, int y, int imgW)
+    {
+        int brightPixels = 0;
+        int edgePixels = 0;
+        int veryDarkPixels = 0;
+
+        for (int x = 0; x < imgW; x++)
+        {
+            byte pixel = grayFull.At<byte>(y, x);
+            if (pixel >= 200)
+            {
+                brightPixels++;
+            }
+
+            if (pixel <= 80)
+            {
+                veryDarkPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)imgW;
+        double darkRatio = veryDarkPixels / (double)imgW;
+        double edgeRatio = edgePixels / (double)imgW;
+        return brightRatio >= 0.68 && darkRatio <= 0.14 && edgeRatio <= 0.18;
+    }
+
+    private static bool IsVerticalGutterColumn(Mat grayFull, Mat edges, int x, int rowStart, int rowEnd)
+    {
+        int brightPixels = 0;
+        int edgePixels = 0;
+        int height = Math.Max(1, rowEnd - rowStart);
+
+        for (int y = rowStart; y < rowEnd; y++)
+        {
+            if (grayFull.At<byte>(y, x) >= 220)
+            {
+                brightPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)height;
+        double edgeRatio = edgePixels / (double)height;
+        return brightRatio >= 0.80 && edgeRatio <= 0.08;
+    }
+
+    private static bool IsVerticalLayoutGutterColumn(Mat grayFull, Mat edges, int x, int rowStart, int rowEnd)
+    {
+        int brightPixels = 0;
+        int edgePixels = 0;
+        int veryDarkPixels = 0;
+        int height = Math.Max(1, rowEnd - rowStart);
+
+        for (int y = rowStart; y < rowEnd; y++)
+        {
+            byte pixel = grayFull.At<byte>(y, x);
+            if (pixel >= 195)
+            {
+                brightPixels++;
+            }
+
+            if (pixel <= 80)
+            {
+                veryDarkPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)height;
+        double darkRatio = veryDarkPixels / (double)height;
+        double edgeRatio = edgePixels / (double)height;
+        return brightRatio >= 0.64 && darkRatio <= 0.18 && edgeRatio <= 0.22;
+    }
+
+    private static List<(int Start, int End)> BuildSegments(List<(int Start, int End)> gutters, int totalLength, int minSegmentSize)
+    {
+        var segments = new List<(int Start, int End)>();
+        int currentStart = 0;
+
+        foreach (var (gutterStart, gutterEnd) in gutters.OrderBy(gutter => gutter.Start))
+        {
+            if (gutterStart - currentStart >= minSegmentSize)
+            {
+                segments.Add((currentStart, gutterStart));
+            }
+
+            currentStart = gutterEnd;
+        }
+
+        if (totalLength - currentStart >= minSegmentSize)
+        {
+            segments.Add((currentStart, totalLength));
+        }
+
+        return segments;
+    }
+
+
+    private List<ComicPanel> RefinePanelsToLocalGutters(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        if (panels.Count < 5)
+        {
+            return panels;
+        }
+
+        var rows = GroupPanelsIntoRows(panels);
+        var adjustedPanels = new List<ComicPanel>();
+        foreach (var row in rows)
+        {
+            row.Panels.Sort((left, right) => left.X.CompareTo(right.X));
+            int rowStart = Math.Max(0, (int)Math.Round(row.MinY * imgH));
+            int rowEnd = Math.Min(imgH, (int)Math.Round(row.MaxY * imgH));
+            var rowPanels = row.Panels
+                .Select(panel => new ComicPanel
+                {
+                    PageIndex = panel.PageIndex,
+                    PanelIndex = panel.PanelIndex,
+                    X = panel.X,
+                    Y = panel.Y,
+                    Width = panel.Width,
+                    Height = panel.Height,
+                    Confidence = panel.Confidence
+                })
+                .ToList();
+
+            for (int i = 0; i < rowPanels.Count - 1; i++)
+            {
+                var leftPanel = rowPanels[i];
+                var rightPanel = rowPanels[i + 1];
+                var gutterRun = FindLocalGutterRun(leftPanel, rightPanel, rowStart, rowEnd, grayFull, edges, imgW, imgH, pageArea);
+                if (gutterRun is null)
+                {
+                    continue;
+                }
+
+                var (gutterStart, gutterEnd) = gutterRun.Value;
+                double leftX = leftPanel.X;
+                double leftY = leftPanel.Y;
+                double leftHeight = leftPanel.Height;
+                double leftNewWidth = gutterStart - leftX;
+                double rightRight = rightPanel.X + rightPanel.Width;
+                double rightNewX = gutterEnd;
+                double rightNewWidth = rightRight - rightNewX;
+
+                if (leftNewWidth <= MinPanelSizeRatio || rightNewWidth <= MinPanelSizeRatio)
+                {
+                    continue;
+                }
+
+                rowPanels[i] = CreateAdjustedPanel(leftPanel, leftX, leftY, leftNewWidth, leftHeight);
+                rowPanels[i + 1] = CreateAdjustedPanel(rightPanel, rightNewX, rightPanel.Y, rightNewWidth, rightPanel.Height);
+            }
+
+            adjustedPanels.AddRange(rowPanels);
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(adjustedPanels));
+    }
+
+    private List<ComicPanel> RefineRowsToHorizontalBorders(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH)
+    {
+        var rows = GroupPanelsIntoRows(panels)
+            .OrderBy(row => row.MinY)
+            .ToList();
+        if (rows.Count <= 1)
+        {
+            return panels;
+        }
+
+        int searchPadding = Math.Max(18, imgH / 12);
+        var topAnchors = new int[rows.Count];
+        var bottomAnchors = new int[rows.Count];
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            int currentTop = Math.Max(0, (int)Math.Round(row.MinY * imgH));
+            int currentBottom = Math.Min(imgH, (int)Math.Round(row.MaxY * imgH));
+            int previousBottom = i > 0
+                ? Math.Max(0, (int)Math.Round(rows[i - 1].MaxY * imgH))
+                : currentTop;
+            int nextTop = i < rows.Count - 1
+                ? Math.Min(imgH, (int)Math.Round(rows[i + 1].MinY * imgH))
+                : currentBottom;
+            int xStart = Math.Max(0, (int)Math.Round(row.Panels.Min(panel => panel.X) * imgW) - Math.Max(12, imgW / 40));
+            int xEnd = Math.Min(imgW, (int)Math.Round(row.Panels.Max(panel => panel.X + panel.Width) * imgW) + Math.Max(12, imgW / 40));
+
+            int topSearchStart = i > 0
+                ? Math.Max(0, previousBottom - searchPadding)
+                : Math.Max(0, currentTop - searchPadding);
+            int topSearchEnd = Math.Min(imgH, currentTop + searchPadding);
+            int bottomSearchStart = Math.Max(0, currentBottom - searchPadding);
+            int bottomSearchEnd = i < rows.Count - 1
+                ? Math.Min(imgH, nextTop + searchPadding)
+                : Math.Min(imgH, currentBottom + searchPadding);
+
+            topAnchors[i] = FindBestHorizontalBorder(topSearchStart, topSearchEnd, xStart, xEnd, grayFull, edges) ?? currentTop;
+            bottomAnchors[i] = FindBestHorizontalBorder(bottomSearchStart, bottomSearchEnd, xStart, xEnd, grayFull, edges) ?? currentBottom;
+        }
+
+        var boundaries = new int[rows.Count + 1];
+        boundaries[0] = topAnchors[0];
+        boundaries[^1] = bottomAnchors[^1];
+        for (int i = 0; i < rows.Count - 1; i++)
+        {
+            int sharedBoundary = (int)Math.Round((bottomAnchors[i] + topAnchors[i + 1]) / 2.0);
+            sharedBoundary = Math.Max(boundaries[i] + 1, sharedBoundary);
+            boundaries[i + 1] = sharedBoundary;
+        }
+
+        for (int i = 1; i < boundaries.Length; i++)
+        {
+            boundaries[i] = Math.Max(boundaries[i], boundaries[i - 1] + 1);
+        }
+
+        var adjustedPanels = new List<ComicPanel>();
+        for (int i = 0; i < rows.Count; i++)
+        {
+            double newY = boundaries[i] / (double)imgH;
+            double newHeight = (boundaries[i + 1] - boundaries[i]) / (double)imgH;
+            if (newHeight <= MinPanelSizeRatio)
+            {
+                adjustedPanels.AddRange(rows[i].Panels);
+                continue;
+            }
+
+            adjustedPanels.AddRange(rows[i].Panels.Select(panel =>
+                CreateAdjustedPanel(panel, panel.X, newY, panel.Width, newHeight)));
+        }
+
+        return FilterOverlappingPanels(adjustedPanels);
+    }
+
+    private List<ComicPanel> RefineBorderLayoutColumns(List<ComicPanel> panels, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        var refinedPanels = new List<ComicPanel>();
+        foreach (var row in GroupPanelsIntoRows(panels).OrderBy(row => row.MinY))
+        {
+            var rowPanels = row.Panels
+                .OrderBy(panel => panel.X)
+                .Select(panel => CreateAdjustedPanel(panel, panel.X, panel.Y, panel.Width, panel.Height))
+                .ToList();
+            if (rowPanels.Count == 0)
+            {
+                continue;
+            }
+
+            int rowStart = Math.Max(0, (int)Math.Round(rowPanels.Min(panel => panel.Y) * imgH));
+            int rowEnd = Math.Min(imgH, (int)Math.Round(rowPanels.Max(panel => panel.Y + panel.Height) * imgH));
+
+            bool merged;
+            do
+            {
+                merged = false;
+                for (int i = 0; i < rowPanels.Count - 1; i++)
+                {
+                    var leftPanel = rowPanels[i];
+                    var rightPanel = rowPanels[i + 1];
+                    var gutterRun = FindLocalGutterRun(leftPanel, rightPanel, rowStart, rowEnd, grayFull, edges, imgW, imgH, pageArea);
+                    if (gutterRun is not null || !ShouldMergeAdjacentBorderPanels(leftPanel, rightPanel, rowPanels.Count))
+                    {
+                        continue;
+                    }
+
+                    double mergedX = leftPanel.X;
+                    double mergedY = Math.Min(leftPanel.Y, rightPanel.Y);
+                    double mergedRight = Math.Max(leftPanel.X + leftPanel.Width, rightPanel.X + rightPanel.Width);
+                    double mergedBottom = Math.Max(leftPanel.Y + leftPanel.Height, rightPanel.Y + rightPanel.Height);
+                    rowPanels[i] = CreateAdjustedPanel(leftPanel, mergedX, mergedY, mergedRight - mergedX, mergedBottom - mergedY);
+                    rowPanels.RemoveAt(i + 1);
+                    merged = true;
+                    break;
+                }
+            } while (merged);
+
+            int searchPadding = Math.Max(20, imgW / 8);
+            int leftEdge = (int)Math.Round(rowPanels[0].X * imgW);
+            int rightEdge = (int)Math.Round((rowPanels[^1].X + rowPanels[^1].Width) * imgW);
+
+            int snappedLeft = FindBestVerticalBorder(
+                Math.Max(0, leftEdge - searchPadding),
+                Math.Min(imgW, leftEdge + Math.Max(20, searchPadding / 2)),
+                rowStart,
+                rowEnd,
+                grayFull,
+                edges) ?? leftEdge;
+
+            int snappedRight = FindBestVerticalBorder(
+                Math.Max(0, rightEdge - Math.Max(20, searchPadding / 2)),
+                Math.Min(imgW, rightEdge + searchPadding),
+                rowStart,
+                rowEnd,
+                grayFull,
+                edges) ?? rightEdge;
+
+            if (snappedLeft < leftEdge)
+            {
+                var first = rowPanels[0];
+                double newX = snappedLeft / (double)imgW;
+                double newWidth = (first.X + first.Width) - newX;
+                if (newWidth > MinPanelSizeRatio)
+                {
+                    rowPanels[0] = CreateAdjustedPanel(first, newX, first.Y, newWidth, first.Height);
+                }
+            }
+
+            if (snappedRight > rightEdge)
+            {
+                var last = rowPanels[^1];
+                double newRight = snappedRight / (double)imgW;
+                double newWidth = newRight - last.X;
+                if (newWidth > MinPanelSizeRatio)
+                {
+                    rowPanels[^1] = CreateAdjustedPanel(last, last.X, last.Y, newWidth, last.Height);
+                }
+            }
+
+            refinedPanels.AddRange(rowPanels);
+        }
+
+        return RemoveNestedInsetPanels(FilterOverlappingPanels(refinedPanels));
+    }
+
+    private static List<RowBand> BuildRows(List<ComicPanel> panels)
+    {
+        var rows = new List<RowBand>();
+        foreach (var panel in panels.OrderBy(panel => panel.Y))
+        {
+            var panelTop = panel.Y;
+            var panelBottom = panel.Y + panel.Height;
+            var existingRow = rows.FirstOrDefault(row => panelTop < row.MaxY && panelBottom > row.MinY);
+            if (existingRow is null)
+            {
+                rows.Add(new RowBand(panelTop, panelBottom, panel.Width));
+            }
+            else
+            {
+                existingRow.MinY = Math.Min(existingRow.MinY, panelTop);
+                existingRow.MaxY = Math.Max(existingRow.MaxY, panelBottom);
+                existingRow.Coverage += panel.Width;
+                existingRow.PanelCount++;
+            }
+        }
+
+        return rows;
+    }
+
+    private static List<PanelRow> GroupPanelsIntoRows(List<ComicPanel> panels)
+    {
+        var rows = new List<PanelRow>();
+        foreach (var panel in panels.OrderBy(panel => panel.Y))
+        {
+            var panelTop = panel.Y;
+            var panelBottom = panel.Y + panel.Height;
+            var row = rows.FirstOrDefault(existing => panelTop < existing.MaxY && panelBottom > existing.MinY);
+            if (row is null)
+            {
+                rows.Add(new PanelRow(panel));
+            }
+            else
+            {
+                row.MinY = Math.Min(row.MinY, panelTop);
+                row.MaxY = Math.Max(row.MaxY, panelBottom);
+                row.Coverage += panel.Width;
+                row.Panels.Add(panel);
+            }
+        }
+
+        return rows;
+    }
+
+    private static List<ComicPanel> RemoveNestedInsetPanels(List<ComicPanel> panels)
+    {
+        if (panels.Count <= 1)
+        {
+            return panels;
+        }
+
+        var result = new List<ComicPanel>();
+        foreach (var panel in panels.OrderByDescending(candidate => candidate.Width * candidate.Height))
+        {
+            bool isNestedInset = panels.Any(other =>
+                !ReferenceEquals(other, panel) &&
+                (other.Width * other.Height) > (panel.Width * panel.Height) * 2.0 &&
+                GetIntersectionRatio(panel, other) > 0.92 &&
+                !TouchesPageEdge(panel) &&
+                panel.Confidence <= other.Confidence + 0.10);
+
+            if (!isNestedInset)
+            {
+                result.Add(panel);
+            }
+        }
+
+        return result;
+    }
+
+    private static double GetIntersectionRatio(ComicPanel panel, Rect rect, int imgW, int imgH)
+    {
+        double panelX = panel.X * imgW;
+        double panelY = panel.Y * imgH;
+        double panelW = panel.Width * imgW;
+        double panelH = panel.Height * imgH;
+
+        double x1 = Math.Max(panelX, rect.X);
+        double y1 = Math.Max(panelY, rect.Y);
+        double x2 = Math.Min(panelX + panelW, rect.X + rect.Width);
+        double y2 = Math.Min(panelY + panelH, rect.Y + rect.Height);
+
+        if (x2 <= x1 || y2 <= y1)
+        {
+            return 0;
+        }
+
+        double intersectionArea = (x2 - x1) * (y2 - y1);
+        return intersectionArea / (rect.Width * (double)rect.Height);
+    }
+
+    private static double GetIntersectionRatio(ComicPanel panel, ComicPanel other)
+    {
+        double x1 = Math.Max(panel.X, other.X);
+        double y1 = Math.Max(panel.Y, other.Y);
+        double x2 = Math.Min(panel.X + panel.Width, other.X + other.Width);
+        double y2 = Math.Min(panel.Y + panel.Height, other.Y + other.Height);
+
+        if (x2 <= x1 || y2 <= y1)
+        {
+            return 0;
+        }
+
+        double intersectionArea = (x2 - x1) * (y2 - y1);
+        return intersectionArea / (panel.Width * panel.Height);
+    }
+
+    private static bool TouchesPageEdge(ComicPanel panel)
+    {
+        return panel.X <= 0.01 || panel.Y <= 0.01 || panel.X + panel.Width >= 0.99 || panel.Y + panel.Height >= 0.99;
+    }
+
+    private (double Start, double End)? FindLocalGutterRun(ComicPanel leftPanel, ComicPanel rightPanel, int rowStart, int rowEnd, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
+    {
+        int currentRight = (int)Math.Round((leftPanel.X + leftPanel.Width) * imgW);
+        int currentLeft = (int)Math.Round(rightPanel.X * imgW);
+        int searchPadding = Math.Max(8, imgW / 40);
+        int searchStart = Math.Max(0, currentRight - searchPadding);
+        int searchEnd = Math.Min(imgW - 1, currentLeft + searchPadding);
+        if (searchEnd <= searchStart)
+        {
+            return null;
+        }
+
+        int? bestStart = null;
+        int? bestEnd = null;
+        double bestScore = double.MinValue;
+        int? runStart = null;
+        double runScore = 0;
+        int runCount = 0;
+
+        for (int x = searchStart; x <= searchEnd; x++)
+        {
+            double score = ScoreVerticalGutterColumn(grayFull, edges, x, rowStart, rowEnd);
+            bool qualifies = score >= 0.38;
+            if (qualifies)
+            {
+                runStart ??= x;
+                runScore += score;
+                runCount++;
+            }
+            else if (runStart.HasValue)
+            {
+                int runEnd = x;
+                double averageScore = runScore / Math.Max(1, runCount);
+                double widthScore = Math.Min(1.0, (runEnd - runStart.Value) / (double)Math.Max(4, imgW / 150));
+                double center = (runStart.Value + runEnd) / 2.0;
+                double currentCenter = (currentRight + currentLeft) / 2.0;
+                double distancePenalty = Math.Abs(center - currentCenter) / Math.Max(20.0, searchEnd - searchStart);
+                double candidateScore = averageScore + widthScore - distancePenalty;
+
+                if (candidateScore > bestScore)
+                {
+                    bestScore = candidateScore;
+                    bestStart = runStart.Value;
+                    bestEnd = runEnd;
+                }
+
+                runStart = null;
+                runScore = 0;
+                runCount = 0;
+            }
+        }
+
+        if (runStart.HasValue)
+        {
+            int runEnd = searchEnd + 1;
+            double averageScore = runScore / Math.Max(1, runCount);
+            double widthScore = Math.Min(1.0, (runEnd - runStart.Value) / (double)Math.Max(4, imgW / 150));
+            double center = (runStart.Value + runEnd) / 2.0;
+            double currentCenter = (currentRight + currentLeft) / 2.0;
+            double distancePenalty = Math.Abs(center - currentCenter) / Math.Max(20.0, searchEnd - searchStart);
+            double candidateScore = averageScore + widthScore - distancePenalty;
+
+            if (candidateScore > bestScore)
+            {
+                bestScore = candidateScore;
+                bestStart = runStart.Value;
+                bestEnd = runEnd;
+            }
+        }
+
+        if (!bestStart.HasValue || !bestEnd.HasValue)
+        {
+            return null;
+        }
+
+        double start = bestStart.Value / (double)imgW;
+        double end = bestEnd.Value / (double)imgW;
+        var leftRect = new Rect(
+            (int)Math.Round(leftPanel.X * imgW),
+            rowStart,
+            Math.Max(1, (int)Math.Round((start - leftPanel.X) * imgW)),
+            Math.Max(1, rowEnd - rowStart));
+        var rightRect = new Rect(
+            (int)Math.Round(start * imgW),
+            rowStart,
+            Math.Max(1, (int)Math.Round(((rightPanel.X + rightPanel.Width) - end) * imgW)),
+            Math.Max(1, rowEnd - rowStart));
+
+        if (!IsSensibleCandidate(leftRect, imgW, imgH, pageArea) || !IsSensibleCandidate(rightRect, imgW, imgH, pageArea))
+        {
+            return null;
+        }
+
+        return (start, end);
+    }
+
+    private static ComicPanel CreateAdjustedPanel(ComicPanel source, double x, double y, double width, double height)
+    {
+        return new ComicPanel
+        {
+            PageIndex = source.PageIndex,
+            PanelIndex = source.PanelIndex,
+            X = x,
+            Y = y,
+            Width = width,
+            Height = height,
+            Confidence = source.Confidence
+        };
+    }
+
+    private static double ScoreVerticalGutterColumn(Mat grayFull, Mat edges, int x, int rowStart, int rowEnd)
+    {
+        int brightPixels = 0;
+        int edgePixels = 0;
+        int height = Math.Max(1, rowEnd - rowStart);
+
+        for (int y = rowStart; y < rowEnd; y++)
+        {
+            if (grayFull.At<byte>(y, x) >= 220)
+            {
+                brightPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)height;
+        double edgeRatio = edgePixels / (double)height;
+        return brightRatio - (edgeRatio * 1.25);
+    }
+
+    private static bool ShouldMergeAdjacentBorderPanels(ComicPanel leftPanel, ComicPanel rightPanel, int rowPanelCount)
+    {
+        if (rowPanelCount <= 1)
+        {
+            return false;
+        }
+
+        double smallerWidth = Math.Min(leftPanel.Width, rightPanel.Width);
+        double largerWidth = Math.Max(leftPanel.Width, rightPanel.Width);
+        return smallerWidth <= 0.22 || smallerWidth <= largerWidth * 0.55;
+    }
+
+    private static int? FindBestVerticalBorder(int searchStart, int searchEnd, int rowStart, int rowEnd, Mat grayFull, Mat edges)
+    {
+        if (searchEnd <= searchStart || rowEnd <= rowStart)
+        {
+            return null;
+        }
+
+        int bestX = -1;
+        double bestScore = 0.22;
+        for (int x = searchStart; x < searchEnd; x++)
+        {
+            double score = ScoreVerticalBorderColumn(grayFull, edges, x, rowStart, rowEnd);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestX = x;
+            }
+        }
+
+        return bestX >= 0 ? bestX : null;
+    }
+
+    private static double ScoreVerticalBorderColumn(Mat grayFull, Mat edges, int x, int rowStart, int rowEnd)
+    {
+        int brightPixels = 0;
+        int darkPixels = 0;
+        int edgePixels = 0;
+        int height = Math.Max(1, rowEnd - rowStart);
+
+        for (int y = rowStart; y < rowEnd; y++)
+        {
+            byte gray = grayFull.At<byte>(y, x);
+            if (gray >= 215)
+            {
+                brightPixels++;
+            }
+
+            if (gray <= 60)
+            {
+                darkPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)height;
+        double darkRatio = darkPixels / (double)height;
+        double edgeRatio = edgePixels / (double)height;
+        return (darkRatio * 0.55) + (edgeRatio * 0.35) - (brightRatio * 0.15);
+    }
+
+    private static int? FindBestHorizontalBorder(int searchStart, int searchEnd, int xStart, int xEnd, Mat grayFull, Mat edges)
+    {
+        if (searchEnd <= searchStart || xEnd <= xStart)
+        {
+            return null;
+        }
+
+        int bestY = -1;
+        double bestScore = 0.22;
+        for (int y = searchStart; y < searchEnd; y++)
+        {
+            double score = ScoreHorizontalBorderRow(grayFull, edges, y, xStart, xEnd);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestY = y;
+            }
+        }
+
+        return bestY >= 0 ? bestY : null;
+    }
+
+    private static double ScoreHorizontalBorderRow(Mat grayFull, Mat edges, int y, int xStart, int xEnd)
+    {
+        int brightPixels = 0;
+        int darkPixels = 0;
+        int edgePixels = 0;
+        int width = Math.Max(1, xEnd - xStart);
+
+        for (int x = xStart; x < xEnd; x++)
+        {
+            byte gray = grayFull.At<byte>(y, x);
+            if (gray >= 215)
+            {
+                brightPixels++;
+            }
+
+            if (gray <= 60)
+            {
+                darkPixels++;
+            }
+
+            if (edges.At<byte>(y, x) > 0)
+            {
+                edgePixels++;
+            }
+        }
+
+        double brightRatio = brightPixels / (double)width;
+        double darkRatio = darkPixels / (double)width;
+        double edgeRatio = edgePixels / (double)width;
+        return (darkRatio * 0.55) + (edgeRatio * 0.35) - (brightRatio * 0.15);
+    }
+
+    private sealed class CandidateStats
+    {
+        public double AreaRatio { get; init; }
+        public double AreaScore { get; init; }
+        public double BorderEdgeDensity { get; init; }
+        public double EdgeTouchScore { get; init; }
+        public double GutterContrast { get; init; }
+        public double InteriorStdDev { get; init; }
+        public double InteriorVarianceScore { get; init; }
+    }
+
+    private sealed class RowBand(double minY, double maxY, double coverage)
+    {
+        public double MinY { get; set; } = minY;
+        public double MaxY { get; set; } = maxY;
+        public double Coverage { get; set; } = coverage;
+        public int PanelCount { get; set; } = 1;
+    }
+
+    private sealed class PanelRow(ComicPanel panel)
+    {
+        public double MinY { get; set; } = panel.Y;
+        public double MaxY { get; set; } = panel.Y + panel.Height;
+        public double Coverage { get; set; } = panel.Width;
+        public List<ComicPanel> Panels { get; } = [panel];
+    }
+
+    private sealed class LayoutRowCandidate(double y, double height, List<ComicPanel> panels)
+    {
+        public double Y { get; set; } = y;
+        public double Height { get; set; } = height;
+        public List<ComicPanel> Panels { get; } = panels;
+    }
+
+    private static List<LayoutRowCandidate> NormalizeLayoutRows(List<LayoutRowCandidate> rows)
+    {
+        if (rows.Count <= 1)
+        {
+            return rows;
+        }
+
+        var orderedRows = rows.OrderBy(row => row.Y).ToList();
+        var boundaries = new double[orderedRows.Count + 1];
+        boundaries[0] = orderedRows[0].Y;
+        boundaries[^1] = orderedRows[^1].Y + orderedRows[^1].Height;
+
+        for (int i = 0; i < orderedRows.Count - 1; i++)
+        {
+            double currentBottom = orderedRows[i].Y + orderedRows[i].Height;
+            double nextTop = orderedRows[i + 1].Y;
+            boundaries[i + 1] = (currentBottom + nextTop) / 2.0;
+        }
+
+        for (int i = 0; i < orderedRows.Count; i++)
+        {
+            double newTop = boundaries[i];
+            double newBottom = boundaries[i + 1];
+            double newHeight = Math.Max(0.01, newBottom - newTop);
+
+            orderedRows[i].Y = newTop;
+            orderedRows[i].Height = newHeight;
+
+            foreach (var panel in orderedRows[i].Panels)
+            {
+                panel.Y = newTop;
+                panel.Height = newHeight;
+            }
+        }
+
+        return orderedRows;
     }
 }

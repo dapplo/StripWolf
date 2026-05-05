@@ -98,6 +98,13 @@ public class Loc
     public string ConnectionFailed => GetString();
     public string TestingConnection => GetString();
     
+    // Custom HTTP Headers
+    public string CustomHttpHeaders => GetString();
+    public string CustomHeadersHint => GetString();
+    public string HeaderName => GetString();
+    public string Value => GetString();
+    public string AddHeader => GetString();
+    
     // Language Settings
     public string LanguageSettings => GetString();
     public string Language => GetString();
@@ -113,6 +120,8 @@ public class Loc
     
     // Reader View
     public string Page => GetString();
+    public string PageDisplay => GetString();
+    public string TwoPagePageDisplay => GetString();
     public string ShowComicInfo => GetString();
     public string ToggleTwoPageMode => GetString();
     public string ChangeFitMode => GetString();
@@ -127,6 +136,15 @@ public class Loc
     public string Publisher => GetString();
     public string ReleaseDate => GetString();
     public string Summary => GetString();
+    public string ExtendedMetadata => GetString();
+    public string Volume => GetString();
+    public string Genre => GetString();
+    public string Characters => GetString();
+    public string Teams => GetString();
+    public string StoryArc => GetString();
+    public string Notes => GetString();
+    public string Web => GetString();
+    public string NoExtendedMetadata => GetString();
     
     // Error Messages
     public string Error => GetString();
