@@ -174,10 +174,9 @@ public class PanelDetectionService
                 }
                 else
                 {
-                    var layoutCandidates = DetectPageLayoutCandidates(pageIndex, grayFull, edgesFull, imgW, imgH, pageArea);
-                    if (layoutCandidates.Count > 0)
+                    if (evidenceLayoutCandidates.Count > 0)
                     {
-                        panels = FilterOverlappingPanels(layoutCandidates);
+                        panels = FilterOverlappingPanels(evidenceLayoutCandidates);
                     }
                 }
             }
@@ -802,79 +801,6 @@ public class PanelDetectionService
         }
 
         return result;
-    }
-
-    private List<ComicPanel> DetectPageLayoutCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
-    {
-        var horizontalGutters = FindHorizontalGuttersForLayout(grayFull, edges, imgW, imgH);
-        var rowBands = BuildSegments(horizontalGutters, imgH, Math.Max(40, imgH / 12));
-        if (rowBands.Count < 2)
-        {
-            return [];
-        }
-
-        var rows = new List<LayoutRowCandidate>();
-        foreach (var (rowStart, rowEnd) in rowBands)
-        {
-            int rowHeight = rowEnd - rowStart;
-            if (rowHeight < Math.Max(40, imgH / 14))
-            {
-                continue;
-            }
-
-            var verticalGutters = FindVerticalGuttersForLayout(grayFull, edges, imgW, rowStart, rowEnd);
-            var columnBands = BuildSegments(verticalGutters, imgW, Math.Max(40, imgW / 10));
-            if (columnBands.Count == 0)
-            {
-                continue;
-            }
-
-            var rowPanels = new List<ComicPanel>();
-            foreach (var (columnStart, columnEnd) in columnBands)
-            {
-                var rect = new Rect(columnStart, rowStart, columnEnd - columnStart, rowEnd - rowStart);
-                if (!IsSensibleCandidate(rect, imgW, imgH, pageArea))
-                {
-                    continue;
-                }
-
-                var stats = MeasureCandidateStats(rect, grayFull, edges, imgW, imgH, pageArea);
-                double confidence =
-                    (stats.GutterContrast * 0.30) +
-                    (stats.BorderEdgeDensity * 0.15) +
-                    (stats.InteriorVarianceScore * 0.15) +
-                    (stats.AreaScore * 0.10) +
-                    (stats.EdgeTouchScore * 0.05) +
-                    0.20;
-
-                if (confidence >= 0.42)
-                {
-                    rowPanels.Add(CreatePanel(pageIndex, rect, imgW, imgH, confidence));
-                }
-            }
-
-            if (rowPanels.Count > 0)
-            {
-                rows.Add(new LayoutRowCandidate(rowStart / (double)imgH, rowHeight / (double)imgH, rowPanels));
-            }
-        }
-
-        var multiPanelHeights = rows
-            .Where(row => row.Panels.Count > 1)
-            .Select(row => row.Height)
-            .OrderBy(height => height)
-            .ToList();
-
-        if (multiPanelHeights.Count > 1)
-        {
-            double medianMultiPanelHeight = multiPanelHeights[multiPanelHeights.Count / 2];
-            rows = rows
-                .Where(row => row.Panels.Count == 1 || row.Height >= medianMultiPanelHeight * 0.65)
-                .ToList();
-        }
-
-        rows = NormalizeLayoutRows(rows);
-        return rows.SelectMany(row => row.Panels).ToList();
     }
 
     private List<ComicPanel> DetectEvidenceLayoutCandidates(int pageIndex, Mat grayFull, Mat edges, int imgW, int imgH, double pageArea)
