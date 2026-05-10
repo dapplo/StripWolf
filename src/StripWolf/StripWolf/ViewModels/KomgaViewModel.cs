@@ -88,9 +88,14 @@ public partial class KomgaViewModel : ViewModelBase
 
     private readonly HashSet<string> _downloadPendingBookIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KomgaDownloadQueueItem> _downloadItemsByBookId = new(StringComparer.OrdinalIgnoreCase);
-    private CancellationTokenSource? _activeDownloadCts;
-    private KomgaDownloadQueueItem? _activeDownloadItem;
+    private readonly Dictionary<string, CancellationTokenSource> _downloadCancellationTokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _cancelRequestedBookIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pauseRequestedBookIds = new(StringComparer.OrdinalIgnoreCase);
     private bool _isProcessingQueue;
+    [ObservableProperty]
+    private bool _isDownloadQueuePaused;
+    private int _maxParallelDownloads = 1;
+    private const int MaxDownloadRetryCount = 3;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -393,7 +398,20 @@ public partial class KomgaViewModel : ViewModelBase
     {
         QueuedDownloadsCount = DownloadQueueItems.Count;
         IsDownloadQueueActive = DownloadQueueItems.Count > 0;
-        IsDownloading = _activeDownloadItem is not null;
+        var activeDownloads = DownloadQueueItems.Where(item => item.IsDownloading).ToList();
+        IsDownloading = activeDownloads.Count > 0;
+
+        if (activeDownloads.Count == 0)
+        {
+            DownloadingBookName = string.Empty;
+            DownloadProgress = 0;
+            return;
+        }
+
+        DownloadingBookName = activeDownloads.Count == 1
+            ? activeDownloads[0].Name
+            : $"{activeDownloads.Count} downloads in progress";
+        DownloadProgress = activeDownloads.Average(item => item.Progress);
     }
 
     private void ApplySectionLayout(AppSettings settings)
@@ -507,12 +525,23 @@ public partial class KomgaViewModel : ViewModelBase
         _libraryService = libraryService;
         _settingsService = settingsService;
         Title = "Komga";
-        ApplySectionLayout(_settingsService.LoadSettings());
+        var initialSettings = _settingsService.LoadSettings();
+        ApplySectionLayout(initialSettings);
+        ApplyDownloadSettings(initialSettings);
         _settingsService.SettingsChanged += (_, settings) =>
         {
-            Dispatcher.UIThread.Post(() => ApplySectionLayout(settings));
+            Dispatcher.UIThread.Post(() =>
+            {
+                ApplySectionLayout(settings);
+                ApplyDownloadSettings(settings);
+            });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => RefreshDownloadQueueState();
+    }
+
+    private void ApplyDownloadSettings(AppSettings settings)
+    {
+        _maxParallelDownloads = Math.Max(1, settings.KomgaParallelDownloads);
     }
 
     partial void OnSearchTextChanged(string value)
@@ -1684,8 +1713,11 @@ public partial class KomgaViewModel : ViewModelBase
         var queueItem = new KomgaDownloadQueueItem
         {
             BookDisplay = bookDisplay,
+            ServerId = _activeServer?.Id,
             IsQueued = true,
-            Progress = 0
+            Progress = 0,
+            IsFailed = false,
+            ErrorMessage = null
         };
 
         _downloadItemsByBookId[bookDisplay.Id] = queueItem;
@@ -1732,43 +1764,79 @@ public partial class KomgaViewModel : ViewModelBase
         {
             while (true)
             {
-                var queueItem = DownloadQueueItems.FirstOrDefault(item => item.IsQueued && !item.IsCancelling);
-                if (queueItem is null)
+                var activeCount = DownloadQueueItems.Count(item => item.IsDownloading);
+                var queuedItems = DownloadQueueItems.Where(item => item.IsQueued && !item.IsCancelling).ToList();
+
+                if (activeCount == 0 && queuedItems.Count == 0)
                 {
                     break;
                 }
 
-                _activeDownloadItem = queueItem;
-                _activeDownloadCts?.Dispose();
-                _activeDownloadCts = new CancellationTokenSource();
-
-                SetDownloadState(queueItem.Id, trackedBook =>
+                if (!IsDownloadQueuePaused)
                 {
-                    trackedBook.IsQueued = false;
-                    trackedBook.IsDownloading = true;
-                    trackedBook.IsCancelling = false;
-                    trackedBook.DownloadProgress = 0;
-                });
-                queueItem.IsQueued = false;
-                queueItem.IsDownloading = true;
-                queueItem.IsCancelling = false;
-                queueItem.Progress = 0;
+                    var availableSlots = Math.Max(1, _maxParallelDownloads) - activeCount;
+                    if (availableSlots > 0)
+                    {
+                        foreach (var queueItem in queuedItems.Take(availableSlots))
+                        {
+                            var cts = new CancellationTokenSource();
+                            _downloadCancellationTokens[queueItem.Id] = cts;
+                            _ = RunDownloadAsync(queueItem, cts.Token);
+                        }
+                    }
+                }
 
-                DownloadingBookName = queueItem.Name;
-                DownloadProgress = 0;
-                RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
                 RefreshDownloadQueueState();
+                await Task.Delay(150);
+            }
+        }
+        finally
+        {
+            foreach (var cts in _downloadCancellationTokens.Values)
+            {
+                cts.Dispose();
+            }
 
+            _downloadCancellationTokens.Clear();
+            _cancelRequestedBookIds.Clear();
+            _pauseRequestedBookIds.Clear();
+            _isProcessingQueue = false;
+            RefreshDownloadQueueState();
+        }
+    }
+
+    private async Task RunDownloadAsync(KomgaDownloadQueueItem queueItem, CancellationToken token)
+    {
+        try
+        {
+            SetDownloadState(queueItem.Id, trackedBook =>
+            {
+                trackedBook.IsQueued = false;
+                trackedBook.IsDownloading = true;
+                trackedBook.IsCancelling = false;
+                trackedBook.DownloadProgress = 0;
+            });
+            queueItem.IsQueued = false;
+            queueItem.IsDownloading = true;
+            queueItem.IsCancelling = false;
+            queueItem.IsFailed = false;
+            queueItem.ErrorMessage = null;
+            queueItem.Progress = 0;
+            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            RefreshDownloadQueueState();
+
+            for (var attempt = 1; attempt <= MaxDownloadRetryCount; attempt++)
+            {
                 try
                 {
                     var progress = new Progress<double>(p =>
                     {
-                        DownloadProgress = p;
                         queueItem.Progress = p;
                         SetDownloadState(queueItem.Id, trackedBook => trackedBook.DownloadProgress = p);
+                        RefreshDownloadQueueState();
                     });
 
-                    await _libraryService.DownloadFromKomgaAsync(queueItem.BookDisplay.Book, _activeServer?.Id, progress, _activeDownloadCts.Token);
+                    await _libraryService.DownloadFromKomgaAsync(queueItem.BookDisplay.Book, queueItem.ServerId, progress, token);
                     SetDownloadState(queueItem.Id, trackedBook =>
                     {
                         trackedBook.IsDownloaded = true;
@@ -1776,44 +1844,83 @@ public partial class KomgaViewModel : ViewModelBase
                     });
                     queueItem.BookDisplay.IsDownloaded = true;
                     queueItem.Progress = 1.0;
+                    _downloadPendingBookIds.Remove(queueItem.Id);
+                    _downloadItemsByBookId.Remove(queueItem.Id);
+                    DownloadQueueItems.Remove(queueItem);
+                    RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                    RefreshDownloadQueueState();
+                    return;
                 }
                 catch (OperationCanceledException)
                 {
+                    if (_pauseRequestedBookIds.Remove(queueItem.Id))
+                    {
+                        SetDownloadState(queueItem.Id, trackedBook =>
+                        {
+                            trackedBook.IsQueued = true;
+                            trackedBook.IsDownloading = false;
+                            trackedBook.IsCancelling = false;
+                            trackedBook.DownloadProgress = 0;
+                        });
+                        queueItem.IsQueued = true;
+                        queueItem.IsDownloading = false;
+                        queueItem.IsCancelling = false;
+                        queueItem.Progress = 0;
+                        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                        RefreshDownloadQueueState();
+                        return;
+                    }
+
+                    if (_cancelRequestedBookIds.Remove(queueItem.Id))
+                    {
+                        _downloadPendingBookIds.Remove(queueItem.Id);
+                        _downloadItemsByBookId.Remove(queueItem.Id);
+                        ResetDownloadState(queueItem.Id);
+                        queueItem.IsDownloading = false;
+                        queueItem.IsCancelling = false;
+                        DownloadQueueItems.Remove(queueItem);
+                        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                        RefreshDownloadQueueState();
+                        return;
+                    }
+
                     System.Diagnostics.Debug.WriteLine($"Download cancelled for '{queueItem.Name}'.");
+                    return;
                 }
                 catch (Exception ex)
                 {
-                    ErrorMessage = $"Failed to download '{queueItem.Name}': {ex.Message}";
-                    System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
-                }
-                finally
-                {
-                    _downloadPendingBookIds.Remove(queueItem.Id);
-                    _downloadItemsByBookId.Remove(queueItem.Id);
-                    ResetDownloadState(queueItem.Id);
+                    if (attempt < MaxDownloadRetryCount)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), token);
+                        continue;
+                    }
+
+                    queueItem.IsFailed = true;
+                    queueItem.ErrorMessage = ex.Message;
                     queueItem.IsDownloading = false;
                     queueItem.IsCancelling = false;
-                    DownloadQueueItems.Remove(queueItem);
-                    DownloadingBookName = string.Empty;
-                    DownloadProgress = 0;
+                    queueItem.IsQueued = false;
+                    SetDownloadState(queueItem.Id, trackedBook =>
+                    {
+                        trackedBook.IsQueued = false;
+                        trackedBook.IsDownloading = false;
+                        trackedBook.IsCancelling = false;
+                        trackedBook.DownloadProgress = 0;
+                    });
+                    ErrorMessage = $"Failed to download '{queueItem.Name}' after {MaxDownloadRetryCount} attempts.";
+                    System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
                     RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                    _activeDownloadItem = null;
-                    _activeDownloadCts?.Dispose();
-                    _activeDownloadCts = null;
+                    RefreshDownloadQueueState();
+                    return;
                 }
-
-                await Task.Delay(100);
             }
         }
         finally
         {
-            _activeDownloadItem = null;
-            _activeDownloadCts?.Dispose();
-            _activeDownloadCts = null;
-            _isProcessingQueue = false;
-            DownloadingBookName = string.Empty;
-            DownloadProgress = 0;
-            RefreshDownloadQueueState();
+            if (_downloadCancellationTokens.Remove(queueItem.Id, out var cts))
+            {
+                cts.Dispose();
+            }
         }
     }
 
@@ -1825,7 +1932,7 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        if (ReferenceEquals(queueItem, _activeDownloadItem) || queueItem.IsDownloading)
+        if (queueItem.IsDownloading)
         {
             queueItem.IsCancelling = true;
             queueItem.IsDownloading = false;
@@ -1835,7 +1942,11 @@ public partial class KomgaViewModel : ViewModelBase
                 trackedBook.IsDownloading = false;
             });
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-            _activeDownloadCts?.Cancel();
+            _cancelRequestedBookIds.Add(queueItem.Id);
+            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts))
+            {
+                activeCts.Cancel();
+            }
             return;
         }
 
@@ -1849,7 +1960,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private void CancelAllDownloads()
     {
-        foreach (var queueItem in DownloadQueueItems.Where(item => !ReferenceEquals(item, _activeDownloadItem) && !item.IsDownloading).ToList())
+        foreach (var queueItem in DownloadQueueItems.Where(item => !item.IsDownloading).ToList())
         {
             _downloadPendingBookIds.Remove(queueItem.Id);
             _downloadItemsByBookId.Remove(queueItem.Id);
@@ -1858,17 +1969,79 @@ public partial class KomgaViewModel : ViewModelBase
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
         }
 
-        if (_activeDownloadItem is not null)
+        foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
         {
-            _activeDownloadItem.IsCancelling = true;
-            _activeDownloadItem.IsDownloading = false;
-            SetDownloadState(_activeDownloadItem.Id, trackedBook =>
+            queueItem.IsCancelling = true;
+            queueItem.IsDownloading = false;
+            SetDownloadState(queueItem.Id, trackedBook =>
             {
                 trackedBook.IsCancelling = true;
                 trackedBook.IsDownloading = false;
             });
-            RefreshSeriesDownloadState(_activeDownloadItem.BookDisplay.Book.SeriesId);
-            _activeDownloadCts?.Cancel();
+            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            _cancelRequestedBookIds.Add(queueItem.Id);
+            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts))
+            {
+                activeCts.Cancel();
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void PauseAllDownloads()
+    {
+        if (IsDownloadQueuePaused)
+        {
+            return;
+        }
+
+        IsDownloadQueuePaused = true;
+        foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
+        {
+            _pauseRequestedBookIds.Add(queueItem.Id);
+            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var cts))
+            {
+                cts.Cancel();
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ResumeAllDownloads()
+    {
+        IsDownloadQueuePaused = false;
+        if (!_isProcessingQueue && DownloadQueueItems.Any(item => item.IsQueued))
+        {
+            _isProcessingQueue = true;
+            _ = ProcessDownloadQueueAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void RetryFailedDownloads()
+    {
+        foreach (var queueItem in DownloadQueueItems.Where(item => item.IsFailed).ToList())
+        {
+            queueItem.IsFailed = false;
+            queueItem.ErrorMessage = null;
+            queueItem.IsQueued = true;
+            queueItem.IsDownloading = false;
+            queueItem.IsCancelling = false;
+            queueItem.Progress = 0;
+            SetDownloadState(queueItem.Id, trackedBook =>
+            {
+                trackedBook.IsQueued = true;
+                trackedBook.IsDownloading = false;
+                trackedBook.IsCancelling = false;
+                trackedBook.DownloadProgress = 0;
+            });
+            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+        }
+
+        if (!_isProcessingQueue && DownloadQueueItems.Any(item => item.IsQueued))
+        {
+            _isProcessingQueue = true;
+            _ = ProcessDownloadQueueAsync();
         }
     }
 

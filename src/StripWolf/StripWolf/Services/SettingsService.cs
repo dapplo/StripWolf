@@ -362,6 +362,8 @@ public class AppSettings
 
     public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
 
+    public int KomgaParallelDownloads { get; set; } = 1;
+
     /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
@@ -395,7 +397,8 @@ public class AppSettings
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
-            KomgaSections = KomgaSections.Select(section => section.Clone()).ToList()
+            KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
+            KomgaParallelDownloads = KomgaParallelDownloads
         };
     }
 }

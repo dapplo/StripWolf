@@ -630,62 +630,6 @@
                 Command="{Binding LoadMoreBooksForReadListCommand}"/>
       </Border>
 
-      <!-- Download Queue Floating Panel -->
-      <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" 
-              Margin="16" Padding="12" CornerRadius="8"
-              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-              BoxShadow="0 4 12 0 #40000000"
-              IsVisible="{Binding IsDownloadQueueActive}">
-        <StackPanel Spacing="10" Width="280">
-          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-            <TextBlock Text="📥" FontSize="16" VerticalAlignment="Center"/>
-            <TextBlock Grid.Column="1" Text="Downloads" FontWeight="Bold" VerticalAlignment="Center"/>
-            <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="10" Padding="6,2" VerticalAlignment="Center">
-              <TextBlock Text="{Binding QueuedDownloadsCount}" FontSize="10" Foreground="White"/>
-            </Border>
-          </Grid>
-          <StackPanel Spacing="4" IsVisible="{Binding IsDownloading}">
-            <TextBlock Text="{Binding DownloadingBookName}" FontSize="11" TextTrimming="CharacterEllipsis"/>
-            <ProgressBar Value="{Binding DownloadProgress}" Maximum="1" Height="6"/>
-          </StackPanel>
-          <Button Content="Cancel All" Command="{Binding CancelAllDownloadsCommand}"
-                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-          <ScrollViewer MaxHeight="240">
-            <ItemsControl ItemsSource="{Binding DownloadQueueItems}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="komga:KomgaDownloadQueueItem">
-                  <Border Margin="0,0,0,8" Padding="8" CornerRadius="6"
-                          Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
-                      <StackPanel Grid.Row="0" Grid.Column="0">
-                        <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding SeriesTitle}" FontSize="11" Foreground="Gray"
-                                   TextTrimming="CharacterEllipsis"
-                                   IsVisible="{Binding SeriesTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                      </StackPanel>
-                      <Button Grid.RowSpan="3" Grid.Column="1" Content="✕"
-                              Command="{Binding ((vm:KomgaViewModel)DataContext).CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=views:KomgaView}}"
-                              CommandParameter="{Binding}" Padding="8,4"
-                              IsEnabled="{Binding !IsCancelling}"/>
-                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Queued" FontSize="11" Foreground="Gray"
-                                 IsVisible="{Binding IsQueued}"/>
-                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Downloading..." FontSize="11" Foreground="Gray"
-                                 IsVisible="{Binding IsDownloading}"/>
-                      <TextBlock Grid.Row="1" Grid.Column="0" Text="Cancelling..." FontSize="11" Foreground="Gray"
-                                 IsVisible="{Binding IsCancelling}"/>
-                      <ProgressBar Grid.Row="2" Grid.Column="0" Value="{Binding Progress}" Maximum="1" Height="4"
-                                   IsVisible="{Binding IsDownloading}"/>
-                      <ProgressBar Grid.Row="2" Grid.Column="0" IsIndeterminate="True" Height="4"
-                                   IsVisible="{Binding IsCancelling}"/>
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </StackPanel>
-      </Border>
-
       <!-- Series Download Picker Overlay -->
       <Panel IsVisible="{Binding SeriesPendingDownloadSelection, Converter={x:Static ObjectConverters.IsNotNull}}">
         <Button Background="#80000000" Command="{Binding CancelSeriesDownloadSelectionCommand}"

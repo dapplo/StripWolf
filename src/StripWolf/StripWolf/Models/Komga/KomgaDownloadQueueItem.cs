@@ -8,6 +8,7 @@ namespace StripWolf.Models.Komga;
 public partial class KomgaDownloadQueueItem : ObservableObject
 {
     public KomgaBookDisplay BookDisplay { get; init; } = new();
+    public int? ServerId { get; init; }
 
     public string Id => BookDisplay.Id;
     public string Name => BookDisplay.Name;
@@ -23,5 +24,11 @@ public partial class KomgaDownloadQueueItem : ObservableObject
     private bool _isCancelling;
 
     [ObservableProperty]
+    private bool _isFailed;
+
+    [ObservableProperty]
     private double _progress;
+
+    [ObservableProperty]
+    private string? _errorMessage;
 }

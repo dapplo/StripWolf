@@ -11,6 +11,7 @@ public partial class MainViewModel : ViewModelBase
 {
     private readonly LibraryViewModel _libraryViewModel;
     private readonly KomgaViewModel _komgaViewModel;
+    private readonly ActivityViewModel _activityViewModel;
     private readonly SettingsViewModel _settingsViewModel;
     private readonly ReaderViewModel _readerViewModel;
 
@@ -26,11 +27,13 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel(
         LibraryViewModel libraryViewModel,
         KomgaViewModel komgaViewModel,
+        ActivityViewModel activityViewModel,
         SettingsViewModel settingsViewModel,
         ReaderViewModel readerViewModel)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
+        _activityViewModel = activityViewModel;
         _settingsViewModel = settingsViewModel;
         _readerViewModel = readerViewModel;
         
@@ -43,6 +46,14 @@ public partial class MainViewModel : ViewModelBase
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
         _readerViewModel.ComicOpenRequested += OnComicOpenRequested;
         _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
+        _activityViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ActivityViewModel.ActiveItemsCount))
+            {
+                OnPropertyChanged(nameof(ActivityItemsCount));
+                OnPropertyChanged(nameof(HasActivityItems));
+            }
+        };
     }
 
     private async void OnViewKomgaSeriesRequested(object? sender, KomgaSeriesNavigationRequest request)
@@ -68,8 +79,11 @@ public partial class MainViewModel : ViewModelBase
 
     public LibraryViewModel LibraryViewModel => _libraryViewModel;
     public KomgaViewModel KomgaViewModel => _komgaViewModel;
+    public ActivityViewModel ActivityViewModel => _activityViewModel;
     public SettingsViewModel SettingsViewModel => _settingsViewModel;
     public ReaderViewModel ReaderViewModel => _readerViewModel;
+    public int ActivityItemsCount => _activityViewModel.ActiveItemsCount;
+    public bool HasActivityItems => ActivityItemsCount > 0;
 
     partial void OnSelectedTabIndexChanged(int value)
     {
@@ -85,7 +99,8 @@ public partial class MainViewModel : ViewModelBase
         {
             0 => _libraryViewModel,
             1 => _komgaViewModel,
-            2 => _settingsViewModel,
+            2 => _activityViewModel,
+            3 => _settingsViewModel,
             _ => _libraryViewModel
         };
     }
@@ -114,6 +129,12 @@ public partial class MainViewModel : ViewModelBase
 
     [RelayCommand]
     private void NavigateToSettings()
+    {
+        ActivateTab(3);
+    }
+
+    [RelayCommand]
+    private void NavigateToActivity()
     {
         ActivateTab(2);
     }

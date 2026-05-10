@@ -171,6 +171,7 @@ public partial class App : Application
         services.AddTransient<ReaderViewModel>();
         services.AddTransient<KomgaViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<ActivityViewModel>();
         services.AddSingleton<MainViewModel>();
     }
 }
