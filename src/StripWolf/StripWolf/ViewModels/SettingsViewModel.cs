@@ -88,6 +88,9 @@ public partial class SettingsViewModel : ViewModelBase
     private EpubOutputResolution _selectedEpubOutputResolution = EpubOutputResolution.Low;
 
     [ObservableProperty]
+    private int _selectedKomgaParallelDownloads = 1;
+
+    [ObservableProperty]
     private ObservableCollection<SectionLayoutPreference> _librarySections = [];
 
     [ObservableProperty]
@@ -113,6 +116,8 @@ public partial class SettingsViewModel : ViewModelBase
 
     public IReadOnlyList<EpubOutputResolution> AvailableEpubOutputResolutions { get; } =
         [EpubOutputResolution.Low, EpubOutputResolution.Medium, EpubOutputResolution.High];
+
+    public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
 
     private KomgaServer? _editingServer;
 
@@ -267,6 +272,7 @@ public partial class SettingsViewModel : ViewModelBase
         CompactOverview = _appSettings.CompactOverview;
         SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
         SelectedEpubOutputResolution = _appSettings.EpubOutputResolution;
+        SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
@@ -341,6 +347,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.EpubOutputResolution = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedKomgaParallelDownloadsChanged(int value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.KomgaParallelDownloads = Math.Max(1, value);
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

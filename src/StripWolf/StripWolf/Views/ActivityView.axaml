@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:StripWolf.ViewModels"
+             xmlns:models="using:StripWolf.Models"
+             xmlns:komga="using:StripWolf.Models.Komga"
+             mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+             x:Class="StripWolf.Views.ActivityView"
+             x:DataType="vm:ActivityViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="16" Spacing="16">
+      <TextBlock Text="Activity" FontSize="24" FontWeight="Bold"/>
+
+      <Border Padding="12" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Downloads" FontSize="18" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+            <Button Grid.Column="0" Content="Pause All" Command="{Binding Komga.PauseAllDownloadsCommand}"/>
+            <Button Grid.Column="1" Content="Resume All" Command="{Binding Komga.ResumeAllDownloadsCommand}"/>
+            <Button Grid.Column="2" Content="Retry Failed" Command="{Binding Komga.RetryFailedDownloadsCommand}"/>
+            <Button Grid.Column="3" Content="Cancel All" HorizontalAlignment="Right" Command="{Binding Komga.CancelAllDownloadsCommand}"/>
+          </Grid>
+          <TextBlock Text="{Binding Komga.DownloadingBookName}" IsVisible="{Binding Komga.IsDownloading}" FontSize="12"/>
+          <ProgressBar Value="{Binding Komga.DownloadProgress}" Maximum="1" Height="6" IsVisible="{Binding Komga.IsDownloading}"/>
+          <ItemsControl ItemsSource="{Binding DownloadQueueItems}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="komga:KomgaDownloadQueueItem">
+                <Border Margin="0,0,0,8" Padding="8" CornerRadius="6"
+                        Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
+                  <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                    <StackPanel Grid.Row="0" Grid.Column="0">
+                      <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding SeriesTitle}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <Button Grid.RowSpan="3" Grid.Column="1" Content="✕"
+                            Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" Padding="8,4"
+                            IsEnabled="{Binding !IsCancelling}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Queued" FontSize="11" Foreground="Gray" IsVisible="{Binding IsQueued}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Downloading..." FontSize="11" Foreground="Gray" IsVisible="{Binding IsDownloading}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Failed" FontSize="11" Foreground="#C62828" IsVisible="{Binding IsFailed}"/>
+                    <ProgressBar Grid.Row="2" Grid.Column="0" Value="{Binding Progress}" Maximum="1" Height="4" IsVisible="{Binding IsDownloading}"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding ErrorMessage}" FontSize="10" Foreground="#C62828" TextWrapping="Wrap" IsVisible="{Binding IsFailed}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Border Padding="12" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Imports" FontSize="18" FontWeight="Bold"/>
+          <ItemsControl ItemsSource="{Binding PendingImports}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:PendingImport">
+                <Border CornerRadius="8" Padding="12"
+                        Background="{DynamicResource SystemControlBackgroundChromeHighBrush}"
+                        Margin="0,0,0,8">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Grid.RowSpan="3" Text="📄" FontSize="24" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" FontSize="12" Foreground="Gray"/>
+                    <ProgressBar Grid.Column="1" Grid.Row="2" Value="{Binding Progress}" Maximum="1" Height="5" IsVisible="{Binding IsProcessing}"/>
+                    <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding ErrorMessage}" FontSize="10" Foreground="#C62828" IsVisible="{Binding IsFailed}" TextWrapping="Wrap"/>
+                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4"
+                            IsVisible="{Binding IsFailed}"
+                            Command="{Binding ((vm:ActivityViewModel)DataContext).Library.RemovePendingImportCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"/>
+                    <TextBlock Grid.Column="2" Grid.RowSpan="3" Text="✓" FontSize="20" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsCompleted}"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

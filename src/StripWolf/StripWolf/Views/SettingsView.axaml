@@ -167,6 +167,16 @@
               <TextBlock Text="Choose the final PNG size for EPUB conversion: Low = 700x1050, Medium = 1400x2100, High = 2100x3150. Higher settings improve text quality but increase conversion time and file size."
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Komga Parallel Downloads" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableKomgaParallelDownloadOptions}"
+                        SelectedItem="{Binding SelectedKomgaParallelDownloads}"
+                        HorizontalAlignment="Stretch"
+                        Width="300"/>
+              <TextBlock Text="Choose how many Komga books may download at the same time."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
           </StackPanel>
         </Border>
 
