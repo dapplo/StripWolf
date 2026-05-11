@@ -167,11 +167,11 @@ public partial class App : Application
         services.AddSingleton<LibraryService>();
 
         // Register view models
-        services.AddTransient<LibraryViewModel>();
-        services.AddTransient<ReaderViewModel>();
-        services.AddTransient<KomgaViewModel>();
-        services.AddTransient<SettingsViewModel>();
-        services.AddTransient<ActivityViewModel>();
+        services.AddSingleton<LibraryViewModel>();
+        services.AddSingleton<ReaderViewModel>();
+        services.AddSingleton<KomgaViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<ActivityViewModel>();
         services.AddSingleton<MainViewModel>();
     }
 }

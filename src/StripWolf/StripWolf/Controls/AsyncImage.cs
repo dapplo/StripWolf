@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
 using Avalonia;
@@ -18,16 +19,15 @@ public class AsyncImage : Control
     // This is the recommended pattern for HttpClient as per Microsoft guidelines.
     // The client is never disposed as it's shared across all AsyncImage instances.
     private static readonly HttpClient SharedHttpClient;
-    
-    /// <summary>
-    /// Delay in milliseconds to wait for bindings to settle before loading images.
-    /// This helps when the control is attached before DataContext bindings are evaluated.
-    /// </summary>
-    private const int BindingSettleDelayMs = 100;
+    private static readonly ConcurrentDictionary<string, Bitmap> LocalBitmapCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly SemaphoreSlim BitmapDecodeSemaphore = new(1, 1);
+    private const int UncachedLocalLoadDelayMs = 150;
     
     private Bitmap? _loadedBitmap;
+    private bool _ownsLoadedBitmap;
     private bool _isLoading;
-    private CancellationTokenSource? _cts;
+    private int _loadVersion;
+    private int _activeLoadVersion;
 
     static AsyncImage()
     {
@@ -108,21 +108,8 @@ public class AsyncImage : Control
 
     private void OnSourceUrlChanged()
     {
-        // Cancel any pending load operation
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
-        
-        _loadedBitmap?.Dispose();
-        _loadedBitmap = null;
-        _isLoading = false;
-        
-        if (!string.IsNullOrEmpty(SourceUrl))
-        {
-            _cts = new CancellationTokenSource();
-            _ = LoadImageSafeAsync(_cts.Token);
-        }
-        
+        ResetImageState();
+        TryStartLoading();
         InvalidateVisual();
     }
 
@@ -140,10 +127,7 @@ public class AsyncImage : Control
         if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading && hasCredentials && IsAttachedToVisualTree)
         {
             System.Diagnostics.Debug.WriteLine($"AsyncImage: Credentials now available, retrying load for '{SourceUrl}'");
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
-            _ = LoadImageSafeAsync(_cts.Token);
+            TryStartLoading();
         }
     }
     
@@ -155,26 +139,31 @@ public class AsyncImage : Control
     /// <summary>
     /// Safely loads the image with proper exception handling for fire-and-forget scenarios
     /// </summary>
-    private async Task LoadImageSafeAsync(CancellationToken cancellationToken)
+    private async Task LoadImageSafeAsync(int loadVersion)
     {
         try
         {
-            await LoadImageAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when the source URL changes before loading completes
+            await LoadImageAsync(loadVersion);
         }
         catch (Exception ex)
         {
-            // Log error - in a production app, this would use a proper logging framework
-            System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load image from '{SourceUrl}': {ex.GetType().Name} - {ex.Message}");
+            if (!IsStale(loadVersion))
+            {
+                System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load image from '{SourceUrl}': {ex.GetType().Name} - {ex.Message}");
+            }
+        }
+        finally
+        {
+            if (Volatile.Read(ref _activeLoadVersion) == loadVersion)
+            {
+                _isLoading = false;
+            }
         }
     }
 
-    private async Task LoadImageAsync(CancellationToken cancellationToken)
+    private async Task LoadImageAsync(int loadVersion)
     {
-        if (_isLoading || string.IsNullOrEmpty(SourceUrl))
+        if (string.IsNullOrEmpty(SourceUrl))
         {
             return;
         }
@@ -190,9 +179,12 @@ public class AsyncImage : Control
             return;
         }
 
-        _isLoading = true;
+        if (IsStale(loadVersion))
+        {
+            return;
+        }
 
-        try
+        if (isRemoteUrl)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, SourceUrl);
             
@@ -203,35 +195,114 @@ public class AsyncImage : Control
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             }
 
-            using var response = await SharedHttpClient.SendAsync(request, cancellationToken);
+            using var response = await SharedHttpClient.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
-                var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                
-                // Create bitmap on UI thread to ensure proper disposal
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                Bitmap? bitmap = null;
+                try
                 {
-                    if (!cancellationToken.IsCancellationRequested)
+                    await BitmapDecodeSemaphore.WaitAsync();
+                    try
                     {
-                        // Bitmap constructor takes ownership of the stream and disposes it
-                        _loadedBitmap = new Bitmap(stream);
-                        InvalidateVisual();
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            if (!IsStale(loadVersion))
+                            {
+                                using var stream = new MemoryStream(imageBytes, writable: false);
+                                bitmap = new Bitmap(stream);
+                            }
+                        }, DispatcherPriority.ContextIdle);
                     }
-                    else
+                    finally
                     {
-                        stream.Dispose();
+                        BitmapDecodeSemaphore.Release();
                     }
-                });
+
+                    if (bitmap is not null)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            if (!IsStale(loadVersion))
+                            {
+                                _loadedBitmap = bitmap;
+                                _ownsLoadedBitmap = true;
+                                InvalidateVisual();
+                                bitmap = null;
+                            }
+                        }, DispatcherPriority.ContextIdle);
+                    }
+                }
+                finally
+                {
+                    bitmap?.Dispose();
+                }
             }
             else
             {
                 System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load '{SourceUrl}': HTTP {(int)response.StatusCode}");
             }
         }
-        finally
+        else
         {
-            _isLoading = false;
+            if (LocalBitmapCache.TryGetValue(SourceUrl, out var cachedBitmap))
+            {
+                if (!IsStale(loadVersion))
+                {
+                    _loadedBitmap = cachedBitmap;
+                    _ownsLoadedBitmap = false;
+                    InvalidateVisual();
+                }
+                return;
+            }
+
+            if (!File.Exists(SourceUrl))
+            {
+                return;
+            }
+
+            await Task.Delay(UncachedLocalLoadDelayMs);
+            if (IsStale(loadVersion))
+            {
+                return;
+            }
+
+            var imageBytes = await File.ReadAllBytesAsync(SourceUrl);
+            Bitmap? sharedBitmap = null;
+            await BitmapDecodeSemaphore.WaitAsync();
+            try
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (IsStale(loadVersion))
+                    {
+                        return;
+                    }
+
+                    using var stream = new MemoryStream(imageBytes, writable: false);
+                    var bitmap = new Bitmap(stream);
+                    sharedBitmap = LocalBitmapCache.GetOrAdd(SourceUrl, bitmap);
+                    if (!ReferenceEquals(sharedBitmap, bitmap))
+                    {
+                        bitmap.Dispose();
+                    }
+                }, DispatcherPriority.ContextIdle);
+            }
+            finally
+            {
+                BitmapDecodeSemaphore.Release();
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!IsStale(loadVersion))
+                {
+                    _loadedBitmap = sharedBitmap;
+                    _ownsLoadedBitmap = false;
+                    InvalidateVisual();
+                }
+            });
         }
     }
 
@@ -251,6 +322,19 @@ public class AsyncImage : Control
         {
             context.FillRectangle(PlaceholderBrush, rect);
         }
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var width = double.IsInfinity(availableSize.Width)
+            ? (_loadedBitmap?.PixelSize.Width ?? 0)
+            : availableSize.Width;
+
+        var height = double.IsInfinity(availableSize.Height)
+            ? (_loadedBitmap?.PixelSize.Height ?? 0)
+            : availableSize.Height;
+
+        return new Size(width, height);
     }
 
     private static Rect CalculateDestRect(Rect bounds, Size sourceSize, Stretch stretch)
@@ -302,41 +386,10 @@ public class AsyncImage : Control
         base.OnAttachedToVisualTree(e);
         
         IsAttachedToVisualTree = true;
-        
-        // If we have a URL but no bitmap, try to load it now with a short delay
-        // This helps when the initial binding evaluated before DataContext was set
+
         if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading)
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
-            // Add a small delay to allow bindings to update
-            _ = LoadImageWithDelayAsync(_cts.Token);
-        }
-    }
-
-    /// <summary>
-    /// Load image with a small delay to allow bindings to settle
-    /// </summary>
-    private async Task LoadImageWithDelayAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Wait a bit for bindings to update (especially credentials)
-            await Task.Delay(BindingSettleDelayMs, cancellationToken);
-            
-            if (!cancellationToken.IsCancellationRequested && _loadedBitmap is null && !_isLoading)
-            {
-                await LoadImageAsync(cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when cancelled
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load image with delay: {ex.Message}");
+            TryStartLoading();
         }
     }
 
@@ -348,12 +401,44 @@ public class AsyncImage : Control
         base.OnDetachedFromVisualTree(e);
         
         IsAttachedToVisualTree = false;
-        
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
-        
-        _loadedBitmap?.Dispose();
+        ResetImageState();
+    }
+
+    private bool ShouldLoad()
+    {
+        return IsAttachedToVisualTree &&
+               !string.IsNullOrEmpty(SourceUrl);
+    }
+
+    private bool IsStale(int loadVersion)
+    {
+        return loadVersion != Volatile.Read(ref _loadVersion) || !ShouldLoad();
+    }
+
+    private void TryStartLoading()
+    {
+        if (!ShouldLoad() || _loadedBitmap is not null || _isLoading)
+        {
+            return;
+        }
+
+        _isLoading = true;
+        var loadVersion = Volatile.Read(ref _loadVersion);
+        Volatile.Write(ref _activeLoadVersion, loadVersion);
+        _ = LoadImageSafeAsync(loadVersion);
+    }
+
+    private void ResetImageState()
+    {
+        Interlocked.Increment(ref _loadVersion);
+
+        if (_ownsLoadedBitmap)
+        {
+            _loadedBitmap?.Dispose();
+        }
+
         _loadedBitmap = null;
+        _ownsLoadedBitmap = false;
+        _isLoading = false;
     }
 }

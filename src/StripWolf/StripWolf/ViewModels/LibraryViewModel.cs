@@ -16,6 +16,7 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
     private readonly SettingsService _settingsService;
+    private bool _hasLoadedComics;
 
     [ObservableProperty]
     private ObservableCollection<Comic> _newComics = [];
@@ -139,6 +140,11 @@ public partial class LibraryViewModel : ViewModelBase
         _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
     }
 
+    public Task EnsureComicsLoadedAsync()
+    {
+        return _hasLoadedComics ? Task.CompletedTask : LoadComicsAsync();
+    }
+
     [RelayCommand]
     private void ShowComicInfo(Comic comic)
     {
@@ -177,7 +183,7 @@ public partial class LibraryViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText))
         {
             IsSearching = false;
-            SearchResults.Clear();
+            SearchResults = new ObservableCollection<Comic>();
             return;
         }
 
@@ -185,11 +191,8 @@ public partial class LibraryViewModel : ViewModelBase
         try
         {
             var results = await _libraryService.SearchComicsAsync(SearchText);
-            SearchResults.Clear();
-            foreach (var comic in results)
-            {
-                SearchResults.Add(comic);
-            }
+            ApplyPendingDeletionState(results);
+            SearchResults = new ObservableCollection<Comic>(results);
         }
         catch (Exception ex)
         {
@@ -220,16 +223,16 @@ public partial class LibraryViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             var favorites = await _libraryService.GetFavoriteComicsAsync();
-            MergeComics(FavoriteComics, favorites);
-            
+            FavoriteComics = ApplyComics(FavoriteComics, favorites);
+             
             var newComicsData = await _libraryService.GetNewComicsAsync();
-            MergeComics(NewComics, newComicsData);
+            NewComics = ApplyComics(NewComics, newComicsData);
 
             var inProgress = await _libraryService.GetInProgressComicsAsync();
-            MergeComics(InProgressComics, inProgress);
+            InProgressComics = ApplyComics(InProgressComics, inProgress);
 
             var completed = await _libraryService.GetCompletedComicsAsync();
-            MergeComics(CompletedComics, completed);
+            CompletedComics = ApplyComics(CompletedComics, completed);
 
             RefreshSeriesGroups();
             RefreshSectionVisibilityState();
@@ -239,7 +242,34 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 try { await _libraryService.CleanupMissingFilesAsync(); } catch { }
             });
+
+            _hasLoadedComics = true;
         });
+    }
+
+    private ObservableCollection<Comic> ApplyComics(ObservableCollection<Comic> targetCollection, List<Comic> comics)
+    {
+        ApplyPendingDeletionState(comics);
+
+        if (!_hasLoadedComics && _deleteCancellationTokens.Count == 0)
+        {
+            return new ObservableCollection<Comic>(comics);
+        }
+
+        MergeComics(targetCollection, comics);
+        return targetCollection;
+    }
+
+    private void ApplyPendingDeletionState(IEnumerable<Comic> comics)
+    {
+        foreach (var comic in comics)
+        {
+            if (_deleteCancellationTokens.TryGetValue(comic.Id, out var entry))
+            {
+                comic.IsDeleting = true;
+                comic.DeletionSecondsRemaining = entry.Comic.DeletionSecondsRemaining;
+            }
+        }
     }
 
     private void MergeComics(ObservableCollection<Comic> currentList, List<Comic> newList)
@@ -318,11 +348,7 @@ public partial class LibraryViewModel : ViewModelBase
             .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        SeriesGroups.Clear();
-        foreach (var group in groups)
-        {
-            SeriesGroups.Add(group);
-        }
+        SeriesGroups = new ObservableCollection<ComicSeriesGroup>(groups);
 
         RefreshSectionVisibilityState();
     }

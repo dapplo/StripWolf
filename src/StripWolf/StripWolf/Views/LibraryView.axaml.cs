@@ -42,7 +42,7 @@ public partial class LibraryView : UserControl
         {
             try
             {
-                await viewModel.LoadComicsCommand.ExecuteAsync(null);
+                await viewModel.EnsureComicsLoadedAsync();
             }
             catch (Exception ex)
             {
