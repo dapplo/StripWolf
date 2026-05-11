@@ -606,7 +606,21 @@ public partial class LibraryViewModel : ViewModelBase
         ComicOpenRequested?.Invoke(this, comic.Id);
     }
 
-    private readonly Dictionary<int, (Comic Comic, CancellationTokenSource Cts)> _deleteCancellationTokens = new();
+    private readonly Dictionary<int, (Comic Comic, CancellationTokenSource Cts, bool DeleteFile)> _deleteCancellationTokens = new();
+
+    [RelayCommand]
+    private async Task DeleteSeriesAsync(ComicSeriesGroup? seriesGroup)
+    {
+        if (seriesGroup is null)
+        {
+            return;
+        }
+
+        foreach (var comic in seriesGroup.Comics.Where(static comic => !comic.IsDeleting).ToList())
+        {
+            await StartDeletionProcess(comic, ShouldDeleteComicFile(comic));
+        }
+    }
 
     [RelayCommand]
     private async Task DeleteComicAsync(Comic? comic)
@@ -616,11 +630,7 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        // Check if file is in application directory
-        var appDir = _libraryService.ComicsDirectory;
-        bool isInternal = comic.FilePath.StartsWith(appDir, StringComparison.OrdinalIgnoreCase);
-
-        if (!isInternal)
+        if (!ShouldDeleteComicFile(comic))
         {
             ComicPendingDeletion = comic;
             DeleteConfirmationPath = comic.FilePath;
@@ -670,7 +680,7 @@ public partial class LibraryViewModel : ViewModelBase
 
         // Create cancellation token
         var cts = new CancellationTokenSource();
-        _deleteCancellationTokens[comic.Id] = (comic, cts);
+        _deleteCancellationTokens[comic.Id] = (comic, cts, deleteFile);
 
         // Start countdown
         _ = StartComicDeleteCountdownAsync(comic, cts, deleteFile);
@@ -883,7 +893,14 @@ public partial class LibraryViewModel : ViewModelBase
             
             try
             {
-                await _libraryService.DeleteComicAsync(entry.Value.Comic);
+                if (entry.Value.DeleteFile)
+                {
+                    await _libraryService.DeleteComicAsync(entry.Value.Comic);
+                }
+                else
+                {
+                    await _libraryService.RemoveComicFromLibraryAsync(entry.Value.Comic);
+                }
             }
             catch
             {
@@ -892,5 +909,29 @@ public partial class LibraryViewModel : ViewModelBase
         }
         
         _deleteCancellationTokens.Clear();
+    }
+
+    private bool ShouldDeleteComicFile(Comic comic)
+    {
+        return comic.Source == ComicSource.Komga || IsManagedComicFile(comic.FilePath);
+    }
+
+    private bool IsManagedComicFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        var managedDirectory = EnsureTrailingDirectorySeparator(Path.GetFullPath(_libraryService.ComicsDirectory));
+        var normalizedFilePath = Path.GetFullPath(filePath);
+        return normalizedFilePath.StartsWith(managedDirectory, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string EnsureTrailingDirectorySeparator(string path)
+    {
+        return path.EndsWith(Path.DirectorySeparatorChar) || path.EndsWith(Path.AltDirectorySeparatorChar)
+            ? path
+            : path + Path.DirectorySeparatorChar;
     }
 }

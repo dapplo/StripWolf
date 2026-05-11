@@ -125,11 +125,11 @@
     </DataTemplate>
 
     <DataTemplate x:Key="SeriesGroupTemplate" x:DataType="models:ComicSeriesGroup">
-      <Expander IsExpanded="{Binding IsExpanded}" Margin="0,0,0,16">
+      <Expander IsExpanded="{Binding IsExpanded}" Margin="0,0,0,16" Padding="0" HorizontalAlignment="Stretch">
         <Expander.Header>
-          <Border CornerRadius="8" Padding="12"
+          <Border CornerRadius="8" Padding="12" HorizontalAlignment="Stretch"
                   Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
               <Border Width="72" Height="96" CornerRadius="8" ClipToBounds="True" Background="Black">
                 <controls:AsyncImage SourceUrl="{Binding RepresentativeComic.CoverPath}" Stretch="Uniform"
                                      RenderOptions.BitmapInterpolationMode="LowQuality"
@@ -148,11 +148,22 @@
                       VerticalAlignment="Top">
                 <TextBlock Text="{Binding ComicCount, StringFormat='{}{0} comics'}" Foreground="White" FontSize="12"/>
               </Border>
+
+              <Button Grid.Column="3"
+                      Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteSeriesCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      CommandParameter="{Binding}"
+                      Background="#D32F2F"
+                      Foreground="White"
+                      Padding="10,4"
+                      VerticalAlignment="Top"
+                      ToolTip.Tip="Delete series from library">
+                <TextBlock Text="Delete" FontSize="12"/>
+              </Button>
             </Grid>
           </Border>
         </Expander.Header>
 
-        <repeater:ItemsRepeater ItemsSource="{Binding Comics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,12,0,0">
+        <repeater:ItemsRepeater ItemsSource="{Binding Comics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0" HorizontalAlignment="Stretch">
           <repeater:ItemsRepeater.Layout>
             <layout:UniformGridLayout Orientation="Horizontal"
                                       MinItemWidth="162"
@@ -249,6 +260,7 @@
 
           <!-- Continue Reading Section -->
           <Expander Grid.Row="{Binding ContinueReadingSectionOrder}"
+                    HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowContinueReadingSection}"
                     IsExpanded="{Binding IsContinueReadingSectionExpanded}">
             <Expander.Header>
@@ -267,12 +279,13 @@
 
           <!-- New Comics Section -->
           <Expander Grid.Row="{Binding NewComicsSectionOrder}"
+                    HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowNewComicsSection}"
                     IsExpanded="{Binding IsNewComicsSectionExpanded}">
             <Expander.Header>
               <TextBlock Text="New Comics" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
-            <StackPanel Spacing="8" Margin="0,8,0,0">
+            <StackPanel Spacing="8" Margin="0,8,0,0" HorizontalAlignment="Stretch">
               <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
                 <TextBlock Text="▤" FontSize="56" HorizontalAlignment="Center"/>
                 <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
@@ -298,6 +311,7 @@
 
           <!-- Favorites Section -->
           <Expander Grid.Row="{Binding FavoritesSectionOrder}"
+                    HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowFavoritesSection}"
                     IsExpanded="{Binding IsFavoritesSectionExpanded}">
             <Expander.Header>
@@ -316,23 +330,27 @@
 
           <!-- Series Section -->
           <Expander Grid.Row="{Binding SeriesSectionOrder}"
+                    HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowSeriesSection}"
                     IsExpanded="{Binding IsSeriesSectionExpanded}">
             <Expander.Header>
               <TextBlock Text="Series" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
-            <StackPanel Spacing="8" Margin="0,8,0,0">
+            <StackPanel Spacing="8" Margin="0,8,0,0" HorizontalAlignment="Stretch">
               <TextBlock Text="Series with multiple comics in your library" Foreground="Gray"/>
-              <repeater:ItemsRepeater ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}">
-                <repeater:ItemsRepeater.Layout>
-                  <layout:StackLayout Spacing="16"/>
-                </repeater:ItemsRepeater.Layout>
-              </repeater:ItemsRepeater>
+              <ItemsControl ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}" HorizontalAlignment="Stretch">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="16"/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
             </StackPanel>
           </Expander>
 
           <!-- Read Section -->
           <Expander Grid.Row="{Binding ReadSectionOrder}"
+                    HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowReadSection}"
                     IsExpanded="{Binding IsReadSectionExpanded}">
             <Expander.Header>

@@ -18,8 +18,10 @@ public class SettingsService
     private readonly string _settingsPath;
     private readonly string _passwordsPath;
     private readonly byte[] _encryptionKey;
+    private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
     
     private AppSettings? _cachedSettings;
+    private long _latestSaveRequestId;
 
     public event EventHandler<AppSettings>? SettingsChanged;
 
@@ -136,26 +138,45 @@ public class SettingsService
     public async Task SaveSettingsAsync(AppSettings settings)
     {
         NormalizeSectionPreferences(settings);
-        _cachedSettings = settings;
+        var requestId = Interlocked.Increment(ref _latestSaveRequestId);
+        var snapshot = settings.Clone();
+        NormalizeSectionPreferences(snapshot);
 
-        // Save settings without sensitive data
-        var settingsToSave = settings.Clone();
-        foreach (var server in settingsToSave.Servers)
+        await _saveSemaphore.WaitAsync();
+        try
         {
-            server.Password = string.Empty; 
-            server.ApiKey = string.Empty;
+            if (requestId != Volatile.Read(ref _latestSaveRequestId))
+            {
+                return;
+            }
+
+            // Save settings without sensitive data
+            var settingsToSave = snapshot.Clone();
+            foreach (var server in settingsToSave.Servers)
+            {
+                server.Password = string.Empty;
+                server.ApiKey = string.Empty;
+            }
+
+            var json = JsonSerializer.Serialize(settingsToSave, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            await File.WriteAllTextAsync(_settingsPath, json);
+
+            // Save sensitive data separately encrypted
+            await SavePasswordsAsync(snapshot);
+
+            if (requestId == Volatile.Read(ref _latestSaveRequestId))
+            {
+                _cachedSettings = snapshot.Clone();
+                SettingsChanged?.Invoke(this, snapshot.Clone());
+            }
         }
-
-        var json = JsonSerializer.Serialize(settingsToSave, new JsonSerializerOptions 
-        { 
-            WriteIndented = true 
-        });
-        await File.WriteAllTextAsync(_settingsPath, json);
-
-        // Save sensitive data separately encrypted
-        await SavePasswordsAsync(settings);
-
-        SettingsChanged?.Invoke(this, settings.Clone());
+        finally
+        {
+            _saveSemaphore.Release();
+        }
     }
 
     /// <summary>
