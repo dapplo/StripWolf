@@ -16,6 +16,7 @@ public partial class KomgaViewModel : ViewModelBase
 {
     private readonly KomgaApiService _komgaApiService;
     private readonly LibraryService _libraryService;
+    private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
     
     private KomgaServer? _activeServer;
@@ -88,10 +89,15 @@ public partial class KomgaViewModel : ViewModelBase
 
     private readonly HashSet<string> _downloadPendingBookIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, KomgaDownloadQueueItem> _downloadItemsByBookId = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, KomgaPostDownloadWorkItem> _postDownloadWorkItemsByBookId = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CancellationTokenSource> _downloadCancellationTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _cancelRequestedBookIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pauseRequestedBookIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<KomgaPostDownloadWorkItem> _postDownloadQueue = new();
+    private readonly object _postDownloadQueueLock = new();
     private bool _isProcessingQueue;
+    private bool _isProcessingPostDownloadQueue;
+    private bool _downloadQueueStateRefreshPending;
     [ObservableProperty]
     private bool _isDownloadQueuePaused;
     private int _maxParallelDownloads = 1;
@@ -351,8 +357,15 @@ public partial class KomgaViewModel : ViewModelBase
     private void ApplySeriesDownloadState(KomgaSeriesDisplay seriesDisplay)
     {
         var matchingQueueItems = DownloadQueueItems.Where(item => string.Equals(item.BookDisplay.Book.SeriesId, seriesDisplay.Id, StringComparison.OrdinalIgnoreCase)).ToList();
-        seriesDisplay.IsQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued);
-        seriesDisplay.IsDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling);
+        var matchingPostDownloadItems = _postDownloadWorkItemsByBookId.Values
+            .Where(item => string.Equals(item.DownloadedFile.Book.SeriesId, seriesDisplay.Id, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        seriesDisplay.IsQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued) ||
+                                            matchingPostDownloadItems.Any(item => !item.PendingImport.IsProcessing &&
+                                                                                  !item.PendingImport.IsCompleted &&
+                                                                                  !item.PendingImport.IsFailed);
+        seriesDisplay.IsDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling) ||
+                                      matchingPostDownloadItems.Any(item => item.PendingImport.IsProcessing);
     }
 
     private void RefreshSeriesDownloadState(string? seriesId)
@@ -390,8 +403,15 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         var matchingQueueItems = DownloadQueueItems.Where(item => string.Equals(item.BookDisplay.Book.SeriesId, seriesId, StringComparison.OrdinalIgnoreCase)).ToList();
-        IsSelectedSeriesQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued);
-        IsSelectedSeriesDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling);
+        var matchingPostDownloadItems = _postDownloadWorkItemsByBookId.Values
+            .Where(item => string.Equals(item.DownloadedFile.Book.SeriesId, seriesId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        IsSelectedSeriesQueuedForDownload = matchingQueueItems.Any(item => item.IsQueued) ||
+                                            matchingPostDownloadItems.Any(item => !item.PendingImport.IsProcessing &&
+                                                                                  !item.PendingImport.IsCompleted &&
+                                                                                  !item.PendingImport.IsFailed);
+        IsSelectedSeriesDownloading = matchingQueueItems.Any(item => item.IsDownloading || item.IsCancelling) ||
+                                      matchingPostDownloadItems.Any(item => item.PendingImport.IsProcessing);
     }
 
     private void RefreshDownloadQueueState()
@@ -412,6 +432,30 @@ public partial class KomgaViewModel : ViewModelBase
             ? activeDownloads[0].Name
             : $"{activeDownloads.Count} downloads in progress";
         DownloadProgress = activeDownloads.Average(item => item.Progress);
+    }
+
+    private void ScheduleRefreshDownloadQueueState()
+    {
+        if (_downloadQueueStateRefreshPending)
+        {
+            return;
+        }
+
+        _downloadQueueStateRefreshPending = true;
+        void Refresh()
+        {
+            _downloadQueueStateRefreshPending = false;
+            RefreshDownloadQueueState();
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            Refresh();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(Refresh, DispatcherPriority.Background);
+        }
     }
 
     private void ApplySectionLayout(AppSettings settings)
@@ -456,15 +500,21 @@ public partial class KomgaViewModel : ViewModelBase
     private KomgaBookDisplay CreateBookDisplay(KomgaBook book, Bitmap? thumbnail, bool isDownloaded)
     {
         _downloadItemsByBookId.TryGetValue(book.Id, out var queueItem);
+        _postDownloadWorkItemsByBookId.TryGetValue(book.Id, out var postDownloadWorkItem);
+        var queuedForPostDownload = postDownloadWorkItem is not null &&
+                                    !postDownloadWorkItem.PendingImport.IsProcessing &&
+                                    !postDownloadWorkItem.PendingImport.IsCompleted &&
+                                    !postDownloadWorkItem.PendingImport.IsFailed;
+        var importingPostDownload = postDownloadWorkItem?.PendingImport.IsProcessing ?? false;
         return new KomgaBookDisplay
         {
             Book = book,
             Thumbnail = thumbnail,
             IsDownloaded = isDownloaded,
-            IsQueued = queueItem?.IsQueued ?? _downloadPendingBookIds.Contains(book.Id),
-            IsDownloading = queueItem?.IsDownloading ?? false,
+            IsQueued = queueItem?.IsQueued ?? queuedForPostDownload || _downloadPendingBookIds.Contains(book.Id),
+            IsDownloading = queueItem?.IsDownloading ?? importingPostDownload,
             IsCancelling = queueItem?.IsCancelling ?? false,
-            DownloadProgress = queueItem?.Progress ?? 0
+            DownloadProgress = queueItem?.Progress ?? postDownloadWorkItem?.PendingImport.Progress ?? 0
         };
     }
 
@@ -519,10 +569,12 @@ public partial class KomgaViewModel : ViewModelBase
     public KomgaViewModel(
         KomgaApiService komgaApiService,
         LibraryService libraryService,
+        ImportQueueService importQueueService,
         SettingsService settingsService)
     {
         _komgaApiService = komgaApiService;
         _libraryService = libraryService;
+        _importQueueService = importQueueService;
         _settingsService = settingsService;
         Title = "Komga";
         var initialSettings = _settingsService.LoadSettings();
@@ -536,7 +588,7 @@ public partial class KomgaViewModel : ViewModelBase
                 ApplyDownloadSettings(settings);
             });
         };
-        DownloadQueueItems.CollectionChanged += (_, _) => RefreshDownloadQueueState();
+        DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
     }
 
     private void ApplyDownloadSettings(AppSettings settings)
@@ -1758,13 +1810,177 @@ public partial class KomgaViewModel : ViewModelBase
         });
     }
 
+    private static PendingImport CreatePostDownloadPendingImport(KomgaDownloadedFile downloadedFile)
+    {
+        return new PendingImport
+        {
+            FilePath = downloadedFile.FilePath,
+            FileName = $"{downloadedFile.Book.SeriesTitle} - {downloadedFile.Book.Name}",
+            Status = downloadedFile.RequiresConversion ? "Queued for conversion..." : "Queued for import..."
+        };
+    }
+
+    private async Task QueueDownloadedBookForImportAsync(KomgaDownloadQueueItem queueItem, KomgaDownloadedFile downloadedFile)
+    {
+        var pendingImport = CreatePostDownloadPendingImport(downloadedFile);
+        var workItem = new KomgaPostDownloadWorkItem(downloadedFile, pendingImport);
+
+        _postDownloadWorkItemsByBookId[queueItem.Id] = workItem;
+        await _importQueueService.EnqueueAsync(pendingImport);
+
+        var shouldStartProcessor = false;
+        lock (_postDownloadQueueLock)
+        {
+            _postDownloadQueue.Enqueue(workItem);
+            if (!_isProcessingPostDownloadQueue)
+            {
+                _isProcessingPostDownloadQueue = true;
+                shouldStartProcessor = true;
+            }
+        }
+
+        SetDownloadState(queueItem.Id, trackedBook =>
+        {
+            trackedBook.IsQueued = true;
+            trackedBook.IsDownloading = false;
+            trackedBook.IsCancelling = false;
+            trackedBook.DownloadProgress = 0;
+        });
+
+        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+
+        if (shouldStartProcessor)
+        {
+            _ = ProcessPostDownloadQueueAsync();
+        }
+    }
+
+    private async Task ProcessPostDownloadQueueAsync()
+    {
+        try
+        {
+            while (true)
+            {
+                KomgaPostDownloadWorkItem? workItem;
+                lock (_postDownloadQueueLock)
+                {
+                    workItem = _postDownloadQueue.Count > 0 ? _postDownloadQueue.Dequeue() : null;
+                    if (workItem is null)
+                    {
+                        _isProcessingPostDownloadQueue = false;
+                        return;
+                    }
+                }
+
+                await RunPostDownloadImportAsync(workItem);
+            }
+        }
+        finally
+        {
+            lock (_postDownloadQueueLock)
+            {
+                if (_postDownloadQueue.Count == 0)
+                {
+                    _isProcessingPostDownloadQueue = false;
+                }
+            }
+        }
+    }
+
+    private async Task RunPostDownloadImportAsync(KomgaPostDownloadWorkItem workItem)
+    {
+        var bookId = workItem.DownloadedFile.Book.Id;
+        var seriesId = workItem.DownloadedFile.Book.SeriesId;
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            workItem.PendingImport.IsProcessing = true;
+            workItem.PendingImport.IsCompleted = false;
+            workItem.PendingImport.IsFailed = false;
+            workItem.PendingImport.ErrorMessage = null;
+            workItem.PendingImport.Progress = 0;
+            workItem.PendingImport.Status = workItem.DownloadedFile.RequiresConversion ? "Converting..." : "Importing...";
+
+            SetDownloadState(bookId, trackedBook =>
+            {
+                trackedBook.IsQueued = false;
+                trackedBook.IsDownloading = true;
+                trackedBook.IsCancelling = false;
+                trackedBook.DownloadProgress = 0;
+            });
+            RefreshSeriesDownloadState(seriesId);
+        });
+
+        try
+        {
+            var progress = UiProgressThrottle.Create(value =>
+            {
+                workItem.PendingImport.Progress = value;
+                workItem.PendingImport.Status = workItem.DownloadedFile.RequiresConversion
+                    ? $"Converting... {value:P0}"
+                    : $"Importing... {value:P0}";
+                SetDownloadState(bookId, trackedBook => trackedBook.DownloadProgress = value);
+                RefreshSeriesDownloadState(seriesId);
+            });
+
+            await _libraryService.ImportDownloadedKomgaBookAsync(workItem.DownloadedFile, progress);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                workItem.PendingImport.IsProcessing = false;
+                workItem.PendingImport.IsCompleted = true;
+                workItem.PendingImport.Progress = 1;
+                workItem.PendingImport.Status = "Completed";
+
+                SetDownloadState(bookId, trackedBook =>
+                {
+                    trackedBook.IsQueued = false;
+                    trackedBook.IsDownloading = false;
+                    trackedBook.IsCancelling = false;
+                    trackedBook.IsDownloaded = true;
+                    trackedBook.DownloadProgress = 1;
+                });
+
+                _downloadPendingBookIds.Remove(bookId);
+                _postDownloadWorkItemsByBookId.Remove(bookId);
+                RefreshSeriesDownloadState(seriesId);
+            });
+
+            await RemoveCompletedPostDownloadImportAfterDelayAsync(workItem.PendingImport);
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                workItem.PendingImport.IsProcessing = false;
+                workItem.PendingImport.IsFailed = true;
+                workItem.PendingImport.Status = "Failed";
+                workItem.PendingImport.ErrorMessage = ex.Message;
+
+                _downloadPendingBookIds.Remove(bookId);
+                _postDownloadWorkItemsByBookId.Remove(bookId);
+                ResetDownloadState(bookId);
+                RefreshSeriesDownloadState(seriesId);
+            });
+
+            ErrorMessage = $"Failed to import '{workItem.PendingImport.FileName}'.";
+            System.Diagnostics.Debug.WriteLine($"Post-download import error: {ex}");
+        }
+    }
+
+    private async Task RemoveCompletedPostDownloadImportAfterDelayAsync(PendingImport pendingImport)
+    {
+        await Task.Delay(2000);
+        await _importQueueService.RemoveAsync(pendingImport);
+    }
+
     private async Task ProcessDownloadQueueAsync()
     {
         try
         {
             while (true)
             {
-                var activeCount = DownloadQueueItems.Count(item => item.IsDownloading);
+                var activeCount = DownloadQueueItems.Count(item => item.IsDownloading || item.IsCancelling);
                 var queuedItems = DownloadQueueItems.Where(item => item.IsQueued && !item.IsCancelling).ToList();
 
                 if (activeCount == 0 && queuedItems.Count == 0)
@@ -1786,7 +2002,7 @@ public partial class KomgaViewModel : ViewModelBase
                     }
                 }
 
-                RefreshDownloadQueueState();
+                ScheduleRefreshDownloadQueueState();
                 await Task.Delay(150);
             }
         }
@@ -1801,7 +2017,7 @@ public partial class KomgaViewModel : ViewModelBase
             _cancelRequestedBookIds.Clear();
             _pauseRequestedBookIds.Clear();
             _isProcessingQueue = false;
-            RefreshDownloadQueueState();
+            ScheduleRefreshDownloadQueueState();
         }
     }
 
@@ -1823,32 +2039,44 @@ public partial class KomgaViewModel : ViewModelBase
             queueItem.ErrorMessage = null;
             queueItem.Progress = 0;
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-            RefreshDownloadQueueState();
+            ScheduleRefreshDownloadQueueState();
 
             for (var attempt = 1; attempt <= MaxDownloadRetryCount; attempt++)
             {
                 try
                 {
-                    var progress = new Progress<double>(p =>
+                    var progress = UiProgressThrottle.Create(p =>
                     {
                         queueItem.Progress = p;
                         SetDownloadState(queueItem.Id, trackedBook => trackedBook.DownloadProgress = p);
-                        RefreshDownloadQueueState();
+                        ScheduleRefreshDownloadQueueState();
                     });
 
-                    await _libraryService.DownloadFromKomgaAsync(queueItem.BookDisplay.Book, queueItem.ServerId, progress, token);
-                    SetDownloadState(queueItem.Id, trackedBook =>
-                    {
-                        trackedBook.IsDownloaded = true;
-                        trackedBook.DownloadProgress = 1.0;
-                    });
-                    queueItem.BookDisplay.IsDownloaded = true;
+                    var downloadedFile = await _libraryService.DownloadKomgaBookAsync(queueItem.BookDisplay.Book, queueItem.ServerId, progress, token);
                     queueItem.Progress = 1.0;
-                    _downloadPendingBookIds.Remove(queueItem.Id);
                     _downloadItemsByBookId.Remove(queueItem.Id);
                     DownloadQueueItems.Remove(queueItem);
+
+                    if (downloadedFile is null)
+                    {
+                        SetDownloadState(queueItem.Id, trackedBook =>
+                        {
+                            trackedBook.IsQueued = false;
+                            trackedBook.IsDownloading = false;
+                            trackedBook.IsCancelling = false;
+                            trackedBook.IsDownloaded = true;
+                            trackedBook.DownloadProgress = 1.0;
+                        });
+                        queueItem.BookDisplay.IsDownloaded = true;
+                        _downloadPendingBookIds.Remove(queueItem.Id);
+                    }
+                    else
+                    {
+                        await QueueDownloadedBookForImportAsync(queueItem, downloadedFile);
+                    }
+
                     RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                    RefreshDownloadQueueState();
+                    ScheduleRefreshDownloadQueueState();
                     return;
                 }
                 catch (OperationCanceledException)
@@ -1867,7 +2095,7 @@ public partial class KomgaViewModel : ViewModelBase
                         queueItem.IsCancelling = false;
                         queueItem.Progress = 0;
                         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                        RefreshDownloadQueueState();
+                        ScheduleRefreshDownloadQueueState();
                         return;
                     }
 
@@ -1880,7 +2108,7 @@ public partial class KomgaViewModel : ViewModelBase
                         queueItem.IsCancelling = false;
                         DownloadQueueItems.Remove(queueItem);
                         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                        RefreshDownloadQueueState();
+                        ScheduleRefreshDownloadQueueState();
                         return;
                     }
 
@@ -1910,7 +2138,7 @@ public partial class KomgaViewModel : ViewModelBase
                     ErrorMessage = $"Failed to download '{queueItem.Name}' after {MaxDownloadRetryCount} attempts.";
                     System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
                     RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                    RefreshDownloadQueueState();
+                    ScheduleRefreshDownloadQueueState();
                     return;
                 }
             }
@@ -1947,6 +2175,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 activeCts.Cancel();
             }
+            ScheduleRefreshDownloadQueueState();
             return;
         }
 
@@ -1955,6 +2184,7 @@ public partial class KomgaViewModel : ViewModelBase
         ResetDownloadState(queueItem.Id);
         DownloadQueueItems.Remove(queueItem);
         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+        ScheduleRefreshDownloadQueueState();
     }
 
     [RelayCommand]
@@ -1967,6 +2197,7 @@ public partial class KomgaViewModel : ViewModelBase
             ResetDownloadState(queueItem.Id);
             DownloadQueueItems.Remove(queueItem);
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            ScheduleRefreshDownloadQueueState();
         }
 
         foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
@@ -1984,6 +2215,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 activeCts.Cancel();
             }
+            ScheduleRefreshDownloadQueueState();
         }
     }
 
@@ -2282,6 +2514,19 @@ public partial class KomgaViewModel : ViewModelBase
     private async Task LoadMoreBooksForReadListAsync()
     {
         await LoadBooksForReadListAsync();
+    }
+
+    private sealed class KomgaPostDownloadWorkItem
+    {
+        public KomgaPostDownloadWorkItem(KomgaDownloadedFile downloadedFile, PendingImport pendingImport)
+        {
+            DownloadedFile = downloadedFile;
+            PendingImport = pendingImport;
+        }
+
+        public KomgaDownloadedFile DownloadedFile { get; }
+
+        public PendingImport PendingImport { get; }
     }
 
     #endregion

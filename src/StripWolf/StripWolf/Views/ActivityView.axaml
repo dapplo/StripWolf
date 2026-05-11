@@ -5,6 +5,8 @@
              xmlns:vm="using:StripWolf.ViewModels"
              xmlns:models="using:StripWolf.Models"
              xmlns:komga="using:StripWolf.Models.Komga"
+             xmlns:repeater="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.ItemsRepeater"
+             xmlns:layout="clr-namespace:Avalonia.Layout;assembly=Avalonia.Controls.ItemsRepeater"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="StripWolf.Views.ActivityView"
              x:DataType="vm:ActivityViewModel">
@@ -24,10 +26,13 @@
           </Grid>
           <TextBlock Text="{Binding Komga.DownloadingBookName}" IsVisible="{Binding Komga.IsDownloading}" FontSize="12"/>
           <ProgressBar Value="{Binding Komga.DownloadProgress}" Maximum="1" Height="6" IsVisible="{Binding Komga.IsDownloading}"/>
-          <ItemsControl ItemsSource="{Binding DownloadQueueItems}">
-            <ItemsControl.ItemTemplate>
+          <repeater:ItemsRepeater ItemsSource="{Binding DownloadQueueItems}">
+            <repeater:ItemsRepeater.Layout>
+              <layout:StackLayout Orientation="Vertical" Spacing="8"/>
+            </repeater:ItemsRepeater.Layout>
+            <repeater:ItemsRepeater.ItemTemplate>
               <DataTemplate x:DataType="komga:KomgaDownloadQueueItem">
-                <Border Margin="0,0,0,8" Padding="8" CornerRadius="6"
+                <Border Padding="8" CornerRadius="6"
                         Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
                   <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
                     <StackPanel Grid.Row="0" Grid.Column="0">
@@ -46,8 +51,8 @@
                   </Grid>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+            </repeater:ItemsRepeater.ItemTemplate>
+          </repeater:ItemsRepeater>
         </StackPanel>
       </Border>
 
@@ -55,12 +60,14 @@
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
         <StackPanel Spacing="8">
           <TextBlock Text="Imports" FontSize="18" FontWeight="Bold"/>
-          <ItemsControl ItemsSource="{Binding PendingImports}">
-            <ItemsControl.ItemTemplate>
+          <repeater:ItemsRepeater ItemsSource="{Binding PendingImports}">
+            <repeater:ItemsRepeater.Layout>
+              <layout:StackLayout Orientation="Vertical" Spacing="8"/>
+            </repeater:ItemsRepeater.Layout>
+            <repeater:ItemsRepeater.ItemTemplate>
               <DataTemplate x:DataType="models:PendingImport">
                 <Border CornerRadius="8" Padding="12"
-                        Background="{DynamicResource SystemControlBackgroundChromeHighBrush}"
-                        Margin="0,0,0,8">
+                        Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
                   <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
                     <TextBlock Grid.Column="0" Grid.RowSpan="3" Text="📄" FontSize="24" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
@@ -75,8 +82,8 @@
                   </Grid>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+            </repeater:ItemsRepeater.ItemTemplate>
+          </repeater:ItemsRepeater>
         </StackPanel>
       </Border>
     </StackPanel>

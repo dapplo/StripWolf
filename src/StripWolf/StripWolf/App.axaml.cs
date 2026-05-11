@@ -165,6 +165,7 @@ public partial class App : Application
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<EpubToCbzConverterService>();
         services.AddSingleton<LibraryService>();
+        services.AddSingleton<ImportQueueService>();
 
         // Register view models
         services.AddSingleton<LibraryViewModel>();

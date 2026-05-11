@@ -369,81 +369,103 @@ public class LibraryService
     }
 
     /// <summary>
-    /// Downloads a comic from Komga and adds it to the library
+    /// Downloads a Komga book to the managed comics directory without importing it into the library yet.
+    /// Returns null when the book is already present in the library.
     /// </summary>
-    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<KomgaDownloadedFile?> DownloadKomgaBookAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
-        // Check if already downloaded by ID or Hash
         var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
         if (existing is not null)
         {
-            return existing;
+            return null;
         }
 
-        // Determine file extension from media type (strip parameters like "; version=4")
-        var baseMediaType = book.Media?.MediaType?.Split(';')[0].Trim();
-        var extension = baseMediaType switch
-        {
-            "application/zip" => ".cbz",
-            "application/x-rar-compressed" => ".cbr",
-            "application/x-7z-compressed" => ".cb7",
-            "application/x-tar" => ".cbt",
-            "application/pdf" => ".pdf",
-            "application/epub+zip" => ".epub",
-            _ => ".cbz"
-        };
-
+        var extension = GetKomgaDownloadExtension(book);
         var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
         var filePath = Path.Combine(_comicsDirectory, fileName);
-        string actualFilePath = filePath;
-        string? coverPath = null;
-        ComicImportData? convertedImportData = null;
 
         try
         {
-            // Download the book
             var success = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, cancellationToken);
             if (!success)
             {
                 throw new Exception("Failed to download comic from Komga");
             }
-            
+
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Check if downloaded file needs conversion (solid RAR, CB7, CBT, PDF)
             var format = ComicReaderService.GetComicFormat(filePath);
-            var needsConversion = format == ComicFormat.Pdf ||
-                                  format == ComicFormat.Epub ||
-                                  format == ComicFormat.Cb7 || 
-                                  format == ComicFormat.Cbt ||
-                                  (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
-            var pageCount = book.Media?.PagesCount ?? 0;
-            var fileSize = book.SizeBytes;
+            return new KomgaDownloadedFile
+            {
+                Book = book,
+                ServerId = serverId,
+                FilePath = filePath,
+                Format = format,
+                RequiresConversion = RequiresKomgaConversion(filePath, format)
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            CleanupPartialFile(filePath);
+            throw;
+        }
+        catch
+        {
+            CleanupPartialFile(filePath);
+            throw;
+        }
+    }
 
+    /// <summary>
+    /// Imports a previously downloaded Komga file into the library, converting it when needed.
+    /// </summary>
+    public async Task<Comic> ImportDownloadedKomgaBookAsync(KomgaDownloadedFile downloadedFile, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(downloadedFile.Book.Id, downloadedFile.Book.FileHash);
+        if (existing is not null)
+        {
+            if (!string.Equals(existing.FilePath, downloadedFile.FilePath, StringComparison.OrdinalIgnoreCase) &&
+                File.Exists(downloadedFile.FilePath) &&
+                IsAppOwnedSourcePath(downloadedFile.FilePath))
+            {
+                await DeleteManagedSourceFileAsync(downloadedFile.FilePath);
+            }
+
+            return existing;
+        }
+
+        var filePath = downloadedFile.FilePath;
+        var actualFilePath = filePath;
+        string? coverPath = null;
+        ComicImportData? convertedImportData = null;
+        var pageCount = downloadedFile.Book.Media?.PagesCount ?? 0;
+        var fileSize = downloadedFile.Book.SizeBytes;
+        var needsConversion = downloadedFile.RequiresConversion;
+
+        try
+        {
             if (needsConversion)
             {
-                if (format == ComicFormat.Pdf)
+                if (downloadedFile.Format == ComicFormat.Pdf)
                 {
                     convertedImportData = await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
                 }
-                else if (format == ComicFormat.Epub)
+                else if (downloadedFile.Format == ComicFormat.Epub)
                 {
                     convertedImportData = await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    convertedImportData = await _comicConverter.ConvertToCbzForImportAsync(filePath, _comicsDirectory, null);
+                    convertedImportData = await _comicConverter.ConvertToCbzForImportAsync(filePath, _comicsDirectory, progress);
                 }
 
                 actualFilePath = convertedImportData.FilePath;
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Delete original file after successful conversion
-                if (actualFilePath != filePath && File.Exists(filePath))
+                if (!string.Equals(actualFilePath, filePath, StringComparison.OrdinalIgnoreCase) && File.Exists(filePath))
                 {
-                    // Add a small delay and retry to allow system to release locks
-                    bool deleted = false;
-                    for (int i = 0; i < 5; i++)
+                    var deleted = false;
+                    for (var attempt = 0; attempt < 5; attempt++)
                     {
                         try
                         {
@@ -456,7 +478,7 @@ public class LibraryService
                             await Task.Delay(500, cancellationToken);
                         }
                     }
-                    
+
                     if (!deleted)
                     {
                         System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete original file '{filePath}' after conversion.");
@@ -469,7 +491,6 @@ public class LibraryService
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Extract ComicInfo.xml metadata if available
             var comicInfo = convertedImportData?.ComicInfo;
             if (comicInfo is null)
             {
@@ -485,26 +506,23 @@ public class LibraryService
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Download thumbnail to unified covers directory
-            var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(book.Id);
-
+            var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(downloadedFile.Book.Id);
             if (thumbnailData is not null)
             {
-                coverPath = Path.Combine(_coversDirectory, $"{book.Id}.jpg");
+                coverPath = Path.Combine(_coversDirectory, $"{downloadedFile.Book.Id}.jpg");
                 await File.WriteAllBytesAsync(coverPath, thumbnailData, cancellationToken);
             }
             else
             {
-                // Extract cover if Komga didn't have one
                 try
                 {
                     if (convertedImportData?.CoverImageStream is not null)
                     {
-                        coverPath = await CreateCoverThumbnailAsync(convertedImportData.CoverImageStream, book.Id);
+                        coverPath = await CreateCoverThumbnailAsync(convertedImportData.CoverImageStream, downloadedFile.Book.Id);
                     }
                     else
                     {
-                        coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, book.Id);
+                        coverPath = await ExtractCoverToUnifiedDirectoryAsync(actualFilePath, downloadedFile.Book.Id);
                     }
                 }
                 catch
@@ -515,45 +533,41 @@ public class LibraryService
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Parse release date
             DateTime? releaseDate = null;
-            if (!string.IsNullOrEmpty(book.Metadata?.ReleaseDate))
+            if (!string.IsNullOrEmpty(downloadedFile.Book.Metadata?.ReleaseDate) &&
+                DateTime.TryParse(downloadedFile.Book.Metadata.ReleaseDate, out var parsed))
             {
-                if (DateTime.TryParse(book.Metadata.ReleaseDate, out var parsed))
-                {
-                    releaseDate = parsed;
-                }
+                releaseDate = parsed;
             }
 
             var comic = new Comic
             {
-                KomgaId = book.Id,
-                KomgaHash = book.FileHash,
-                KomgaSeriesId = book.SeriesId,
-                Title = book.Metadata?.Title ?? book.Name,
-                SeriesName = book.SeriesTitle,
-                Number = book.Number,
-                Summary = book.Metadata?.Summary,
-                Authors = book.Metadata?.Authors is not null 
-                    ? string.Join(", ", book.Metadata.Authors.Select(a => a.Name))
+                KomgaId = downloadedFile.Book.Id,
+                KomgaHash = downloadedFile.Book.FileHash,
+                KomgaSeriesId = downloadedFile.Book.SeriesId,
+                Title = downloadedFile.Book.Metadata?.Title ?? downloadedFile.Book.Name,
+                SeriesName = downloadedFile.Book.SeriesTitle,
+                Number = downloadedFile.Book.Number,
+                Summary = downloadedFile.Book.Metadata?.Summary,
+                Authors = downloadedFile.Book.Metadata?.Authors is not null
+                    ? string.Join(", ", downloadedFile.Book.Metadata.Authors.Select(author => author.Name))
                     : null,
                 ReleaseDate = releaseDate,
                 FilePath = actualFilePath,
                 PageCount = pageCount,
                 FileSize = fileSize,
                 CoverPath = coverPath,
-                Format = needsConversion ? ComicFormat.Cbz : format,
+                Format = needsConversion ? ComicFormat.Cbz : downloadedFile.Format,
                 Source = ComicSource.Komga,
                 AddedDate = DateTime.UtcNow,
-                CurrentPage = book.ReadProgress?.Page ?? 0,
-                IsCompleted = book.ReadProgress?.Completed ?? false,
-                KomgaServerId = serverId
+                CurrentPage = downloadedFile.Book.ReadProgress?.Page ?? 0,
+                IsCompleted = downloadedFile.Book.ReadProgress?.Completed ?? false,
+                KomgaServerId = downloadedFile.ServerId
             };
 
-            // Create sidecar ComicInfo.xml if not already embedded
             if (comicInfo == null)
             {
-                var newInfo = CreateComicInfoFromKomgaBook(book);
+                var newInfo = CreateComicInfoFromKomgaBook(downloadedFile.Book);
                 await WriteComicInfoSidecarAsync(newInfo, actualFilePath);
             }
 
@@ -582,6 +596,21 @@ public class LibraryService
         {
             convertedImportData?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Downloads a comic from Komga and adds it to the library.
+    /// </summary>
+    public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var downloadedFile = await DownloadKomgaBookAsync(book, serverId, progress, cancellationToken);
+        if (downloadedFile is null)
+        {
+            return await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash)
+                ?? throw new InvalidOperationException($"Komga book '{book.Name}' is already present but could not be reloaded from the library.");
+        }
+
+        return await ImportDownloadedKomgaBookAsync(downloadedFile, progress, cancellationToken);
     }
 
     /// <summary>
@@ -857,6 +886,30 @@ public class LibraryService
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string GetKomgaDownloadExtension(KomgaBook book)
+    {
+        var baseMediaType = book.Media?.MediaType?.Split(';')[0].Trim();
+        return baseMediaType switch
+        {
+            "application/zip" => ".cbz",
+            "application/x-rar-compressed" => ".cbr",
+            "application/x-7z-compressed" => ".cb7",
+            "application/x-tar" => ".cbt",
+            "application/pdf" => ".pdf",
+            "application/epub+zip" => ".epub",
+            _ => ".cbz"
+        };
+    }
+
+    private static bool RequiresKomgaConversion(string filePath, ComicFormat format)
+    {
+        return format == ComicFormat.Pdf ||
+               format == ComicFormat.Epub ||
+               format == ComicFormat.Cb7 ||
+               format == ComicFormat.Cbt ||
+               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
     }
 
     private static void CleanupPartialFile(string? path)

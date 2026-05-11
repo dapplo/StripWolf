@@ -140,7 +140,11 @@
               <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"/>
                 <TextBlock Text="{Binding RepresentativeComic.Title}" FontSize="12" Foreground="Gray"
-                           TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                           TextTrimming="CharacterEllipsis" MaxLines="1"
+                           IsVisible="{Binding !HasDeletingComics}"/>
+                <TextBlock Text="{Binding DeleteStatusText}" FontSize="12" Foreground="#D32F2F"
+                           TextTrimming="CharacterEllipsis" MaxLines="1"
+                           IsVisible="{Binding HasDeletingComics}"/>
                 <TextBlock Text="{Binding ReadCount, StringFormat='{}{0} read'}" FontSize="12" Foreground="Gray"/>
               </StackPanel>
 
@@ -157,7 +161,7 @@
                       Padding="10,4"
                       VerticalAlignment="Top"
                       ToolTip.Tip="Delete series from library">
-                <TextBlock Text="Delete" FontSize="12"/>
+                <TextBlock Text="{Binding DeleteActionLabel}" FontSize="12"/>
               </Button>
             </Grid>
           </Border>

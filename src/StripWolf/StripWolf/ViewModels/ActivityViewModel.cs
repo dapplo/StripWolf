@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
@@ -11,6 +12,7 @@ public partial class ActivityViewModel : ViewModelBase
 {
     private readonly LibraryViewModel _libraryViewModel;
     private readonly KomgaViewModel _komgaViewModel;
+    private bool _activityRefreshPending;
 
     [ObservableProperty]
     private int _activeItemsCount;
@@ -69,7 +71,7 @@ public partial class ActivityViewModel : ViewModelBase
             }
         }
 
-        RefreshActivityState();
+        ScheduleRefreshActivityState();
     }
 
     private void OnDownloadQueueChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -90,7 +92,7 @@ public partial class ActivityViewModel : ViewModelBase
             }
         }
 
-        RefreshActivityState();
+        ScheduleRefreshActivityState();
     }
 
     private void OnActivityItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -98,7 +100,31 @@ public partial class ActivityViewModel : ViewModelBase
         if (e.PropertyName is nameof(PendingImport.Progress) or nameof(PendingImport.IsProcessing) or nameof(PendingImport.IsCompleted) or nameof(PendingImport.IsFailed)
             or nameof(KomgaDownloadQueueItem.Progress) or nameof(KomgaDownloadQueueItem.IsDownloading) or nameof(KomgaDownloadQueueItem.IsQueued) or nameof(KomgaDownloadQueueItem.IsFailed))
         {
+            ScheduleRefreshActivityState();
+        }
+    }
+
+    private void ScheduleRefreshActivityState()
+    {
+        if (_activityRefreshPending)
+        {
+            return;
+        }
+
+        _activityRefreshPending = true;
+        void Refresh()
+        {
+            _activityRefreshPending = false;
             RefreshActivityState();
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            Refresh();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(Refresh, DispatcherPriority.Background);
         }
     }
 

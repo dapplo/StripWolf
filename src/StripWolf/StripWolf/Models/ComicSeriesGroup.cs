@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Models;
@@ -23,4 +25,84 @@ public partial class ComicSeriesGroup : ObservableObject
     public int ComicCount => Comics.Count;
 
     public int ReadCount => Comics.Count(comic => comic.IsCompleted);
+
+    public bool HasDeletingComics => Comics.Any(comic => comic.IsDeleting);
+
+    public int DeletingComicCount => Comics.Count(comic => comic.IsDeleting);
+
+    public int DeleteCountdownSeconds => Comics
+        .Where(comic => comic.IsDeleting)
+        .Select(comic => comic.DeletionSecondsRemaining)
+        .DefaultIfEmpty(0)
+        .Max();
+
+    public string DeleteActionLabel => !HasDeletingComics
+        ? "Delete"
+        : DeletingComicCount >= ComicCount
+            ? $"Undo ({DeleteCountdownSeconds})"
+            : $"Undo {DeletingComicCount} ({DeleteCountdownSeconds})";
+
+    public string DeleteStatusText => !HasDeletingComics
+        ? string.Empty
+        : $"Deleting {DeletingComicCount} comic{(DeletingComicCount == 1 ? string.Empty : "s")} in {DeleteCountdownSeconds}s";
+
+    partial void OnComicsChanged(ObservableCollection<Comic>? oldValue, ObservableCollection<Comic> newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.CollectionChanged -= OnComicsCollectionChanged;
+            foreach (var comic in oldValue)
+            {
+                comic.PropertyChanged -= OnComicPropertyChanged;
+            }
+        }
+
+        newValue.CollectionChanged += OnComicsCollectionChanged;
+        foreach (var comic in newValue)
+        {
+            comic.PropertyChanged += OnComicPropertyChanged;
+        }
+
+        RaiseComputedPropertiesChanged();
+    }
+
+    private void OnComicsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (var comic in e.OldItems.OfType<Comic>())
+            {
+                comic.PropertyChanged -= OnComicPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var comic in e.NewItems.OfType<Comic>())
+            {
+                comic.PropertyChanged += OnComicPropertyChanged;
+            }
+        }
+
+        RaiseComputedPropertiesChanged();
+    }
+
+    private void OnComicPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Comic.IsDeleting) or nameof(Comic.DeletionSecondsRemaining) or nameof(Comic.IsCompleted))
+        {
+            RaiseComputedPropertiesChanged();
+        }
+    }
+
+    private void RaiseComputedPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(ComicCount));
+        OnPropertyChanged(nameof(ReadCount));
+        OnPropertyChanged(nameof(HasDeletingComics));
+        OnPropertyChanged(nameof(DeletingComicCount));
+        OnPropertyChanged(nameof(DeleteCountdownSeconds));
+        OnPropertyChanged(nameof(DeleteActionLabel));
+        OnPropertyChanged(nameof(DeleteStatusText));
+    }
 }

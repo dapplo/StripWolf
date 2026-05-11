@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace StripWolf.Models;
 
 /// <summary>
-/// Represents a file that is being imported (e.g., PDF being converted)
+/// Represents a queued or active local import/conversion task.
 /// </summary>
 public partial class PendingImport : ObservableObject
 {

@@ -15,6 +15,7 @@ public partial class LibraryViewModel : ViewModelBase
 {
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
+    private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
     private bool _hasLoadedComics;
 
@@ -32,10 +33,6 @@ public partial class LibraryViewModel : ViewModelBase
 
     [ObservableProperty]
     private ObservableCollection<ComicSeriesGroup> _seriesGroups = [];
-
-    [ObservableProperty]
-    private ObservableCollection<PendingImport> _pendingImports = [];
-
 
     [ObservableProperty]
     private Comic? _selectedComic;
@@ -122,11 +119,13 @@ public partial class LibraryViewModel : ViewModelBase
     public bool ShowFavoritesSection => IsFavoritesSectionVisible && FavoriteComics.Count > 0;
     public bool ShowSeriesSection => IsSeriesSectionVisible && SeriesGroups.Count > 0;
     public bool ShowReadSection => IsReadSectionVisible && CompletedComics.Count > 0;
+    public ObservableCollection<PendingImport> PendingImports => _importQueueService.PendingImports;
 
-    public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService, SettingsService settingsService)
+    public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService, ImportQueueService importQueueService, SettingsService settingsService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
+        _importQueueService = importQueueService;
         _settingsService = settingsService;
         Title = "Library";
 
@@ -515,7 +514,7 @@ public partial class LibraryViewModel : ViewModelBase
                 Status = "Waiting..."
             };
             pendingItems.Add(pending);
-            PendingImports.Add(pending);
+            await _importQueueService.EnqueueAsync(pending);
         }
 
         using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
@@ -536,13 +535,10 @@ public partial class LibraryViewModel : ViewModelBase
 
             try
             {
-                var progress = new Progress<double>(p =>
+                var progress = UiProgressThrottle.Create(p =>
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        pending.Progress = p;
-                        pending.Status = $"Converting... {p:P0}";
-                    });
+                    pending.Progress = p;
+                    pending.Status = $"Converting... {p:P0}";
                 });
 
                 var comic = await _libraryService.ImportLocalComicAsync(
@@ -613,6 +609,16 @@ public partial class LibraryViewModel : ViewModelBase
     {
         if (seriesGroup is null)
         {
+            return;
+        }
+
+        if (seriesGroup.HasDeletingComics)
+        {
+            foreach (var comic in seriesGroup.Comics.Where(static comic => comic.IsDeleting).ToList())
+            {
+                UndoComicDelete(comic);
+            }
+
             return;
         }
 
@@ -871,10 +877,7 @@ public partial class LibraryViewModel : ViewModelBase
     private async Task RemoveCompletedImportAfterDelayAsync(PendingImport pending)
     {
         await Task.Delay(2000);
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            PendingImports.Remove(pending);
-        });
+        await _importQueueService.RemoveAsync(pending);
     }
 
     /// <summary>
