@@ -33,6 +33,12 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsFirstPage))]
     [NotifyPropertyChangedFor(nameof(IsLastPage))]
     [NotifyPropertyChangedFor(nameof(MaxSliderValue))]
+    [NotifyPropertyChangedFor(nameof(ComicCoverPath))]
+    [NotifyPropertyChangedFor(nameof(ComicTitleDisplay))]
+    [NotifyPropertyChangedFor(nameof(ComicNumberDisplay))]
+    [NotifyPropertyChangedFor(nameof(ComicPageCountDisplay))]
+    [NotifyPropertyChangedFor(nameof(HasKomgaSeriesLink))]
+    [NotifyPropertyChangedFor(nameof(IsFavorite))]
     private Comic? _comic;
 
     [ObservableProperty]
@@ -107,6 +113,12 @@ public partial class ReaderViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AuthorsDisplay))]
+    [NotifyPropertyChangedFor(nameof(SeriesDisplay))]
+    [NotifyPropertyChangedFor(nameof(ComicInfoPublisher))]
+    [NotifyPropertyChangedFor(nameof(ComicInfoGenre))]
+    [NotifyPropertyChangedFor(nameof(ComicInfoLanguageIso))]
+    [NotifyPropertyChangedFor(nameof(ComicInfoTags))]
+    [NotifyPropertyChangedFor(nameof(ComicInfoSummary))]
     private ComicInfo? _comicInfo;
 
     [ObservableProperty]
@@ -124,14 +136,25 @@ public partial class ReaderViewModel : ViewModelBase
     public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
     public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
     public string Location => Comic?.FilePath ?? "";
+    public string? ComicCoverPath => Comic?.CoverPath;
+    public string ComicTitleDisplay => Comic?.Title ?? string.Empty;
+    public string ComicNumberDisplay => Comic?.Number?.ToString() ?? string.Empty;
+    public string ComicPageCountDisplay => Comic?.PageCount.ToString() ?? string.Empty;
     public bool CanAdvanceOrShowEndChoices => Comic is not null && (Comic.PageCount > 0 || HasPendingEpubConversion);
     public bool CanViewSeriesOnKomgaOption => !string.IsNullOrEmpty(Comic?.KomgaSeriesId);
+    public bool HasKomgaSeriesLink => !string.IsNullOrEmpty(Comic?.KomgaSeriesId);
+    public bool IsFavorite => Comic?.IsFavorite ?? false;
     public bool HasNextSeriesComic => NextSeriesComic is not null;
     public string NextSeriesComicTitle => NextSeriesComic?.Title ?? string.Empty;
 
     public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
 
     public string? SeriesDisplay => !string.IsNullOrEmpty(ComicInfo?.Series) ? ComicInfo.Series : Comic?.SeriesName;
+    public string? ComicInfoPublisher => ComicInfo?.Publisher;
+    public string? ComicInfoGenre => ComicInfo?.Genre;
+    public string? ComicInfoLanguageIso => ComicInfo?.LanguageISO;
+    public string? ComicInfoTags => ComicInfo?.Tags;
+    public string? ComicInfoSummary => ComicInfo?.Summary;
 
     private static string FormatBytes(long bytes)
     {

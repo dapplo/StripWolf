@@ -5,15 +5,48 @@ using Avalonia.Platform.Storage;
 using StripWolf.Services;
 using StripWolf.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using StripWolf.Models;
 
 namespace StripWolf.Views;
 
-public partial class LibraryView : UserControl
+public partial class LibraryView : UserControl, INotifyPropertyChanged
 {
+    private LibraryViewModel? _subscribedViewModel;
+    private event PropertyChangedEventHandler? ProxyPropertyChanged;
+
     public LibraryView()
     {
         InitializeComponent();
     }
+
+    event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
+    {
+        add => ProxyPropertyChanged += value;
+        remove => ProxyPropertyChanged -= value;
+    }
+
+    public ICommand? OpenComicCommand => (DataContext as LibraryViewModel)?.OpenComicCommand;
+
+    public ICommand? ShowComicInfoCommand => (DataContext as LibraryViewModel)?.ShowComicInfoCommand;
+
+    public ICommand? ToggleFavoriteCommand => (DataContext as LibraryViewModel)?.ToggleFavoriteCommand;
+
+    public ICommand? ToggleReadStatusCommand => (DataContext as LibraryViewModel)?.ToggleReadStatusCommand;
+
+    public ICommand? DeleteComicCommand => (DataContext as LibraryViewModel)?.DeleteComicCommand;
+
+    public ICommand? UndoComicDeleteCommand => (DataContext as LibraryViewModel)?.UndoComicDeleteCommand;
+
+    public ICommand? DeleteSeriesCommand => (DataContext as LibraryViewModel)?.DeleteSeriesCommand;
+
+    public ICommand? RemovePendingImportCommand => (DataContext as LibraryViewModel)?.RemovePendingImportCommand;
+
+    public ICommand? ConvertComicNowCommand => (DataContext as LibraryViewModel)?.ConvertComicNowCommand;
+
+    public Comic? SelectedInfoComic => (DataContext as LibraryViewModel)?.SelectedInfoComic;
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -36,6 +69,19 @@ public partial class LibraryView : UserControl
     protected override async void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
+        _subscribedViewModel = DataContext as LibraryViewModel;
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+
+        RaiseProxyPropertyChanges();
         
         // Load comics when the view is displayed
         if (DataContext is LibraryViewModel viewModel)
@@ -49,6 +95,33 @@ public partial class LibraryView : UserControl
                 System.Diagnostics.Debug.WriteLine($"Failed to load comics: {ex.Message}");
             }
         }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LibraryViewModel.SelectedInfoComic))
+        {
+            OnPropertyChanged(nameof(SelectedInfoComic));
+        }
+    }
+
+    private void RaiseProxyPropertyChanges()
+    {
+        OnPropertyChanged(nameof(OpenComicCommand));
+        OnPropertyChanged(nameof(ShowComicInfoCommand));
+        OnPropertyChanged(nameof(ToggleFavoriteCommand));
+        OnPropertyChanged(nameof(ToggleReadStatusCommand));
+        OnPropertyChanged(nameof(DeleteComicCommand));
+        OnPropertyChanged(nameof(UndoComicDeleteCommand));
+        OnPropertyChanged(nameof(DeleteSeriesCommand));
+        OnPropertyChanged(nameof(RemovePendingImportCommand));
+        OnPropertyChanged(nameof(ConvertComicNowCommand));
+        OnPropertyChanged(nameof(SelectedInfoComic));
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        ProxyPropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     private async void OnImportClicked(object? sender, RoutedEventArgs e)

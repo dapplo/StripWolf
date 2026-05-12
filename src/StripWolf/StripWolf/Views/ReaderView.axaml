@@ -208,12 +208,12 @@
               <Grid ColumnDefinitions="150,*">
                 <!-- Cover -->
                 <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
-                  <Image Source="{Binding Comic.CoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
+                  <Image Source="{Binding ComicCoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
                 </Border>
                 
                 <!-- Basic Meta -->
                 <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
-                  <TextBlock Text="{Binding Comic.Title}" FontSize="20" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding ComicTitleDisplay}" FontSize="20" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
                   
                   <StackPanel IsVisible="{Binding SeriesDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="Series" FontSize="12" Foreground="#888"/>
@@ -223,11 +223,11 @@
                   <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0">
                        <TextBlock Text="Number" FontSize="12" Foreground="#888"/>
-                       <TextBlock Text="{Binding Comic.Number}" FontSize="16" Foreground="White"/>
+                       <TextBlock Text="{Binding ComicNumberDisplay}" FontSize="16" Foreground="White"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1">
                        <TextBlock Text="Pages" FontSize="12" Foreground="#888"/>
-                       <TextBlock Text="{Binding Comic.PageCount}" FontSize="16" Foreground="White"/>
+                       <TextBlock Text="{Binding ComicPageCountDisplay}" FontSize="16" Foreground="White"/>
                     </StackPanel>
                   </Grid>
 
@@ -236,7 +236,7 @@
                           Background="#444" Foreground="White"
                           HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
                     <Button.IsVisible>
-                       <Binding Path="Comic.KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                       <Binding Path="HasKomgaSeriesLink"/>
                     </Button.IsVisible>
                   </Button>
                 </StackPanel>
@@ -251,35 +251,35 @@
                    <TextBlock Text="{Binding AuthorsDisplay}" Foreground="White" TextWrapping="Wrap"/>
                  </StackPanel>
 
-                 <StackPanel IsVisible="{Binding ComicInfo.Publisher, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                   <TextBlock Text="Publisher" Foreground="#888" FontSize="12"/>
-                   <TextBlock Text="{Binding ComicInfo.Publisher}" Foreground="White"/>
+                 <StackPanel IsVisible="{Binding ComicInfoPublisher, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="Publisher" Foreground="#888" FontSize="12"/>
+                   <TextBlock Text="{Binding ComicInfoPublisher}" Foreground="White"/>
                  </StackPanel>
-                 
-                 <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
-                   <StackPanel Grid.Column="0" IsVisible="{Binding ComicInfo.Genre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                  
+                  <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+                   <StackPanel Grid.Column="0" IsVisible="{Binding ComicInfoGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                      <TextBlock Text="Genre" Foreground="#888" FontSize="12"/>
-                     <TextBlock Text="{Binding ComicInfo.Genre}" Foreground="White" TextWrapping="Wrap"/>
-                   </StackPanel>
-                   <StackPanel Grid.Column="1" IsVisible="{Binding ComicInfo.LanguageISO, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                     <TextBlock Text="{Binding ComicInfoGenre}" Foreground="White" TextWrapping="Wrap"/>
+                    </StackPanel>
+                   <StackPanel Grid.Column="1" IsVisible="{Binding ComicInfoLanguageIso, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                      <TextBlock Text="Language" Foreground="#888" FontSize="12"/>
-                     <TextBlock Text="{Binding ComicInfo.LanguageISO}" Foreground="White"/>
-                   </StackPanel>
-                 </Grid>
+                     <TextBlock Text="{Binding ComicInfoLanguageIso}" Foreground="White"/>
+                    </StackPanel>
+                  </Grid>
 
-                 <StackPanel IsVisible="{Binding ComicInfo.Tags, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                   <TextBlock Text="Tags" Foreground="#888" FontSize="12"/>
-                   <TextBlock Text="{Binding ComicInfo.Tags}" Foreground="White" TextWrapping="Wrap"/>
-                 </StackPanel>
-              </StackPanel>
+                 <StackPanel IsVisible="{Binding ComicInfoTags, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="Tags" Foreground="#888" FontSize="12"/>
+                    <TextBlock Text="{Binding ComicInfoTags}" Foreground="White" TextWrapping="Wrap"/>
+                  </StackPanel>
+               </StackPanel>
 
-              <Separator Background="#333" IsVisible="{Binding ComicInfo.Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-              
-              <!-- Summary -->
-              <StackPanel IsVisible="{Binding ComicInfo.Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Text="Summary" FontSize="12" Foreground="#888" Margin="0,0,0,4"/>
-                <TextBlock Text="{Binding ComicInfo.Summary}" TextWrapping="Wrap" Foreground="White" FontSize="14" Opacity="0.9"/>
-              </StackPanel>
+              <Separator Background="#333" IsVisible="{Binding ComicInfoSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+               
+               <!-- Summary -->
+               <StackPanel IsVisible="{Binding ComicInfoSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                 <TextBlock Text="Summary" FontSize="12" Foreground="#888" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding ComicInfoSummary}" TextWrapping="Wrap" Foreground="White" FontSize="14" Opacity="0.9"/>
+               </StackPanel>
 
               <!-- Actions -->
               <StackPanel Spacing="8" Margin="0,8,0,0">
@@ -291,8 +291,8 @@
                   <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           Command="{Binding ToggleFavoriteCommand}" Background="#444" Foreground="White">
                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="⭐" IsVisible="{Binding Comic.IsFavorite}"/>
-                        <TextBlock Text="☆" IsVisible="{Binding !Comic.IsFavorite}"/>
+                        <TextBlock Text="⭐" IsVisible="{Binding IsFavorite}"/>
+                        <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}"/>
                         <TextBlock Text="Favorite" />
                      </StackPanel>
                   </Button>

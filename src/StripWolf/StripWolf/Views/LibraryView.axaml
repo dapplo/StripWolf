@@ -36,7 +36,7 @@
           <!-- Cover with click handler -->
           <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
                   IsEnabled="{Binding CanOpen}"
-                  Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                  Command="{Binding OpenComicCommand, ElementName=Root}"
                   CommandParameter="{Binding}">
             <Border Background="Black" CornerRadius="8,8,0,0">
               <Panel>
@@ -78,13 +78,13 @@
             <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" IsVisible="{Binding !IsDeleting}">
               <!-- Info -->
               <Button Grid.Column="0" Grid.Row="0" Classes="icon-btn"
-                      Command="{Binding ((vm:LibraryViewModel)DataContext).ShowComicInfoCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      Command="{Binding ShowComicInfoCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="Information">
                 <TextBlock Text="ⓘ" FontSize="18" VerticalAlignment="Center"/>
               </Button>
               <!-- Favorite -->
               <Button Grid.Column="1" Grid.Row="0" Classes="icon-btn"
-                      Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      Command="{Binding ToggleFavoriteCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="Favorite">
                 <Panel>
                   <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}" FontSize="18" VerticalAlignment="Center"/>
@@ -93,7 +93,7 @@
               </Button>
               <!-- Mark Read -->
               <Button Grid.Column="0" Grid.Row="1" Classes="icon-btn" 
-                      Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      Command="{Binding ToggleReadStatusCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="Mark Read/Unread">
                  <Panel>
                     <TextBlock Text="✓" IsVisible="{Binding !IsCompleted}" FontSize="18" VerticalAlignment="Center"/>
@@ -102,7 +102,7 @@
               </Button>
               <!-- Delete -->
               <Button Grid.Column="1" Grid.Row="1" Classes="icon-btn"
-                      Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      Command="{Binding DeleteComicCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="Delete">
                 <TextBlock Text="✕" FontSize="18" VerticalAlignment="Center"/>
               </Button>
@@ -112,7 +112,7 @@
             <Button FontSize="10" Padding="8,4" Background="#FFF3E0" Foreground="Black"
                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                     IsVisible="{Binding IsDeleting}"
-                    Command="{Binding ((vm:LibraryViewModel)DataContext).UndoComicDeleteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                    Command="{Binding UndoComicDeleteCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
               <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock Text="↩ Undo" FontWeight="Bold"/>
@@ -154,7 +154,7 @@
               </Border>
 
               <Button Grid.Column="3"
-                      Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteSeriesCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
+                      Command="{Binding DeleteSeriesCommand, ElementName=Root}"
                       CommandParameter="{Binding}"
                       Background="#D32F2F"
                       Foreground="White"
@@ -250,7 +250,7 @@
                     <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" FontSize="12" Foreground="Gray"/>
                     <ProgressBar Grid.Column="1" Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding Progress}" Height="6" Margin="0,4,0,0" IsVisible="{Binding IsProcessing}"/>
                     <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding ErrorMessage}" FontSize="10" Foreground="#C62828" Margin="0,4,0,0" IsVisible="{Binding IsFailed}" TextWrapping="Wrap"/>
-                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4" VerticalAlignment="Center" IsVisible="{Binding IsFailed}" Command="{Binding ((vm:LibraryViewModel)DataContext).RemovePendingImportCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}"/>
+                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4" VerticalAlignment="Center" IsVisible="{Binding IsFailed}" Command="{Binding RemovePendingImportCommand, ElementName=Root}" CommandParameter="{Binding}"/>
                     <TextBlock Grid.Column="2" Grid.RowSpan="3" Text="✓" FontSize="20" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsCompleted}"/>
                   </Grid>
                 </Border>
@@ -418,7 +418,7 @@
           </Border>
           <ScrollViewer Grid.Row="1" MaxHeight="600">
             <Border Padding="24">
-              <StackPanel Spacing="16" x:DataType="models:Comic" DataContext="{Binding ((vm:LibraryViewModel)DataContext).SelectedInfoComic, RelativeSource={RelativeSource AncestorType=views:LibraryView}}">
+              <StackPanel Spacing="16" x:DataType="models:Comic" DataContext="{Binding SelectedInfoComic, ElementName=Root}">
                 <Grid ColumnDefinitions="150,*">
                    <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
                      <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
@@ -453,20 +453,20 @@
                   <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14" Opacity="0.9"/>
                 </StackPanel>
                 <StackPanel Spacing="8" Margin="0,8,0,0">
-                  <Button Content="📖 Read Now" Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen}"/>
-                  <Button Content="⚙ Convert Now" Command="{Binding ((vm:LibraryViewModel)DataContext).ConvertComicNowCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow}"/>
+                  <Button Content="📖 Read Now" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen}"/>
+                  <Button Content="⚙ Convert Now" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow}"/>
                   <TextBlock Text="Converting to CBZ..." Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding IsConverting}"/>
                   <Grid ColumnDefinitions="*,*">
-                    <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}">
+                    <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleFavoriteCommand, ElementName=Root}" CommandParameter="{Binding}">
                        <StackPanel Orientation="Horizontal" Spacing="8">
                           <TextBlock Text="⭐" IsVisible="{Binding IsFavorite}"/>
                           <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}"/>
                           <TextBlock Text="Favorite" />
                        </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleReadStatusCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}"/>
+                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding}"/>
                   </Grid>
-                  <Button Content="🗑️ Delete Comic" Background="#D32F2F" Foreground="White" Command="{Binding ((vm:LibraryViewModel)DataContext).DeleteComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                  <Button Content="🗑️ Delete Comic" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                 </StackPanel>
               </StackPanel>
             </Border>
