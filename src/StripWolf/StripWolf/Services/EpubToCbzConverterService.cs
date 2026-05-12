@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Styling;
 using StripWolf.Models;
 using VersOne.Epub;
@@ -20,6 +21,8 @@ public sealed class EpubToCbzConverterService
     private const int DefaultViewportWidth = 700;
     private const int DefaultViewportHeight = 1050;
     private const string PaginationCss = "body { height: 100vh; overflow: hidden; }";
+    private const string ReaderTempDirectoryPrefix = "StripWolf_EPUB_READ_";
+    private const string ImportTempDirectoryPrefix = "StripWolf_EPUB_";
 
     private const string PaginationScriptBody = """
         window.__stripWolfReady = false;
@@ -182,6 +185,37 @@ public sealed class EpubToCbzConverterService
         _settingsService = settingsService;
     }
 
+    public static void CleanupTemporaryDirectories()
+    {
+        var tempPath = Path.GetTempPath();
+        if (!Directory.Exists(tempPath))
+        {
+            return;
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(tempPath, $"{ImportTempDirectoryPrefix}*"))
+        {
+            var directoryName = Path.GetFileName(directory);
+            if (string.IsNullOrEmpty(directoryName) ||
+                (!directoryName.StartsWith(ImportTempDirectoryPrefix, StringComparison.Ordinal) &&
+                 !directoryName.StartsWith(ReaderTempDirectoryPrefix, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            try
+            {
+                Directory.Delete(directory, true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
     public async Task<string> ConvertEpubToCbzAsync(
         string epubFilePath,
         string outputDirectory,
@@ -232,7 +266,7 @@ public sealed class EpubToCbzConverterService
         try
         {
             var settings = _settingsService.LoadSettings();
-            var conversionTheme = ResolveConversionTheme(settings.EpubConversionTheme);
+            var conversionTheme = await ResolveConversionThemeAsync(settings.EpubConversionTheme);
             var renderScale = ResolveRenderScale(settings.EpubOutputResolution);
             var book = await EpubReader.ReadBookAsync(epubFilePath);
             await MaterializeContentAsync(book, tempRoot, cancellationToken);
@@ -341,6 +375,217 @@ public sealed class EpubToCbzConverterService
             catch (UnauthorizedAccessException)
             {
             }
+        }
+    }
+
+    public async Task<ComicImportData> AnalyzeEpubForImportAsync(
+        string epubFilePath,
+        int viewportWidth = DefaultViewportWidth,
+        int viewportHeight = DefaultViewportHeight,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var book = await Task.Run(() => EpubReader.ReadBookAsync(epubFilePath), cancellationToken);
+        progress?.Report(0.35);
+
+        var comicInfo = CreateComicInfo(book, 0);
+        var fileSize = new FileInfo(epubFilePath).Length;
+        Stream? coverImageStream = null;
+
+        if (book.CoverImage is { Length: > 0 })
+        {
+            var coverStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(EpubToCbzConverterService));
+            await coverStream.WriteAsync(book.CoverImage, cancellationToken);
+            coverStream.Position = 0;
+            coverImageStream = coverStream;
+        }
+
+        progress?.Report(0.6);
+
+        return new ComicImportData
+        {
+            FilePath = epubFilePath,
+            Format = ComicFormat.Epub,
+            ComicInfo = comicInfo,
+            PageCount = 0,
+            FileSize = fileSize,
+            CoverImageStream = coverImageStream
+        };
+    }
+
+    public async Task<ComicInfo?> ExtractComicInfoAsync(string epubFilePath, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(epubFilePath))
+        {
+            throw new FileNotFoundException("EPUB file not found.", epubFilePath);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var book = await Task.Run(() => EpubReader.ReadBookAsync(epubFilePath), cancellationToken);
+        return CreateComicInfo(book, 0);
+    }
+
+    public async Task<EpubReaderSession> CreateReaderSessionAsync(
+        string epubFilePath,
+        int viewportWidth = DefaultViewportWidth,
+        int viewportHeight = DefaultViewportHeight,
+        CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(epubFilePath))
+        {
+            throw new FileNotFoundException("EPUB file not found.", epubFilePath);
+        }
+
+        if (!Path.GetExtension(epubFilePath).Equals(".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Only .epub files can be read by the EPUB reader.");
+        }
+
+        var settings = _settingsService.LoadSettings();
+        var conversionTheme = await ResolveConversionThemeAsync(settings.EpubConversionTheme);
+        var renderScale = ResolveRenderScale(settings.EpubOutputResolution);
+        var book = await Task.Run(() => EpubReader.ReadBookAsync(epubFilePath), cancellationToken);
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"{ReaderTempDirectoryPrefix}{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            await MaterializeContentAsync(book, tempRoot, cancellationToken);
+            var chapters = new List<EpubRenderedChapter>();
+            var totalPages = 0;
+            var chapterRenderIndex = 0;
+            var paginationSession = await _webViewPaginationService.CreatePaginationSessionAsync(viewportWidth, viewportHeight, renderScale);
+
+            try
+            {
+                foreach (var chapter in book.ReadingOrder)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (string.IsNullOrWhiteSpace(chapter.Content))
+                    {
+                        continue;
+                    }
+
+                    var chapterRelativePath = GetChapterRelativePath(chapter);
+                    var baseUri = CreateChapterBaseUri(tempRoot, chapterRelativePath);
+                    var html = BuildPaginatedHtml(chapter.Content, baseUri, conversionTheme);
+                    await paginationSession.LoadHtmlAsync(html);
+
+                    var pageCount = await paginationSession.GetPageCountAsync();
+                    if (pageCount <= 0)
+                    {
+                        continue;
+                    }
+
+                    chapters.Add(new EpubRenderedChapter(chapterRenderIndex, totalPages, pageCount, html));
+                    totalPages += pageCount;
+                    chapterRenderIndex++;
+                }
+
+                return new EpubReaderSession(
+                    paginationSession,
+                    tempRoot,
+                    CreateComicInfo(book, totalPages),
+                    new FileInfo(epubFilePath).Length,
+                    chapters,
+                    totalPages);
+            }
+            catch
+            {
+                await paginationSession.DisposeAsync();
+                throw;
+            }
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            throw;
+        }
+    }
+
+    public async Task<EpubIncrementalConversionSession> CreateIncrementalConversionSessionAsync(
+        string epubFilePath,
+        int nextChapterIndex = 0,
+        int nextPageIndexInChapter = 0,
+        int viewportWidth = DefaultViewportWidth,
+        int viewportHeight = DefaultViewportHeight,
+        CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(epubFilePath))
+        {
+            throw new FileNotFoundException("EPUB file not found.", epubFilePath);
+        }
+
+        if (!Path.GetExtension(epubFilePath).Equals(".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Only .epub files can be converted by the EPUB converter.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var settings = _settingsService.LoadSettings();
+        var conversionTheme = await ResolveConversionThemeAsync(settings.EpubConversionTheme);
+        var renderScale = ResolveRenderScale(settings.EpubOutputResolution);
+        var book = await EpubReader.ReadBookAsync(epubFilePath);
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"{ReaderTempDirectoryPrefix}{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            await MaterializeContentAsync(book, tempRoot, cancellationToken);
+            var paginationSession = await _webViewPaginationService.CreatePaginationSessionAsync(
+                viewportWidth,
+                viewportHeight,
+                renderScale);
+
+            try
+            {
+                return new EpubIncrementalConversionSession(
+                    paginationSession,
+                    tempRoot,
+                    book,
+                    conversionTheme,
+                    nextChapterIndex,
+                    nextPageIndexInChapter);
+            }
+            catch
+            {
+                await paginationSession.DisposeAsync();
+                throw;
+            }
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            throw;
         }
     }
 
@@ -480,14 +725,18 @@ public sealed class EpubToCbzConverterService
             $"script-src 'nonce-{scriptNonce}'";
     }
 
-    private static EpubConversionTheme ResolveConversionTheme(EpubConversionTheme configuredTheme)
+    private static async Task<EpubConversionTheme> ResolveConversionThemeAsync(EpubConversionTheme configuredTheme)
     {
         if (configuredTheme != EpubConversionTheme.System)
         {
             return configuredTheme;
         }
 
-        return Application.Current?.ActualThemeVariant == ThemeVariant.Dark
+        var actualThemeVariant = Dispatcher.UIThread.CheckAccess()
+            ? Application.Current?.ActualThemeVariant
+            : await Dispatcher.UIThread.InvokeAsync(() => Application.Current?.ActualThemeVariant);
+
+        return actualThemeVariant == ThemeVariant.Dark
             ? EpubConversionTheme.Dark
             : EpubConversionTheme.Light;
     }
@@ -637,5 +886,258 @@ public sealed class EpubToCbzConverterService
     private sealed class Utf8StringWriter : StringWriter
     {
         public override Encoding Encoding => new UTF8Encoding(false);
+    }
+
+    internal sealed class EpubRenderedChapter(int renderIndex, int startPageIndex, int pageCount, string html)
+    {
+        public int RenderIndex { get; } = renderIndex;
+        public int StartPageIndex { get; } = startPageIndex;
+        public int PageCount { get; } = pageCount;
+        public string Html { get; } = html;
+    }
+
+    public sealed class EpubIncrementalPageResult
+    {
+        public required int ChapterIndex { get; init; }
+
+        public required int PageIndexInChapter { get; init; }
+
+        public required bool HasMorePages { get; init; }
+    }
+
+    public sealed class EpubIncrementalConversionSession : IAsyncDisposable
+    {
+        private readonly IWebViewPaginationSession _paginationSession;
+        private readonly string _tempRoot;
+        private readonly EpubBook _book;
+        private readonly EpubConversionTheme _conversionTheme;
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private int? _loadedChapterIndex;
+        private int _currentChapterPageCount = -1;
+        private string? _currentChapterHtml;
+
+        internal EpubIncrementalConversionSession(
+            IWebViewPaginationSession paginationSession,
+            string tempRoot,
+            EpubBook book,
+            EpubConversionTheme conversionTheme,
+            int nextChapterIndex,
+            int nextPageIndexInChapter)
+        {
+            _paginationSession = paginationSession;
+            _tempRoot = tempRoot;
+            _book = book;
+            _conversionTheme = conversionTheme;
+            NextChapterIndex = Math.Max(0, nextChapterIndex);
+            NextPageIndexInChapter = Math.Max(0, nextPageIndexInChapter);
+        }
+
+        public int NextChapterIndex { get; private set; }
+
+        public int NextPageIndexInChapter { get; private set; }
+
+        public async Task<EpubIncrementalPageResult?> RenderNextPageToStreamAsync(Stream outputStream, CancellationToken cancellationToken = default)
+        {
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                while (await EnsureCurrentChapterLoadedAsync(cancellationToken))
+                {
+                    if (_currentChapterHtml is null)
+                    {
+                        throw new InvalidOperationException("EPUB chapter HTML was not prepared.");
+                    }
+
+                    var chapterIndex = NextChapterIndex;
+                    var pageIndexInChapter = NextPageIndexInChapter;
+
+                    await _paginationSession.CapturePageToStreamAsync(pageIndexInChapter, outputStream);
+
+                    NextPageIndexInChapter++;
+                    if (NextPageIndexInChapter >= _currentChapterPageCount)
+                    {
+                        NextChapterIndex++;
+                        NextPageIndexInChapter = 0;
+                        _loadedChapterIndex = null;
+                        _currentChapterPageCount = -1;
+                        _currentChapterHtml = null;
+                    }
+
+                    var hasMorePages = NextChapterIndex < _book.ReadingOrder.Count;
+                    return new EpubIncrementalPageResult
+                    {
+                        ChapterIndex = chapterIndex,
+                        PageIndexInChapter = pageIndexInChapter,
+                        HasMorePages = hasMorePages
+                    };
+                }
+
+                return null;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        private async Task<bool> EnsureCurrentChapterLoadedAsync(CancellationToken cancellationToken)
+        {
+            while (NextChapterIndex < _book.ReadingOrder.Count)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (_loadedChapterIndex == NextChapterIndex &&
+                    _currentChapterPageCount > 0 &&
+                    NextPageIndexInChapter < _currentChapterPageCount)
+                {
+                    return true;
+                }
+
+                var chapter = _book.ReadingOrder[NextChapterIndex];
+                if (string.IsNullOrWhiteSpace(chapter.Content))
+                {
+                    NextChapterIndex++;
+                    NextPageIndexInChapter = 0;
+                    _loadedChapterIndex = null;
+                    _currentChapterPageCount = -1;
+                    _currentChapterHtml = null;
+                    continue;
+                }
+
+                var chapterRelativePath = GetChapterRelativePath(chapter);
+                var baseUri = CreateChapterBaseUri(_tempRoot, chapterRelativePath);
+                var html = BuildPaginatedHtml(chapter.Content, baseUri, _conversionTheme);
+                await _paginationSession.LoadHtmlAsync(html);
+                var pageCount = await _paginationSession.GetPageCountAsync();
+                if (pageCount <= 0)
+                {
+                    NextChapterIndex++;
+                    NextPageIndexInChapter = 0;
+                    _loadedChapterIndex = null;
+                    _currentChapterPageCount = -1;
+                    _currentChapterHtml = null;
+                    continue;
+                }
+
+                _loadedChapterIndex = NextChapterIndex;
+                _currentChapterPageCount = pageCount;
+                _currentChapterHtml = html;
+
+                if (NextPageIndexInChapter >= pageCount)
+                {
+                    NextChapterIndex++;
+                    NextPageIndexInChapter = 0;
+                    _loadedChapterIndex = null;
+                    _currentChapterPageCount = -1;
+                    _currentChapterHtml = null;
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _gate.Dispose();
+            await _paginationSession.DisposeAsync();
+
+            try
+            {
+                if (Directory.Exists(_tempRoot))
+                {
+                    Directory.Delete(_tempRoot, true);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    public sealed class EpubReaderSession : IAsyncDisposable
+    {
+        private readonly IWebViewPaginationSession _paginationSession;
+        private readonly string _tempRoot;
+        private readonly IReadOnlyList<EpubRenderedChapter> _chapters;
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private int? _loadedChapterIndex;
+
+        internal EpubReaderSession(
+            IWebViewPaginationSession paginationSession,
+            string tempRoot,
+            ComicInfo comicInfo,
+            long fileSize,
+            IReadOnlyList<EpubRenderedChapter> chapters,
+            int pageCount)
+        {
+            _paginationSession = paginationSession;
+            _tempRoot = tempRoot;
+            ComicInfo = comicInfo;
+            FileSize = fileSize;
+            _chapters = chapters;
+            PageCount = pageCount;
+        }
+
+        public ComicInfo ComicInfo { get; }
+
+        public long FileSize { get; }
+
+        public int PageCount { get; }
+
+        public async Task RenderPageToStreamAsync(int pageIndex, Stream outputStream, CancellationToken cancellationToken = default)
+        {
+            if (pageIndex < 0 || pageIndex >= PageCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+            }
+
+            var chapter = _chapters.First(chapter =>
+                pageIndex >= chapter.StartPageIndex &&
+                pageIndex < chapter.StartPageIndex + chapter.PageCount);
+
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (_loadedChapterIndex != chapter.RenderIndex)
+                {
+                    await _paginationSession.LoadHtmlAsync(chapter.Html);
+                    _loadedChapterIndex = chapter.RenderIndex;
+                }
+
+                await _paginationSession.CapturePageToStreamAsync(pageIndex - chapter.StartPageIndex, outputStream);
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _gate.Dispose();
+            await _paginationSession.DisposeAsync();
+
+            try
+            {
+                if (Directory.Exists(_tempRoot))
+                {
+                    Directory.Delete(_tempRoot, true);
+                }
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
     }
 }

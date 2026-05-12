@@ -88,6 +88,9 @@ public partial class SettingsViewModel : ViewModelBase
     private EpubOutputResolution _selectedEpubOutputResolution = EpubOutputResolution.Low;
 
     [ObservableProperty]
+    private UnsupportedFormatHandlingMode _selectedUnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode.ConvertOnImport;
+
+    [ObservableProperty]
     private int _selectedKomgaParallelDownloads = 1;
 
     [ObservableProperty]
@@ -116,6 +119,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     public IReadOnlyList<EpubOutputResolution> AvailableEpubOutputResolutions { get; } =
         [EpubOutputResolution.Low, EpubOutputResolution.Medium, EpubOutputResolution.High];
+
+    public IReadOnlyList<UnsupportedFormatHandlingMode> AvailableUnsupportedFormatHandlingModes { get; } =
+        [UnsupportedFormatHandlingMode.ConvertOnImport, UnsupportedFormatHandlingMode.ConvertWhileReading];
 
     public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
 
@@ -272,6 +278,7 @@ public partial class SettingsViewModel : ViewModelBase
         CompactOverview = _appSettings.CompactOverview;
         SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
         SelectedEpubOutputResolution = _appSettings.EpubOutputResolution;
+        SelectedUnsupportedFormatHandlingMode = _appSettings.UnsupportedFormatHandlingMode;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
@@ -356,6 +363,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.KomgaParallelDownloads = Math.Max(1, value);
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedUnsupportedFormatHandlingModeChanged(UnsupportedFormatHandlingMode value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.UnsupportedFormatHandlingMode = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

@@ -40,6 +40,11 @@
     <!-- Loading Indicator -->
     <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
                  HorizontalAlignment="Center" VerticalAlignment="Center" Width="100"/>
+    <Border Background="#B0000000" CornerRadius="6" Padding="12,6"
+            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,72,0,0"
+            IsVisible="{Binding ReaderStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding ReaderStatusMessage}" Foreground="White"/>
+    </Border>
 
     <!-- Top Controls -->
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"

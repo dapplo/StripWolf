@@ -40,6 +40,8 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
+
+        EpubToCbzConverterService.CleanupTemporaryDirectories();
         
         // Apply saved language settings before creating any UI
         ApplyLanguageSettings();
@@ -164,6 +166,7 @@ public partial class App : Application
             serviceProvider.GetRequiredService<IWebViewPaginationService>());
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<EpubToCbzConverterService>();
+        services.AddSingleton<EpubShadowConversionService>();
         services.AddSingleton<LibraryService>();
         services.AddSingleton<ImportQueueService>();
 

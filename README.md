@@ -7,9 +7,10 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 
 ## Features
 
-- **Local Comic Reading**: Read CBZ, CBR, CB7, CBT, and PDF files stored on your device
+- **Local Comic Reading**: Read CBZ, CBR, CB7, CBT, PDF, and EPUB files stored on your device
 - **PDF Support**: Import PDF files - they are automatically converted to CBZ format for optimal viewing
-- **Extended Format Support**: CB7 (7-Zip), CBT (TAR), and solid RAR archives are automatically converted to CBZ for optimal reading performance
+- **EPUB Support**: Import EPUB files either by converting them to CBZ on import or by converting pages on demand while you read
+- **Extended Format Support**: Read CB7 (7-Zip) and CBT (TAR) archives natively, while solid RAR archives are automatically converted to CBZ for reliable reading
 - **ComicInfo.xml Support**: Automatically extracts and displays metadata from ComicInfo.xml files embedded in comic archives
 - **Komga Integration**: Connect to your Komga server to browse and download comics
 - **Offline Reading**: Download comics from Komga for offline access
@@ -22,9 +23,10 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 |--------|-----------|---------|
 | CBZ (ZIP) | .cbz | ✅ Native |
 | CBR (RAR) | .cbr | ✅ Native (converted if solid) |
-| CB7 (7-Zip) | .cb7 | ✅ Converted to CBZ |
-| CBT (TAR) | .cbt | ✅ Converted to CBZ |
+| CB7 (7-Zip) | .cb7 | ✅ Native |
+| CBT (TAR) | .cbt | ✅ Native |
 | PDF | .pdf | ✅ Converted to CBZ |
+| EPUB | .epub | ✅ Supported (convert on import or convert while reading) |
 
 ### Supported Image Formats
 

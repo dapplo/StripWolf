@@ -35,7 +35,7 @@
         <Grid RowDefinitions="200,Auto,Auto,Auto">
           <!-- Cover with click handler -->
           <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
-                  IsEnabled="{Binding !IsDeleting}"
+                  IsEnabled="{Binding CanOpen}"
                   Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}"
                   CommandParameter="{Binding}">
             <Border Background="Black" CornerRadius="8,8,0,0">
@@ -435,12 +435,12 @@
                          <TextBlock Text="Number" FontSize="12" Foreground="Gray"/>
                          <TextBlock Text="{Binding Number}" FontSize="16"/>
                       </StackPanel>
-                      <StackPanel Grid.Column="1">
-                         <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
-                         <TextBlock Text="{Binding PageCount}" FontSize="16"/>
-                      </StackPanel>
-                    </Grid>
-                    <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                       <StackPanel Grid.Column="1">
+                          <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
+                          <TextBlock Text="{Binding LibraryPageStatusDisplay}" FontSize="16"/>
+                       </StackPanel>
+                     </Grid>
+                     <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
                       <Button.IsVisible>
                          <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                       </Button.IsVisible>
@@ -453,7 +453,9 @@
                   <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14" Opacity="0.9"/>
                 </StackPanel>
                 <StackPanel Spacing="8" Margin="0,8,0,0">
-                  <Button Content="📖 Read Now" Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
+                  <Button Content="📖 Read Now" Command="{Binding ((vm:LibraryViewModel)DataContext).OpenComicCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen}"/>
+                  <Button Content="⚙ Convert Now" Command="{Binding ((vm:LibraryViewModel)DataContext).ConvertComicNowCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow}"/>
+                  <TextBlock Text="Converting to CBZ..." Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding IsConverting}"/>
                   <Grid ColumnDefinitions="*,*">
                     <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=views:LibraryView}}" CommandParameter="{Binding}">
                        <StackPanel Orientation="Horizontal" Spacing="8">

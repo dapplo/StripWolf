@@ -143,8 +143,8 @@ public partial class MainViewModel : ViewModelBase
     private async Task OpenReaderAsync(int comicId)
     {
         IsInReader = true;
-        await _readerViewModel.LoadComicAsync(comicId);
         CurrentView = _readerViewModel;
+        await _readerViewModel.LoadComicAsync(comicId);
     }
 
     [RelayCommand]

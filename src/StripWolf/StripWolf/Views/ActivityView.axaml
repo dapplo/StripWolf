@@ -86,6 +86,33 @@
           </repeater:ItemsRepeater>
         </StackPanel>
       </Border>
+
+      <Border Padding="12" CornerRadius="8"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+              IsVisible="{Binding EpubConversions.Count}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="EPUB conversions" FontSize="18" FontWeight="Bold"/>
+          <repeater:ItemsRepeater ItemsSource="{Binding EpubConversions}">
+            <repeater:ItemsRepeater.Layout>
+              <layout:StackLayout Orientation="Vertical" Spacing="8"/>
+            </repeater:ItemsRepeater.Layout>
+            <repeater:ItemsRepeater.ItemTemplate>
+              <DataTemplate x:DataType="models:EpubConversionState">
+                <Border CornerRadius="8" Padding="12"
+                        Background="{DynamicResource SystemControlBackgroundChromeHighBrush}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Grid.RowSpan="2" Text="📚" FontSize="24" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding SourceEpubPath}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" FontSize="12" Foreground="Gray"/>
+                    <TextBlock Grid.Column="2" Grid.Row="0" Text="{Binding ProducedPageCount}" FontSize="20" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Grid.Row="1" Text="pages ready" FontSize="10" Foreground="Gray" HorizontalAlignment="Right"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </repeater:ItemsRepeater.ItemTemplate>
+          </repeater:ItemsRepeater>
+        </StackPanel>
+      </Border>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

@@ -56,11 +56,13 @@
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
             <TextBlock Text="↻" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Activity" FontSize="12" HorizontalAlignment="Center"/>
-            <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="4,1"
-                    HorizontalAlignment="Center" IsVisible="{Binding HasActivityItems}">
-              <TextBlock Text="{Binding ActivityItemsCount}" FontSize="10" Foreground="White"/>
-            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+              <TextBlock Text="Activity" FontSize="12" VerticalAlignment="Center"/>
+              <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="4,1"
+                      VerticalAlignment="Center" IsVisible="{Binding HasActivityItems}">
+                <TextBlock Text="{Binding ActivityItemsCount}" FontSize="10" Foreground="White"/>
+              </Border>
+            </StackPanel>
           </StackPanel>
         </Button>
         <Button Grid.Column="3" Command="{Binding NavigateToSettingsCommand}"

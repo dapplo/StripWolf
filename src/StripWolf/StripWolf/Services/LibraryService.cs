@@ -21,8 +21,10 @@ public class LibraryService
     private readonly DatabaseService _databaseService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly SettingsService _settingsService;
     private readonly PdfToCbzConverterService _pdfConverter;
     private readonly EpubToCbzConverterService _epubConverter;
+    private readonly EpubShadowConversionService _epubShadowConversionService;
     private readonly ComicConverterService _comicConverter;
     private readonly string _appDataDirectory;
     private readonly string _comicsDirectory;
@@ -40,15 +42,19 @@ public class LibraryService
         DatabaseService databaseService,
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
+        SettingsService settingsService,
         PdfToCbzConverterService pdfConverter,
         EpubToCbzConverterService epubConverter,
+        EpubShadowConversionService epubShadowConversionService,
         ComicConverterService comicConverter)
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
+        _settingsService = settingsService;
         _pdfConverter = pdfConverter;
         _epubConverter = epubConverter;
+        _epubShadowConversionService = epubShadowConversionService;
         _comicConverter = comicConverter;
         
         _appDataDirectory = GetAppDataDirectory();
@@ -57,6 +63,8 @@ public class LibraryService
         
         Directory.CreateDirectory(_comicsDirectory);
         Directory.CreateDirectory(_coversDirectory);
+
+        _epubShadowConversionService.ConversionFinalized += (_, _) => OnLibraryChanged();
     }
 
     /// <summary>
@@ -117,6 +125,17 @@ public class LibraryService
         }
 
         System.Diagnostics.Debug.WriteLine($"Warning: Failed to delete managed source file '{filePath}' after conversion.");
+    }
+
+    private UnsupportedFormatHandlingMode GetUnsupportedFormatHandlingMode()
+    {
+        return _settingsService.LoadSettings().UnsupportedFormatHandlingMode;
+    }
+
+    private bool ShouldRenderUnsupportedFormatWhileReading(ComicFormat format)
+    {
+        return GetUnsupportedFormatHandlingMode() == UnsupportedFormatHandlingMode.ConvertWhileReading &&
+               (format == ComicFormat.Pdf || format == ComicFormat.Epub);
     }
 
     /// <summary>
@@ -281,9 +300,15 @@ public class LibraryService
     /// </summary>
     /// <param name="filePath">Path to the comic file</param>
     /// <returns>ComicInfo if found, null otherwise</returns>
-    public Task<ComicInfo?> GetComicInfoAsync(string filePath)
+    public async Task<ComicInfo?> GetComicInfoAsync(string filePath)
     {
-        return _comicConverter.ExtractComicInfoAsync(filePath);
+        var format = ComicReaderService.GetComicFormat(filePath);
+        return format switch
+        {
+            ComicFormat.Pdf => await _pdfConverter.ExtractComicInfoAsync(filePath),
+            ComicFormat.Epub => await _epubConverter.ExtractComicInfoAsync(filePath),
+            _ => await _comicConverter.ExtractComicInfoAsync(filePath)
+        };
     }
 
     /// <summary>
@@ -306,6 +331,14 @@ public class LibraryService
 
         using var importData = await PrepareLocalImportAsync(filePath, format, progress);
         var actualFilePath = importData.FilePath;
+        var isLazyEpubImport = format == ComicFormat.Epub && ShouldRenderUnsupportedFormatWhileReading(format);
+        if (isLazyEpubImport)
+        {
+            progress?.Report(0.75);
+            actualFilePath = await _epubShadowConversionService.StoreManagedSourceAsync(actualFilePath);
+            progress?.Report(0.9);
+        }
+
         if (!string.Equals(actualFilePath, filePath, StringComparison.OrdinalIgnoreCase) &&
             File.Exists(filePath) &&
             IsAppOwnedSourcePath(filePath))
@@ -326,7 +359,9 @@ public class LibraryService
         {
             try
             {
-                coverPath = await CreateCoverThumbnailAsync(importData.CoverImageStream, coverId);
+                coverPath = isLazyEpubImport
+                    ? await CreateCoverImageAsync(importData.CoverImageStream, coverId, preferOriginal: true)
+                    : await CreateCoverThumbnailAsync(importData.CoverImageStream, coverId);
             }
             catch
             {
@@ -335,7 +370,9 @@ public class LibraryService
         }
 
         // Build comic metadata - prefer ComicInfo.xml data over filename
-        var title = comicInfo?.Title ?? Path.GetFileNameWithoutExtension(filePath);
+        var title = !string.IsNullOrWhiteSpace(comicInfo?.Title)
+            ? comicInfo.Title
+            : Path.GetFileNameWithoutExtension(filePath);
         var seriesName = !string.IsNullOrWhiteSpace(comicInfo?.Series)
             ? comicInfo.Series
             : NormalizeSeriesName(seriesNameFallback);
@@ -364,6 +401,13 @@ public class LibraryService
         };
 
         await _databaseService.SaveComicAsync(comic);
+
+        if (isLazyEpubImport)
+        {
+            await _epubShadowConversionService.InitializePendingConversionAsync(comic, comicInfo);
+            progress?.Report(1);
+        }
+
         OnLibraryChanged();
         return comic;
     }
@@ -441,6 +485,7 @@ public class LibraryService
         var pageCount = downloadedFile.Book.Media?.PagesCount ?? 0;
         var fileSize = downloadedFile.Book.SizeBytes;
         var needsConversion = downloadedFile.RequiresConversion;
+        var renderWhileReading = needsConversion && ShouldRenderUnsupportedFormatWhileReading(downloadedFile.Format);
 
         try
         {
@@ -448,11 +493,15 @@ public class LibraryService
             {
                 if (downloadedFile.Format == ComicFormat.Pdf)
                 {
-                    convertedImportData = await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
+                    convertedImportData = renderWhileReading
+                        ? await _pdfConverter.AnalyzePdfForImportAsync(filePath)
+                        : await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
                 }
                 else if (downloadedFile.Format == ComicFormat.Epub)
                 {
-                    convertedImportData = await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
+                    convertedImportData = renderWhileReading
+                        ? await _epubConverter.AnalyzeEpubForImportAsync(filePath, progress: progress, cancellationToken: cancellationToken)
+                        : await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress, cancellationToken: cancellationToken);
                 }
                 else
                 {
@@ -496,7 +545,7 @@ public class LibraryService
             {
                 try
                 {
-                    comicInfo = await _comicConverter.ExtractComicInfoAsync(actualFilePath);
+                    comicInfo = await GetComicInfoAsync(actualFilePath);
                 }
                 catch
                 {
@@ -518,7 +567,9 @@ public class LibraryService
                 {
                     if (convertedImportData?.CoverImageStream is not null)
                     {
-                        coverPath = await CreateCoverThumbnailAsync(convertedImportData.CoverImageStream, downloadedFile.Book.Id);
+                        coverPath = renderWhileReading && downloadedFile.Format == ComicFormat.Epub
+                            ? await CreateCoverImageAsync(convertedImportData.CoverImageStream, downloadedFile.Book.Id, preferOriginal: true)
+                            : await CreateCoverThumbnailAsync(convertedImportData.CoverImageStream, downloadedFile.Book.Id);
                     }
                     else
                     {
@@ -557,7 +608,7 @@ public class LibraryService
                 PageCount = pageCount,
                 FileSize = fileSize,
                 CoverPath = coverPath,
-                Format = needsConversion ? ComicFormat.Cbz : downloadedFile.Format,
+                Format = convertedImportData?.Format ?? (needsConversion ? ComicFormat.Cbz : downloadedFile.Format),
                 Source = ComicSource.Komga,
                 AddedDate = DateTime.UtcNow,
                 CurrentPage = downloadedFile.Book.ReadProgress?.Page ?? 0,
@@ -574,6 +625,14 @@ public class LibraryService
             cancellationToken.ThrowIfCancellationRequested();
 
             await _databaseService.SaveComicAsync(comic);
+
+            if (renderWhileReading && downloadedFile.Format == ComicFormat.Epub)
+            {
+                progress?.Report(0.9);
+                await _epubShadowConversionService.InitializePendingConversionAsync(comic, comicInfo);
+                progress?.Report(1);
+            }
+
             OnLibraryChanged();
             return comic;
         }
@@ -618,7 +677,13 @@ public class LibraryService
     /// </summary>
     public async Task UpdateReadingProgressAsync(Comic comic, int currentPage)
     {
-        var isCompleted = currentPage >= comic.PageCount - 1;
+        if (comic.PageCount <= 0)
+        {
+            return;
+        }
+
+        var conversionState = await _epubShadowConversionService.GetConversionStateAsync(comic.Id);
+        var isCompleted = conversionState is null && currentPage >= comic.PageCount - 1;
         
         await _databaseService.UpdateReadingProgressAsync(comic.Id, currentPage, isCompleted);
         
@@ -636,11 +701,86 @@ public class LibraryService
         }
     }
 
+    public Task<EpubConversionState?> GetEpubConversionStateAsync(int comicId)
+    {
+        return _epubShadowConversionService.GetConversionStateAsync(comicId);
+    }
+
+    public async Task<Comic> PrepareComicForReadingAsync(Comic comic, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        if (comic.Format != ComicFormat.Epub ||
+            !Path.GetExtension(comic.FilePath).Equals(".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            return comic;
+        }
+
+        using var importData = await _epubConverter.ConvertEpubToCbzForImportAsync(
+            comic.FilePath,
+            _comicsDirectory,
+            progress: progress,
+            cancellationToken: cancellationToken);
+
+        var originalFilePath = comic.FilePath;
+        comic.FilePath = importData.FilePath;
+        comic.Format = importData.Format;
+        comic.PageCount = importData.PageCount;
+        comic.FileSize = importData.FileSize;
+
+        if (!string.Equals(importData.FilePath, originalFilePath, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(originalFilePath) &&
+            IsAppOwnedSourcePath(originalFilePath))
+        {
+            await DeleteManagedSourceFileAsync(originalFilePath);
+        }
+
+        await _databaseService.SaveComicAsync(comic);
+        OnLibraryChanged();
+        return comic;
+    }
+
+    public async Task<Comic> ConvertPendingEpubAsync(Comic comic, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var state = await _epubShadowConversionService.GetConversionStateAsync(comic.Id);
+        if (state is null)
+        {
+            return comic;
+        }
+
+        await _epubShadowConversionService.StopReadingSessionAsync(comic.Id);
+
+        using var importData = await _epubConverter.ConvertEpubToCbzForImportAsync(
+            state.SourceEpubPath,
+            _comicsDirectory,
+            progress: progress,
+            cancellationToken: cancellationToken);
+
+        await _epubShadowConversionService.DeleteConversionArtifactsAsync(comic.Id);
+
+        var originalFilePath = comic.FilePath;
+        comic.FilePath = importData.FilePath;
+        comic.Format = importData.Format;
+        comic.PageCount = importData.PageCount;
+        comic.FileSize = importData.FileSize;
+
+        if (!string.Equals(originalFilePath, importData.FilePath, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(originalFilePath) &&
+            IsAppOwnedSourcePath(originalFilePath))
+        {
+            await DeleteManagedSourceFileAsync(originalFilePath);
+        }
+
+        await _databaseService.SaveComicAsync(comic);
+        OnLibraryChanged();
+        return comic;
+    }
+
     /// <summary>
     /// Removes a comic from the library database but keeps the physical file
     /// </summary>
     public async Task RemoveComicFromLibraryAsync(Comic comic)
     {
+        await _epubShadowConversionService.DeleteConversionArtifactsAsync(comic.Id);
+
         // Delete cover (now just a single file in unified covers directory)
         if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
         {
@@ -663,6 +803,8 @@ public class LibraryService
     /// </summary>
     public async Task DeleteComicAsync(Comic comic)
     {
+        await _epubShadowConversionService.DeleteConversionArtifactsAsync(comic.Id);
+
         // If we want to protect the file, e.g. only delete if file is in our managed directory, add this: comic.FilePath.StartsWith(_comicsDirectory)
 
         if (File.Exists(comic.FilePath))
@@ -761,20 +903,28 @@ public class LibraryService
     private async Task<ComicImportData> PrepareLocalImportAsync(string filePath, ComicFormat format, IProgress<double>? progress)
     {
         var needsConversion = format == ComicFormat.Pdf ||
-                              format == ComicFormat.Epub ||
-                              format == ComicFormat.Cb7 ||
-                              format == ComicFormat.Cbt ||
-                              (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
+                               format == ComicFormat.Epub ||
+                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
 
         if (needsConversion)
         {
             if (format == ComicFormat.Pdf)
             {
+                if (ShouldRenderUnsupportedFormatWhileReading(format))
+                {
+                    return await _pdfConverter.AnalyzePdfForImportAsync(filePath);
+                }
+
                 return await _pdfConverter.ConvertPdfToCbzForImportAsync(filePath, _comicsDirectory, progress);
             }
 
             if (format == ComicFormat.Epub)
             {
+                if (ShouldRenderUnsupportedFormatWhileReading(format))
+                {
+                    return await _epubConverter.AnalyzeEpubForImportAsync(filePath, progress: progress);
+                }
+
                 return await _epubConverter.ConvertEpubToCbzForImportAsync(filePath, _comicsDirectory, progress: progress);
             }
 
@@ -792,6 +942,24 @@ public class LibraryService
         return await CreateCoverThumbnailAsync(coverStream, coverId);
     }
 
+    private async Task<string> CreateCoverImageAsync(Stream imageStream, string coverId, bool preferOriginal)
+    {
+        if (preferOriginal && TryGetImageExtension(imageStream, out var extension))
+        {
+            var coverPath = Path.Combine(_coversDirectory, $"{coverId}{extension}");
+            if (imageStream.CanSeek)
+            {
+                imageStream.Position = 0;
+            }
+
+            await using var outputStream = File.Create(coverPath);
+            await imageStream.CopyToAsync(outputStream);
+            return coverPath;
+        }
+
+        return await CreateCoverThumbnailAsync(imageStream, coverId);
+    }
+
     private async Task<string> CreateCoverThumbnailAsync(Stream imageStream, string coverId)
     {
         var coverPath = Path.Combine(_coversDirectory, $"{coverId}.jpg");
@@ -801,27 +969,106 @@ public class LibraryService
             imageStream.Position = 0;
         }
 
-        using var sourceImage = await Image.LoadAsync<Rgba32>(imageStream);
-        sourceImage.Mutate(context => context.AutoOrient());
-
-        var resizeOptions = new ResizeOptions
+        await Task.Run(() =>
         {
-            Mode = ResizeMode.Max,
-            Size = new Size(CoverThumbnailMaxWidth, CoverThumbnailMaxHeight),
-            Sampler = KnownResamplers.Lanczos3
-        };
+            if (imageStream.CanSeek)
+            {
+                imageStream.Position = 0;
+            }
 
-        using var resizedImage = sourceImage.Clone(context => context.Resize(resizeOptions));
-        using var flattenedImage = new Image<Rgba32>(resizedImage.Width, resizedImage.Height, Color.White);
-        flattenedImage.Mutate(context => context.DrawImage(resizedImage, 1f));
+            using var sourceImage = Image.Load<Rgba32>(imageStream);
+            sourceImage.Mutate(context => context.AutoOrient());
 
-        await using var outputStream = File.Create(coverPath);
-        await flattenedImage.SaveAsJpegAsync(outputStream, new JpegEncoder
-        {
-            Quality = CoverThumbnailJpegQuality
+            var resizeOptions = new ResizeOptions
+            {
+                Mode = ResizeMode.Max,
+                Size = new Size(CoverThumbnailMaxWidth, CoverThumbnailMaxHeight),
+                Sampler = KnownResamplers.Lanczos3
+            };
+
+            using var resizedImage = sourceImage.Clone(context => context.Resize(resizeOptions));
+            using var flattenedImage = new Image<Rgba32>(resizedImage.Width, resizedImage.Height, Color.White);
+            flattenedImage.Mutate(context => context.DrawImage(resizedImage, 1f));
+
+            using var outputStream = File.Create(coverPath);
+            flattenedImage.SaveAsJpeg(outputStream, new JpegEncoder
+            {
+                Quality = CoverThumbnailJpegQuality
+            });
         });
 
         return coverPath;
+    }
+
+    private static bool TryGetImageExtension(Stream imageStream, out string extension)
+    {
+        extension = string.Empty;
+        if (!imageStream.CanSeek)
+        {
+            return false;
+        }
+
+        var originalPosition = imageStream.Position;
+        Span<byte> header = stackalloc byte[16];
+        var read = imageStream.Read(header);
+        imageStream.Position = originalPosition;
+
+        if (read >= 3 &&
+            header[0] == 0xFF &&
+            header[1] == 0xD8 &&
+            header[2] == 0xFF)
+        {
+            extension = ".jpg";
+            return true;
+        }
+
+        if (read >= 8 &&
+            header[0] == 0x89 &&
+            header[1] == 0x50 &&
+            header[2] == 0x4E &&
+            header[3] == 0x47 &&
+            header[4] == 0x0D &&
+            header[5] == 0x0A &&
+            header[6] == 0x1A &&
+            header[7] == 0x0A)
+        {
+            extension = ".png";
+            return true;
+        }
+
+        if (read >= 6 &&
+            header[0] == 0x47 &&
+            header[1] == 0x49 &&
+            header[2] == 0x46 &&
+            header[3] == 0x38)
+        {
+            extension = ".gif";
+            return true;
+        }
+
+        if (read >= 2 &&
+            header[0] == 0x42 &&
+            header[1] == 0x4D)
+        {
+            extension = ".bmp";
+            return true;
+        }
+
+        if (read >= 12 &&
+            header[0] == 0x52 &&
+            header[1] == 0x49 &&
+            header[2] == 0x46 &&
+            header[3] == 0x46 &&
+            header[8] == 0x57 &&
+            header[9] == 0x45 &&
+            header[10] == 0x42 &&
+            header[11] == 0x50)
+        {
+            extension = ".webp";
+            return true;
+        }
+
+        return false;
     }
 
     private ComicInfo CreateComicInfoFromKomgaBook(KomgaBook book)
@@ -907,8 +1154,6 @@ public class LibraryService
     {
         return format == ComicFormat.Pdf ||
                format == ComicFormat.Epub ||
-               format == ComicFormat.Cb7 ||
-               format == ComicFormat.Cbt ||
                (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
     }
 

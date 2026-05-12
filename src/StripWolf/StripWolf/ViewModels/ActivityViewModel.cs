@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
+using StripWolf.Services;
 
 namespace StripWolf.ViewModels;
 
@@ -12,6 +13,7 @@ public partial class ActivityViewModel : ViewModelBase
 {
     private readonly LibraryViewModel _libraryViewModel;
     private readonly KomgaViewModel _komgaViewModel;
+    private readonly EpubShadowConversionService _epubShadowConversionService;
     private bool _activityRefreshPending;
 
     [ObservableProperty]
@@ -20,6 +22,9 @@ public partial class ActivityViewModel : ViewModelBase
     [ObservableProperty]
     private double _overallProgress;
 
+    [ObservableProperty]
+    private ObservableCollection<EpubConversionState> _epubConversions = [];
+
     public ObservableCollection<PendingImport> PendingImports => _libraryViewModel.PendingImports;
     public ObservableCollection<KomgaDownloadQueueItem> DownloadQueueItems => _komgaViewModel.DownloadQueueItems;
     public LibraryViewModel Library => _libraryViewModel;
@@ -27,10 +32,14 @@ public partial class ActivityViewModel : ViewModelBase
 
     public bool HasActiveItems => ActiveItemsCount > 0;
 
-    public ActivityViewModel(LibraryViewModel libraryViewModel, KomgaViewModel komgaViewModel)
+    public ActivityViewModel(
+        LibraryViewModel libraryViewModel,
+        KomgaViewModel komgaViewModel,
+        EpubShadowConversionService epubShadowConversionService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
+        _epubShadowConversionService = epubShadowConversionService;
         Title = "Activity";
 
         PendingImports.CollectionChanged += OnPendingImportsChanged;
@@ -45,6 +54,8 @@ public partial class ActivityViewModel : ViewModelBase
             queueItem.PropertyChanged += OnActivityItemPropertyChanged;
         }
 
+        _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
+        _ = RefreshEpubConversionsAsync();
         RefreshActivityState();
     }
 
@@ -130,11 +141,28 @@ public partial class ActivityViewModel : ViewModelBase
 
     private void RefreshActivityState()
     {
-        ActiveItemsCount = PendingImports.Count + DownloadQueueItems.Count;
+        ActiveItemsCount = PendingImports.Count + DownloadQueueItems.Count + EpubConversions.Count;
 
         var inFlightImports = PendingImports.Where(item => item.IsProcessing).Select(item => item.Progress);
         var inFlightDownloads = DownloadQueueItems.Where(item => item.IsDownloading).Select(item => item.Progress);
         var progressValues = inFlightImports.Concat(inFlightDownloads).ToList();
         OverallProgress = progressValues.Count == 0 ? 0 : progressValues.Average();
+    }
+
+    private void OnEpubConversionStateChanged(object? sender, int comicId)
+    {
+        _ = RefreshEpubConversionsAsync();
+    }
+
+    private async Task RefreshEpubConversionsAsync()
+    {
+        var states = await _epubShadowConversionService.GetActiveConversionsAsync();
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            EpubConversions = new ObservableCollection<EpubConversionState>(
+                states.OrderBy(state => state.UpdatedAtUtc)
+                    .ThenBy(state => state.ComicId));
+            ScheduleRefreshActivityState();
+        });
     }
 }

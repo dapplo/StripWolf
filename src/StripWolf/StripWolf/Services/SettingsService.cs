@@ -379,6 +379,12 @@ public class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public EpubOutputResolution EpubOutputResolution { get; set; } = EpubOutputResolution.Low;
 
+    /// <summary>
+    /// Controls whether unsupported formats are converted up front or rendered page-by-page while reading.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public UnsupportedFormatHandlingMode UnsupportedFormatHandlingMode { get; set; } = UnsupportedFormatHandlingMode.ConvertOnImport;
+
     public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
 
     public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
@@ -417,6 +423,7 @@ public class AppSettings
             CompactOverview = CompactOverview,
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
+            UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
             KomgaParallelDownloads = KomgaParallelDownloads

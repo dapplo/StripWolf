@@ -1,5 +1,6 @@
 using Avalonia.Media.Imaging;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Models;
@@ -17,6 +18,8 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly KomgaApiService _komgaApiService;
     private readonly PanelDetectionService _panelDetectionService;
     private readonly SettingsService _settingsService;
+    private readonly EpubShadowConversionService _epubShadowConversionService;
+    private string? _readerFilePath;
 
     [ObservableProperty]
     private int _comicId;
@@ -24,6 +27,12 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanAdvanceOrShowEndChoices))]
     [NotifyPropertyChangedFor(nameof(CanViewSeriesOnKomgaOption))]
+    [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
+    [NotifyPropertyChangedFor(nameof(HasNextPage))]
+    [NotifyPropertyChangedFor(nameof(PageDisplay))]
+    [NotifyPropertyChangedFor(nameof(IsFirstPage))]
+    [NotifyPropertyChangedFor(nameof(IsLastPage))]
+    [NotifyPropertyChangedFor(nameof(MaxSliderValue))]
     private Comic? _comic;
 
     [ObservableProperty]
@@ -33,6 +42,16 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsFirstPage))]
     [NotifyPropertyChangedFor(nameof(IsLastPage))]
     private int _currentPage;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNextPage))]
+    [NotifyPropertyChangedFor(nameof(IsLastPage))]
+    [NotifyPropertyChangedFor(nameof(CanAdvanceOrShowEndChoices))]
+    [NotifyPropertyChangedFor(nameof(PageDisplay))]
+    private bool _hasPendingEpubConversion;
+
+    [ObservableProperty]
+    private string? _readerStatusMessage;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
@@ -74,6 +93,7 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isLoadingPage;
     private int _lastLoadedPageIndex = -1;
     private bool _shouldSelectLastPanel;
+    private long _epubConversionUpdateVersion;
 
     // Pre-decoded bitmap cache for instant page display without loading bar
     private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
@@ -81,9 +101,9 @@ public partial class ReaderViewModel : ViewModelBase
     private const int MaxPrefetchedBitmaps = 3;
 
     public bool HasPreviousPage => CurrentPage > 0;
-    public bool HasNextPage => Comic is not null && CurrentPage < Comic.PageCount - 1;
+    public bool HasNextPage => Comic is not null && (CurrentPage < Comic.PageCount - 1 || HasPendingEpubConversion);
     public bool IsFirstPage => CurrentPage == 0;
-    public bool IsLastPage => Comic is not null && CurrentPage == Comic.PageCount - 1;
+    public bool IsLastPage => Comic is not null && !HasPendingEpubConversion && CurrentPage == Comic.PageCount - 1;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AuthorsDisplay))]
@@ -104,7 +124,7 @@ public partial class ReaderViewModel : ViewModelBase
     public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
     public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
     public string Location => Comic?.FilePath ?? "";
-    public bool CanAdvanceOrShowEndChoices => Comic is not null && Comic.PageCount > 0;
+    public bool CanAdvanceOrShowEndChoices => Comic is not null && (Comic.PageCount > 0 || HasPendingEpubConversion);
     public bool CanViewSeriesOnKomgaOption => !string.IsNullOrEmpty(Comic?.KomgaSeriesId);
     public bool HasNextSeriesComic => NextSeriesComic is not null;
     public string NextSeriesComicTitle => NextSeriesComic?.Title ?? string.Empty;
@@ -231,11 +251,16 @@ public partial class ReaderViewModel : ViewModelBase
         get
         {
             if (Comic is null) return "";
+            if (Comic.PageCount <= 0) return HasPendingEpubConversion ? "Preparing..." : "0 / 0";
             if (IsTwoPageMode && CurrentPage + 1 < Comic.PageCount)
             {
-                return $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}";
+                return HasPendingEpubConversion
+                    ? $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}+"
+                    : $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}";
             }
-            return $"{CurrentPage + 1} / {Comic.PageCount}";
+            return HasPendingEpubConversion
+                ? $"{CurrentPage + 1} / {Comic.PageCount}+"
+                : $"{CurrentPage + 1} / {Comic.PageCount}";
         }
     }
     
@@ -252,7 +277,7 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "◫";
     
-    public int MaxSliderValue => Comic?.PageCount - 1 ?? 0;
+    public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 
     public bool IsDebug => 
 #if DEBUG
@@ -271,14 +296,139 @@ public partial class ReaderViewModel : ViewModelBase
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
         PanelDetectionService panelDetectionService,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        EpubShadowConversionService epubShadowConversionService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
+        _epubShadowConversionService = epubShadowConversionService;
+        _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
         Title = "Reader";
+    }
+
+    private void ReleaseReaderResources()
+    {
+        if (Comic is not null && HasPendingEpubConversion)
+        {
+            _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
+        }
+
+        _panelDetectionService.ClearAllCache();
+        _comicReaderService.ClearCache();
+        ClearBitmapPrefetchCache();
+        _lastLoadedPageIndex = -1;
+        _readerFilePath = null;
+        HasPendingEpubConversion = false;
+        ReaderStatusMessage = null;
+
+        var oldCurrentPageImage = CurrentPageImage;
+        CurrentPageImage = null;
+
+        var oldLeftPageImage = LeftPageImage;
+        LeftPageImage = null;
+
+        var oldRightPageImage = RightPageImage;
+        RightPageImage = null;
+
+        oldCurrentPageImage?.Dispose();
+        if (!ReferenceEquals(oldLeftPageImage, oldCurrentPageImage))
+        {
+            oldLeftPageImage?.Dispose();
+        }
+        if (!ReferenceEquals(oldRightPageImage, oldCurrentPageImage) &&
+            !ReferenceEquals(oldRightPageImage, oldLeftPageImage))
+        {
+            oldRightPageImage?.Dispose();
+        }
+
+        CurrentPagePanels = null;
+        CurrentPanel = null;
+        CurrentPanelIndex = 0;
+        IsDetectingPanels = false;
+    }
+
+    private string GetActiveReadPath()
+    {
+        return _readerFilePath ?? Comic?.FilePath ?? string.Empty;
+    }
+
+    private async void OnEpubConversionStateChanged(object? sender, int comicId)
+    {
+        if (Comic?.Id != comicId)
+        {
+            return;
+        }
+
+        var updateVersion = Interlocked.Increment(ref _epubConversionUpdateVersion);
+        var refreshedComic = await _libraryService.GetComicAsync(comicId);
+        var state = await _libraryService.GetEpubConversionStateAsync(comicId);
+        if (updateVersion != Interlocked.Read(ref _epubConversionUpdateVersion))
+        {
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (Comic?.Id != comicId || updateVersion != Interlocked.Read(ref _epubConversionUpdateVersion))
+            {
+                return;
+            }
+
+            var previousReadPath = GetActiveReadPath();
+            if (refreshedComic is not null)
+            {
+                Comic.FilePath = refreshedComic.FilePath;
+                Comic.Format = refreshedComic.Format;
+                Comic.PageCount = refreshedComic.PageCount;
+                Comic.FileSize = refreshedComic.FileSize;
+                Title = refreshedComic.Title;
+            }
+
+            ApplyEpubConversionState(state);
+            InvalidateReaderSourceIfChanged(previousReadPath);
+        });
+    }
+
+    private void ApplyEpubConversionState(EpubConversionState? state)
+    {
+        HasPendingEpubConversion = state is not null;
+        _readerFilePath = state?.ShadowPath ?? Comic?.FilePath;
+        if (Comic is not null && state is not null)
+        {
+            Comic.PageCount = state.ProducedPageCount;
+            ReaderStatusMessage = state.Status switch
+            {
+                EpubConversionStatus.Failed => state.LastError,
+                _ => null
+            };
+        }
+        else
+        {
+            ReaderStatusMessage = null;
+        }
+
+        OnPropertyChanged(nameof(MaxSliderValue));
+        OnPropertyChanged(nameof(PageDisplay));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(IsLastPage));
+        OnPropertyChanged(nameof(CanAdvanceOrShowEndChoices));
+    }
+
+    private void InvalidateReaderSourceIfChanged(string previousReadPath)
+    {
+        var currentReadPath = GetActiveReadPath();
+        if (string.Equals(previousReadPath, currentReadPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _comicReaderService.ClearCache();
+        ClearBitmapPrefetchCache();
+        _lastLoadedPageIndex = -1;
+        _ = LoadPageAsync();
     }
 
     [RelayCommand]
@@ -295,15 +445,16 @@ public partial class ReaderViewModel : ViewModelBase
                 Directory.CreateDirectory(imagesDir);
             }
 
-            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
-            var pageNames = await _comicReaderService.GetPageNamesAsync(Comic.FilePath);
+            var readPath = GetActiveReadPath();
+            var pageData = await _comicReaderService.GetPageAsync(readPath, CurrentPage);
+            var pageNames = await _comicReaderService.GetPageNamesAsync(readPath);
             var extension = ".jpg"; // Default
             if (pageNames.Count > CurrentPage)
             {
                 extension = Path.GetExtension(pageNames[CurrentPage]);
             }
 
-            var fileName = $"{Path.GetFileNameWithoutExtension(Comic.FilePath)}_p{CurrentPage}{extension}";
+            var fileName = $"{Path.GetFileNameWithoutExtension(readPath)}_p{CurrentPage}{extension}";
             var filePath = Path.Combine(imagesDir, fileName);
 
             await File.WriteAllBytesAsync(filePath, pageData);
@@ -327,26 +478,64 @@ public partial class ReaderViewModel : ViewModelBase
             IsInfoPanelVisible = false;
             IsEndOfComicOptionsVisible = false;
             NextSeriesComic = null;
-            
+            ComicInfo = null;
+            Title = "Reader";
+            ReaderStatusMessage = null;
+              
             // Clear previous comic data
-            _panelDetectionService.ClearAllCache();
-            _comicReaderService.ClearCache();
-            ClearBitmapPrefetchCache();
-            _lastLoadedPageIndex = -1;
-            
+            ReleaseReaderResources();
+            Comic = null;
+            CurrentPage = 0;
+             
             // Load reading mode preferences
             var settings = _settingsService.LoadSettings();
             ReadingMode = settings.PreferredReadingMode;
             Handedness = settings.Handedness;
             CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
-            
+             
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
             {
                 Title = Comic.Title;
+                OnPropertyChanged(nameof(MaxSliderValue));
+                OnPropertyChanged(nameof(PageDisplay));
+                OnPropertyChanged(nameof(HasPreviousPage));
+                OnPropertyChanged(nameof(HasNextPage));
+                OnPropertyChanged(nameof(IsFirstPage));
+                OnPropertyChanged(nameof(IsLastPage));
+                OnPropertyChanged(nameof(CanAdvanceOrShowEndChoices));
+
+                if (Comic.Format == ComicFormat.Epub)
+                {
+                    _epubShadowConversionService.StartReadingSession(Comic.Id);
+                    var (readPath, state) = await _epubShadowConversionService.EnsurePagesAvailableAsync(Comic, Math.Max(0, Comic.CurrentPage));
+                    _readerFilePath = readPath;
+                    ApplyEpubConversionState(state);
+                }
+
+                if (Comic.Format == ComicFormat.Pdf)
+                {
+                    var (pageCount, fileSize) = await _comicReaderService.GetComicInfoAsync(Comic.FilePath);
+                    Comic.PageCount = pageCount;
+                    Comic.FileSize = fileSize;
+                }
+                else if (!HasPendingEpubConversion)
+                {
+                    _readerFilePath = Comic.FilePath;
+                }
+
+                Title = Comic.Title;
                 await RefreshSeriesNavigationTargetsAsync();
-                
+
+                if (Comic.PageCount <= 0)
+                {
+                    ErrorMessage = HasPendingEpubConversion
+                        ? "Preparing the first readable page..."
+                        : "This book could not be prepared for reading.";
+                    return;
+                }
+                 
                 // Sync with Komga if this is a Komga comic
                 if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
                 {
@@ -414,10 +603,15 @@ public partial class ReaderViewModel : ViewModelBase
             // Capture current index
             int pageIndex = CurrentPage;
 
+            if (HasPendingEpubConversion)
+            {
+                await EnsureEpubPagesAvailableAsync(pageIndex);
+            }
+
             // Validate page index is within range
             if (Comic.PageCount == 0)
             {
-                ErrorMessage = "Comic has no pages";
+                ErrorMessage = HasPendingEpubConversion ? "Preparing readable pages..." : "Comic has no pages";
                 return;
             }
 
@@ -437,7 +631,8 @@ public partial class ReaderViewModel : ViewModelBase
                 if (IsTwoPageMode)
                 {
                     // Load two pages for two-page mode
-                    var leftPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                    var readPath = GetActiveReadPath();
+                    var leftPageData = await _comicReaderService.GetPageAsync(readPath, pageIndex);
                     var newLeftBitmap = await Task.Run(() =>
                     {
                         using var stream = new MemoryStream(leftPageData);
@@ -454,7 +649,7 @@ public partial class ReaderViewModel : ViewModelBase
                     // Load right page if available
                     if (pageIndex + 1 < Comic.PageCount)
                     {
-                        var rightPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex + 1);
+                        var rightPageData = await _comicReaderService.GetPageAsync(readPath, pageIndex + 1);
                         var newRightBitmap = await Task.Run(() =>
                         {
                             using var stream = new MemoryStream(rightPageData);
@@ -478,7 +673,7 @@ public partial class ReaderViewModel : ViewModelBase
                     if (newBitmap is null)
                     {
                         // Not prefetched - decode now on a background thread
-                        pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                        pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
                         newBitmap = await Task.Run(() =>
                         {
                             using var stream = new MemoryStream(pageData);
@@ -488,7 +683,7 @@ public partial class ReaderViewModel : ViewModelBase
                     else if (ReadingMode == ReadingMode.Guided)
                     {
                         // Need raw data for panel detection even though bitmap was prefetched
-                        pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, pageIndex);
+                        pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
                     }
 
                     var oldBitmap = CurrentPageImage;
@@ -527,6 +722,23 @@ public partial class ReaderViewModel : ViewModelBase
 
         // Prefetch adjacent pages in the background so the next navigation is instant
         PrefetchAdjacentPages(CurrentPage);
+    }
+
+    private async Task EnsureEpubPagesAvailableAsync(int requestedPageIndex)
+    {
+        if (Comic is null || Comic.Format != ComicFormat.Epub)
+        {
+            return;
+        }
+
+        var (readPath, state) = await _epubShadowConversionService.EnsurePagesAvailableAsync(
+            Comic,
+            requestedPageIndex,
+            IsTwoPageMode ? 1 : 0);
+
+        _readerFilePath = readPath;
+        ApplyEpubConversionState(state);
+        ErrorMessage = state?.Status == EpubConversionStatus.Failed ? state.LastError : null;
     }
 
     partial void OnCurrentPageChanged(int value)
@@ -635,6 +847,16 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
+        if (HasPendingEpubConversion && CurrentPage >= Comic.PageCount - 1)
+        {
+            ReaderStatusMessage = "Preparing next page...";
+            await EnsureEpubPagesAvailableAsync(CurrentPage + 1);
+            if (CurrentPage >= Comic.PageCount - 1)
+            {
+                return;
+            }
+        }
+
         if (!HasNextPage)
         {
             if (IsLastPage)
@@ -655,7 +877,18 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoToPageAsync(int page)
     {
-        if (Comic is null || page < 0 || page >= Comic.PageCount)
+        if (Comic is null || page < 0)
+        {
+            return;
+        }
+
+        if (HasPendingEpubConversion && page >= Comic.PageCount)
+        {
+            ReaderStatusMessage = "Preparing requested page...";
+            await EnsureEpubPagesAvailableAsync(page);
+        }
+
+        if (page >= Comic.PageCount)
         {
             return;
         }
@@ -835,7 +1068,7 @@ public partial class ReaderViewModel : ViewModelBase
         // If switching to guided mode, detect panels
         if (ReadingMode == ReadingMode.Guided && Comic is not null)
         {
-            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
         
@@ -902,7 +1135,7 @@ public partial class ReaderViewModel : ViewModelBase
         // If switching to guided mode, detect panels
         if (Comic is not null)
         {
-            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
         
@@ -934,7 +1167,7 @@ public partial class ReaderViewModel : ViewModelBase
         // If switching to guided mode, detect panels
         if (mode == ReadingMode.Guided && Comic is not null)
         {
-            var pageData = await _comicReaderService.GetPageAsync(Comic.FilePath, CurrentPage);
+            var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
     }
@@ -969,7 +1202,7 @@ public partial class ReaderViewModel : ViewModelBase
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
             var result = await _panelDetectionService.DetectPanelsAsync(
-                Comic.FilePath, 
+                GetActiveReadPath(), 
                 pageIndex, 
                 pageData,
                 isManga);
@@ -1025,7 +1258,8 @@ public partial class ReaderViewModel : ViewModelBase
         }
         
         // Check if already cached
-        if (_panelDetectionService.IsCached(Comic.FilePath, nextPageIndex))
+        var readPath = GetActiveReadPath();
+        if (_panelDetectionService.IsCached(readPath, nextPageIndex))
         {
             return;
         }
@@ -1033,8 +1267,8 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
-            var nextPageData = await _comicReaderService.GetPageAsync(Comic.FilePath, nextPageIndex);
-            await _panelDetectionService.DetectPanelsAsync(Comic.FilePath, nextPageIndex, nextPageData, isManga);
+            var nextPageData = await _comicReaderService.GetPageAsync(readPath, nextPageIndex);
+            await _panelDetectionService.DetectPanelsAsync(readPath, nextPageIndex, nextPageData, isManga);
         }
         catch
         {
@@ -1125,7 +1359,7 @@ public partial class ReaderViewModel : ViewModelBase
 
         try
         {
-            var filePath = Comic.FilePath;
+            var filePath = GetActiveReadPath();
             var pageData = await _comicReaderService.GetPageAsync(filePath, pageIndex);
 
             // Decode bitmap on a background thread to avoid blocking the UI
@@ -1136,7 +1370,7 @@ public partial class ReaderViewModel : ViewModelBase
             });
 
             // Only cache if still reading the same comic
-            if (Comic?.FilePath == filePath)
+            if (GetActiveReadPath() == filePath)
             {
                 StorePrefetchedBitmap(pageIndex, bitmap);
             }
@@ -1337,6 +1571,7 @@ public partial class ReaderViewModel : ViewModelBase
     private async Task GoBackAsync()
     {
         await SaveProgressAsync();
+        ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

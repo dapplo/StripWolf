@@ -17,6 +17,8 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly ComicReaderService _comicReaderService;
     private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
+    private CancellationTokenSource? _deleteCountdownLoopCancellation;
+    private Task? _deleteCountdownLoopTask;
     private bool _hasLoadedComics;
 
     [ObservableProperty]
@@ -298,10 +300,24 @@ public partial class LibraryViewModel : ViewModelBase
                 // Update properties of existing item but preserve deletion state
                 if (!existing.IsDeleting)
                 {
+                    existing.Title = newItem.Title;
+                    existing.SeriesName = newItem.SeriesName;
+                    existing.Number = newItem.Number;
+                    existing.Authors = newItem.Authors;
+                    existing.CoverPath = newItem.CoverPath;
+                    existing.FilePath = newItem.FilePath;
+                    existing.Format = newItem.Format;
+                    existing.FileSize = newItem.FileSize;
+                    existing.PageCount = newItem.PageCount;
                     existing.CurrentPage = newItem.CurrentPage;
                     existing.IsCompleted = newItem.IsCompleted;
                     existing.IsFavorite = newItem.IsFavorite;
                     existing.LastReadDate = newItem.LastReadDate;
+                    existing.AddedDate = newItem.AddedDate;
+                    existing.Source = newItem.Source;
+                    existing.KomgaId = newItem.KomgaId;
+                    existing.KomgaSeriesId = newItem.KomgaSeriesId;
+                    existing.KomgaServerId = newItem.KomgaServerId;
                 }
                 
                 // Move to correct position if needed
@@ -524,12 +540,13 @@ public partial class LibraryViewModel : ViewModelBase
         {
             pending.IsProcessing = true;
             var format = ComicReaderService.GetComicFormat(pending.FilePath);
+            var useLazyUnsupportedFormats = _settingsService.LoadSettings().UnsupportedFormatHandlingMode == UnsupportedFormatHandlingMode.ConvertWhileReading;
+            var isLazyEpubImport = useLazyUnsupportedFormats && format == ComicFormat.Epub;
             pending.Status = format switch
             {
+                ComicFormat.Epub when isLazyEpubImport => "Analyzing EPUB...",
                 ComicFormat.Pdf => "Converting PDF...",
                 ComicFormat.Epub => "Converting EPUB...",
-                ComicFormat.Cb7 => "Converting CB7...",
-                ComicFormat.Cbt => "Converting CBT...",
                 _ => "Importing..."
             };
 
@@ -538,7 +555,14 @@ public partial class LibraryViewModel : ViewModelBase
                 var progress = UiProgressThrottle.Create(p =>
                 {
                     pending.Progress = p;
-                    pending.Status = $"Converting... {p:P0}";
+                    pending.Status = isLazyEpubImport
+                        ? p switch
+                        {
+                            < 0.7 => $"Preparing EPUB... {p:P0}",
+                            < 0.95 => $"Copying EPUB... {p:P0}",
+                            _ => $"Finalizing EPUB... {p:P0}"
+                        }
+                        : $"Converting... {p:P0}";
                 });
 
                 var comic = await _libraryService.ImportLocalComicAsync(
@@ -567,6 +591,7 @@ public partial class LibraryViewModel : ViewModelBase
                 pending.IsFailed = true;
                 pending.Status = "Failed";
                 pending.ErrorMessage = ex.Message;
+                ErrorMessage = $"Failed to import '{pending.FileName}': {ex.Message}";
             }
         }
     }
@@ -592,7 +617,7 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private void OpenComic(Comic? comic)
     {
-        if (comic is null)
+        if (comic is null || !comic.CanOpen)
         {
             return;
         }
@@ -602,7 +627,57 @@ public partial class LibraryViewModel : ViewModelBase
         ComicOpenRequested?.Invoke(this, comic.Id);
     }
 
-    private readonly Dictionary<int, (Comic Comic, CancellationTokenSource Cts, bool DeleteFile)> _deleteCancellationTokens = new();
+    [RelayCommand]
+    private async Task ConvertComicNowAsync(Comic? comic)
+    {
+        if (comic is null || !comic.CanConvertNow)
+        {
+            return;
+        }
+
+        var pending = new PendingImport
+        {
+            FilePath = comic.FilePath,
+            FileName = comic.Title,
+            Status = "Waiting to convert EPUB..."
+        };
+
+        try
+        {
+            comic.IsConverting = true;
+            ErrorMessage = null;
+            await _importQueueService.EnqueueAsync(pending);
+
+            pending.IsProcessing = true;
+            pending.Status = "Converting EPUB...";
+            var progress = UiProgressThrottle.Create(value =>
+            {
+                pending.Progress = value;
+                pending.Status = $"Converting EPUB... {value:P0}";
+            });
+
+            await _libraryService.ConvertPendingEpubAsync(comic, progress);
+            pending.IsProcessing = false;
+            pending.IsCompleted = true;
+            pending.Progress = 1.0;
+            pending.Status = "Completed";
+            await RemoveCompletedImportAfterDelayAsync(pending);
+        }
+        catch (Exception ex)
+        {
+            pending.IsProcessing = false;
+            pending.IsFailed = true;
+            pending.Status = "Failed";
+            pending.ErrorMessage = ex.Message;
+            ErrorMessage = $"Failed to convert '{comic.Title}': {ex.Message}";
+        }
+        finally
+        {
+            comic.IsConverting = false;
+        }
+    }
+
+    private readonly Dictionary<int, PendingComicDeletion> _deleteCancellationTokens = new();
 
     [RelayCommand]
     private async Task DeleteSeriesAsync(ComicSeriesGroup? seriesGroup)
@@ -624,7 +699,7 @@ public partial class LibraryViewModel : ViewModelBase
 
         foreach (var comic in seriesGroup.Comics.Where(static comic => !comic.IsDeleting).ToList())
         {
-            await StartDeletionProcess(comic, ShouldDeleteComicFile(comic));
+            StartDeletionProcess(comic, ShouldDeleteComicFile(comic));
         }
     }
 
@@ -644,7 +719,7 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        await StartDeletionProcess(comic, true); // Internal files are always deleted physically
+        StartDeletionProcess(comic, true); // Internal files are always deleted physically
     }
 
     [RelayCommand]
@@ -655,7 +730,7 @@ public partial class LibraryViewModel : ViewModelBase
             var comic = ComicPendingDeletion;
             ShowDeleteConfirmation = false;
             ComicPendingDeletion = null;
-            await StartDeletionProcess(comic, true); // Permanent delete
+            StartDeletionProcess(comic, true); // Permanent delete
         }
     }
 
@@ -667,7 +742,7 @@ public partial class LibraryViewModel : ViewModelBase
             var comic = ComicPendingDeletion;
             ShowDeleteConfirmation = false;
             ComicPendingDeletion = null;
-            await StartDeletionProcess(comic, false); // Only remove from library
+            StartDeletionProcess(comic, false); // Only remove from library
         }
     }
 
@@ -678,55 +753,84 @@ public partial class LibraryViewModel : ViewModelBase
         ComicPendingDeletion = null;
     }
 
-    private async Task StartDeletionProcess(Comic comic, bool deleteFile)
+    private void StartDeletionProcess(Comic comic, bool deleteFile)
     {
         // Mark as deleting in UI
         comic.IsDeleting = true;
         comic.DeletionSecondsRemaining = DeleteUndoTimeoutSeconds;
 
-        // Create cancellation token
-        var cts = new CancellationTokenSource();
-        _deleteCancellationTokens[comic.Id] = (comic, cts, deleteFile);
-
-        // Start countdown
-        _ = StartComicDeleteCountdownAsync(comic, cts, deleteFile);
+        _deleteCancellationTokens[comic.Id] = new PendingComicDeletion(comic, deleteFile, DateTime.UtcNow.AddSeconds(DeleteUndoTimeoutSeconds));
+        EnsureDeleteCountdownTimer();
     }
 
-    private async Task StartComicDeleteCountdownAsync(Comic comic, CancellationTokenSource cts, bool deleteFile)
+    private void EnsureDeleteCountdownTimer()
+    {
+        if (_deleteCancellationTokens.Count > 0)
+        {
+            if (_deleteCountdownLoopTask is null || _deleteCountdownLoopTask.IsCompleted)
+            {
+                _deleteCountdownLoopCancellation?.Dispose();
+                _deleteCountdownLoopCancellation = new CancellationTokenSource();
+                _deleteCountdownLoopTask = RunDeleteCountdownLoopAsync(_deleteCountdownLoopCancellation.Token);
+            }
+        }
+        else
+        {
+            _deleteCountdownLoopCancellation?.Cancel();
+        }
+    }
+
+    private async Task RunDeleteCountdownLoopAsync(CancellationToken cancellationToken)
     {
         try
         {
-            Debug.WriteLine($"Starting {(deleteFile ? "deletion" : "removal")} countdown for comic {comic.Id}: {comic.Title}");
-            while (comic.DeletionSecondsRemaining > 0 && !cts.Token.IsCancellationRequested)
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                await Task.Delay(1000, cts.Token);
-                if (!cts.Token.IsCancellationRequested)
-                {
-                    comic.DeletionSecondsRemaining--;
-                }
-            }
-
-            // If not cancelled, perform action
-            if (!cts.Token.IsCancellationRequested)
-            {
-                await PerformPermanentComicActionAsync(comic, deleteFile);
+                await Dispatcher.UIThread.InvokeAsync(UpdateDeleteCountdowns);
             }
         }
         catch (OperationCanceledException)
         {
-            Debug.WriteLine($"Action for comic {comic.Id} was cancelled");
         }
-        catch (Exception ex)
+    }
+
+    private void UpdateDeleteCountdowns()
+    {
+        if (_deleteCancellationTokens.Count == 0)
         {
-            Debug.WriteLine($"Error in countdown for comic {comic.Id}: {ex.Message}");
+            _deleteCountdownLoopCancellation?.Cancel();
+            return;
         }
-        finally
+
+        var now = DateTime.UtcNow;
+        var expiredDeletes = new List<PendingComicDeletion>();
+
+        foreach (var entry in _deleteCancellationTokens.Values.ToList())
         {
-            if (_deleteCancellationTokens.TryGetValue(comic.Id, out var entry) && entry.Cts == cts)
+            var secondsRemaining = Math.Max(0, (int)Math.Ceiling((entry.ExpiresAtUtc - now).TotalSeconds));
+            UpdateTrackedComics(entry.Comic.Id, trackedComic =>
             {
-                _deleteCancellationTokens.Remove(comic.Id);
+                trackedComic.IsDeleting = true;
+                trackedComic.DeletionSecondsRemaining = secondsRemaining;
+            });
+
+            entry.Comic.IsDeleting = true;
+            entry.Comic.DeletionSecondsRemaining = secondsRemaining;
+
+            if (secondsRemaining == 0)
+            {
+                expiredDeletes.Add(entry);
             }
         }
+
+        foreach (var entry in expiredDeletes)
+        {
+            _deleteCancellationTokens.Remove(entry.Comic.Id);
+            _ = PerformPermanentComicActionAsync(entry.Comic, entry.DeleteFile);
+        }
+
+        EnsureDeleteCountdownTimer();
     }
 
     private async Task PerformPermanentComicActionAsync(Comic comic, bool deleteFile)
@@ -768,15 +872,18 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        if (_deleteCancellationTokens.TryGetValue(comic.Id, out var entry))
+        if (_deleteCancellationTokens.Remove(comic.Id))
         {
-            entry.Cts.Cancel();
-            entry.Cts.Dispose();
-            _deleteCancellationTokens.Remove(comic.Id);
+            EnsureDeleteCountdownTimer();
         }
 
         comic.IsDeleting = false;
         comic.DeletionSecondsRemaining = 0;
+        UpdateTrackedComics(comic.Id, trackedComic =>
+        {
+            trackedComic.IsDeleting = false;
+            trackedComic.DeletionSecondsRemaining = 0;
+        });
     }
 
     [RelayCommand]
@@ -886,14 +993,12 @@ public partial class LibraryViewModel : ViewModelBase
     /// </summary>
     public async Task DeleteAllPendingComicsAsync()
     {
-        // Cancel all pending countdowns and perform deletion immediately
+        _deleteCountdownLoopCancellation?.Cancel();
+
         var tokens = _deleteCancellationTokens.ToList();
         
         foreach (var entry in tokens)
         {
-            entry.Value.Cts.Cancel();
-            entry.Value.Cts.Dispose();
-            
             try
             {
                 if (entry.Value.DeleteFile)
@@ -912,6 +1017,13 @@ public partial class LibraryViewModel : ViewModelBase
         }
         
         _deleteCancellationTokens.Clear();
+    }
+
+    private sealed class PendingComicDeletion(Comic comic, bool deleteFile, DateTime expiresAtUtc)
+    {
+        public Comic Comic { get; } = comic;
+        public bool DeleteFile { get; } = deleteFile;
+        public DateTime ExpiresAtUtc { get; } = expiresAtUtc;
     }
 
     private bool ShouldDeleteComicFile(Comic comic)

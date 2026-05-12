@@ -1,3 +1,4 @@
+using System.IO;
 using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -86,6 +87,8 @@ public partial class Comic : ObservableObject
     /// </summary>
     [ObservableProperty]
     [property: Indexed]
+    [NotifyPropertyChangedFor(nameof(IsPendingEpubConversion))]
+    [NotifyPropertyChangedFor(nameof(LibraryPageStatusDisplay))]
     private string _filePath = string.Empty;
 
     /// <summary>
@@ -95,6 +98,7 @@ public partial class Comic : ObservableObject
     [NotifyPropertyChangedFor(nameof(ReadingProgress))]
     [NotifyPropertyChangedFor(nameof(HasReadingProgress))]
     [NotifyPropertyChangedFor(nameof(ReadingProgressDisplay))]
+    [NotifyPropertyChangedFor(nameof(LibraryPageStatusDisplay))]
     private int _pageCount;
 
     /// <summary>
@@ -154,14 +158,21 @@ public partial class Comic : ObservableObject
     public bool HasReadingProgress => !IsCompleted && CurrentPage > 0 && PageCount > 0;
 
     [SQLite.Ignore]
-    public string ReadingProgressDisplay => HasReadingProgress
-        ? $"{Math.Min(CurrentPage + 1, PageCount)} / {PageCount} pages"
-        : $"{PageCount} pages";
+    public string ReadingProgressDisplay => IsConverting
+        ? "Converting..."
+        : IsPendingEpubConversion
+            ? "Not converted yet"
+            : HasReadingProgress
+                ? $"{Math.Min(CurrentPage + 1, PageCount)} / {PageCount} pages"
+                : $"{PageCount} pages";
 
     /// <summary>
     /// Format of the comic file (CBZ, CBR)
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPendingEpubConversion))]
+    [NotifyPropertyChangedFor(nameof(CanConvertNow))]
+    [NotifyPropertyChangedFor(nameof(LibraryPageStatusDisplay))]
     private ComicFormat _format;
 
     /// <summary>
@@ -175,6 +186,7 @@ public partial class Comic : ObservableObject
     /// </summary>
     [property: SQLite.Ignore]
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpen))]
     private bool _isDeleting;
 
     /// <summary>
@@ -183,6 +195,34 @@ public partial class Comic : ObservableObject
     [property: SQLite.Ignore]
     [ObservableProperty]
     private int _deletionSecondsRemaining;
+
+    [property: SQLite.Ignore]
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpen))]
+    [NotifyPropertyChangedFor(nameof(CanConvertNow))]
+    [NotifyPropertyChangedFor(nameof(IsPendingEpubConversion))]
+    [NotifyPropertyChangedFor(nameof(ReadingProgressDisplay))]
+    [NotifyPropertyChangedFor(nameof(LibraryPageStatusDisplay))]
+    private bool _isConverting;
+
+    [SQLite.Ignore]
+    public bool IsPendingEpubConversion =>
+        !IsConverting &&
+        Format == ComicFormat.Epub &&
+        Path.GetExtension(FilePath).Equals(".epub", StringComparison.OrdinalIgnoreCase);
+
+    [SQLite.Ignore]
+    public bool CanOpen => !IsDeleting && !IsConverting;
+
+    [SQLite.Ignore]
+    public bool CanConvertNow => IsPendingEpubConversion && !IsConverting;
+
+    [SQLite.Ignore]
+    public string LibraryPageStatusDisplay => IsPendingEpubConversion
+        ? "Not converted yet"
+        : IsConverting
+            ? "Converting..."
+            : $"{PageCount} pages";
 }
 
 public enum ComicFormat

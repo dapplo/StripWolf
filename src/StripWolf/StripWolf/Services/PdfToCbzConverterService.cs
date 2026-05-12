@@ -136,6 +136,73 @@ public class PdfToCbzConverterService
         };
     }
 
+    public async Task<ComicImportData> AnalyzePdfForImportAsync(string pdfFilePath)
+    {
+        if (!File.Exists(pdfFilePath))
+        {
+            throw new FileNotFoundException("PDF file not found", pdfFilePath);
+        }
+
+        await using var coverStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(PdfToCbzConverterService));
+        using var renderSession = await _pdfRenderer.CreateRenderSessionAsync(pdfFilePath);
+        var pageCount = renderSession.GetPageCount();
+        if (pageCount > 0)
+        {
+            await renderSession.RenderPageToJpegAsync(0, coverStream);
+            coverStream.Position = 0;
+        }
+
+        Stream? storedCoverStream = null;
+        if (coverStream.Length > 0)
+        {
+            storedCoverStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(PdfToCbzConverterService));
+            coverStream.Position = 0;
+            await coverStream.CopyToAsync(storedCoverStream);
+            storedCoverStream.Position = 0;
+        }
+
+        return new ComicImportData
+        {
+            FilePath = pdfFilePath,
+            Format = ComicFormat.Pdf,
+            ComicInfo = await ExtractComicInfoAsync(pdfFilePath, pageCount),
+            PageCount = pageCount,
+            FileSize = new FileInfo(pdfFilePath).Length,
+            CoverImageStream = storedCoverStream
+        };
+    }
+
+    public async Task<ComicInfo?> ExtractComicInfoAsync(string pdfFilePath, int? knownPageCount = null)
+    {
+        if (!File.Exists(pdfFilePath))
+        {
+            throw new FileNotFoundException("PDF file not found", pdfFilePath);
+        }
+
+        return await Task.Run(() =>
+        {
+            var metadata = _pdfRenderer.GetMetadata(pdfFilePath);
+            if (metadata is null)
+            {
+                return knownPageCount.HasValue
+                    ? new ComicInfo
+                    {
+                        Title = Path.GetFileNameWithoutExtension(pdfFilePath),
+                        PageCount = knownPageCount.Value
+                    }
+                    : null;
+            }
+
+            var comicInfo = CreateComicInfoFromPdfMetadata(metadata, Path.GetFileNameWithoutExtension(pdfFilePath));
+            if (knownPageCount.HasValue)
+            {
+                comicInfo.PageCount = knownPageCount.Value;
+            }
+
+            return comicInfo;
+        });
+    }
+
     /// <summary>
     /// Gets the number of pages in a PDF file
     /// </summary>

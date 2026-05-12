@@ -12,9 +12,19 @@ namespace StripWolf.Services;
 /// </summary>
 public class ComicReaderService
 {
+    private readonly IPdfRenderer _pdfRenderer;
+    private readonly EpubToCbzConverterService _epubConverter;
     private readonly Dictionary<(string, int), byte[]> _pageCache = new();
     private readonly Dictionary<string, List<string>> _pageNamesCache = new();
+    private readonly Dictionary<string, Task<PdfReaderSession>> _pdfSessions = new();
+    private readonly Dictionary<string, Task<EpubToCbzConverterService.EpubReaderSession>> _epubSessions = new();
     private readonly object _cacheLock = new();
+
+    public ComicReaderService(IPdfRenderer pdfRenderer, EpubToCbzConverterService epubConverter)
+    {
+        _pdfRenderer = pdfRenderer;
+        _epubConverter = epubConverter;
+    }
 
     /// <summary>
     /// Gets the format of a comic file based on its extension
@@ -39,6 +49,12 @@ public class ComicReaderService
     /// </summary>
     public async Task<(int pageCount, long fileSize)> GetComicInfoAsync(string filePath)
     {
+        if (Directory.Exists(filePath))
+        {
+            var pageNames = await GetCachedPageNamesAsync(filePath);
+            return (pageNames.Count, 0);
+        }
+
         var fileInfo = new FileInfo(filePath);
         
         if (!fileInfo.Exists)
@@ -46,8 +62,13 @@ public class ComicReaderService
             throw new FileNotFoundException("Comic file not found", filePath);
         }
 
-        var pageNames = await GetCachedPageNamesAsync(filePath);
-        return (pageNames.Count, fileInfo.Length);
+        var format = GetComicFormat(filePath);
+        return format switch
+        {
+            ComicFormat.Pdf => await GetPdfComicInfoAsync(filePath),
+            ComicFormat.Epub => await GetEpubComicInfoAsync(filePath),
+            _ => ((await GetCachedPageNamesAsync(filePath)).Count, fileInfo.Length)
+        };
     }
 
     /// <summary>
@@ -56,6 +77,12 @@ public class ComicReaderService
     /// </summary>
     public async Task<(int pageCount, long fileSize)> GetComicInfoWithoutCacheAsync(string filePath)
     {
+        if (Directory.Exists(filePath))
+        {
+            var pageNames = await GetPageNamesWithoutCacheAsync(filePath);
+            return (pageNames.Count, 0);
+        }
+
         var fileInfo = new FileInfo(filePath);
 
         if (!fileInfo.Exists)
@@ -63,8 +90,13 @@ public class ComicReaderService
             throw new FileNotFoundException("Comic file not found", filePath);
         }
 
-        var pageNames = await GetPageNamesWithoutCacheAsync(filePath);
-        return (pageNames.Count, fileInfo.Length);
+        var format = GetComicFormat(filePath);
+        return format switch
+        {
+            ComicFormat.Pdf => (GetPdfPageCount(filePath), fileInfo.Length),
+            ComicFormat.Epub => await GetEpubComicInfoWithoutCacheAsync(filePath),
+            _ => ((await GetPageNamesWithoutCacheAsync(filePath)).Count, fileInfo.Length)
+        };
     }
 
     /// <summary>
@@ -80,6 +112,11 @@ public class ComicReaderService
     /// </summary>
     public async Task<List<string>> GetPageNamesWithoutCacheAsync(string filePath)
     {
+        if (Directory.Exists(filePath))
+        {
+            return await BuildDirectoryPageNamesAsync(filePath);
+        }
+
         var format = GetComicFormat(filePath);
         return format switch
         {
@@ -87,6 +124,8 @@ public class ComicReaderService
             ComicFormat.Cbr => await BuildCbrPageNamesAsync(filePath),
             ComicFormat.Cb7 => await BuildCb7PageNamesAsync(filePath),
             ComicFormat.Cbt => await BuildCbtPageNamesAsync(filePath),
+            ComicFormat.Pdf => BuildSyntheticPageNames(GetPdfPageCount(filePath), ".jpg"),
+            ComicFormat.Epub => await GetEpubPageNamesWithoutCacheAsync(filePath),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
     }
@@ -96,6 +135,11 @@ public class ComicReaderService
     /// </summary>
     private async Task<List<string>> GetCachedPageNamesAsync(string filePath)
     {
+        if (Directory.Exists(filePath))
+        {
+            return await BuildDirectoryPageNamesAsync(filePath);
+        }
+
         lock (_cacheLock)
         {
             if (_pageNamesCache.TryGetValue(filePath, out var cached))
@@ -111,6 +155,8 @@ public class ComicReaderService
             ComicFormat.Cbr => await BuildCbrPageNamesAsync(filePath),
             ComicFormat.Cb7 => await BuildCb7PageNamesAsync(filePath),
             ComicFormat.Cbt => await BuildCbtPageNamesAsync(filePath),
+            ComicFormat.Pdf => BuildSyntheticPageNames((await GetOrCreatePdfSessionAsync(filePath)).PageCount, ".jpg"),
+            ComicFormat.Epub => BuildSyntheticPageNames((await GetOrCreateEpubSessionAsync(filePath)).PageCount, ".png"),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
 
@@ -178,7 +224,7 @@ public class ComicReaderService
         await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream);
     }
 
-    private static async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
+    private async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
@@ -186,6 +232,11 @@ public class ComicReaderService
         }
 
         var entryName = sortedNames[pageIndex];
+        if (Directory.Exists(filePath))
+        {
+            return await ReadDirectoryPageAsync(filePath, entryName);
+        }
+
         var format = GetComicFormat(filePath);
 
         return format switch
@@ -194,11 +245,13 @@ public class ComicReaderService
             ComicFormat.Cbr => await ReadCbrPageAsync(filePath, pageIndex, entryName, sortedNames),
             ComicFormat.Cb7 => await ReadCb7PageAsync(filePath, entryName),
             ComicFormat.Cbt => await ReadCbtPageAsync(filePath, entryName),
+            ComicFormat.Pdf => await ReadPdfPageAsync(filePath, pageIndex),
+            ComicFormat.Epub => await ReadEpubPageAsync(filePath, pageIndex),
             _ => throw new NotSupportedException($"Unsupported comic format: {format}")
         };
     }
 
-    private static async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream)
+    private async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
@@ -206,6 +259,12 @@ public class ComicReaderService
         }
 
         var entryName = sortedNames[pageIndex];
+        if (Directory.Exists(filePath))
+        {
+            await CopyDirectoryPageAsync(filePath, entryName, outputStream);
+            return;
+        }
+
         var format = GetComicFormat(filePath);
 
         switch (format)
@@ -222,6 +281,12 @@ public class ComicReaderService
             case ComicFormat.Cbt:
                 await CopyCbtPageAsync(filePath, entryName, outputStream);
                 break;
+            case ComicFormat.Pdf:
+                await CopyPdfPageAsync(filePath, pageIndex, outputStream);
+                break;
+            case ComicFormat.Epub:
+                await CopyEpubPageAsync(filePath, pageIndex, outputStream);
+                break;
             default:
                 throw new NotSupportedException($"Unsupported comic format: {format}");
         }
@@ -229,10 +294,27 @@ public class ComicReaderService
 
     public void ClearCache()
     {
+        Task<PdfReaderSession>[] pdfSessions;
+        Task<EpubToCbzConverterService.EpubReaderSession>[] epubSessions;
+
         lock (_cacheLock)
         {
             _pageCache.Clear();
             _pageNamesCache.Clear();
+            pdfSessions = _pdfSessions.Values.ToArray();
+            epubSessions = _epubSessions.Values.ToArray();
+            _pdfSessions.Clear();
+            _epubSessions.Clear();
+        }
+
+        foreach (var pdfSession in pdfSessions.Where(task => task.IsCompletedSuccessfully))
+        {
+            pdfSession.Result.Dispose();
+        }
+
+        foreach (var epubSession in epubSessions.Where(task => task.IsCompletedSuccessfully))
+        {
+            epubSession.Result.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
 
@@ -255,6 +337,182 @@ public class ComicReaderService
         await File.WriteAllBytesAsync(coverPath, coverData);
         
         return coverPath;
+    }
+
+    private async Task<(int pageCount, long fileSize)> GetPdfComicInfoAsync(string filePath)
+    {
+        var session = await GetOrCreatePdfSessionAsync(filePath);
+        return (session.PageCount, session.FileSize);
+    }
+
+    private async Task<(int pageCount, long fileSize)> GetEpubComicInfoAsync(string filePath)
+    {
+        var session = await GetOrCreateEpubSessionAsync(filePath);
+        return (session.PageCount, session.FileSize);
+    }
+
+    private async Task<(int pageCount, long fileSize)> GetEpubComicInfoWithoutCacheAsync(string filePath)
+    {
+        await using var session = await _epubConverter.CreateReaderSessionAsync(filePath);
+        return (session.PageCount, session.FileSize);
+    }
+
+    private async Task<List<string>> GetEpubPageNamesWithoutCacheAsync(string filePath)
+    {
+        await using var session = await _epubConverter.CreateReaderSessionAsync(filePath);
+        return BuildSyntheticPageNames(session.PageCount, ".png");
+    }
+
+    private int GetPdfPageCount(string filePath)
+    {
+        return _pdfRenderer.GetPageCount(filePath);
+    }
+
+    private static List<string> BuildSyntheticPageNames(int pageCount, string extension)
+    {
+        return Enumerable.Range(1, pageCount)
+            .Select(index => $"Page_{index:D5}{extension}")
+            .ToList();
+    }
+
+    private static Task<List<string>> BuildDirectoryPageNamesAsync(string filePath)
+    {
+        return Task.FromResult(Directory.EnumerateFiles(filePath, "Page_*.*", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Cast<string>()
+            .OrderBy(static name => name, ComicPageComparer.Instance)
+            .ToList());
+    }
+
+    private static Task<byte[]> ReadDirectoryPageAsync(string directoryPath, string entryName)
+    {
+        return File.ReadAllBytesAsync(Path.Combine(directoryPath, entryName));
+    }
+
+    private static async Task CopyDirectoryPageAsync(string directoryPath, string entryName, Stream outputStream)
+    {
+        await using var inputStream = File.OpenRead(Path.Combine(directoryPath, entryName));
+        await inputStream.CopyToAsync(outputStream);
+    }
+
+    private Task<PdfReaderSession> GetOrCreatePdfSessionAsync(string filePath)
+    {
+        lock (_cacheLock)
+        {
+            if (_pdfSessions.TryGetValue(filePath, out var existing))
+            {
+                return existing;
+            }
+
+            var created = CreatePdfSessionAsync(filePath);
+            _pdfSessions[filePath] = created;
+            return created;
+        }
+    }
+
+    private Task<EpubToCbzConverterService.EpubReaderSession> GetOrCreateEpubSessionAsync(string filePath)
+    {
+        lock (_cacheLock)
+        {
+            if (_epubSessions.TryGetValue(filePath, out var existing))
+            {
+                return existing;
+            }
+
+            var created = CreateEpubSessionAsync(filePath);
+            _epubSessions[filePath] = created;
+            return created;
+        }
+    }
+
+    private async Task<PdfReaderSession> CreatePdfSessionAsync(string filePath)
+    {
+        try
+        {
+            var session = await _pdfRenderer.CreateRenderSessionAsync(filePath);
+            return new PdfReaderSession(session, new FileInfo(filePath).Length);
+        }
+        catch
+        {
+            lock (_cacheLock)
+            {
+                _pdfSessions.Remove(filePath);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<EpubToCbzConverterService.EpubReaderSession> CreateEpubSessionAsync(string filePath)
+    {
+        try
+        {
+            return await Task.Run(() => _epubConverter.CreateReaderSessionAsync(filePath));
+        }
+        catch
+        {
+            lock (_cacheLock)
+            {
+                _epubSessions.Remove(filePath);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<byte[]> ReadPdfPageAsync(string filePath, int pageIndex)
+    {
+        using var stream = new MemoryStream();
+        await CopyPdfPageAsync(filePath, pageIndex, stream);
+        return stream.ToArray();
+    }
+
+    private async Task CopyPdfPageAsync(string filePath, int pageIndex, Stream outputStream)
+    {
+        var session = await GetOrCreatePdfSessionAsync(filePath);
+        await session.RenderPageAsync(pageIndex, outputStream);
+    }
+
+    private async Task<byte[]> ReadEpubPageAsync(string filePath, int pageIndex)
+    {
+        using var stream = new MemoryStream();
+        await CopyEpubPageAsync(filePath, pageIndex, stream);
+        return stream.ToArray();
+    }
+
+    private async Task CopyEpubPageAsync(string filePath, int pageIndex, Stream outputStream)
+    {
+        var session = await GetOrCreateEpubSessionAsync(filePath);
+        await session.RenderPageToStreamAsync(pageIndex, outputStream);
+    }
+
+    private sealed class PdfReaderSession(IPdfRenderSession session, long fileSize) : IDisposable
+    {
+        private readonly SemaphoreSlim _gate = new(1, 1);
+
+        public int PageCount { get; } = session.GetPageCount();
+
+        public long FileSize { get; } = fileSize;
+
+        public async Task RenderPageAsync(int pageIndex, Stream outputStream)
+        {
+            await _gate.WaitAsync();
+            try
+            {
+                await session.RenderPageToJpegAsync(pageIndex, outputStream);
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            _gate.Dispose();
+            session.Dispose();
+        }
     }
 
     #region CBZ (ZIP) Operations

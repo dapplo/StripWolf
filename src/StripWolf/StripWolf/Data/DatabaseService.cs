@@ -40,8 +40,10 @@ public class DatabaseService : IAsyncDisposable
         await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
         
         await _database.CreateTableAsync<Comic>();
+        await _database.CreateTableAsync<EpubConversionState>();
         await _database.CreateTableAsync<KomgaServer>();
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
+        await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
         
         return _database;
     }
@@ -172,6 +174,32 @@ public class DatabaseService : IAsyncDisposable
     {
         var db = await GetDatabaseAsync();
         return await db.DeleteAsync(comic);
+    }
+
+    public async Task<EpubConversionState?> GetEpubConversionStateAsync(int comicId)
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<EpubConversionState>().FirstOrDefaultAsync(state => state.ComicId == comicId);
+    }
+
+    public async Task<int> SaveEpubConversionStateAsync(EpubConversionState state)
+    {
+        var db = await GetDatabaseAsync();
+        return await db.InsertOrReplaceAsync(state);
+    }
+
+    public async Task<int> DeleteEpubConversionStateAsync(int comicId)
+    {
+        var db = await GetDatabaseAsync();
+        return await db.DeleteAsync<EpubConversionState>(comicId);
+    }
+
+    public async Task<List<EpubConversionState>> GetIncompleteEpubConversionStatesAsync()
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<EpubConversionState>()
+            .Where(state => state.Status != EpubConversionStatus.Completed)
+            .ToListAsync();
     }
 
     public async Task UpdateReadingProgressAsync(int comicId, int currentPage, bool isCompleted)

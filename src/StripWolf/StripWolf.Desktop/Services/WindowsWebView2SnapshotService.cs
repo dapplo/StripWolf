@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using DrawingColor = System.Drawing.Color;
 using Microsoft.Web.WebView2.Core;
 using StripWolf.Services;
@@ -46,7 +47,12 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         await _gate.WaitAsync();
         try
         {
-            var environment = _environment ??= await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+            var environment = await RunOnUiThreadAsync(async () =>
+            {
+                _environment ??= await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+                return _environment;
+            });
+
             return await PaginationSession.CreateAsync(this, environment, viewportWidth, viewportHeight, renderScale);
         }
         catch
@@ -120,6 +126,26 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         }
     }
 
+    private Task<T> RunOnUiThreadAsync<T>(Func<Task<T>> action)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            return action();
+        }
+
+        return Dispatcher.UIThread.InvokeAsync(action);
+    }
+
+    private Task RunOnUiThreadAsync(Func<Task> action)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            return action();
+        }
+
+        return Dispatcher.UIThread.InvokeAsync(action);
+    }
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
@@ -183,30 +209,42 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             int viewportHeight,
             double renderScale)
         {
-            var outputWidth = Math.Max(1, (int)Math.Ceiling(viewportWidth * renderScale));
-            var outputHeight = Math.Max(1, (int)Math.Ceiling(viewportHeight * renderScale));
-            var hostWindow = CreateHostWindow(outputWidth, outputHeight);
+            var hostWindow = CreateHostWindow(viewportWidth, viewportHeight);
             CoreWebView2Controller? controller = null;
 
             try
             {
-                controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
-                controller.Bounds = new Rectangle(0, 0, outputWidth, outputHeight);
-                controller.RasterizationScale = 1;
-                controller.IsVisible = true;
-                controller.DefaultBackgroundColor = DrawingColor.White;
+                return await owner.RunOnUiThreadAsync(async () =>
+                {
+                    controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
+                    controller.Bounds = new Rectangle(0, 0, viewportWidth, viewportHeight);
+                    controller.RasterizationScale = renderScale;
+                    controller.IsVisible = true;
+                    controller.DefaultBackgroundColor = DrawingColor.White;
 
-                var coreWebView = controller.CoreWebView2;
-                coreWebView.Settings.IsStatusBarEnabled = false;
-                coreWebView.Settings.AreDefaultContextMenusEnabled = false;
-                coreWebView.Settings.AreDevToolsEnabled = false;
-                coreWebView.Settings.IsZoomControlEnabled = false;
-                return new PaginationSession(owner, hostWindow, controller, coreWebView, viewportWidth, viewportHeight, renderScale);
+                    var coreWebView = controller.CoreWebView2;
+                    coreWebView.Settings.IsStatusBarEnabled = false;
+                    coreWebView.Settings.AreDefaultContextMenusEnabled = false;
+                    coreWebView.Settings.AreDevToolsEnabled = false;
+                    coreWebView.Settings.IsZoomControlEnabled = false;
+                    return new PaginationSession(owner, hostWindow, controller, coreWebView, viewportWidth, viewportHeight, renderScale);
+                });
             }
             catch
             {
-                controller?.Close();
-                DestroyWindow(hostWindow);
+                if (controller is not null)
+                {
+                    await owner.RunOnUiThreadAsync(() =>
+                    {
+                        controller.Close();
+                        DestroyWindow(hostWindow);
+                        return Task.CompletedTask;
+                    });
+                }
+                else
+                {
+                    DestroyWindow(hostWindow);
+                }
                 throw;
             }
         }
@@ -214,6 +252,11 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public async Task LoadHtmlAsync(string htmlContent)
         {
             ThrowIfDisposed();
+            await _owner.RunOnUiThreadAsync(() => LoadHtmlCoreAsync(htmlContent));
+        }
+
+        private async Task LoadHtmlCoreAsync(string htmlContent)
+        {
             var readyTask = PrepareReadyAwaiter();
 
             var navigationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -260,41 +303,52 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public Task<int> GetPageCountAsync()
         {
             ThrowIfDisposed();
-            return WindowsWebView2SnapshotService.GetPageCountAsync(_coreWebView);
+            return _owner.RunOnUiThreadAsync(() => WindowsWebView2SnapshotService.GetPageCountAsync(_coreWebView));
         }
 
         public async Task<Stream> CapturePageAsync(int pageIndex)
         {
             ThrowIfDisposed();
-            var output = RecyclableStreamManagerProvider.Manager.GetStream(nameof(WindowsWebView2SnapshotService));
-            await CapturePageToStreamAsync(pageIndex, output);
-            output.Position = 0;
-            return output;
+            return await _owner.RunOnUiThreadAsync(async () =>
+            {
+                var output = RecyclableStreamManagerProvider.Manager.GetStream(nameof(WindowsWebView2SnapshotService));
+                await CapturePageToStreamCoreAsync(pageIndex, output);
+                output.Position = 0;
+                return (Stream)output;
+            });
         }
 
         public async Task CapturePageToStreamAsync(int pageIndex, Stream outputStream)
         {
             ThrowIfDisposed();
+            await _owner.RunOnUiThreadAsync(() => CapturePageToStreamCoreAsync(pageIndex, outputStream));
+        }
+
+        private async Task CapturePageToStreamCoreAsync(int pageIndex, Stream outputStream)
+        {
             var readyTask = PrepareReadyAwaiter();
             await _coreWebView.ExecuteScriptAsync($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
             await WaitForReadyAsync(readyTask, "Timed out waiting for WebView2 EPUB pagination to finish paging.");
             await _coreWebView.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, outputStream);
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (_disposed)
             {
-                return ValueTask.CompletedTask;
+                return;
             }
 
             _disposed = true;
-            _coreWebView.WebMessageReceived -= OnWebMessageReceived;
-            _controller.Close();
-            DestroyWindow(_hostWindow);
+            await _owner.RunOnUiThreadAsync(() =>
+            {
+                _coreWebView.WebMessageReceived -= OnWebMessageReceived;
+                _controller.Close();
+                DestroyWindow(_hostWindow);
+                return Task.CompletedTask;
+            });
             CleanupTemporaryHtmlFile(_temporaryHtmlPath);
             _owner._gate.Release();
-            return ValueTask.CompletedTask;
         }
 
         private void ThrowIfDisposed()
@@ -335,65 +389,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 
         private string PrepareHtmlForCapture(string htmlContent)
         {
-            if (_renderScale <= 1.001)
-            {
-                return htmlContent;
-            }
-
-            var verticalPadding = _viewportHeight * 0.03;
-            var horizontalPadding = _viewportWidth * 0.06;
-            var columnGap = _viewportWidth * 0.12;
-            var columnWidth = _viewportWidth - (horizontalPadding * 2);
-            var imageMaxHeight = _viewportHeight - (_viewportHeight * 0.08);
-            var viewportOverrideScript =
-                "<script id=\"stripwolf-windows-pagination-override\">" + Environment.NewLine +
-                $"window.__stripWolfPaginationViewportWidth = {FormatCssNumber(_viewportWidth)};" + Environment.NewLine +
-                "</script>";
-            var scaledStyle =
-                "<style id=\"stripwolf-windows-capture-scale\">" + Environment.NewLine +
-                "body > .stripwolf-page-viewport {" + Environment.NewLine +
-                $"    width: {FormatCssNumber(_viewportWidth)}px !important;" + Environment.NewLine +
-                $"    height: {FormatCssNumber(_viewportHeight)}px !important;" + Environment.NewLine +
-                $"    transform: scale({FormatCssNumber(_renderScale)}) !important;" + Environment.NewLine +
-                "    transform-origin: top left !important;" + Environment.NewLine +
-                "    overflow: hidden !important;" + Environment.NewLine +
-                "}" + Environment.NewLine +
-                "body.stripwolf-reading-page > .stripwolf-page-viewport > .stripwolf-reading-content {" + Environment.NewLine +
-                $"    width: {FormatCssNumber(_viewportWidth)}px !important;" + Environment.NewLine +
-                $"    height: {FormatCssNumber(_viewportHeight)}px !important;" + Environment.NewLine +
-                $"    padding: {FormatCssNumber(verticalPadding)}px {FormatCssNumber(horizontalPadding)}px !important;" + Environment.NewLine +
-                $"    column-width: {FormatCssNumber(columnWidth)}px !important;" + Environment.NewLine +
-                $"    column-gap: {FormatCssNumber(columnGap)}px !important;" + Environment.NewLine +
-                $"    -webkit-column-width: {FormatCssNumber(columnWidth)}px !important;" + Environment.NewLine +
-                $"    -webkit-column-gap: {FormatCssNumber(columnGap)}px !important;" + Environment.NewLine +
-                "}" + Environment.NewLine +
-                "body.stripwolf-reading-page img," + Environment.NewLine +
-                "body.stripwolf-reading-page svg {" + Environment.NewLine +
-                $"    max-height: {FormatCssNumber(imageMaxHeight)}px !important;" + Environment.NewLine +
-                "}" + Environment.NewLine +
-                "body.stripwolf-single-visual-page > .stripwolf-page-viewport > .stripwolf-visual-content {" + Environment.NewLine +
-                $"    width: {FormatCssNumber(_viewportWidth)}px !important;" + Environment.NewLine +
-                $"    min-height: {FormatCssNumber(_viewportHeight)}px !important;" + Environment.NewLine +
-                "}" + Environment.NewLine +
-                "body.stripwolf-single-visual-page img," + Environment.NewLine +
-                "body.stripwolf-single-visual-page svg {" + Environment.NewLine +
-                $"    width: {FormatCssNumber(_viewportWidth)}px !important;" + Environment.NewLine +
-                $"    height: {FormatCssNumber(_viewportHeight)}px !important;" + Environment.NewLine +
-                "}" + Environment.NewLine +
-                "</style>";
-
-            var headCloseIndex = htmlContent.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
-            if (headCloseIndex >= 0)
-            {
-                return htmlContent.Insert(headCloseIndex, viewportOverrideScript + Environment.NewLine + scaledStyle + Environment.NewLine);
-            }
-
-            return viewportOverrideScript + Environment.NewLine + scaledStyle + Environment.NewLine + htmlContent;
-        }
-
-        private static string FormatCssNumber(double value)
-        {
-            return value.ToString("0.###", CultureInfo.InvariantCulture);
+            return htmlContent;
         }
     }
 }
