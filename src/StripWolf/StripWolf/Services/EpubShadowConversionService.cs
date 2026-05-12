@@ -10,6 +10,9 @@ namespace StripWolf.Services;
 public sealed class EpubShadowConversionService
 {
     private const int BackgroundBatchSize = 1;
+    private static readonly TimeSpan DesktopForegroundPriorityWindow = TimeSpan.FromMilliseconds(350);
+    private static readonly TimeSpan AndroidBackgroundLoopDelay = TimeSpan.FromMilliseconds(75);
+    private static readonly TimeSpan WindowsBackgroundLoopDelay = TimeSpan.FromMilliseconds(225);
     private readonly DatabaseService _databaseService;
     private readonly EpubToCbzConverterService _epubConverter;
     private readonly SettingsService _settingsService;
@@ -18,7 +21,9 @@ public sealed class EpubShadowConversionService
     private readonly string _shadowDirectory;
     private readonly Dictionary<int, SemaphoreSlim> _comicGates = new();
     private readonly Dictionary<int, Task> _backgroundTasks = new();
+    private readonly Dictionary<int, EpubToCbzConverterService.EpubIncrementalConversionSession> _conversionSessions = new();
     private readonly Dictionary<int, CancellationTokenSource> _activeReaderSessions = new();
+    private readonly Dictionary<int, DateTime> _lastForegroundRequests = new();
     private readonly object _lock = new();
 
     public event EventHandler<int>? ConversionStateChanged;
@@ -102,6 +107,7 @@ public sealed class EpubShadowConversionService
 
         cancellationSource?.Cancel();
         cancellationSource?.Dispose();
+        await DisposeTrackedSessionAsync(comicId);
 
         var state = await _databaseService.GetEpubConversionStateAsync(comicId);
         if (state is not null && state.Status == EpubConversionStatus.Converting)
@@ -150,6 +156,7 @@ public sealed class EpubShadowConversionService
         int pagesAhead = 1,
         CancellationToken cancellationToken = default)
     {
+        NoteForegroundRequest(comic.Id);
         var state = await _databaseService.GetEpubConversionStateAsync(comic.Id);
         if (state is null)
         {
@@ -165,6 +172,7 @@ public sealed class EpubShadowConversionService
             if (state.Status != EpubConversionStatus.Completed && state.ProducedPageCount <= targetPage)
             {
                 await ProducePagesCoreAsync(comic, state, targetPage, cancellationToken);
+                NoteForegroundRequest(comic.Id);
                 state = await _databaseService.GetEpubConversionStateAsync(comic.Id) ?? state;
             }
 
@@ -195,6 +203,8 @@ public sealed class EpubShadowConversionService
         {
             return;
         }
+
+        await DisposeTrackedSessionAsync(comicId);
 
         if (Directory.Exists(state.ShadowPath))
         {
@@ -232,6 +242,13 @@ public sealed class EpubShadowConversionService
                             return;
                         }
 
+                        var quietDelay = GetForegroundPriorityDelay(comicId);
+                        if (quietDelay > TimeSpan.Zero)
+                        {
+                            await Task.Delay(quietDelay, backgroundCancellationToken);
+                            continue;
+                        }
+
                         var gate = GetGate(comicId);
                         await gate.WaitAsync(backgroundCancellationToken);
                         try
@@ -250,7 +267,7 @@ public sealed class EpubShadowConversionService
                             gate.Release();
                         }
 
-                        await Task.Delay(75, backgroundCancellationToken);
+                        await Task.Delay(GetBackgroundLoopDelay(), backgroundCancellationToken);
                     }
                 }
                 catch (OperationCanceledException)
@@ -258,6 +275,7 @@ public sealed class EpubShadowConversionService
                     var state = await _databaseService.GetEpubConversionStateAsync(comicId);
                     if (state is not null && state.Status != EpubConversionStatus.Completed)
                     {
+                        await DisposeTrackedSessionAsync(comicId);
                         state.Status = EpubConversionStatus.Paused;
                         state.UpdatedAtUtc = DateTime.UtcNow;
                         await _databaseService.SaveEpubConversionStateAsync(state);
@@ -269,6 +287,7 @@ public sealed class EpubShadowConversionService
                     var state = await _databaseService.GetEpubConversionStateAsync(comicId);
                     if (state is not null)
                     {
+                        await DisposeTrackedSessionAsync(comicId);
                         state.Status = EpubConversionStatus.Failed;
                         state.LastError = ex.Message;
                         state.UpdatedAtUtc = DateTime.UtcNow;
@@ -280,7 +299,11 @@ public sealed class EpubShadowConversionService
         }
     }
 
-    private async Task ProducePagesCoreAsync(Comic comic, EpubConversionState state, int targetPage, CancellationToken cancellationToken)
+    private async Task ProducePagesCoreAsync(
+        Comic comic,
+        EpubConversionState state,
+        int targetPage,
+        CancellationToken cancellationToken)
     {
         if (state.Status == EpubConversionStatus.Completed)
         {
@@ -295,57 +318,62 @@ public sealed class EpubShadowConversionService
         await _databaseService.SaveEpubConversionStateAsync(state);
         ConversionStateChanged?.Invoke(this, comic.Id);
 
-        await using var session = await _epubConverter.CreateIncrementalConversionSessionAsync(
-            state.SourceEpubPath,
-            state.NextChapterIndex,
-            state.NextPageIndexInChapter,
-            cancellationToken: cancellationToken);
+        var session = await GetOrCreateTrackedSessionAsync(comic.Id, state, cancellationToken);
 
-        while (state.ProducedPageCount <= targetPage)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var pagePath = GetRenderedPagePath(state.ShadowPath, state.ProducedPageCount);
-            var temporaryPagePath = $"{pagePath}.tmp";
-            if (File.Exists(temporaryPagePath))
+            while (state.ProducedPageCount <= targetPage)
             {
-                File.Delete(temporaryPagePath);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            EpubToCbzConverterService.EpubIncrementalPageResult? result;
-            await using (var pageStream = new FileStream(temporaryPagePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
-            {
-                result = await session.RenderNextPageToStreamAsync(pageStream, cancellationToken);
-            }
-
-            if (result is null)
-            {
+                var pagePath = GetRenderedPagePath(state.ShadowPath, state.ProducedPageCount);
+                var temporaryPagePath = $"{pagePath}.tmp";
                 if (File.Exists(temporaryPagePath))
                 {
                     File.Delete(temporaryPagePath);
                 }
 
-                await FinalizeCompletedConversionAsync(comic, state);
-                return;
-            }
+                EpubToCbzConverterService.EpubIncrementalPageResult? result;
+                await using (var pageStream = new FileStream(temporaryPagePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true))
+                {
+                    result = await session.RenderNextPageToStreamAsync(pageStream, cancellationToken);
+                }
 
-            if (File.Exists(pagePath))
-            {
-                File.Delete(pagePath);
-            }
+                if (result is null)
+                {
+                    if (File.Exists(temporaryPagePath))
+                    {
+                        File.Delete(temporaryPagePath);
+                    }
 
-            File.Move(temporaryPagePath, pagePath);
-            state.ProducedPageCount++;
-            state.NextChapterIndex = session.NextChapterIndex;
-            state.NextPageIndexInChapter = session.NextPageIndexInChapter;
-            state.UpdatedAtUtc = DateTime.UtcNow;
-            await _databaseService.SaveEpubConversionStateAsync(state);
-            ConversionStateChanged?.Invoke(this, comic.Id);
+                    await FinalizeCompletedConversionAsync(comic, state);
+                    return;
+                }
+
+                if (File.Exists(pagePath))
+                {
+                    File.Delete(pagePath);
+                }
+
+                File.Move(temporaryPagePath, pagePath);
+                state.ProducedPageCount++;
+                state.NextChapterIndex = session.NextChapterIndex;
+                state.NextPageIndexInChapter = session.NextPageIndexInChapter;
+                state.UpdatedAtUtc = DateTime.UtcNow;
+                await _databaseService.SaveEpubConversionStateAsync(state);
+                ConversionStateChanged?.Invoke(this, comic.Id);
+            }
+        }
+        catch
+        {
+            await DisposeTrackedSessionAsync(comic.Id);
+            throw;
         }
     }
 
     private async Task FinalizeCompletedConversionAsync(Comic comic, EpubConversionState state)
     {
+        await DisposeTrackedSessionAsync(comic.Id);
         var finalPageCount = CountRenderedPages(state.ShadowPath);
         var finalCbzPath = GetFinalCbzPath(state.SourceEpubPath, comic.Id);
         if (File.Exists(finalCbzPath))
@@ -513,6 +541,8 @@ public sealed class EpubShadowConversionService
         {
             _backgroundTasks.Remove(comicId);
             _comicGates.Remove(comicId);
+            _conversionSessions.Remove(comicId);
+            _lastForegroundRequests.Remove(comicId);
         }
     }
 
@@ -527,7 +557,94 @@ public sealed class EpubShadowConversionService
 
     private static bool ShouldContinueInBackground()
     {
-        return !OperatingSystem.IsWindows();
+        return OperatingSystem.IsAndroid() || OperatingSystem.IsWindows();
+    }
+
+    private void NoteForegroundRequest(int comicId)
+    {
+        lock (_lock)
+        {
+            _lastForegroundRequests[comicId] = DateTime.UtcNow;
+        }
+    }
+
+    private TimeSpan GetForegroundPriorityDelay(int comicId)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return TimeSpan.Zero;
+        }
+
+        lock (_lock)
+        {
+            if (!_lastForegroundRequests.TryGetValue(comicId, out var lastRequestUtc))
+            {
+                return TimeSpan.Zero;
+            }
+
+            var quietUntilUtc = lastRequestUtc + DesktopForegroundPriorityWindow;
+            var remaining = quietUntilUtc - DateTime.UtcNow;
+            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        }
+    }
+
+    private static TimeSpan GetBackgroundLoopDelay()
+    {
+        return OperatingSystem.IsWindows() ? WindowsBackgroundLoopDelay : AndroidBackgroundLoopDelay;
+    }
+
+    private async Task<EpubToCbzConverterService.EpubIncrementalConversionSession> GetOrCreateTrackedSessionAsync(
+        int comicId,
+        EpubConversionState state,
+        CancellationToken cancellationToken)
+    {
+        EpubToCbzConverterService.EpubIncrementalConversionSession? existingSession = null;
+        lock (_lock)
+        {
+            if (_conversionSessions.TryGetValue(comicId, out var existing))
+            {
+                return existing;
+            }
+        }
+
+        var created = await _epubConverter.CreateIncrementalConversionSessionAsync(
+            state.SourceEpubPath,
+            state.NextChapterIndex,
+            state.NextPageIndexInChapter,
+            cancellationToken: cancellationToken);
+
+        lock (_lock)
+        {
+            if (_conversionSessions.TryGetValue(comicId, out var existing))
+            {
+                existingSession = existing;
+            }
+            else
+            {
+                _conversionSessions[comicId] = created;
+                return created;
+            }
+        }
+
+        await created.DisposeAsync();
+        return existingSession;
+    }
+
+    private async Task DisposeTrackedSessionAsync(int comicId)
+    {
+        EpubToCbzConverterService.EpubIncrementalConversionSession? session = null;
+        lock (_lock)
+        {
+            if (_conversionSessions.TryGetValue(comicId, out session))
+            {
+                _conversionSessions.Remove(comicId);
+            }
+        }
+
+        if (session is not null)
+        {
+            await session.DisposeAsync();
+        }
     }
 
     private bool TryGetReaderCancellationToken(int comicId, out CancellationToken cancellationToken)

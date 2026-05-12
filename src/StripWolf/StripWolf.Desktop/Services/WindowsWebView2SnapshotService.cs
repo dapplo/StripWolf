@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 using DrawingColor = System.Drawing.Color;
 using Microsoft.Web.WebView2.Core;
 using StripWolf.Services;
@@ -16,17 +17,25 @@ namespace StripWolf.Desktop.Services;
 /// <summary>
 /// Windows off-screen snapshot service backed by a hidden native WebView2 host.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 {
     private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(6);
     private const int SwHide = 0;
+    private const int WsDisabled = 0x08000000;
     private const int WsOverlapped = 0x00000000;
     private const int WsClipSiblings = 0x04000000;
     private const int WsClipChildren = 0x02000000;
     private const int WsPopup = unchecked((int)0x80000000);
+    private const int WsExToolWindow = 0x00000080;
+    private const int WsExNoActivate = 0x08000000;
+    private const int WsExNoRedirectionBitmap = 0x00200000;
+    private const uint WmApp = 0x8000;
+    private const uint WmWorkerInvoke = WmApp + 1;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _userDataFolder = Path.Combine(Path.GetTempPath(), "StripWolf.WebView2");
+    private readonly WebViewWorker _worker = new();
 
     private CoreWebView2Environment? _environment;
 
@@ -47,13 +56,13 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         await _gate.WaitAsync();
         try
         {
-            var environment = await RunOnUiThreadAsync(async () =>
+            var environment = await _worker.ExecuteAsync(async () =>
             {
                 _environment ??= await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
                 return _environment;
             });
 
-            return await PaginationSession.CreateAsync(this, environment, viewportWidth, viewportHeight, renderScale);
+            return await PaginationSession.CreateAsync(this, _worker, environment, viewportWidth, viewportHeight, renderScale);
         }
         catch
         {
@@ -81,10 +90,10 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
     {
         var moduleHandle = GetModuleHandle(null);
         var windowHandle = CreateWindowEx(
-            0,
+            WsExToolWindow | WsExNoActivate | WsExNoRedirectionBitmap,
             "STATIC",
             string.Empty,
-            WsOverlapped | WsClipSiblings | WsClipChildren | WsPopup,
+            WsOverlapped | WsClipSiblings | WsClipChildren | WsPopup | WsDisabled,
             0,
             0,
             width,
@@ -126,28 +135,11 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         }
     }
 
-    private Task<T> RunOnUiThreadAsync<T>(Func<Task<T>> action)
-    {
-        if (Dispatcher.UIThread.CheckAccess())
-        {
-            return action();
-        }
-
-        return Dispatcher.UIThread.InvokeAsync(action);
-    }
-
-    private Task RunOnUiThreadAsync(Func<Task> action)
-    {
-        if (Dispatcher.UIThread.CheckAccess())
-        {
-            return action();
-        }
-
-        return Dispatcher.UIThread.InvokeAsync(action);
-    }
-
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateWindowEx(
@@ -170,9 +162,35 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostThreadMessage(uint idThread, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetMessage(out Message lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage(in Message lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr DispatchMessage(in Message lpMsg);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PeekMessage(out Message lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
+
+    private struct Message
+    {
+        public IntPtr HWnd;
+        public uint Msg;
+        public IntPtr WParam;
+        public IntPtr LParam;
+        public uint Time;
+        public Point Pt;
+    }
+
     private sealed class PaginationSession : IWebViewPaginationSession
     {
         private readonly WindowsWebView2SnapshotService _owner;
+        private readonly WebViewWorker _worker;
         private readonly IntPtr _hostWindow;
         private readonly CoreWebView2Controller _controller;
         private readonly CoreWebView2 _coreWebView;
@@ -185,6 +203,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 
         private PaginationSession(
             WindowsWebView2SnapshotService owner,
+            WebViewWorker worker,
             IntPtr hostWindow,
             CoreWebView2Controller controller,
             CoreWebView2 coreWebView,
@@ -193,6 +212,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             double renderScale)
         {
             _owner = owner;
+            _worker = worker;
             _hostWindow = hostWindow;
             _controller = controller;
             _coreWebView = coreWebView;
@@ -204,17 +224,18 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
 
         public static async Task<PaginationSession> CreateAsync(
             WindowsWebView2SnapshotService owner,
+            WebViewWorker worker,
             CoreWebView2Environment environment,
             int viewportWidth,
             int viewportHeight,
             double renderScale)
         {
-            var hostWindow = CreateHostWindow(viewportWidth, viewportHeight);
-            CoreWebView2Controller? controller = null;
-
-            try
+            return await worker.ExecuteAsync(async () =>
             {
-                return await owner.RunOnUiThreadAsync(async () =>
+                var hostWindow = CreateHostWindow(viewportWidth, viewportHeight);
+                CoreWebView2Controller? controller = null;
+
+                try
                 {
                     controller = await environment.CreateCoreWebView2ControllerAsync(hostWindow);
                     controller.Bounds = new Rectangle(0, 0, viewportWidth, viewportHeight);
@@ -227,32 +248,21 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
                     coreWebView.Settings.AreDefaultContextMenusEnabled = false;
                     coreWebView.Settings.AreDevToolsEnabled = false;
                     coreWebView.Settings.IsZoomControlEnabled = false;
-                    return new PaginationSession(owner, hostWindow, controller, coreWebView, viewportWidth, viewportHeight, renderScale);
-                });
-            }
-            catch
-            {
-                if (controller is not null)
-                {
-                    await owner.RunOnUiThreadAsync(() =>
-                    {
-                        controller.Close();
-                        DestroyWindow(hostWindow);
-                        return Task.CompletedTask;
-                    });
+                    return new PaginationSession(owner, worker, hostWindow, controller, coreWebView, viewportWidth, viewportHeight, renderScale);
                 }
-                else
+                catch
                 {
+                    controller?.Close();
                     DestroyWindow(hostWindow);
+                    throw;
                 }
-                throw;
-            }
+            });
         }
 
         public async Task LoadHtmlAsync(string htmlContent)
         {
             ThrowIfDisposed();
-            await _owner.RunOnUiThreadAsync(() => LoadHtmlCoreAsync(htmlContent));
+            await _worker.ExecuteAsync(() => LoadHtmlCoreAsync(htmlContent));
         }
 
         private async Task LoadHtmlCoreAsync(string htmlContent)
@@ -303,13 +313,13 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public Task<int> GetPageCountAsync()
         {
             ThrowIfDisposed();
-            return _owner.RunOnUiThreadAsync(() => WindowsWebView2SnapshotService.GetPageCountAsync(_coreWebView));
+            return _worker.ExecuteAsync(() => WindowsWebView2SnapshotService.GetPageCountAsync(_coreWebView));
         }
 
         public async Task<Stream> CapturePageAsync(int pageIndex)
         {
             ThrowIfDisposed();
-            return await _owner.RunOnUiThreadAsync(async () =>
+            return await _worker.ExecuteAsync(async () =>
             {
                 var output = RecyclableStreamManagerProvider.Manager.GetStream(nameof(WindowsWebView2SnapshotService));
                 await CapturePageToStreamCoreAsync(pageIndex, output);
@@ -321,7 +331,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         public async Task CapturePageToStreamAsync(int pageIndex, Stream outputStream)
         {
             ThrowIfDisposed();
-            await _owner.RunOnUiThreadAsync(() => CapturePageToStreamCoreAsync(pageIndex, outputStream));
+            await _worker.ExecuteAsync(() => CapturePageToStreamCoreAsync(pageIndex, outputStream));
         }
 
         private async Task CapturePageToStreamCoreAsync(int pageIndex, Stream outputStream)
@@ -340,7 +350,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
             }
 
             _disposed = true;
-            await _owner.RunOnUiThreadAsync(() =>
+            await _worker.ExecuteAsync(() =>
             {
                 _coreWebView.WebMessageReceived -= OnWebMessageReceived;
                 _controller.Close();
@@ -390,6 +400,150 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
         private string PrepareHtmlForCapture(string htmlContent)
         {
             return htmlContent;
+        }
+    }
+
+    private sealed class WebViewWorker : IAsyncDisposable
+    {
+        private readonly ConcurrentQueue<Action> _pendingActions = new();
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Thread _thread;
+        private int _disposeRequested;
+        private uint _threadId;
+
+        public WebViewWorker()
+        {
+            _thread = new Thread(ThreadMain)
+            {
+                IsBackground = true,
+                Name = "StripWolf.WebView2Worker"
+            };
+            _thread.SetApartmentState(ApartmentState.STA);
+            _thread.Start();
+        }
+
+        public async Task<T> ExecuteAsync<T>(Func<Task<T>> action)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeRequested) != 0, this);
+            await _started.Task;
+
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Enqueue(() =>
+            {
+                _ = ExecuteCoreAsync(action, completion);
+            });
+
+            return await completion.Task;
+        }
+
+        public async Task ExecuteAsync(Func<Task> action)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeRequested) != 0, this);
+            await _started.Task;
+
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Enqueue(() =>
+            {
+                _ = ExecuteCoreAsync(action, completion);
+            });
+
+            await completion.Task;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposeRequested, 1) != 0)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            if (_started.Task.IsCompletedSuccessfully)
+            {
+                PostQuit();
+                _thread.Join();
+            }
+
+            return ValueTask.CompletedTask;
+        }
+
+        private async Task ExecuteCoreAsync<T>(Func<Task<T>> action, TaskCompletionSource<T> completion)
+        {
+            try
+            {
+                completion.TrySetResult(await action());
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        }
+
+        private async Task ExecuteCoreAsync(Func<Task> action, TaskCompletionSource completion)
+        {
+            try
+            {
+                await action();
+                completion.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                completion.TrySetException(ex);
+            }
+        }
+
+        private void ThreadMain()
+        {
+            SynchronizationContext.SetSynchronizationContext(new WorkerSynchronizationContext(this));
+            PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
+            _threadId = GetCurrentThreadId();
+            _started.TrySetResult();
+
+            while (GetMessage(out var message, IntPtr.Zero, 0, 0) > 0)
+            {
+                if (message.Msg == WmWorkerInvoke)
+                {
+                    DrainPendingActions();
+                    continue;
+                }
+
+                TranslateMessage(in message);
+                DispatchMessage(in message);
+            }
+
+            DrainPendingActions();
+        }
+
+        private void Enqueue(Action action)
+        {
+            _pendingActions.Enqueue(action);
+            if (!PostThreadMessage(_threadId, WmWorkerInvoke, IntPtr.Zero, IntPtr.Zero))
+            {
+                throw new InvalidOperationException($"Failed to post WebView2 worker message. Win32 error: {Marshal.GetLastWin32Error()}");
+            }
+        }
+
+        private void DrainPendingActions()
+        {
+            while (_pendingActions.TryDequeue(out var action))
+            {
+                action();
+            }
+        }
+
+        private void PostQuit()
+        {
+            if (_threadId != 0)
+            {
+                PostThreadMessage(_threadId, 0x0012, IntPtr.Zero, IntPtr.Zero);
+            }
+        }
+
+        private sealed class WorkerSynchronizationContext(WebViewWorker owner) : SynchronizationContext
+        {
+            public override void Post(SendOrPostCallback d, object? state)
+            {
+                owner.Enqueue(() => d(state));
+            }
         }
     }
 }
