@@ -96,7 +96,7 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isReadSectionExpanded = true;
 
-    private const int DeleteUndoTimeoutSeconds = 10; // 10 seconds
+    private const int DeleteUndoTimeoutSeconds = 5;
 
     /// <summary>
     /// Whether the app is running on desktop (not mobile)
@@ -582,8 +582,7 @@ public partial class LibraryViewModel : ViewModelBase
 
                 RefreshSeriesGroups();
 
-                // Remove completed item after a short delay
-                await RemoveCompletedImportAfterDelayAsync(pending);
+                ScheduleCompletedImportRemoval(pending);
             }
             catch (Exception ex)
             {
@@ -661,7 +660,7 @@ public partial class LibraryViewModel : ViewModelBase
             pending.IsCompleted = true;
             pending.Progress = 1.0;
             pending.Status = "Completed";
-            await RemoveCompletedImportAfterDelayAsync(pending);
+            ScheduleCompletedImportRemoval(pending);
         }
         catch (Exception ex)
         {
@@ -981,9 +980,14 @@ public partial class LibraryViewModel : ViewModelBase
         }
     }
 
+    private void ScheduleCompletedImportRemoval(PendingImport pending)
+    {
+        _ = RemoveCompletedImportAfterDelayAsync(pending);
+    }
+
     private async Task RemoveCompletedImportAfterDelayAsync(PendingImport pending)
     {
-        await Task.Delay(2000);
+        await Task.Delay(500);
         await _importQueueService.RemoveAsync(pending);
     }
 

@@ -1946,7 +1946,7 @@ public partial class KomgaViewModel : ViewModelBase
                 RefreshSeriesDownloadState(seriesId);
             });
 
-            await RemoveCompletedPostDownloadImportAfterDelayAsync(workItem.PendingImport);
+            ScheduleCompletedPostDownloadImportRemoval(workItem.PendingImport);
         }
         catch (Exception ex)
         {
@@ -1968,9 +1968,14 @@ public partial class KomgaViewModel : ViewModelBase
         }
     }
 
+    private void ScheduleCompletedPostDownloadImportRemoval(PendingImport pendingImport)
+    {
+        _ = RemoveCompletedPostDownloadImportAfterDelayAsync(pendingImport);
+    }
+
     private async Task RemoveCompletedPostDownloadImportAfterDelayAsync(PendingImport pendingImport)
     {
-        await Task.Delay(2000);
+        await Task.Delay(500);
         await _importQueueService.RemoveAsync(pendingImport);
     }
 

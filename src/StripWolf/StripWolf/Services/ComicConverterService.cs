@@ -199,8 +199,14 @@ public class ComicConverterService
             _ => ComicFormat.Unknown
         };
 
-        await using var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return await AnalyzeArchiveForImportAsync(inputStream, archiveType, format, filePath);
+        return archiveType switch
+        {
+            ComicArchiveType.Zip => await AnalyzeZipArchiveForImportAsync(filePath, format),
+            ComicArchiveType.Rar => await AnalyzeRarArchiveForImportAsync(filePath, format),
+            ComicArchiveType.SevenZip => await AnalyzeSevenZipArchiveForImportAsync(filePath, format),
+            ComicArchiveType.Tar => await AnalyzeTarArchiveForImportAsync(filePath, format),
+            _ => throw new NotSupportedException("Unsupported comic archive format.")
+        };
     }
 
     /// <summary>
@@ -324,6 +330,135 @@ public class ComicConverterService
         });
 
         return capture.Build(filePath, format, new FileInfo(filePath).Length);
+    }
+
+    private async Task<ComicImportData> AnalyzeZipArchiveForImportAsync(string filePath, ComicFormat format)
+    {
+        var capture = await Task.Run(() =>
+        {
+            using var archive = ZipFile.OpenRead(filePath);
+            return CaptureArchiveEntries(
+                archive.Entries,
+                entry => entry.FullName,
+                entry => entry.FullName.EndsWith("/", StringComparison.Ordinal),
+                entry => entry.Open());
+        });
+
+        return capture.Build(filePath, format, new FileInfo(filePath).Length);
+    }
+
+    private async Task<ComicImportData> AnalyzeRarArchiveForImportAsync(string filePath, ComicFormat format)
+    {
+        await using var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var archive = RarArchive.OpenArchive(inputStream);
+        if (archive.IsSolid)
+        {
+            inputStream.Position = 0;
+            return await AnalyzeArchiveForImportAsync(inputStream, ComicArchiveType.Rar, format, filePath);
+        }
+
+        var capture = await Task.Run(() =>
+        {
+            return CaptureArchiveEntries(
+                archive.Entries,
+                entry => entry.Key,
+                entry => entry.IsDirectory,
+                entry => entry.OpenEntryStream());
+        });
+
+        return capture.Build(filePath, format, new FileInfo(filePath).Length);
+    }
+
+    private async Task<ComicImportData> AnalyzeSevenZipArchiveForImportAsync(string filePath, ComicFormat format)
+    {
+        var capture = await Task.Run(() =>
+        {
+            using var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(inputStream);
+            return CaptureArchiveEntries(
+                archive.Entries,
+                entry => entry.Key,
+                entry => entry.IsDirectory,
+                entry => entry.OpenEntryStream());
+        });
+
+        return capture.Build(filePath, format, new FileInfo(filePath).Length);
+    }
+
+    private async Task<ComicImportData> AnalyzeTarArchiveForImportAsync(string filePath, ComicFormat format)
+    {
+        var capture = await Task.Run(() =>
+        {
+            using var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = TarArchive.OpenArchive(inputStream);
+            return CaptureArchiveEntries(
+                archive.Entries,
+                entry => entry.Key,
+                entry => entry.IsDirectory,
+                entry => entry.OpenEntryStream());
+        });
+
+        return capture.Build(filePath, format, new FileInfo(filePath).Length);
+    }
+
+    private static ComicImportCapture CaptureArchiveEntries<TEntry>(
+        IEnumerable<TEntry> entries,
+        Func<TEntry, string?> getEntryKey,
+        Func<TEntry, bool> isDirectory,
+        Func<TEntry, Stream> openEntryStream)
+        where TEntry : class
+    {
+        using var capture = new ComicImportCapture();
+        TEntry? comicInfoEntry = null;
+        TEntry? coverEntry = null;
+        string? coverEntryName = null;
+        var pageCount = 0;
+
+        foreach (var entry in entries)
+        {
+            if (isDirectory(entry))
+            {
+                continue;
+            }
+
+            var safeEntryName = GetSafeEntryName(getEntryKey(entry) ?? string.Empty);
+            if (!ShouldIncludeEntry(safeEntryName))
+            {
+                continue;
+            }
+
+            if (ComicConstants.IsComicInfoFile(safeEntryName) && comicInfoEntry is null)
+            {
+                comicInfoEntry = entry;
+            }
+
+            if (!ComicConstants.IsImageFile(safeEntryName))
+            {
+                continue;
+            }
+
+            pageCount++;
+            if (coverEntryName is null || ComicPageComparer.Instance.Compare(safeEntryName, coverEntryName) < 0)
+            {
+                coverEntry = entry;
+                coverEntryName = safeEntryName;
+            }
+        }
+
+        if (comicInfoEntry is not null)
+        {
+            using var comicInfoStream = openEntryStream(comicInfoEntry);
+            capture.SetComicInfo(ParseComicInfo(comicInfoStream));
+        }
+
+        if (coverEntry is not null && coverEntryName is not null)
+        {
+            using var coverStream = openEntryStream(coverEntry);
+            capture.SetCover(coverEntryName, coverStream);
+        }
+
+        capture.SetPageCount(pageCount);
+        return capture.Detach();
     }
 
     private static ComicImportCapture ConvertArchiveStreamToCbz(
@@ -453,6 +588,16 @@ public class ComicConverterService
 
         public int PageCount { get; private set; }
 
+        public void SetComicInfo(ComicInfo? comicInfo)
+        {
+            ComicInfo ??= comicInfo;
+        }
+
+        public void SetPageCount(int pageCount)
+        {
+            PageCount = pageCount;
+        }
+
         public void ProcessEntry(string safeEntryName, Stream entryStream)
         {
             if (ComicConstants.IsComicInfoFile(safeEntryName) && ComicInfo is null)
@@ -476,6 +621,11 @@ public class ComicConverterService
                 return;
             }
 
+            SetCover(safeEntryName, entryStream);
+        }
+
+        public void SetCover(string safeEntryName, Stream entryStream)
+        {
             var coverStream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ComicConverterService));
             entryStream.CopyTo(coverStream);
             coverStream.Position = 0;
