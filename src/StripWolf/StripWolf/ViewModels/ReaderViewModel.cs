@@ -632,29 +632,18 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     // Load two pages for two-page mode
                     var readPath = GetActiveReadPath();
-                    var leftPageData = await _comicReaderService.GetPageAsync(readPath, pageIndex);
-                    var newLeftBitmap = await Task.Run(() =>
-                    {
-                        using var stream = new MemoryStream(leftPageData);
-                        return new Bitmap(stream);
-                    });
+                    var newLeftBitmap = await LoadBitmapAsync(readPath, pageIndex);
                     var oldLeftBitmap = LeftPageImage;
                     LeftPageImage = newLeftBitmap;
                     oldLeftBitmap?.Dispose();
-                    
+                     
                     // Also update the single page image for consistency
                     CurrentPageImage = LeftPageImage;
-                    pageData = leftPageData;
-                    
+                     
                     // Load right page if available
                     if (pageIndex + 1 < Comic.PageCount)
                     {
-                        var rightPageData = await _comicReaderService.GetPageAsync(readPath, pageIndex + 1);
-                        var newRightBitmap = await Task.Run(() =>
-                        {
-                            using var stream = new MemoryStream(rightPageData);
-                            return new Bitmap(stream);
-                        });
+                        var newRightBitmap = await LoadBitmapAsync(readPath, pageIndex + 1);
                         var oldRightBitmap = RightPageImage;
                         RightPageImage = newRightBitmap;
                         oldRightBitmap?.Dispose();
@@ -672,13 +661,15 @@ public partial class ReaderViewModel : ViewModelBase
                     var newBitmap = TakePrefetchedBitmap(pageIndex);
                     if (newBitmap is null)
                     {
-                        // Not prefetched - decode now on a background thread
-                        pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
-                        newBitmap = await Task.Run(() =>
+                        if (ReadingMode == ReadingMode.Guided)
                         {
-                            using var stream = new MemoryStream(pageData);
-                            return new Bitmap(stream);
-                        });
+                            pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
+                            newBitmap = await CreateBitmapFromPageDataAsync(pageData);
+                        }
+                        else
+                        {
+                            newBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex);
+                        }
                     }
                     else if (ReadingMode == ReadingMode.Guided)
                     {
@@ -1275,6 +1266,23 @@ public partial class ReaderViewModel : ViewModelBase
             // Silently fail - this is just pre-caching
         }
     }
+
+    private async Task<Bitmap> LoadBitmapAsync(string filePath, int pageIndex)
+    {
+        using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ReaderViewModel));
+        await _comicReaderService.CopyPageAsync(filePath, pageIndex, stream);
+        stream.Position = 0;
+        return await Task.Run(() => new Bitmap(stream));
+    }
+
+    private static Task<Bitmap> CreateBitmapFromPageDataAsync(byte[] pageData)
+    {
+        return Task.Run(() =>
+        {
+            using var stream = new MemoryStream(pageData, writable: false);
+            return new Bitmap(stream);
+        });
+    }
     
     #endregion
 
@@ -1360,14 +1368,7 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var filePath = GetActiveReadPath();
-            var pageData = await _comicReaderService.GetPageAsync(filePath, pageIndex);
-
-            // Decode bitmap on a background thread to avoid blocking the UI
-            var bitmap = await Task.Run(() =>
-            {
-                using var stream = new MemoryStream(pageData);
-                return new Bitmap(stream);
-            });
+            var bitmap = await LoadBitmapAsync(filePath, pageIndex);
 
             // Only cache if still reading the same comic
             if (GetActiveReadPath() == filePath)

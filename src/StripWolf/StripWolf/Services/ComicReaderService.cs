@@ -14,11 +14,15 @@ public class ComicReaderService
 {
     private readonly IPdfRenderer _pdfRenderer;
     private readonly EpubToCbzConverterService _epubConverter;
-    private readonly Dictionary<(string, int), byte[]> _pageCache = new();
+    private readonly Dictionary<(string, int), PageCacheEntry> _pageCache = new();
+    private readonly LinkedList<(string, int)> _pageCacheLru = new();
     private readonly Dictionary<string, List<string>> _pageNamesCache = new();
     private readonly Dictionary<string, Task<PdfReaderSession>> _pdfSessions = new();
     private readonly Dictionary<string, Task<EpubToCbzConverterService.EpubReaderSession>> _epubSessions = new();
     private readonly object _cacheLock = new();
+    private const int MaxCachedPageEntries = 12;
+    private const long MaxCachedPageBytes = 32L * 1024 * 1024;
+    private long _cachedPageBytes;
 
     public ComicReaderService(IPdfRenderer pdfRenderer, EpubToCbzConverterService epubConverter)
     {
@@ -177,22 +181,14 @@ public class ComicReaderService
     /// </summary>
     public async Task<byte[]> GetPageAsync(string filePath, int pageIndex)
     {
-        lock (_cacheLock)
+        if (TryGetCachedPageData(filePath, pageIndex, out var cached))
         {
-            if (_pageCache.TryGetValue((filePath, pageIndex), out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
         var sortedNames = await GetCachedPageNamesAsync(filePath);
-
         var data = await ReadPageAsync(filePath, pageIndex, sortedNames);
-
-        lock (_cacheLock)
-        {
-            _pageCache[(filePath, pageIndex)] = data;
-        }
+        CachePageData(filePath, pageIndex, data);
 
         return data;
     }
@@ -203,16 +199,28 @@ public class ComicReaderService
     /// </summary>
     public async Task<byte[]> GetPageWithoutCacheAsync(string filePath, int pageIndex)
     {
-        lock (_cacheLock)
+        if (TryGetCachedPageData(filePath, pageIndex, out var cached))
         {
-            if (_pageCache.TryGetValue((filePath, pageIndex), out var cached))
-            {
-                return cached;
-            }
+            return cached;
         }
 
         var sortedNames = await GetPageNamesWithoutCacheAsync(filePath);
         return await ReadPageAsync(filePath, pageIndex, sortedNames);
+    }
+
+    /// <summary>
+    /// Copies a specific page to the supplied stream, using cached page bytes when available.
+    /// </summary>
+    public async Task CopyPageAsync(string filePath, int pageIndex, Stream outputStream)
+    {
+        if (TryGetCachedPageData(filePath, pageIndex, out var cached))
+        {
+            await outputStream.WriteAsync(cached, 0, cached.Length);
+            return;
+        }
+
+        var sortedNames = await GetCachedPageNamesAsync(filePath);
+        await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream);
     }
 
     /// <summary>
@@ -226,29 +234,9 @@ public class ComicReaderService
 
     private async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
     {
-        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
-        {
-            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
-        }
-
-        var entryName = sortedNames[pageIndex];
-        if (Directory.Exists(filePath))
-        {
-            return await ReadDirectoryPageAsync(filePath, entryName);
-        }
-
-        var format = GetComicFormat(filePath);
-
-        return format switch
-        {
-            ComicFormat.Cbz => await ReadCbzPageAsync(filePath, entryName),
-            ComicFormat.Cbr => await ReadCbrPageAsync(filePath, pageIndex, entryName, sortedNames),
-            ComicFormat.Cb7 => await ReadCb7PageAsync(filePath, entryName),
-            ComicFormat.Cbt => await ReadCbtPageAsync(filePath, entryName),
-            ComicFormat.Pdf => await ReadPdfPageAsync(filePath, pageIndex),
-            ComicFormat.Epub => await ReadEpubPageAsync(filePath, pageIndex),
-            _ => throw new NotSupportedException($"Unsupported comic format: {format}")
-        };
+        using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ComicReaderService));
+        await CopyPageAsync(filePath, pageIndex, sortedNames, stream);
+        return stream.ToArray();
     }
 
     private async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream)
@@ -300,6 +288,8 @@ public class ComicReaderService
         lock (_cacheLock)
         {
             _pageCache.Clear();
+            _pageCacheLru.Clear();
+            _cachedPageBytes = 0;
             _pageNamesCache.Clear();
             pdfSessions = _pdfSessions.Values.ToArray();
             epubSessions = _epubSessions.Values.ToArray();
@@ -361,6 +351,95 @@ public class ComicReaderService
     {
         await using var session = await _epubConverter.CreateReaderSessionAsync(filePath);
         return BuildSyntheticPageNames(session.PageCount, ".png");
+    }
+
+    private bool TryGetCachedPageData(string filePath, int pageIndex, out byte[] data)
+    {
+        lock (_cacheLock)
+        {
+            if (_pageCache.TryGetValue((filePath, pageIndex), out var cached))
+            {
+                MovePageCacheEntryToFront(cached.Node);
+                data = cached.Data;
+                return true;
+            }
+        }
+
+        data = [];
+        return false;
+    }
+
+    private void CachePageData(string filePath, int pageIndex, byte[] data)
+    {
+        if (!ShouldCachePageData(filePath, data.Length))
+        {
+            return;
+        }
+
+        lock (_cacheLock)
+        {
+            if (_pageCache.TryGetValue((filePath, pageIndex), out var existing))
+            {
+                _cachedPageBytes -= existing.Data.Length;
+                existing.Data = data;
+                _cachedPageBytes += data.Length;
+                MovePageCacheEntryToFront(existing.Node);
+            }
+            else
+            {
+                var key = (filePath, pageIndex);
+                var node = _pageCacheLru.AddFirst(key);
+                _pageCache[key] = new PageCacheEntry(data, node);
+                _cachedPageBytes += data.Length;
+            }
+
+            TrimPageCache();
+        }
+    }
+
+    private static bool ShouldCachePageData(string filePath, int dataLength)
+    {
+        if (dataLength > MaxCachedPageBytes / 2)
+        {
+            return false;
+        }
+
+        var format = GetComicFormat(filePath);
+        if (OperatingSystem.IsWindows() && (format == ComicFormat.Pdf || format == ComicFormat.Epub))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void TrimPageCache()
+    {
+        while (_pageCache.Count > MaxCachedPageEntries || _cachedPageBytes > MaxCachedPageBytes)
+        {
+            var oldestNode = _pageCacheLru.Last;
+            if (oldestNode is null)
+            {
+                break;
+            }
+
+            var key = oldestNode.Value;
+            if (_pageCache.Remove(key, out var entry))
+            {
+                _cachedPageBytes -= entry.Data.Length;
+            }
+
+            _pageCacheLru.Remove(oldestNode);
+        }
+    }
+
+    private void MovePageCacheEntryToFront(LinkedListNode<(string, int)> node)
+    {
+        if (!ReferenceEquals(_pageCacheLru.First, node))
+        {
+            _pageCacheLru.Remove(node);
+            _pageCacheLru.AddFirst(node);
+        }
     }
 
     private int GetPdfPageCount(string filePath)
@@ -824,6 +903,13 @@ public class ComicReaderService
     #endregion
 
     private static bool IsImageFile(string fileName) => ComicConstants.IsImageFile(fileName);
+
+    private sealed class PageCacheEntry(byte[] data, LinkedListNode<(string, int)> node)
+    {
+        public byte[] Data { get; set; } = data;
+
+        public LinkedListNode<(string, int)> Node { get; } = node;
+    }
 }
 
 /// <summary>
