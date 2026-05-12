@@ -187,6 +187,16 @@
               <TextBlock Text="Choose how many Komga books may download at the same time."
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
+
+            <Separator/>
+
+            <StackPanel Spacing="8">
+              <ToggleSwitch IsChecked="{Binding SkipExternalDeleteConfirmation}"
+                            OnContent="Skip external delete confirmation"
+                            OffContent="Ask before deleting external comics"/>
+              <TextBlock Text="When enabled, deleting a comic outside the managed library folder will always remove it from the library only and will not ask whether to delete the original file."
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
           </StackPanel>
         </Border>
 

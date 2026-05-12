@@ -500,6 +500,14 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private async Task ImportDirectoryAsync(string? directoryPath)
     {
+        await ImportDirectoryWithOptionsAsync(directoryPath, null, suppressAutomaticDirectoryFallback: false);
+    }
+
+    public async Task ImportDirectoryWithOptionsAsync(
+        string? directoryPath,
+        string? seriesNameFallback,
+        bool suppressAutomaticDirectoryFallback)
+    {
         if (string.IsNullOrWhiteSpace(directoryPath))
         {
             return;
@@ -512,10 +520,14 @@ public partial class LibraryViewModel : ViewModelBase
             return;
         }
 
-        await ImportFilesCoreAsync(filePaths, directoryPath);
+        await ImportFilesCoreAsync(filePaths, directoryPath, seriesNameFallback, suppressAutomaticDirectoryFallback);
     }
 
-    private async Task ImportFilesCoreAsync(IList<string> filePaths, string? importRootDirectory)
+    private async Task ImportFilesCoreAsync(
+        IList<string> filePaths,
+        string? importRootDirectory,
+        string? seriesNameFallbackOverride = null,
+        bool suppressAutomaticDirectoryFallback = false)
     {
         ErrorMessage = null;
 
@@ -568,7 +580,9 @@ public partial class LibraryViewModel : ViewModelBase
                 var comic = await _libraryService.ImportLocalComicAsync(
                     pending.FilePath,
                     progress,
-                    LibraryService.GetDirectorySeriesNameFallback(pending.FilePath, importRootDirectory ?? string.Empty));
+                    suppressAutomaticDirectoryFallback
+                        ? seriesNameFallbackOverride
+                        : seriesNameFallbackOverride ?? LibraryService.GetDirectorySeriesNameFallback(pending.FilePath, importRootDirectory ?? string.Empty));
                 
                 pending.IsProcessing = false;
                 pending.IsCompleted = true;
@@ -707,6 +721,12 @@ public partial class LibraryViewModel : ViewModelBase
     {
         if (comic is null || comic.IsDeleting)
         {
+            return;
+        }
+
+        if (!ShouldDeleteComicFile(comic) && _settingsService.LoadSettings().SkipExternalDeleteConfirmation)
+        {
+            StartDeletionProcess(comic, false);
             return;
         }
 

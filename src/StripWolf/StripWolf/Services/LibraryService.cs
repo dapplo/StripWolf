@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Xml.Serialization;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -858,6 +860,41 @@ public class LibraryService
         }
 
         return comics;
+    }
+
+    public static string GetDirectoryDisplayName(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            return string.Empty;
+        }
+
+        var trimmedPath = Path.TrimEndingDirectorySeparator(directoryPath);
+        return Path.GetFileName(trimmedPath);
+    }
+
+    public static string GetSuggestedSeriesNameFromDirectory(string directoryPath)
+    {
+        return GetSuggestedSeriesNameFromDirectoryName(GetDirectoryDisplayName(directoryPath));
+    }
+
+    public static string GetSuggestedSeriesNameFromDirectoryName(string directoryName)
+    {
+        if (string.IsNullOrWhiteSpace(directoryName))
+        {
+            return string.Empty;
+        }
+
+        var match = Regex.Match(directoryName, @"^[A-Za-z0-9_ ]+");
+        var candidate = match.Success ? match.Value : string.Empty;
+        candidate = candidate.Replace('_', ' ');
+        candidate = Regex.Replace(candidate, @"\s+", " ").Trim();
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return string.Empty;
+        }
+
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(candidate.ToLower(CultureInfo.CurrentCulture));
     }
 
     public List<string> GetSupportedComicFilesInDirectory(string directoryPath)

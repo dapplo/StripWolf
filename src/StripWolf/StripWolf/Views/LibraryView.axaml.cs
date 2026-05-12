@@ -233,7 +233,26 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
         var localPath = folders[0].TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(localPath))
         {
-            await viewModel.ImportDirectoryCommand.ExecuteAsync(localPath);
+            var owner = topLevel as Window;
+            if (owner is null)
+            {
+                await viewModel.ImportDirectoryCommand.ExecuteAsync(localPath);
+                return;
+            }
+
+            var prompt = new DirectoryImportSeriesPromptWindow(
+                LibraryService.GetDirectoryDisplayName(localPath),
+                LibraryService.GetSuggestedSeriesNameFromDirectory(localPath));
+            var promptResult = await prompt.ShowDialog<DirectoryImportSeriesPromptResult?>(owner);
+            if (promptResult is null)
+            {
+                return;
+            }
+
+            await viewModel.ImportDirectoryWithOptionsAsync(
+                localPath,
+                promptResult.UseSeriesName ? promptResult.SeriesName : null,
+                suppressAutomaticDirectoryFallback: !promptResult.UseSeriesName);
         }
     }
 

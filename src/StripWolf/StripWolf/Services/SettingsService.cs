@@ -385,6 +385,11 @@ public class AppSettings
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UnsupportedFormatHandlingMode UnsupportedFormatHandlingMode { get; set; } = UnsupportedFormatHandlingMode.ConvertOnImport;
 
+    /// <summary>
+    /// When enabled, deleting an external comic skips the confirmation and only removes it from the library.
+    /// </summary>
+    public bool SkipExternalDeleteConfirmation { get; set; }
+
     public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
 
     public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
@@ -424,6 +429,7 @@ public class AppSettings
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
             UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,
+            SkipExternalDeleteConfirmation = SkipExternalDeleteConfirmation,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
             KomgaParallelDownloads = KomgaParallelDownloads

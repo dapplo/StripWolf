@@ -91,6 +91,9 @@ public partial class SettingsViewModel : ViewModelBase
     private UnsupportedFormatHandlingMode _selectedUnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode.ConvertOnImport;
 
     [ObservableProperty]
+    private bool _skipExternalDeleteConfirmation;
+
+    [ObservableProperty]
     private int _selectedKomgaParallelDownloads = 1;
 
     [ObservableProperty]
@@ -279,6 +282,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
         SelectedEpubOutputResolution = _appSettings.EpubOutputResolution;
         SelectedUnsupportedFormatHandlingMode = _appSettings.UnsupportedFormatHandlingMode;
+        SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
@@ -372,6 +376,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.UnsupportedFormatHandlingMode = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSkipExternalDeleteConfirmationChanged(bool value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.SkipExternalDeleteConfirmation = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
