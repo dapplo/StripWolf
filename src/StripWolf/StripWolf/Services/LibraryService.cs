@@ -1024,7 +1024,7 @@ public class LibraryService
             };
 
             using var resizedImage = sourceImage.Clone(context => context.Resize(resizeOptions));
-            using var flattenedImage = new Image<Rgba32>(resizedImage.Width, resizedImage.Height, Color.White);
+            using var flattenedImage = new Image<Rgba32>(resizedImage.Width, resizedImage.Height, Color.White.ToPixel<Rgba32>());
             flattenedImage.Mutate(context => context.DrawImage(resizedImage, 1f));
 
             using var outputStream = File.Create(coverPath);
