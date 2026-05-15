@@ -1,11 +1,12 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Buffers;
 using PDFiumCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
+using System;
+using System.Threading.Tasks;
+using System.IO;
 
 namespace StripWolf.Services;
 

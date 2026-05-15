@@ -7,11 +7,6 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   
-  <!-- Define compile constant when PDFium is excluded -->
-  <PropertyGroup Condition="'$(ExcludePdfium)' == 'true'">
-    <DefineConstants>$(DefineConstants);EXCLUDE_PDFIUM</DefineConstants>
-  </PropertyGroup>
-  
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
@@ -40,14 +35,4 @@
     <PackageReference Include="OpenCvSharp4" />
   </ItemGroup>
 
-  <!-- PDFium is only needed on desktop platforms (Windows, macOS, Linux) -->
-  <!-- It is not used on Android which has its own PDF renderer -->
-  <ItemGroup Condition="'$(ExcludePdfium)' != 'true'">
-    <PackageReference Include="PDFiumCore" />
-  </ItemGroup>
-  
-  <!-- Exclude PdfiumPdfRenderer.cs when building for Android -->
-  <ItemGroup Condition="'$(ExcludePdfium)' == 'true'">
-    <Compile Remove="Services\PdfiumPdfRenderer.cs" />
-  </ItemGroup>
 </Project>

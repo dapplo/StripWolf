@@ -1,6 +1,5 @@
 using StripWolf.Models;
 using OpenCvSharp;
-using System.Runtime.InteropServices;
 
 namespace StripWolf.Services;
 

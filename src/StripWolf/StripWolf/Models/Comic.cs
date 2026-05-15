@@ -1,4 +1,3 @@
-using System.IO;
 using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
 

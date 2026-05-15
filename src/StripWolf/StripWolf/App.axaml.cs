@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Styling;
 using System.Globalization;
 using Avalonia.Markup.Xaml;
@@ -141,17 +140,11 @@ public partial class App : Application
         services.AddSingleton<ComicConverterService>();
 
         // Register platform-specific PDF renderer
-        // Use the custom registration action if set (e.g., for Android), otherwise default to PDFium
+        // Use the custom registration action if set (e.g., for Android), otherwise default to nothing
         if (RegisterPdfRenderer != null)
         {
             RegisterPdfRenderer(services);
         }
-    #if !EXCLUDE_PDFIUM
-        else
-        {
-            services.AddSingleton<IPdfRenderer, PdfiumPdfRenderer>();
-        }
-    #endif
 
         if (RegisterWebViewSnapshotService != null)
         {

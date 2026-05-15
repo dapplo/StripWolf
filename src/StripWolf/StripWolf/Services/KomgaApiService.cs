@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.IO.Pipelines;
-using System.Buffers;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
 

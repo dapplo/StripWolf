@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.Desktop", "StripW
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.Android", "StripWolf.Android\StripWolf.Android.csproj", "{7AD1DAC8-7FBE-49D5-8614-7321233DB82E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.iOS", "StripWolf.iOS\StripWolf.iOS.csproj", "{B10A8E9A-8C2A-4F7D-B6E4-9B2D8C3F1E2D}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3DA99C4E-89E3-4049-9C22-0A7EC60D83D8}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Packages.props = Directory.Packages.props
@@ -33,6 +35,10 @@ Global
 		{7AD1DAC8-7FBE-49D5-8614-7321233DB82E}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
 		{7AD1DAC8-7FBE-49D5-8614-7321233DB82E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7AD1DAC8-7FBE-49D5-8614-7321233DB82E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B10A8E9A-8C2A-4F7D-B6E4-9B2D8C3F1E2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B10A8E9A-8C2A-4F7D-B6E4-9B2D8C3F1E2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B10A8E9A-8C2A-4F7D-B6E4-9B2D8C3F1E2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B10A8E9A-8C2A-4F7D-B6E4-9B2D8C3F1E2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Drawing;
-using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;

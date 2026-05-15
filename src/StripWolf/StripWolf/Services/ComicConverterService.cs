@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Xml.Serialization;
 using StripWolf.Models;
-using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Tar;

@@ -18,13 +18,20 @@ sealed class Program
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
     {
+        App.RegisterPdfRenderer = services =>
+        {
+            services.AddSingleton<IPdfRenderer, PdfiumPdfRenderer>();
+        };
+
         App.RegisterWebViewSnapshotService = services =>
         {
+#if Windows
             if (OperatingSystem.IsWindows())
             {
                 services.AddSingleton<IWebViewPaginationService, WindowsWebView2SnapshotService>();
             }
             else
+#endif
             {
                 services.AddSingleton<IWebViewPaginationService, UnsupportedWebViewSnapshotService>();
             }
