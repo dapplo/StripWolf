@@ -100,11 +100,16 @@ public partial class ReaderViewModel : ViewModelBase
     private int _lastLoadedPageIndex = -1;
     private bool _shouldSelectLastPanel;
     private long _epubConversionUpdateVersion;
+    private CancellationTokenSource? _pageLoadingCts;
 
+    // Static semaphore to limit concurrent bitmap decodes globally in the reader
+    // This prevents memory spikes during rapid page flipping
+    private static readonly SemaphoreSlim GlobalDecodeSemaphore = new(2, 2);
+    
     // Pre-decoded bitmap cache for instant page display without loading bar
     private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
     private readonly object _bitmapPrefetchLock = new();
-    private const int MaxPrefetchedBitmaps = 3;
+    private const int MaxPrefetchedBitmaps = 3; // Reverted from 2 for better speed
 
     public bool HasPreviousPage => CurrentPage > 0;
     public bool HasNextPage => Comic is not null && (CurrentPage < Comic.PageCount - 1 || HasPendingEpubConversion);
@@ -230,6 +235,15 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private bool _compactOverview;
 
+    [ObservableProperty]
+    private int _decodeWidth;
+
+    [ObservableProperty]
+    private int _decodeHeight;
+
+    partial void OnDecodeWidthChanged(int value) => ClearBitmapPrefetchCache();
+    partial void OnDecodeHeightChanged(int value) => ClearBitmapPrefetchCache();
+
     public GridLength LeftColumnWidth => IsOverviewOnLeft ? OverviewGridLength : ZoomGridLength;
     public GridLength RightColumnWidth => IsOverviewOnLeft ? ZoomGridLength : OverviewGridLength;
 
@@ -339,9 +353,7 @@ public partial class ReaderViewModel : ViewModelBase
             _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
         }
 
-        _panelDetectionService.ClearAllCache();
-        _comicReaderService.ClearCache();
-        ClearBitmapPrefetchCache();
+        ClearAllCaches();
         _lastLoadedPageIndex = -1;
         _readerFilePath = null;
         HasPendingEpubConversion = false;
@@ -371,6 +383,19 @@ public partial class ReaderViewModel : ViewModelBase
         CurrentPanel = null;
         CurrentPanelIndex = 0;
         IsDetectingPanels = false;
+    }
+
+    private void ClearAllCaches()
+    {
+        _panelDetectionService.ClearAllCache();
+        _comicReaderService.ClearCache();
+        ClearBitmapPrefetchCache();
+        
+        // Force ImageSharp to release its internal memory pools
+        SixLabors.ImageSharp.Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
+        
+        // Suggest a collection to the runtime
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
     }
 
     private string GetActiveReadPath()
@@ -616,121 +641,160 @@ public partial class ReaderViewModel : ViewModelBase
 
     private async Task LoadPageAsync()
     {
-        if (Comic is null || _isLoadingPage)
+        if (Comic is null)
         {
             return;
         }
 
-        while (_lastLoadedPageIndex != CurrentPage)
+        // Cancel any existing load
+        _pageLoadingCts?.Cancel();
+        _pageLoadingCts = new CancellationTokenSource();
+        var ct = _pageLoadingCts.Token;
+
+        // Small debounce to skip intermediate pages during very rapid scrolling (e.g. scroll wheel)
+        // This prevents the semaphore from being flooded with requests that will be immediately cancelled
+        try { await Task.Delay(50, ct); } catch (OperationCanceledException) { return; }
+
+        _isLoadingPage = true;
+        try
         {
-            // Capture current index
-            int pageIndex = CurrentPage;
-
-            if (HasPendingEpubConversion)
+            while (_lastLoadedPageIndex != CurrentPage)
             {
-                await EnsureEpubPagesAvailableAsync(pageIndex);
-            }
+                if (ct.IsCancellationRequested) return;
 
-            // Validate page index is within range
-            if (Comic.PageCount == 0)
-            {
-                ErrorMessage = HasPendingEpubConversion ? "Preparing readable pages..." : "Comic has no pages";
-                return;
-            }
+                // Capture current index
+                int pageIndex = CurrentPage;
 
-            // Only show the loading indicator when the bitmap is not already pre-decoded
-            bool hasPrefetchedBitmap = !IsTwoPageMode && HasPrefetchedBitmap(pageIndex);
-
-            _isLoadingPage = true;
-            if (!hasPrefetchedBitmap)
-            {
-                IsBusy = true;
-            }
-            try
-            {
-                // Store page data for panel detection in guided mode
-                byte[]? pageData = null;
-                
-                if (IsTwoPageMode)
+                if (HasPendingEpubConversion)
                 {
-                    // Load two pages for two-page mode
-                    var readPath = GetActiveReadPath();
-                    var newLeftBitmap = await LoadBitmapAsync(readPath, pageIndex);
-                    var oldLeftBitmap = LeftPageImage;
-                    LeftPageImage = newLeftBitmap;
-                    oldLeftBitmap?.Dispose();
-                     
-                    // Also update the single page image for consistency
-                    CurrentPageImage = LeftPageImage;
-                     
-                    // Load right page if available
-                    if (pageIndex + 1 < Comic.PageCount)
+                    await EnsureEpubPagesAvailableAsync(pageIndex);
+                    if (ct.IsCancellationRequested) return;
+                }
+
+                // Validate page index is within range
+                if (Comic.PageCount == 0)
+                {
+                    ErrorMessage = HasPendingEpubConversion ? "Preparing readable pages..." : "Comic has no pages";
+                    return;
+                }
+
+                // Only show the loading indicator when the bitmap is not already pre-decoded
+                bool hasPrefetchedBitmap = !IsTwoPageMode && HasPrefetchedBitmap(pageIndex);
+
+                if (!hasPrefetchedBitmap)
+                {
+                    IsBusy = true;
+                }
+                
+                try
+                {
+                    // Store page data for panel detection in guided mode
+                    byte[]? pageData = null;
+                    
+                    if (IsTwoPageMode)
                     {
-                        var newRightBitmap = await LoadBitmapAsync(readPath, pageIndex + 1);
+                        // Load two pages for two-page mode
+                        var readPath = GetActiveReadPath();
+                        
+                        // Load in parallel but with cancellation support
+                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct);
+                        var rightTask = pageIndex + 1 < Comic.PageCount 
+                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct) 
+                            : Task.FromResult<Bitmap?>(null);
+
+                        var newLeftBitmap = await leftTask;
+                        var newRightBitmap = await rightTask;
+
+                        if (ct.IsCancellationRequested)
+                        {
+                            newLeftBitmap?.Dispose();
+                            newRightBitmap?.Dispose();
+                            return;
+                        }
+
+                        var oldLeftBitmap = LeftPageImage;
+                        LeftPageImage = newLeftBitmap;
+                        oldLeftBitmap?.Dispose();
+                         
+                        // Also update the single page image for consistency
+                        CurrentPageImage = LeftPageImage;
+                         
                         var oldRightBitmap = RightPageImage;
                         RightPageImage = newRightBitmap;
                         oldRightBitmap?.Dispose();
                     }
                     else
                     {
-                        var oldRightBitmap = RightPageImage;
-                        RightPageImage = null;
-                        oldRightBitmap?.Dispose();
-                    }
-                }
-                else
-                {
-                    // Single page mode - use pre-decoded bitmap from prefetch cache if available
-                    var newBitmap = TakePrefetchedBitmap(pageIndex);
-                    if (newBitmap is null)
-                    {
-                        if (ReadingMode == ReadingMode.Guided)
+                        // Single page mode - use pre-decoded bitmap from prefetch cache if available
+                        var newBitmap = TakePrefetchedBitmap(pageIndex);
+                        if (newBitmap is null)
                         {
+                            if (ReadingMode == ReadingMode.Guided)
+                            {
+                                pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
+                                if (ct.IsCancellationRequested) return;
+                                newBitmap = await CreateBitmapFromPageDataAsync(pageData, ct);
+                            }
+                            else
+                            {
+                                newBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex, ct);
+                            }
+                        }
+                        else if (ReadingMode == ReadingMode.Guided)
+                        {
+                            // Need raw data for panel detection even though bitmap was prefetched
                             pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
-                            newBitmap = await CreateBitmapFromPageDataAsync(pageData);
                         }
-                        else
+
+                        if (ct.IsCancellationRequested)
                         {
-                            newBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex);
+                            newBitmap?.Dispose();
+                            return;
                         }
+
+                        var oldBitmap = CurrentPageImage;
+                        CurrentPageImage = newBitmap;
+                        oldBitmap?.Dispose();
                     }
-                    else if (ReadingMode == ReadingMode.Guided)
+                    
+                    // If in guided mode, detect panels
+                    if (ReadingMode == ReadingMode.Guided && pageData is not null)
                     {
-                        // Need raw data for panel detection even though bitmap was prefetched
-                        pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), pageIndex);
+                        await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
+                        if (ct.IsCancellationRequested) return;
+                    }
+                    
+                    // Pre-detect panels for next page in background if in guided mode
+                    if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
+                    {
+                        _ = PreDetectNextPagePanelsAsync(pageIndex + 1);
                     }
 
-                    var oldBitmap = CurrentPageImage;
-                    CurrentPageImage = newBitmap;
-                    oldBitmap?.Dispose();
+                    _lastLoadedPageIndex = pageIndex;
+                    
+                    // Reset zoom when changing pages
+                    ZoomLevel = 1.0;
                 }
-                
-                // If in guided mode, detect panels
-                if (ReadingMode == ReadingMode.Guided && pageData is not null)
+                catch (Exception ex)
                 {
-                    await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
+                    if (ex is not OperationCanceledException && !ct.IsCancellationRequested)
+                    {
+                        ErrorMessage = $"Failed to load page: {ex.Message}";
+                    }
+                    _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
                 }
-                
-                // Pre-detect panels for next page in background if in guided mode
-                if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
+                finally
                 {
-                    _ = PreDetectNextPagePanelsAsync(pageIndex + 1);
+                    IsBusy = false;
                 }
-
-                _lastLoadedPageIndex = pageIndex;
-                
-                // Reset zoom when changing pages
-                ZoomLevel = 1.0;
             }
-            catch (Exception ex)
-            {
-                ErrorMessage = $"Failed to load page: {ex.Message}";
-                _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
-            }
-            finally
+        }
+        finally
+        {
+            // Only clear the loading flag if this is still the active load operation
+            if (!ct.IsCancellationRequested)
             {
                 _isLoadingPage = false;
-                IsBusy = false;
             }
         }
 
@@ -757,8 +821,7 @@ public partial class ReaderViewModel : ViewModelBase
 
     partial void OnCurrentPageChanged(int value)
     {
-        // Only trigger page load when not already loading (to avoid loops)
-        if (!_isLoadingPage && Comic is not null)
+        if (Comic is not null)
         {
             _ = LoadAndSaveProgressAsync();
         }
@@ -772,9 +835,10 @@ public partial class ReaderViewModel : ViewModelBase
 
     partial void OnIsTwoPageModeChanged(bool value)
     {
-        // Reload pages when switching modes
+        // Force a reload of the current page when switching modes to avoid black screen
         if (Comic is not null && !_isLoadingPage)
         {
+            _lastLoadedPageIndex = -1;
             _ = LoadPageAsync();
         }
     }
@@ -1290,21 +1354,42 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
-    private async Task<Bitmap> LoadBitmapAsync(string filePath, int pageIndex)
+    private async Task<Bitmap?> LoadBitmapAsync(string filePath, int pageIndex, CancellationToken ct)
     {
         using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ReaderViewModel));
         await _comicReaderService.CopyPageAsync(filePath, pageIndex, stream);
+        
+        if (ct.IsCancellationRequested) return null;
         stream.Position = 0;
-        return await Task.Run(() => new Bitmap(stream));
+
+        await GlobalDecodeSemaphore.WaitAsync(ct);
+        try
+        {
+            if (ct.IsCancellationRequested) return null;
+            return await Task.Run(() => new Bitmap(stream));
+        }
+        finally
+        {
+            GlobalDecodeSemaphore.Release();
+        }
     }
 
-    private static Task<Bitmap> CreateBitmapFromPageDataAsync(byte[] pageData)
+    private async Task<Bitmap?> CreateBitmapFromPageDataAsync(byte[] pageData, CancellationToken ct)
     {
-        return Task.Run(() =>
+        await GlobalDecodeSemaphore.WaitAsync(ct);
+        try
         {
-            using var stream = new MemoryStream(pageData, writable: false);
-            return new Bitmap(stream);
-        });
+            if (ct.IsCancellationRequested) return null;
+            return await Task.Run(() =>
+            {
+                using var stream = new MemoryStream(pageData, writable: false);
+                return new Bitmap(stream);
+            });
+        }
+        finally
+        {
+            GlobalDecodeSemaphore.Release();
+        }
     }
     
     #endregion
@@ -1391,7 +1476,9 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var filePath = GetActiveReadPath();
-            var bitmap = await LoadBitmapAsync(filePath, pageIndex);
+            var bitmap = await LoadBitmapAsync(filePath, pageIndex, CancellationToken.None);
+
+            if (bitmap is null) return;
 
             // Only cache if still reading the same comic
             if (GetActiveReadPath() == filePath)
@@ -1597,6 +1684,12 @@ public partial class ReaderViewModel : ViewModelBase
         await SaveProgressAsync();
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
+
+        // Force a cleanup after leaving the reader to ensure high-res bitmaps are truly gone
+        await Task.Delay(500); // Give UI time to detach
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     private async Task RefreshSeriesNavigationTargetsAsync()

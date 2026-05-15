@@ -1032,6 +1032,9 @@ public class LibraryService
             {
                 Quality = CoverThumbnailJpegQuality
             });
+
+            // Return pooled memory to the system
+            Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
         });
 
         return coverPath;

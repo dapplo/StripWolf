@@ -1,7 +1,12 @@
 using System;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
-using StripWolf.Desktop.Services;
+#if Windows
+using StripWolf.Desktop.Services.Windows;
+#endif
+#if Linux
+using StripWolf.Desktop.Services.Linux;
+#endif
 using StripWolf.Services;
 
 namespace StripWolf.Desktop;
@@ -29,6 +34,13 @@ sealed class Program
             if (OperatingSystem.IsWindows())
             {
                 services.AddSingleton<IWebViewPaginationService, WindowsWebView2SnapshotService>();
+            }
+            else
+#endif
+#if Linux
+            if (OperatingSystem.IsLinux())
+            {
+                services.AddSingleton<IWebViewPaginationService, LinuxWpeWebViewSnapshotService>();
             }
             else
 #endif

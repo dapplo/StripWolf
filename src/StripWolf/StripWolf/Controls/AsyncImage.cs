@@ -19,7 +19,7 @@ public class AsyncImage : Control
     // This is the recommended pattern for HttpClient as per Microsoft guidelines.
     // The client is never disposed as it's shared across all AsyncImage instances.
     private static readonly HttpClient SharedHttpClient;
-    private static readonly ConcurrentDictionary<string, Bitmap> LocalBitmapCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly LruCache<string, Bitmap> LocalBitmapCache = new(200); // Cache up to 200 bitmaps
     private static readonly SemaphoreSlim BitmapDecodeSemaphore = new(1, 1);
     private const int UncachedLocalLoadDelayMs = 150;
     
@@ -304,6 +304,67 @@ public class AsyncImage : Control
                 }
             });
         }
+    }
+
+    private class LruCache<TKey, TValue> where TKey : notnull where TValue : IDisposable
+    {
+        private readonly int _capacity;
+        private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheEntry>> _dictionary = new();
+        private readonly LinkedList<CacheEntry> _list = new();
+        private readonly object _lock = new();
+
+        public LruCache(int capacity)
+        {
+            _capacity = capacity;
+        }
+
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            if (_dictionary.TryGetValue(key, out var node))
+            {
+                lock (_lock)
+                {
+                    _list.Remove(node);
+                    _list.AddFirst(node);
+                }
+                value = node.Value.Value;
+                return true;
+            }
+
+            value = default!;
+            return false;
+        }
+
+        public TValue GetOrAdd(TKey key, TValue value)
+        {
+            lock (_lock)
+            {
+                if (_dictionary.TryGetValue(key, out var existingNode))
+                {
+                    _list.Remove(existingNode);
+                    _list.AddFirst(existingNode);
+                    return existingNode.Value.Value;
+                }
+
+                if (_dictionary.Count >= _capacity)
+                {
+                    var last = _list.Last;
+                    if (last != null)
+                    {
+                        _list.RemoveLast();
+                        _dictionary.TryRemove(last.Value.Key, out _);
+                        last.Value.Value.Dispose();
+                    }
+                }
+
+                var newNode = new LinkedListNode<CacheEntry>(new CacheEntry(key, value));
+                _list.AddFirst(newNode);
+                _dictionary[key] = newNode;
+                return value;
+            }
+        }
+
+        private record CacheEntry(TKey Key, TValue Value);
     }
 
     public override void Render(DrawingContext context)

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using StripWolf.ViewModels;
 
 namespace StripWolf.Views;
@@ -15,6 +16,23 @@ public partial class ReaderView : UserControl
         
         // Handle scroll wheel globally for page navigation
         PointerWheelChanged += OnPointerWheelChanged;
+
+        // Update decode dimensions when size changes
+        this.SizeChanged += (s, e) => UpdateDecodeDimensions();
+    }
+
+    private void UpdateDecodeDimensions()
+    {
+        if (DataContext is not ReaderViewModel vm) return;
+
+        // Get the scaling factor (DPI)
+        var topLevel = TopLevel.GetTopLevel(this);
+        var scaling = topLevel?.RenderScaling ?? 1.0;
+
+        // Calculate needed pixels (physical pixels)
+        // We add a 20% buffer to avoid blurriness during small zooms
+        vm.DecodeWidth = (int)(Bounds.Width * scaling * 1.2);
+        vm.DecodeHeight = (int)(Bounds.Height * scaling * 1.2);
     }
 
     private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)

@@ -19,8 +19,8 @@ public class ComicReaderService
     private readonly Dictionary<string, Task<PdfReaderSession>> _pdfSessions = new();
     private readonly Dictionary<string, Task<EpubToCbzConverterService.EpubReaderSession>> _epubSessions = new();
     private readonly object _cacheLock = new();
-    private const int MaxCachedPageEntries = 12;
-    private const long MaxCachedPageBytes = 32L * 1024 * 1024;
+    private const int MaxCachedPageEntries = 16; // Increased from 8
+    private const long MaxCachedPageBytes = 64L * 1024 * 1024; // Increased from 24MB
     private long _cachedPageBytes;
 
     public ComicReaderService(IPdfRenderer pdfRenderer, EpubToCbzConverterService epubConverter)
