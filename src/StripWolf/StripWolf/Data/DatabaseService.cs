@@ -1,5 +1,6 @@
 using StripWolf.Models;
 using SQLite;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.Data;
 
@@ -25,6 +26,15 @@ public class DatabaseService : IAsyncDisposable
         return Path.Combine(baseDir, "StripWolf");
     }
 
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(Comic))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(EpubConversionState))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(KomgaServer))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
         if (_database is not null)
