@@ -1,3 +1,22 @@
+﻿// StripWolf - an open source comic book reader
+// Copyright (C) 2026 Dapplo - Robin Krom
+//
+// For more information see: https://github.com/dapplo/StripWolf
+// The StripWolf project is hosted on GitHub https://github.com/dapplo/StripWolf
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 using System.Xml.Serialization;
 
 namespace StripWolf.Models;
@@ -338,149 +357,3 @@ public class ComicInfo
     #endregion
 }
 
-/// <summary>
-/// Information about a single page in the comic
-/// </summary>
-public class ComicPageInfo
-{
-    /// <summary>
-    /// Page index (0-based)
-    /// </summary>
-    [XmlAttribute("Image")]
-    public int Image { get; set; }
-
-    /// <summary>
-    /// Page type
-    /// </summary>
-    [XmlIgnore]
-    public ComicPageType? Type { get; set; }
-
-    /// <summary>
-    /// Page type as string for XML serialization
-    /// </summary>
-    [XmlAttribute("Type")]
-    public string? TypeString
-    {
-        get => Type?.ToString();
-        set
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                Type = null;
-            }
-            else
-            {
-                Type = Enum.TryParse<ComicPageType>(value, out var result) ? result : null;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Whether the page should be shown in double page spread
-    /// </summary>
-    [XmlAttribute("DoublePage")]
-    public bool DoublePage { get; set; }
-
-    /// <summary>
-    /// Page width
-    /// </summary>
-    [XmlAttribute("ImageWidth")]
-    public int ImageWidth { get; set; }
-
-    /// <summary>
-    /// Page height
-    /// </summary>
-    [XmlAttribute("ImageHeight")]
-    public int ImageHeight { get; set; }
-
-    /// <summary>
-    /// File size of the page image
-    /// </summary>
-    [XmlAttribute("ImageSize")]
-    public long ImageSize { get; set; }
-
-    /// <summary>
-    /// Bookmark name for this page
-    /// </summary>
-    [XmlAttribute("Bookmark")]
-    public string? Bookmark { get; set; }
-}
-
-/// <summary>
-/// Page types in comic
-/// </summary>
-public enum ComicPageType
-{
-    [XmlEnum("FrontCover")]
-    FrontCover,
-    [XmlEnum("InnerCover")]
-    InnerCover,
-    [XmlEnum("Roundup")]
-    Roundup,
-    [XmlEnum("Story")]
-    Story,
-    [XmlEnum("Advertisement")]
-    Advertisement,
-    [XmlEnum("Editorial")]
-    Editorial,
-    [XmlEnum("Letters")]
-    Letters,
-    [XmlEnum("Preview")]
-    Preview,
-    [XmlEnum("BackCover")]
-    BackCover,
-    [XmlEnum("Other")]
-    Other,
-    [XmlEnum("Deleted")]
-    Deleted
-}
-
-/// <summary>
-/// Yes/No enumeration for XML
-/// </summary>
-public enum YesNo
-{
-    [XmlEnum("Unknown")]
-    Unknown,
-    [XmlEnum("No")]
-    No,
-    [XmlEnum("Yes")]
-    Yes
-}
-
-/// <summary>
-/// Age rating enumeration
-/// </summary>
-public enum AgeRating
-{
-    [XmlEnum("Unknown")]
-    Unknown,
-    [XmlEnum("Adults Only 18+")]
-    AdultsOnly18Plus,
-    [XmlEnum("Early Childhood")]
-    EarlyChildhood,
-    [XmlEnum("Everyone")]
-    Everyone,
-    [XmlEnum("Everyone 10+")]
-    Everyone10Plus,
-    [XmlEnum("G")]
-    G,
-    [XmlEnum("Kids to Adults")]
-    KidsToAdults,
-    [XmlEnum("M")]
-    M,
-    [XmlEnum("MA15+")]
-    MA15Plus,
-    [XmlEnum("Mature 17+")]
-    Mature17Plus,
-    [XmlEnum("PG")]
-    PG,
-    [XmlEnum("R18+")]
-    R18Plus,
-    [XmlEnum("Rating Pending")]
-    RatingPending,
-    [XmlEnum("Teen")]
-    Teen,
-    [XmlEnum("X18+")]
-    X18Plus
-}

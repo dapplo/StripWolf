@@ -1,26 +1,26 @@
+﻿// StripWolf - an open source comic book reader
+// Copyright (C) 2026 Dapplo - Robin Krom
+//
+// For more information see: https://github.com/dapplo/StripWolf
+// The StripWolf project is hosted on GitHub https://github.com/dapplo/StripWolf
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Models;
-
-public static class LibrarySectionKeys
-{
-    public const string ContinueReading = "continue-reading";
-    public const string NewComics = "new-comics";
-    public const string Favorites = "favorites";
-    public const string Series = "series";
-    public const string Read = "read";
-}
-
-public static class KomgaSectionKeys
-{
-    public const string KeepReading = "keep-reading";
-    public const string OnDeck = "on-deck";
-    public const string RecentlyAddedBooks = "recently-added-books";
-    public const string RecentlyAddedSeries = "recently-added-series";
-    public const string Libraries = "libraries";
-    public const string ReadLists = "read-lists";
-}
 
 public partial class SectionLayoutPreference : ObservableObject
 {
@@ -118,3 +118,4 @@ public partial class SectionLayoutPreference : ObservableObject
         return normalized;
     }
 }
+
