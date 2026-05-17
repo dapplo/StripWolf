@@ -42,7 +42,9 @@ public class ComicReaderService
             ".cb7" => ComicFormat.Cb7,
             ".cbt" => ComicFormat.Cbt,
             ".pdf" => ComicFormat.Pdf,
+#if !DISABLE_EPUB_SUPPORT
             ".epub" => ComicFormat.Epub,
+#endif
             _ => ComicFormat.Unknown
         };
     }

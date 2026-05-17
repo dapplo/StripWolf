@@ -11,6 +11,8 @@ public class PanelDetectionService
     private readonly Dictionary<string, Dictionary<int, PagePanelInfo>> _cache = new();
     private readonly object _cacheLock = new();
 
+    public bool IsAvailable => false;
+
     public Task<PagePanelInfo> DetectPanelsAsync(string comicFilePath, int pageIndex, byte[] pageData, bool isManga = false)
     {
         lock (_cacheLock)

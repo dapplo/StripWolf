@@ -328,7 +328,7 @@ public class LibraryService
         var format = ComicReaderService.GetComicFormat(filePath);
         if (format == ComicFormat.Unknown)
         {
-            throw new NotSupportedException("Unsupported comic format. Only CBZ, CBR, CB7, CBT, PDF, and EPUB files are supported.");
+            throw new NotSupportedException("Unsupported comic format.");
         }
 
         using var importData = await PrepareLocalImportAsync(filePath, format, progress);

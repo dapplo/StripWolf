@@ -13,6 +13,10 @@
   <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">
     <DefineConstants>$(DefineConstants);DISABLE_EPUB_SUPPORT</DefineConstants>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
+    <DefineConstants>$(DefineConstants);DISABLE_GUIDED_READING</DefineConstants>
+  </PropertyGroup>
   
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />

@@ -11,6 +11,8 @@ public class PanelDetectionService
 {
     private readonly Dictionary<string, Dictionary<int, PagePanelInfo>> _cache = new();
     private readonly object _cacheLock = new();
+
+    public bool IsAvailable => true;
     
     private const double MinPanelSizeRatio = 0.04;
     private const double MinPanelAreaRatio = 0.015;

@@ -316,12 +316,24 @@ public partial class ReaderViewModel : ViewModelBase
     
     public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 
+    public bool IsGuidedReadingAvailable => _panelDetectionService.IsAvailable;
+
     public bool IsDebug => 
 #if DEBUG
         true;
 #else
         false;
 #endif
+
+    private ReadingMode NormalizeReadingMode(ReadingMode mode)
+    {
+        if (!IsGuidedReadingAvailable && mode == ReadingMode.Guided)
+        {
+            return ReadingMode.Zoomed;
+        }
+
+        return mode;
+    }
 
     /// <summary>
     /// Event raised when the reader should be closed
@@ -537,7 +549,7 @@ public partial class ReaderViewModel : ViewModelBase
              
             // Load reading mode preferences
             var settings = _settingsService.LoadSettings();
-            ReadingMode = settings.PreferredReadingMode;
+            ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
             CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
@@ -1129,13 +1141,14 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task CycleReadingModeAsync()
     {
-        ReadingMode = ReadingMode switch
+        ReadingMode = NormalizeReadingMode(ReadingMode switch
         {
             ReadingMode.Normal => ReadingMode.Zoomed,
-            ReadingMode.Zoomed => ReadingMode.Guided,
+            ReadingMode.Zoomed when IsGuidedReadingAvailable => ReadingMode.Guided,
+            ReadingMode.Zoomed => ReadingMode.Normal,
             ReadingMode.Guided => ReadingMode.Normal,
             _ => ReadingMode.Normal
-        };
+        });
         
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
@@ -1202,6 +1215,11 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task SetGuidedModeAsync()
     {
+        if (!IsGuidedReadingAvailable)
+        {
+            return;
+        }
+
         ReadingMode = ReadingMode.Guided;
         
         // Disable two-page mode when switching to zoomed or guided
@@ -1229,6 +1247,8 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task SetReadingModeAsync(ReadingMode mode)
     {
+        mode = NormalizeReadingMode(mode);
+
         if (ReadingMode == mode)
         {
             return;

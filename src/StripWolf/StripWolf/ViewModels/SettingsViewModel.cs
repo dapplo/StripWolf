@@ -60,6 +60,20 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isReleaseNotesVisible;
 
+    public bool SupportsGuidedReading =>
+#if DISABLE_GUIDED_READING
+        false;
+#else
+        true;
+#endif
+
+    public bool SupportsEpubFeatures =>
+#if DISABLE_EPUB_SUPPORT
+        false;
+#else
+        true;
+#endif
+
     [ObservableProperty]
     private LanguageOption _selectedLanguage = LocalizationService.AvailableLanguages[0];
     
@@ -105,8 +119,10 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>
     /// Available reading modes
     /// </summary>
-    public IReadOnlyList<ReadingMode> AvailableReadingModes { get; } = 
-        [ReadingMode.Normal, ReadingMode.Zoomed, ReadingMode.Guided];
+    public IReadOnlyList<ReadingMode> AvailableReadingModes =>
+        SupportsGuidedReading
+            ? [ReadingMode.Normal, ReadingMode.Zoomed, ReadingMode.Guided]
+            : [ReadingMode.Normal, ReadingMode.Zoomed];
     
     /// <summary>
     /// Available handedness options
@@ -126,6 +142,11 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<UnsupportedFormatHandlingMode> AvailableUnsupportedFormatHandlingModes { get; } =
         [UnsupportedFormatHandlingMode.ConvertOnImport, UnsupportedFormatHandlingMode.ConvertWhileReading];
 
+    public string UnsupportedFormatHandlingDescription =>
+        SupportsEpubFeatures
+            ? "Convert On Import keeps the current behavior and stores a CBZ. Convert While Reading keeps the original PDF/EPUB and renders pages on demand, while still caching the cover thumbnail separately."
+            : "Convert On Import keeps the current behavior and stores a CBZ. Convert While Reading keeps the original PDF and renders pages on demand, while still caching the cover thumbnail separately.";
+
     public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
 
     private KomgaServer? _editingServer;
@@ -136,6 +157,16 @@ public partial class SettingsViewModel : ViewModelBase
         _komgaApiService = komgaApiService;
         _localizationService = localizationService;
         Title = "Settings";
+    }
+
+    private ReadingMode NormalizeReadingMode(ReadingMode value)
+    {
+        if (!SupportsGuidedReading && value == ReadingMode.Guided)
+        {
+            return ReadingMode.Zoomed;
+        }
+
+        return value;
     }
 
     private void ReplaceSectionCollection(
@@ -276,7 +307,7 @@ public partial class SettingsViewModel : ViewModelBase
             
         // Load reading mode settings
         SelectedAppTheme = _appSettings.AppTheme;
-        SelectedReadingMode = _appSettings.PreferredReadingMode;
+        SelectedReadingMode = NormalizeReadingMode(_appSettings.PreferredReadingMode);
         SelectedHandedness = _appSettings.Handedness;
         CompactOverview = _appSettings.CompactOverview;
         SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
@@ -284,6 +315,12 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedUnsupportedFormatHandlingMode = _appSettings.UnsupportedFormatHandlingMode;
         SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
+
+        if (_appSettings.PreferredReadingMode != SelectedReadingMode)
+        {
+            _appSettings.PreferredReadingMode = SelectedReadingMode;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
@@ -326,10 +363,17 @@ public partial class SettingsViewModel : ViewModelBase
     
     partial void OnSelectedReadingModeChanged(ReadingMode value)
     {
+        var normalized = NormalizeReadingMode(value);
+        if (normalized != value)
+        {
+            SelectedReadingMode = normalized;
+            return;
+        }
+
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.PreferredReadingMode = value;
+            _appSettings.PreferredReadingMode = normalized;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

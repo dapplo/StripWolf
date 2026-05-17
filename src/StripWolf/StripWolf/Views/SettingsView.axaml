@@ -148,7 +148,7 @@
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
 
-            <StackPanel Spacing="8">
+            <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
               <TextBlock Text="EPUB Conversion Theme" FontWeight="SemiBold"/>
               <ComboBox ItemsSource="{Binding AvailableEpubConversionThemes}"
                         SelectedItem="{Binding SelectedEpubConversionTheme}"
@@ -158,7 +158,7 @@
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
 
-            <StackPanel Spacing="8">
+            <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
               <TextBlock Text="EPUB Output Resolution" FontWeight="SemiBold"/>
               <ComboBox ItemsSource="{Binding AvailableEpubOutputResolutions}"
                         SelectedItem="{Binding SelectedEpubOutputResolution}"
@@ -174,7 +174,7 @@
                         SelectedItem="{Binding SelectedUnsupportedFormatHandlingMode}"
                         HorizontalAlignment="Stretch"
                         Width="300"/>
-              <TextBlock Text="Convert On Import keeps the current behavior and stores a CBZ. Convert While Reading keeps the original PDF/EPUB and renders pages on demand, while still caching the cover thumbnail separately."
+              <TextBlock Text="{Binding UnsupportedFormatHandlingDescription}"
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
 

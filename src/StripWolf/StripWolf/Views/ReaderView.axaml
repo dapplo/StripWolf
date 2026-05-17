@@ -85,6 +85,7 @@
           <Button Classes="reading-mode" 
                   Classes.active="{Binding IsGuidedMode}"
                   Command="{Binding SetGuidedModeCommand}"
+                  IsVisible="{Binding IsGuidedReadingAvailable}"
                   ToolTip.Tip="Guided Mode">
             <TextBlock Text="⊞" FontSize="20"/>
           </Button>
