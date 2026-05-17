@@ -197,7 +197,7 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
             [
                 new FilePickerFileType("Comic Files")
                 {
-                    Patterns = ["*.cbz", "*.cbr", "*.cb7", "*.cbt", "*.epub"]
+                    Patterns = ComicConstants.ComicFilePickerPatterns
                 },
                 new FilePickerFileType("PDF Files")
                 {

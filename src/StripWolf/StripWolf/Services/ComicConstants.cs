@@ -20,8 +20,14 @@ public static class ComicConstants
     /// </summary>
     public static readonly string[] ComicExtensions = 
     [
-        ".cbz", ".cbr", ".cb7", ".cbt", ".pdf", ".epub"
+        ".cbz", ".cbr", ".cb7", ".cbt", ".pdf"
+#if !DISABLE_EPUB_SUPPORT
+        , ".epub"
+#endif
     ];
+
+    public static readonly string[] ComicFilePickerPatterns =
+        ComicExtensions.Select(extension => $"*{extension}").ToArray();
 
     /// <summary>
     /// Checks if a filename is an image file

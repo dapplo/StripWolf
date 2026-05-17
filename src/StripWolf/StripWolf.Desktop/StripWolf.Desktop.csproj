@@ -6,12 +6,22 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>
+    <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
+    <UseOpenCvPanelDetection Condition="'$(RuntimeIdentifier)' != ''">false</UseOpenCvPanelDetection>
+    <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
+    <UseEpubSupport Condition="'$(RuntimeIdentifier)' != ''">false</UseEpubSupport>
   </PropertyGroup>
 
   <ItemGroup>
     <TrimmerRootAssembly Include="SQLite-net" />
-    <TrimmerRootAssembly Include="OpenCvSharp" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseEpubSupport)' == 'true'">
     <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">
+    <TrimmerRootAssembly Include="OpenCvSharp" />
   </ItemGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
@@ -20,6 +30,10 @@
 
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
     <DefineConstants>$(DefineConstants);Linux</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">
+    <DefineConstants>$(DefineConstants);DISABLE_EPUB_WEBVIEW</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -34,34 +48,44 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Web.WebView2" GeneratePathProperty="true" ExcludeAssets="all" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <PackageReference Include="Tmds.DBus.Protocol" />
+    <PackageReference Include="PDFiumCore" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseEpubSupport)' == 'true'">
+    <PackageReference Include="Microsoft.Web.WebView2" GeneratePathProperty="true" ExcludeAssets="all" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">
     <PackageReference Include="OpenCvSharp4.runtime.win" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <PackageReference Include="OpenCvSharp4.runtime.ubuntu.22.04-x64" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
     <PackageReference Include="OpenCvSharp4.runtime.osx-arm64" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
     <PackageReference Include="OpenCvSharp4.runtime.osx-x64" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
-    <PackageReference Include="PDFiumCore" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf\StripWolf.csproj" />
+    <ProjectReference Include="..\StripWolf\StripWolf.csproj" AdditionalProperties="UseOpenCvPanelDetection=$(UseOpenCvPanelDetection);UseEpubSupport=$(UseEpubSupport)" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
     <Compile Remove="Services\Windows\**" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(UseEpubSupport)' == 'false'">
+    <Compile Remove="Services\Windows\WindowsWebView2SnapshotService.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Linux'))">
     <Compile Remove="Services\Linux\**" />
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(UseEpubSupport)' == 'true'">
     <Reference Include="Microsoft.Web.WebView2.Core">
       <HintPath>$(PkgMicrosoft_Web_WebView2)\lib_manual\netcoreapp3.0\Microsoft.Web.WebView2.Core.dll</HintPath>
     </Reference>
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(UseEpubSupport)' == 'true'">
     <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll">
       <Link>runtimes\win-x86\native\WebView2Loader.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

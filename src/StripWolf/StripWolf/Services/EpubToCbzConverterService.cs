@@ -22,6 +22,7 @@ public sealed class EpubToCbzConverterService
     private const string PaginationCss = "body { height: 100vh; overflow: hidden; }";
     private const string ReaderTempDirectoryPrefix = "StripWolf_EPUB_READ_";
     private const string ImportTempDirectoryPrefix = "StripWolf_EPUB_";
+    private const string EpubSupportUnavailableMessage = "EPUB support is disabled in the desktop Native AOT build because the WebView-based pagination engine is not AOT-compatible.";
 
     private const string PaginationScriptBody = """
         window.__stripWolfReady = false;
@@ -184,6 +185,13 @@ public sealed class EpubToCbzConverterService
         _settingsService = settingsService;
     }
 
+    private static void EnsureEpubSupportAvailable()
+    {
+#if DISABLE_EPUB_SUPPORT
+        throw new PlatformNotSupportedException(EpubSupportUnavailableMessage);
+#endif
+    }
+
     public static void CleanupTemporaryDirectories()
     {
         var tempPath = Path.GetTempPath();
@@ -241,6 +249,8 @@ public sealed class EpubToCbzConverterService
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        EnsureEpubSupportAvailable();
+
         if (!File.Exists(epubFilePath))
         {
             throw new FileNotFoundException("EPUB file not found.", epubFilePath);
@@ -384,6 +394,8 @@ public sealed class EpubToCbzConverterService
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        EnsureEpubSupportAvailable();
+
         cancellationToken.ThrowIfCancellationRequested();
         var book = await Task.Run(() => EpubReader.ReadBookAsync(epubFilePath), cancellationToken);
         progress?.Report(0.35);
@@ -415,6 +427,8 @@ public sealed class EpubToCbzConverterService
 
     public async Task<ComicInfo?> ExtractComicInfoAsync(string epubFilePath, CancellationToken cancellationToken = default)
     {
+        EnsureEpubSupportAvailable();
+
         if (!File.Exists(epubFilePath))
         {
             throw new FileNotFoundException("EPUB file not found.", epubFilePath);
@@ -431,6 +445,8 @@ public sealed class EpubToCbzConverterService
         int viewportHeight = DefaultViewportHeight,
         CancellationToken cancellationToken = default)
     {
+        EnsureEpubSupportAvailable();
+
         if (!File.Exists(epubFilePath))
         {
             throw new FileNotFoundException("EPUB file not found.", epubFilePath);
@@ -525,6 +541,8 @@ public sealed class EpubToCbzConverterService
         int viewportHeight = DefaultViewportHeight,
         CancellationToken cancellationToken = default)
     {
+        EnsureEpubSupportAvailable();
+
         if (!File.Exists(epubFilePath))
         {
             throw new FileNotFoundException("EPUB file not found.", epubFilePath);

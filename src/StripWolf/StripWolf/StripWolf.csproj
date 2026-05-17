@@ -6,6 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsAotCompatible>true</IsAotCompatible>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
+    <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">
+    <DefineConstants>$(DefineConstants);DISABLE_EPUB_SUPPORT</DefineConstants>
   </PropertyGroup>
   
   <ItemGroup>
@@ -32,8 +38,19 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" />
     <!-- For CBR (RAR) file support -->
     <PackageReference Include="SharpCompress" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">
     <!-- For Panel Detection -->
     <PackageReference Include="OpenCvSharp4" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
+    <Compile Remove="Services\PanelDetectionService.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' != 'false'">
+    <Compile Remove="Services\PanelDetectionService.NoOp.cs" />
   </ItemGroup>
 
 </Project>

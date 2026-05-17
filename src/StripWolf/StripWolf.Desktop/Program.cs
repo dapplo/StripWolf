@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
-#if Windows
+#if Windows && !DISABLE_EPUB_WEBVIEW
 using StripWolf.Desktop.Services.Windows;
 #endif
 #if Linux
@@ -30,7 +30,7 @@ sealed class Program
 
         App.RegisterWebViewSnapshotService = services =>
         {
-#if Windows
+#if Windows && !DISABLE_EPUB_WEBVIEW
             if (OperatingSystem.IsWindows())
             {
                 services.AddSingleton<IWebViewPaginationService, WindowsWebView2SnapshotService>();
