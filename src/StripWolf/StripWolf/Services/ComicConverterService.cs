@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Xml.Serialization;
 using StripWolf.Models;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
@@ -241,7 +240,7 @@ public class ComicConverterService
         try
         {
             using var stream = new MemoryStream(xmlData);
-            return ParseComicInfo(stream);
+            return ComicInfoXmlService.Read(stream);
         }
         catch
         {
@@ -251,20 +250,12 @@ public class ComicConverterService
 
     public static ComicInfo? ParseComicInfo(Stream xmlStream)
     {
-        try
+        if (xmlStream.CanSeek)
         {
-            if (xmlStream.CanSeek)
-            {
-                xmlStream.Position = 0;
-            }
+            xmlStream.Position = 0;
+        }
 
-            var serializer = new XmlSerializer(typeof(ComicInfo));
-            return serializer.Deserialize(xmlStream) as ComicInfo;
-        }
-        catch
-        {
-            return null;
-        }
+        return ComicInfoXmlService.Read(xmlStream);
     }
 
     private async Task<ComicImportData> ConvertArchiveToCbzAsync(

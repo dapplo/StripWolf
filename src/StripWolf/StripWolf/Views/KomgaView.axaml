@@ -265,24 +265,28 @@
               </TextBlock.IsVisible>
             </TextBlock>
             <!-- Read List breadcrumb -->
-            <TextBlock Text="{Binding SelectedReadList.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center"
-                       IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <TextBlock x:DataType="komga:KomgaReadList" DataContext="{Binding SelectedReadList, ElementName=Root}" 
+                       Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"
+                       IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <!-- Library breadcrumb -->
-            <Button Content="{Binding SelectedLibrary.Name, FallbackValue=''}" Command="{Binding GoBackToSeriesCommand}"
+            <Button x:DataType="komga:KomgaLibrary" DataContext="{Binding SelectedLibrary, ElementName=Root}"
+                    Content="{Binding Name}" Command="{Binding GoBackToSeriesCommand, ElementName=Root}"
                     Background="Transparent" Padding="0"
-                    IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-            <TextBlock Text="{Binding SelectedLibrary.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center">
+                    IsVisible="{Binding SelectedSeries, ElementName=Root, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <TextBlock x:DataType="komga:KomgaLibrary" DataContext="{Binding SelectedLibrary, ElementName=Root}"
+                       Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center">
               <TextBlock.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
-                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-                  <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+                  <Binding Path="$self.DataContext" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedSeries" ElementName="Root" Converter="{x:Static ObjectConverters.IsNull}"/>
                 </MultiBinding>
               </TextBlock.IsVisible>
             </TextBlock>
             <TextBlock Text="/" VerticalAlignment="Center"
-                       IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-            <TextBlock Text="{Binding SelectedSeries.Name, FallbackValue=''}" FontWeight="Bold" VerticalAlignment="Center"
-                       IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                       IsVisible="{Binding SelectedSeries, ElementName=Root, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+            <TextBlock x:DataType="komga:KomgaSeries" DataContext="{Binding SelectedSeries, ElementName=Root}"
+                       Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center"
+                       IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
           </StackPanel>
 
           <!-- Libraries and Read Lists (shown when nothing is selected) -->
@@ -645,8 +649,10 @@
               <Button Grid.Column="1" Content="✕" Command="{Binding CancelSeriesDownloadSelectionCommand}"
                       Background="Transparent" Padding="8,4"/>
             </Grid>
-            <TextBlock Text="{Binding SeriesPendingDownloadSelection.Name, StringFormat='Choose what to download for {0}'}"
-                       TextWrapping="Wrap" Foreground="Gray"/>
+            <TextBlock x:DataType="komga:KomgaSeriesDisplay" DataContext="{Binding SeriesPendingDownloadSelection, ElementName=Root}"
+                       Text="{Binding Name, StringFormat='Choose what to download for {0}'}"
+                       TextWrapping="Wrap" Foreground="Gray"
+                       IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="Already-downloaded books are skipped automatically." Foreground="Gray" FontSize="12"/>
             <Button Content="📥 All missing books" Command="{Binding ConfirmSeriesDownloadAllCommand}"
                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
@@ -687,8 +693,10 @@
               <Button Grid.Column="1" Content="✕" Command="{Binding CancelReadListSelectionCommand}"
                       Background="Transparent" Padding="8,4"/>
             </Grid>
-            <TextBlock Text="{Binding BookPendingReadListSelection.Name, StringFormat='Choose a read list for {0}'}"
-                       TextWrapping="Wrap" Foreground="Gray"/>
+            <TextBlock x:DataType="komga:KomgaBookDisplay" DataContext="{Binding BookPendingReadListSelection}"
+                       Text="{Binding Name, StringFormat='Choose a read list for {0}'}"
+                       TextWrapping="Wrap" Foreground="Gray"
+                       IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="Loading read lists..." IsVisible="{Binding IsLoadingReadListSelection}" HorizontalAlignment="Center"/>
             <ScrollViewer MaxHeight="360" IsVisible="{Binding !IsLoadingReadListSelection}">
               <ItemsControl ItemsSource="{Binding AvailableReadLists}">

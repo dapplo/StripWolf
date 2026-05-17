@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using System.Xml.Serialization;
 using StripWolf.Data;
 using StripWolf.Models;
 
@@ -496,22 +495,13 @@ public sealed class EpubShadowConversionService
             return;
         }
 
-        var serializer = new XmlSerializer(typeof(ComicInfo));
-        var namespaces = new XmlSerializerNamespaces();
-        namespaces.Add("", "");
-        var settings = new XmlWriterSettings
-        {
-            Indent = true,
-            Encoding = new UTF8Encoding(false),
-            OmitXmlDeclaration = false,
-            Async = true
-        };
-
         var comicInfoPath = Path.Combine(shadowPath, "ComicInfo.xml");
-        await using var outputStream = File.Create(comicInfoPath);
-        await using var writer = XmlWriter.Create(outputStream, settings);
-        serializer.Serialize(writer, comicInfo, namespaces);
-        await writer.FlushAsync();
+        await Task.Run(() =>
+        {
+            using var outputStream = File.Create(comicInfoPath);
+            ComicInfoXmlService.Write(outputStream, comicInfo);
+        }, cancellationToken);
+        
         cancellationToken.ThrowIfCancellationRequested();
     }
 

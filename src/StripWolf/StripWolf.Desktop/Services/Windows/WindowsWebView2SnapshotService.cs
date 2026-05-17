@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DrawingColor = System.Drawing.Color;
 using Microsoft.Web.WebView2.Core;
+using StripWolf.Data;
 using StripWolf.Services;
 
 namespace StripWolf.Desktop.Services.Windows;
@@ -114,7 +115,7 @@ public sealed class WindowsWebView2SnapshotService : IWebViewPaginationService
     private static async Task<int> GetPageCountAsync(CoreWebView2 coreWebView)
     {
         var pageCountJson = await coreWebView.ExecuteScriptAsync("window.__stripWolfPageCount ?? 1");
-        var parsed = JsonSerializer.Deserialize<int?>(pageCountJson);
+        var parsed = JsonSerializer.Deserialize(pageCountJson, StripWolfJsonContext.Default.NullableInt32);
         return Math.Max(1, parsed ?? 1);
     }
 

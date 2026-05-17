@@ -46,6 +46,20 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
 
     public ICommand? ConvertComicNowCommand => (DataContext as LibraryViewModel)?.ConvertComicNowCommand;
 
+    public ICommand? ViewSeriesOnKomgaCommand => (DataContext as LibraryViewModel)?.ViewSeriesOnKomgaCommand;
+
+    public ICommand? EditMetadataCommand => (DataContext as LibraryViewModel)?.EditMetadataCommand;
+
+    public ICommand? SaveMetadataCommand => (DataContext as LibraryViewModel)?.SaveMetadataCommand;
+
+    public ICommand? CancelMetadataEditCommand => (DataContext as LibraryViewModel)?.CancelMetadataEditCommand;
+
+    public ICommand? CloseComicInfoCommand => (DataContext as LibraryViewModel)?.CloseComicInfoCommand;
+
+    public bool IsEditingMetadata => (DataContext as LibraryViewModel)?.IsEditingMetadata ?? false;
+
+    public ComicInfo? EditingComicInfo => (DataContext as LibraryViewModel)?.EditingComicInfo;
+
     public Comic? SelectedInfoComic => (DataContext as LibraryViewModel)?.SelectedInfoComic;
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -99,9 +113,17 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(LibraryViewModel.SelectedInfoComic))
+        switch (e.PropertyName)
         {
-            OnPropertyChanged(nameof(SelectedInfoComic));
+            case nameof(LibraryViewModel.SelectedInfoComic):
+                OnPropertyChanged(nameof(SelectedInfoComic));
+                break;
+            case nameof(LibraryViewModel.IsEditingMetadata):
+                OnPropertyChanged(nameof(IsEditingMetadata));
+                break;
+            case nameof(LibraryViewModel.EditingComicInfo):
+                OnPropertyChanged(nameof(EditingComicInfo));
+                break;
         }
     }
 
@@ -116,6 +138,13 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
         OnPropertyChanged(nameof(DeleteSeriesCommand));
         OnPropertyChanged(nameof(RemovePendingImportCommand));
         OnPropertyChanged(nameof(ConvertComicNowCommand));
+        OnPropertyChanged(nameof(ViewSeriesOnKomgaCommand));
+        OnPropertyChanged(nameof(EditMetadataCommand));
+        OnPropertyChanged(nameof(SaveMetadataCommand));
+        OnPropertyChanged(nameof(CancelMetadataEditCommand));
+        OnPropertyChanged(nameof(CloseComicInfoCommand));
+        OnPropertyChanged(nameof(IsEditingMetadata));
+        OnPropertyChanged(nameof(EditingComicInfo));
         OnPropertyChanged(nameof(SelectedInfoComic));
     }
 
@@ -136,7 +165,7 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
 
     private void OnComicInfoBackdropPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is LibraryViewModel viewModel && viewModel.SelectedInfoComic is not null)
+        if (DataContext is LibraryViewModel viewModel && SelectedInfoComic is not null)
         {
             viewModel.CloseComicInfoCommand.Execute(null);
             e.Handled = true;
@@ -145,9 +174,9 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
 
     private void OnViewSeriesOnKomgaClicked(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is LibraryViewModel viewModel && viewModel.SelectedInfoComic is not null)
+        if (DataContext is LibraryViewModel viewModel && SelectedInfoComic is not null)
         {
-            viewModel.ViewSeriesOnKomgaCommand.Execute(viewModel.SelectedInfoComic);
+            viewModel.ViewSeriesOnKomgaCommand.Execute(SelectedInfoComic);
             e.Handled = true;
         }
     }

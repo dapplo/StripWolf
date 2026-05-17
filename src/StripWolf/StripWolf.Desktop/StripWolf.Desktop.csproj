@@ -5,7 +5,14 @@
     See https://docs.avaloniaui.net/docs/guides/platforms/platform-specific-code/dotnet for more details.-->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
   </PropertyGroup>
+
+  <ItemGroup>
+    <TrimmerRootAssembly Include="SQLite-net" />
+    <TrimmerRootAssembly Include="OpenCvSharp" />
+    <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
+  </ItemGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <DefineConstants>$(DefineConstants);Windows</DefineConstants>

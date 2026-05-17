@@ -1,11 +1,14 @@
 using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
 
 namespace StripWolf.Models;
 
 /// <summary>
 /// Represents a comic book in the local library
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public partial class Comic : ObservableObject
 {
     [PrimaryKey, AutoIncrement]

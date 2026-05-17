@@ -9,6 +9,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using StripWolf.Data;
 using StripWolf.Services;
 
 namespace StripWolf.Desktop.Services.Linux;
@@ -158,7 +159,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
             
             try 
             {
-                var parsed = JsonSerializer.Deserialize<int?>(pageCountJson);
+                var parsed = JsonSerializer.Deserialize(pageCountJson, StripWolfJsonContext.Default.NullableInt32);
                 return Math.Max(1, parsed ?? 1);
             }
             catch

@@ -1,0 +1,124 @@
+using System.Text.Json.Serialization;
+
+namespace StripWolf.Models;
+
+/// <summary>
+/// Application settings model
+/// </summary>
+public class AppSettings
+{
+    public List<KomgaServer> Servers { get; set; } = [];
+
+    public int? ActiveServerId { get; set; }
+
+    public string? LastOpenedComicPath { get; set; }
+
+    public string? ComicsDirectory { get; set; }
+
+    /// <summary>
+    /// The preferred language code (e.g., "en", "de", "fr"), or null for system default
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// Whether to use the system language setting
+    /// </summary>
+    public bool UseSystemLanguage { get; set; } = true;
+
+    /// <summary>
+    /// Preferred reading mode for the comic reader
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<ReadingMode>))]
+    public ReadingMode PreferredReadingMode { get; set; } = ReadingMode.Normal;
+
+    /// <summary>
+    /// Handedness preference for zoomed/guided reading layout
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<Handedness>))]
+    public Handedness Handedness { get; set; } = Handedness.RightHanded;
+
+    /// <summary>
+    /// Default zoom region size for zoomed reading mode (0.1 to 0.8)
+    /// </summary>
+    public double DefaultZoomRegionSize { get; set; } = 0.3;
+
+    /// <summary>
+    /// Whether to use compact overview in zoomed/guided reading mode (saves screen space)
+    /// </summary>
+    public bool CompactOverview { get; set; } = false;
+
+    /// <summary>
+    /// Theme to use for the application UI.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AppThemePreference>))]
+    public AppThemePreference AppTheme { get; set; } = AppThemePreference.System;
+
+    /// <summary>
+    /// Theme to use when converting EPUB pages into rendered images.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<EpubConversionTheme>))]
+    public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.System;
+
+    /// <summary>
+    /// Output resolution to use when converting EPUB pages into rendered images.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<EpubOutputResolution>))]
+    public EpubOutputResolution EpubOutputResolution { get; set; } = EpubOutputResolution.Low;
+
+    /// <summary>
+    /// Controls whether unsupported formats are converted up front or rendered page-by-page while reading.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<UnsupportedFormatHandlingMode>))]
+    public UnsupportedFormatHandlingMode UnsupportedFormatHandlingMode { get; set; } = UnsupportedFormatHandlingMode.ConvertOnImport;
+
+    /// <summary>
+    /// When enabled, deleting an external comic skips the confirmation and only removes it from the library.
+    /// </summary>
+    public bool SkipExternalDeleteConfirmation { get; set; }
+
+    public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
+
+    public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
+
+    public int KomgaParallelDownloads { get; set; } = 1;
+
+    /// <summary>
+    /// Creates a deep copy of the settings
+    /// </summary>
+    public AppSettings Clone()
+    {
+        return new AppSettings
+        {
+            Servers = Servers.Select(s => new KomgaServer
+            {
+                Id = s.Id,
+                Name = s.Name,
+                BaseUrl = s.BaseUrl,
+                Username = s.Username,
+                Password = s.Password,
+                ApiKey = s.ApiKey,
+                CustomHeaders = s.CustomHeaders.Select(h => new KomgaHeader { Name = h.Name, Value = h.Value }).ToList(),
+                IsActive = s.IsActive,
+                AddedDate = s.AddedDate,
+                LastConnected = s.LastConnected
+            }).ToList(),
+            ActiveServerId = ActiveServerId,
+            LastOpenedComicPath = LastOpenedComicPath,
+            ComicsDirectory = ComicsDirectory,
+            LanguageCode = LanguageCode,
+            UseSystemLanguage = UseSystemLanguage,
+            AppTheme = AppTheme,
+            PreferredReadingMode = PreferredReadingMode,
+            Handedness = Handedness,
+            DefaultZoomRegionSize = DefaultZoomRegionSize,
+            CompactOverview = CompactOverview,
+            EpubConversionTheme = EpubConversionTheme,
+            EpubOutputResolution = EpubOutputResolution,
+            UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,
+            SkipExternalDeleteConfirmation = SkipExternalDeleteConfirmation,
+            LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
+            KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
+            KomgaParallelDownloads = KomgaParallelDownloads
+        };
+    }
+}

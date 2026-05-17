@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StripWolf.Data;
 using StripWolf.Models;
 
 namespace StripWolf.Services;
@@ -22,6 +23,12 @@ public class SettingsService
     
     private AppSettings? _cachedSettings;
     private long _latestSaveRequestId;
+
+    public class SensitiveServerData
+    {
+        public string? Password { get; set; }
+        public string? ApiKey { get; set; }
+    }
 
     public event EventHandler<AppSettings>? SettingsChanged;
 
@@ -110,7 +117,7 @@ public class SettingsService
             try
             {
                 var json = File.ReadAllText(_settingsPath);
-                _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                _cachedSettings = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.AppSettings) ?? new AppSettings();
             }
             catch (IOException)
             {
@@ -158,10 +165,7 @@ public class SettingsService
                 server.ApiKey = string.Empty;
             }
 
-            var json = JsonSerializer.Serialize(settingsToSave, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(settingsToSave, StripWolfJsonContext.Default.AppSettings);
             await File.WriteAllTextAsync(_settingsPath, json);
 
             // Save sensitive data separately encrypted
@@ -184,16 +188,16 @@ public class SettingsService
     /// </summary>
     private async Task SavePasswordsAsync(AppSettings settings)
     {
-        var sensitiveData = new Dictionary<int, (string? Password, string? ApiKey)>();
+        var sensitiveData = new Dictionary<int, SensitiveServerData>();
         foreach (var server in settings.Servers)
         {
             if (!string.IsNullOrEmpty(server.Password) || !string.IsNullOrEmpty(server.ApiKey))
             {
-                sensitiveData[server.Id] = (server.Password, server.ApiKey);
+                sensitiveData[server.Id] = new SensitiveServerData { Password = server.Password, ApiKey = server.ApiKey };
             }
         }
 
-        var json = JsonSerializer.Serialize(sensitiveData, new JsonSerializerOptions { IncludeFields = true });
+        var json = JsonSerializer.Serialize(sensitiveData, StripWolfJsonContext.Default.DictionaryIntSensitiveServerData);
         var encrypted = Encrypt(json);
         await File.WriteAllBytesAsync(_passwordsPath, encrypted);
     }
@@ -213,10 +217,10 @@ public class SettingsService
             var encrypted = File.ReadAllBytes(_passwordsPath);
             var json = Decrypt(encrypted);
             
-            // Try new format first (tuple)
+            // Try new format first (SensitiveServerData)
             try 
             {
-                var sensitiveData = JsonSerializer.Deserialize<Dictionary<int, (string? Password, string? ApiKey)>>(json, new JsonSerializerOptions { IncludeFields = true });
+                var sensitiveData = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.DictionaryIntSensitiveServerData);
                 if (sensitiveData is not null)
                 {
                     foreach (var server in settings.Servers)
@@ -233,7 +237,7 @@ public class SettingsService
             catch { /* fallback to old format */ }
 
             // Fallback to old format (string password only)
-            var passwords = JsonSerializer.Deserialize<Dictionary<int, string>>(json);
+            var passwords = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.DictionaryIntString);
             if (passwords is not null)
             {
                 foreach (var server in settings.Servers)
@@ -313,126 +317,5 @@ public class SettingsService
         settings.KomgaSections = SectionLayoutPreference.MergeWithDefaults(
             settings.KomgaSections,
             SectionLayoutPreference.CreateDefaultKomgaSections());
-    }
-}
-
-/// <summary>
-/// Application settings model
-/// </summary>
-public class AppSettings
-{
-    public List<KomgaServer> Servers { get; set; } = [];
-    
-    public int? ActiveServerId { get; set; }
-    
-    public string? LastOpenedComicPath { get; set; }
-    
-    public string? ComicsDirectory { get; set; }
-    
-    /// <summary>
-    /// The preferred language code (e.g., "en", "de", "fr"), or null for system default
-    /// </summary>
-    public string? LanguageCode { get; set; }
-    
-    /// <summary>
-    /// Whether to use the system language setting
-    /// </summary>
-    public bool UseSystemLanguage { get; set; } = true;
-    
-    /// <summary>
-    /// Preferred reading mode for the comic reader
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public ReadingMode PreferredReadingMode { get; set; } = ReadingMode.Normal;
-    
-    /// <summary>
-    /// Handedness preference for zoomed/guided reading layout
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public Handedness Handedness { get; set; } = Handedness.RightHanded;
-    
-    /// <summary>
-    /// Default zoom region size for zoomed reading mode (0.1 to 0.8)
-    /// </summary>
-    public double DefaultZoomRegionSize { get; set; } = 0.3;
-
-    /// <summary>
-    /// Whether to use compact overview in zoomed/guided reading mode (saves screen space)
-    /// </summary>
-    public bool CompactOverview { get; set; } = false;
-
-    /// <summary>
-    /// Theme to use for the application UI.
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public AppThemePreference AppTheme { get; set; } = AppThemePreference.System;
-
-    /// <summary>
-    /// Theme to use when converting EPUB pages into rendered images.
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public EpubConversionTheme EpubConversionTheme { get; set; } = EpubConversionTheme.System;
-
-    /// <summary>
-    /// Output resolution to use when converting EPUB pages into rendered images.
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public EpubOutputResolution EpubOutputResolution { get; set; } = EpubOutputResolution.Low;
-
-    /// <summary>
-    /// Controls whether unsupported formats are converted up front or rendered page-by-page while reading.
-    /// </summary>
-    [JsonConverter(typeof(JsonStringEnumConverter))]
-    public UnsupportedFormatHandlingMode UnsupportedFormatHandlingMode { get; set; } = UnsupportedFormatHandlingMode.ConvertOnImport;
-
-    /// <summary>
-    /// When enabled, deleting an external comic skips the confirmation and only removes it from the library.
-    /// </summary>
-    public bool SkipExternalDeleteConfirmation { get; set; }
-
-    public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
-
-    public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
-
-    public int KomgaParallelDownloads { get; set; } = 1;
-
-    /// <summary>
-    /// Creates a deep copy of the settings
-    /// </summary>
-    public AppSettings Clone()
-    {
-        return new AppSettings
-        {
-            Servers = Servers.Select(s => new KomgaServer
-            {
-                Id = s.Id,
-                Name = s.Name,
-                BaseUrl = s.BaseUrl,
-                Username = s.Username,
-                Password = s.Password,
-                ApiKey = s.ApiKey,
-                CustomHeaders = s.CustomHeaders.Select(h => new KomgaHeader { Name = h.Name, Value = h.Value }).ToList(),
-                IsActive = s.IsActive,
-                AddedDate = s.AddedDate,
-                LastConnected = s.LastConnected
-            }).ToList(),
-            ActiveServerId = ActiveServerId,
-            LastOpenedComicPath = LastOpenedComicPath,
-            ComicsDirectory = ComicsDirectory,
-            LanguageCode = LanguageCode,
-            UseSystemLanguage = UseSystemLanguage,
-            AppTheme = AppTheme,
-            PreferredReadingMode = PreferredReadingMode,
-            Handedness = Handedness,
-            DefaultZoomRegionSize = DefaultZoomRegionSize,
-            CompactOverview = CompactOverview,
-            EpubConversionTheme = EpubConversionTheme,
-            EpubOutputResolution = EpubOutputResolution,
-            UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,
-            SkipExternalDeleteConfirmation = SkipExternalDeleteConfirmation,
-            LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
-            KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
-            KomgaParallelDownloads = KomgaParallelDownloads
-        };
     }
 }

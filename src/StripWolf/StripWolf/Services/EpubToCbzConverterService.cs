@@ -3,7 +3,6 @@ using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using System.Xml.Serialization;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Styling;
@@ -825,21 +824,9 @@ public sealed class EpubToCbzConverterService
 
     private static string CreateComicInfoXml(ComicInfo comicInfo)
     {
-        var serializer = new XmlSerializer(typeof(ComicInfo));
-        var namespaces = new XmlSerializerNamespaces();
-        namespaces.Add("", "");
-
-        var settings = new XmlWriterSettings
-        {
-            Indent = true,
-            Encoding = new UTF8Encoding(false),
-            OmitXmlDeclaration = false
-        };
-
-        using var stringWriter = new Utf8StringWriter();
-        using var xmlWriter = XmlWriter.Create(stringWriter, settings);
-        serializer.Serialize(xmlWriter, comicInfo, namespaces);
-        return stringWriter.ToString();
+        using var memoryStream = new MemoryStream();
+        ComicInfoXmlService.Write(memoryStream, comicInfo);
+        return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
 
     private static string? ExtractSeriesName(EpubMetadata metadata)

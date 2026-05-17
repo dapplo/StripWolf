@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.IO.Pipelines;
+using StripWolf.Data;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
 
@@ -15,14 +16,9 @@ public class KomgaApiService : IDisposable
 {
     private HttpClient? _httpClient;
     private KomgaServer? _currentServer;
-    private readonly JsonSerializerOptions _jsonOptions;
 
     public KomgaApiService()
     {
-        _jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        };
     }
 
     /// <summary>
@@ -77,7 +73,7 @@ public class KomgaApiService : IDisposable
         _httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri(server.BaseUrl.TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromMinutes(20)
         };
         
         _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -143,7 +139,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<List<KomgaLibrary>>(stream, _jsonOptions) ?? [];
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.ListKomgaLibrary) ?? [];
     }
 
     #endregion
@@ -182,7 +178,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaSeries) ?? new KomgaPage<KomgaSeries>();
     }
 
     /// <summary>
@@ -199,7 +195,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaSeries) ?? new KomgaPage<KomgaSeries>();
     }
 
     /// <summary>
@@ -216,7 +212,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -235,7 +231,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaSeries>(stream, _jsonOptions);
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaSeries);
     }
 
     /// <summary>
@@ -271,7 +267,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -317,7 +313,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -336,7 +332,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaBook>(stream, _jsonOptions);
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaBook);
     }
 
     /// <summary>
@@ -368,7 +364,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<List<KomgaPageInfo>>(stream, _jsonOptions) ?? [];
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.ListKomgaPageInfo) ?? [];
     }
 
     /// <summary>
@@ -489,13 +485,13 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var payload = new
+        var payload = new KomgaReadProgressUpdate
         {
-            page,
-            completed
+            Page = page,
+            Completed = completed
         };
         
-        var json = JsonSerializer.Serialize(payload, _jsonOptions);
+        var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadProgressUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         
         var response = await _httpClient!.PatchAsync($"api/v1/books/{bookId}/read-progress", content);
@@ -541,7 +537,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaReadList>>(stream, _jsonOptions) ?? new KomgaPage<KomgaReadList>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaReadList) ?? new KomgaPage<KomgaReadList>();
     }
 
     /// <summary>
@@ -586,7 +582,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaReadList>(stream, _jsonOptions);
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaReadList);
     }
 
     /// <summary>
@@ -596,20 +592,20 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
 
-        var payload = new
+        var payload = new KomgaReadListUpdate
         {
-            name,
-            summary,
-            bookIds,
-            ordered
+            Name = name,
+            Summary = summary,
+            BookIds = bookIds,
+            Ordered = ordered
         };
 
-        var json = JsonSerializer.Serialize(payload, _jsonOptions);
+        var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadListUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
         return response.IsSuccessStatusCode;
-    }
+        }
 
     /// <summary>
     /// Gets read list thumbnail
@@ -640,7 +636,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -672,7 +668,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -688,7 +684,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -704,7 +700,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaBook>>(stream, _jsonOptions) ?? new KomgaPage<KomgaBook>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaBook) ?? new KomgaPage<KomgaBook>();
     }
 
     /// <summary>
@@ -720,7 +716,7 @@ public class KomgaApiService : IDisposable
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<KomgaPage<KomgaSeries>>(stream, _jsonOptions) ?? new KomgaPage<KomgaSeries>();
+        return await JsonSerializer.DeserializeAsync(stream, StripWolfJsonContext.Default.KomgaPageKomgaSeries) ?? new KomgaPage<KomgaSeries>();
     }
 
     #endregion

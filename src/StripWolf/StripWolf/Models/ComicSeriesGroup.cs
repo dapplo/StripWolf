@@ -1,15 +1,18 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Models;
 
 /// <summary>
-/// Represents a source-agnostic comic series grouping in the local library.
+/// Represents a source-agnostic comic series group
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public partial class ComicSeriesGroup : ObservableObject
 {
+
     [ObservableProperty]
     private string _name = string.Empty;
 

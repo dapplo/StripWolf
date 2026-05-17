@@ -6,12 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 using StripWolf.Models;
 using StripWolf.Models.Komga;
 using StripWolf.Services;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.ViewModels;
 
 /// <summary>
 /// View model for browsing Komga content
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public partial class KomgaViewModel : ViewModelBase
 {
     private readonly KomgaApiService _komgaApiService;

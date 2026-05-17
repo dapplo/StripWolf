@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.Models.Komga;
 
 /// <summary>
 /// Represents a library from Komga
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaLibrary
 {
     [JsonPropertyName("id")]
@@ -80,6 +82,7 @@ public class KomgaLibrary
 /// <summary>
 /// Represents a series from Komga
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaSeries
 {
     [JsonPropertyName("id")]
@@ -132,12 +135,14 @@ public class KomgaSeries
 }
 
 /// <summary>
-/// Series metadata from Komga
+/// Metadata for a series
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaSeriesMetadata
 {
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+
 
     [JsonPropertyName("statusLock")]
     public bool StatusLock { get; set; }
@@ -228,12 +233,14 @@ public class KomgaSeriesMetadata
 }
 
 /// <summary>
-/// Represents a book (comic) from Komga
+/// Represents a book (issue) from Komga
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaBook
 {
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+
 
     [JsonPropertyName("seriesId")]
     public string SeriesId { get; set; } = string.Empty;
@@ -294,12 +301,14 @@ public class KomgaBook
 }
 
 /// <summary>
-/// Book metadata from Komga
+/// Metadata for a book
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaBookMetadata
 {
     [JsonPropertyName("title")]
     public string Title { get; set; } = string.Empty;
+
 
     [JsonPropertyName("titleLock")]
     public bool TitleLock { get; set; }
@@ -551,6 +560,7 @@ public class KomgaPageInfo
 /// <summary>
 /// Represents a read list from Komga
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaReadList
 {
     [JsonPropertyName("id")]
@@ -576,4 +586,34 @@ public class KomgaReadList
 
     [JsonPropertyName("filtered")]
     public bool Filtered { get; set; }
+}
+
+/// <summary>
+/// Request payload for updating read progress
+/// </summary>
+public class KomgaReadProgressUpdate
+{
+    [JsonPropertyName("page")]
+    public int Page { get; set; }
+
+    [JsonPropertyName("completed")]
+    public bool Completed { get; set; }
+}
+
+/// <summary>
+/// Request payload for updating a read list
+/// </summary>
+public class KomgaReadListUpdate
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("summary")]
+    public string? Summary { get; set; }
+
+    [JsonPropertyName("bookIds")]
+    public IReadOnlyCollection<string>? BookIds { get; set; }
+
+    [JsonPropertyName("ordered")]
+    public bool? Ordered { get; set; }
 }

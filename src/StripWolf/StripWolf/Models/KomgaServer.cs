@@ -1,12 +1,15 @@
 using System.Text.Json;
 using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StripWolf.Data;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.Models;
 
 /// <summary>
 /// Represents a custom HTTP header
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public partial class KomgaHeader : ObservableObject
 {
     [ObservableProperty]
@@ -19,6 +22,7 @@ public partial class KomgaHeader : ObservableObject
 /// <summary>
 /// Represents a Komga server connection configuration
 /// </summary>
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class KomgaServer
 {
     [PrimaryKey, AutoIncrement]
@@ -60,8 +64,8 @@ public class KomgaServer
     /// </summary>
     public string CustomHeadersJson
     {
-        get => JsonSerializer.Serialize(CustomHeaders);
-        set => CustomHeaders = string.IsNullOrEmpty(value) ? [] : JsonSerializer.Deserialize<List<KomgaHeader>>(value) ?? [];
+        get => JsonSerializer.Serialize(CustomHeaders, StripWolfJsonContext.Default.ListKomgaHeader);
+        set => CustomHeaders = string.IsNullOrEmpty(value) ? [] : JsonSerializer.Deserialize(value, StripWolfJsonContext.Default.ListKomgaHeader) ?? [];
     }
 
     /// <summary>

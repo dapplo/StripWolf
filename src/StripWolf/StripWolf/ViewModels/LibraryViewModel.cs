@@ -116,6 +116,61 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private Comic? _selectedInfoComic;
 
+    [ObservableProperty]
+    private bool _isEditingMetadata;
+
+    [ObservableProperty]
+    private ComicInfo? _editingComicInfo;
+
+    [RelayCommand]
+    private async Task EditMetadataAsync()
+    {
+        if (SelectedInfoComic is null) return;
+        
+        IsEditingMetadata = true;
+        try
+        {
+            EditingComicInfo = await _libraryService.GetComicInfoAsync(SelectedInfoComic.FilePath) ?? new ComicInfo
+            {
+                Title = SelectedInfoComic.Title,
+                Series = SelectedInfoComic.SeriesName,
+                Number = SelectedInfoComic.Number?.ToString()
+            };
+        }
+        catch
+        {
+            EditingComicInfo = new ComicInfo
+            {
+                Title = SelectedInfoComic.Title,
+                Series = SelectedInfoComic.SeriesName,
+                Number = SelectedInfoComic.Number?.ToString()
+            };
+        }
+    }
+
+    [RelayCommand]
+    private void CancelMetadataEdit()
+    {
+        IsEditingMetadata = false;
+        EditingComicInfo = null;
+    }
+
+    [RelayCommand]
+    private async Task SaveMetadataAsync()
+    {
+        if (SelectedInfoComic is null || EditingComicInfo is null) return;
+
+        await ExecuteAsync(async () =>
+        {
+            await _libraryService.UpdateComicMetadataAsync(SelectedInfoComic, EditingComicInfo);
+            IsEditingMetadata = false;
+            EditingComicInfo = null;
+            
+            // Refresh the UI to show updated values
+            OnPropertyChanged(nameof(SelectedInfoComic));
+        });
+    }
+
     public bool ShowContinueReadingSection => IsContinueReadingSectionVisible && InProgressComics.Count > 0;
     public bool ShowNewComicsSection => IsNewComicsSectionVisible;
     public bool ShowFavoritesSection => IsFavoritesSectionVisible && FavoriteComics.Count > 0;

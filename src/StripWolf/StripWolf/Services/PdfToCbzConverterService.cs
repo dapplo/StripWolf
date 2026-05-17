@@ -1,6 +1,5 @@
 using System.IO.Compression;
 using System.Text;
-using System.Xml.Serialization;
 using StripWolf.Models;
 
 namespace StripWolf.Services;
@@ -253,19 +252,7 @@ public class PdfToCbzConverterService
     {
         await Task.Run(() =>
         {
-            var serializer = new XmlSerializer(typeof(ComicInfo));
-            var namespaces = new System.Xml.Serialization.XmlSerializerNamespaces();
-            namespaces.Add("", "");
-
-            var settings = new System.Xml.XmlWriterSettings
-            {
-                Indent = true,
-                Encoding = Encoding.UTF8,
-                OmitXmlDeclaration = false
-            };
-
-            using var writer = System.Xml.XmlWriter.Create(outputStream, settings);
-            serializer.Serialize(writer, comicInfo, namespaces);
+            ComicInfoXmlService.Write(outputStream, comicInfo);
         });
     }
 }

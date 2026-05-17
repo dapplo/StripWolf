@@ -1,7 +1,9 @@
 using SQLite;
+using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.Models;
 
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class EpubConversionState
 {
     [PrimaryKey]

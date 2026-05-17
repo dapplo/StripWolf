@@ -399,7 +399,7 @@
     </Border>
 
     <!-- Comic Info Overlay -->
-    <Panel Grid.RowSpan="2" IsVisible="{Binding SelectedInfoComic, Converter={x:Static ObjectConverters.IsNotNull}}">
+    <Panel Grid.RowSpan="2" IsVisible="{Binding SelectedInfoComic, ElementName=Root, Converter={x:Static ObjectConverters.IsNotNull}}">
       <!-- Click background to close -->
       <Border Background="#80000000"
               HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
@@ -413,60 +413,116 @@
           <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="16" CornerRadius="8,8,0,0">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="Comic Information" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-              <Button Grid.Column="1" Content="✕" Command="{Binding CloseComicInfoCommand}" Background="Transparent" Foreground="White" FontSize="18" Padding="8,4"/>
+              <Button Grid.Column="1" Content="✕" Command="{Binding CloseComicInfoCommand, ElementName=Root}" Background="Transparent" Foreground="White" FontSize="18" Padding="8,4"/>
             </Grid>
           </Border>
           <ScrollViewer Grid.Row="1" MaxHeight="600">
             <Border Padding="24">
-              <StackPanel Spacing="16" x:DataType="models:Comic" DataContext="{Binding SelectedInfoComic, ElementName=Root}">
-                <Grid ColumnDefinitions="150,*">
-                   <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
-                     <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
-                                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                   </Border>
-                  <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
-                    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>
-                    <StackPanel IsVisible="{Binding SeriesName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                      <TextBlock Text="Series" FontSize="12" Foreground="Gray"/>
-                      <TextBlock Text="{Binding SeriesName}" FontSize="16"/>
-                    </StackPanel>
-                    <Grid ColumnDefinitions="*,*">
-                      <StackPanel Grid.Column="0">
-                         <TextBlock Text="Number" FontSize="12" Foreground="Gray"/>
-                         <TextBlock Text="{Binding Number}" FontSize="16"/>
+              <!-- Content area inherits LibraryViewModel DataContext -->
+              <StackPanel Spacing="16">
+                
+                <!-- View Mode Metadata -->
+                <StackPanel IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
+                  <Grid x:DataType="models:Comic" DataContext="{Binding SelectedInfoComic, ElementName=Root}"
+                        ColumnDefinitions="150,*">
+                     <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
+                       <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
+                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                     </Border>
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
+                      <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>
+                      <StackPanel IsVisible="{Binding SeriesName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="Series" FontSize="12" Foreground="Gray"/>
+                        <TextBlock Text="{Binding SeriesName}" FontSize="16"/>
                       </StackPanel>
-                       <StackPanel Grid.Column="1">
-                          <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
-                          <TextBlock Text="{Binding LibraryPageStatusDisplay}" FontSize="16"/>
-                       </StackPanel>
-                     </Grid>
-                     <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
-                      <Button.IsVisible>
-                         <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
-                      </Button.IsVisible>
-                    </Button>
-                  </StackPanel>
-                </Grid>
-                <Separator Background="Gray" Opacity="0.3"/>
-                <StackPanel IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                  <TextBlock Text="Summary" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                  <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14" Opacity="0.9"/>
+                      <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0">
+                           <TextBlock Text="Number" FontSize="12" Foreground="Gray"/>
+                           <TextBlock Text="{Binding Number}" FontSize="16"/>
+                        </StackPanel>
+                         <StackPanel Grid.Column="1">
+                            <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
+                            <TextBlock Text="{Binding LibraryPageStatusDisplay}" FontSize="16"/>
+                         </StackPanel>
+                       </Grid>
+                       <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                        <Button.IsVisible>
+                           <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                        </Button.IsVisible>
+                      </Button>
+                    </StackPanel>
+                  </Grid>
                 </StackPanel>
-                <StackPanel Spacing="8" Margin="0,8,0,0">
-                  <Button Content="📖 Read Now" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen}"/>
-                  <Button Content="⚙ Convert Now" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow}"/>
-                  <TextBlock Text="Converting to CBZ..." Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding IsConverting}"/>
+
+                <!-- Edit Mode Metadata -->
+                <StackPanel IsVisible="{Binding IsEditingMetadata, ElementName=Root, FallbackValue=False}">
+                  <StackPanel x:DataType="models:ComicInfo" DataContext="{Binding EditingComicInfo, ElementName=Root}"
+                              Spacing="12">
+                     <StackPanel>
+                       <TextBlock Text="Title" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Title}" PlaceholderText="Comic Title"/>
+                     </StackPanel>
+                     <StackPanel>
+                       <TextBlock Text="Series" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Series}" PlaceholderText="Series Name"/>
+                     </StackPanel>
+
+                     <StackPanel>
+                       <TextBlock Text="Number" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Number}" PlaceholderText="Issue Number"/>
+                     </StackPanel>
+                     <StackPanel>
+                       <TextBlock Text="Summary" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Summary}" PlaceholderText="Description" TextWrapping="Wrap" AcceptsReturn="True" Height="100"/>
+                     </StackPanel>
+                     <StackPanel>
+                       <TextBlock Text="Writer" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Writer}" PlaceholderText="Writer(s)"/>
+                     </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+
+                <Separator Background="Gray" Opacity="0.3"/>
+                
+                <!-- Summary (View Mode) -->
+                <StackPanel IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
+                  <StackPanel DataContext="{Binding SelectedInfoComic, ElementName=Root}" x:DataType="models:Comic"
+                              IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="Summary" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14" Opacity="0.9"/>
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- Action Buttons (View Mode) -->
+                <StackPanel Spacing="8" Margin="0,8,0,0" 
+                            IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
+                  <Button Content="📖 Read Now" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding SelectedInfoComic.CanOpen, ElementName=Root, FallbackValue=False}"/>
+                  <Button Content="⚙ Convert Now" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding SelectedInfoComic.CanConvertNow, ElementName=Root, FallbackValue=False}"/>
+                  <TextBlock Text="Converting to CBZ..." Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding SelectedInfoComic.IsConverting, ElementName=Root, FallbackValue=False}"/>
                   <Grid ColumnDefinitions="*,*">
-                    <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleFavoriteCommand, ElementName=Root}" CommandParameter="{Binding}">
+                    <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleFavoriteCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}">
                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <TextBlock Text="⭐" IsVisible="{Binding IsFavorite}"/>
-                          <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}"/>
+                          <TextBlock Text="⭐" IsVisible="{Binding SelectedInfoComic.IsFavorite, ElementName=Root, FallbackValue=False}"/>
+                          <TextBlock Text="☆" IsVisible="{Binding !SelectedInfoComic.IsFavorite, ElementName=Root, FallbackValue=True}"/>
                           <TextBlock Text="Favorite" />
                        </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding}"/>
+                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}"/>
                   </Grid>
-                  <Button Content="🗑️ Delete Comic" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                  <Grid ColumnDefinitions="*,*">
+                    <Button Grid.Column="0" Content="✏️ Edit Metadata" Margin="0,0,4,0" Command="{Binding EditMetadataCommand, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="🗑️ Delete Comic" Margin="4,0,0,0" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                  </Grid>
+                </StackPanel>
+
+                <!-- Action Buttons (Edit Mode) -->
+                <StackPanel Spacing="8" Margin="0,8,0,0" 
+                            IsVisible="{Binding IsEditingMetadata, ElementName=Root, FallbackValue=False}">
+                   <Button Content="💾 Save Changes" Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                           Command="{Binding SaveMetadataCommand, ElementName=Root}"
+                           HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
+                   <Button Content="Cancel" Command="{Binding CancelMetadataEditCommand, ElementName=Root}"
+                           HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                 </StackPanel>
               </StackPanel>
             </Border>

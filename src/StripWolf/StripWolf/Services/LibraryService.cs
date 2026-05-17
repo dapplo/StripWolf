@@ -1,6 +1,6 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
-using System.Xml.Serialization;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
@@ -677,6 +677,73 @@ public class LibraryService
     /// <summary>
     /// Updates reading progress for a comic
     /// </summary>
+    /// <summary>
+    /// Updates comic metadata in the database and persists it to the ComicInfo.xml file within the archive.
+    /// </summary>
+    public async Task UpdateComicMetadataAsync(Comic comic, ComicInfo comicInfo)
+    {
+        // 1. Update the comic object and database
+        comic.Title = !string.IsNullOrWhiteSpace(comicInfo.Title) ? comicInfo.Title : comic.Title;
+        comic.SeriesName = !string.IsNullOrWhiteSpace(comicInfo.Series) ? comicInfo.Series : comic.SeriesName;
+        
+        if (!string.IsNullOrEmpty(comicInfo.Number) && float.TryParse(comicInfo.Number, out var parsedNumber))
+        {
+            comic.Number = parsedNumber;
+        }
+        
+        comic.Summary = comicInfo.Summary;
+        comic.Publisher = comicInfo.Publisher;
+        comic.Authors = comicInfo.GetSimpleAuthors();
+        comic.ReleaseDate = comicInfo.GetReleaseDate();
+
+        await _databaseService.SaveComicAsync(comic);
+
+        // 2. Persist to the file if it's a ZIP/CBZ
+        if (comic.Format == ComicFormat.Cbz)
+        {
+            await WriteComicInfoAsync(comic.FilePath, comicInfo);
+        }
+
+        OnLibraryChanged();
+    }
+
+    private async Task WriteComicInfoAsync(string filePath, ComicInfo comicInfo)
+    {
+        await Task.Run(() =>
+        {
+            var tempFile = Path.GetTempFileName();
+            try
+            {
+                using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
+                {
+                    // Remove existing ComicInfo.xml if present
+                    var existingEntry = archive.Entries.FirstOrDefault(e => 
+                        Path.GetFileName(e.FullName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
+                    existingEntry?.Delete();
+
+                    // Create new entry
+                    var entry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
+                    using var entryStream = entry.Open();
+                    
+                    var settings = new System.Xml.XmlWriterSettings
+                    {
+                        Indent = true,
+                        Encoding = System.Text.Encoding.UTF8,
+                        OmitXmlDeclaration = false
+                    };
+
+                    using var writer = System.Xml.XmlWriter.Create(entryStream, settings);
+                    WriteComicInfo(writer, comicInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to update ComicInfo.xml for {filePath}: {ex.Message}");
+                throw;
+            }
+        });
+    }
+
     public async Task UpdateReadingProgressAsync(Comic comic, int currentPage)
     {
         if (comic.PageCount <= 0)
@@ -1148,10 +1215,6 @@ public class LibraryService
         {
             try
             {
-                var serializer = new XmlSerializer(typeof(ComicInfo));
-                var namespaces = new XmlSerializerNamespaces();
-                namespaces.Add("", "");
-
                 var settings = new System.Xml.XmlWriterSettings
                 {
                     Indent = true,
@@ -1160,7 +1223,7 @@ public class LibraryService
                 };
 
                 using var writer = System.Xml.XmlWriter.Create(sidecarPath, settings);
-                serializer.Serialize(writer, comicInfo, namespaces);
+                WriteComicInfo(writer, comicInfo);
             }
             catch (Exception ex)
             {
@@ -1168,6 +1231,82 @@ public class LibraryService
             }
         });
     }
+
+    private static void WriteComicInfo(System.Xml.XmlWriter writer, ComicInfo info)
+    {
+        writer.WriteStartElement("ComicInfo");
+        
+        if (!string.IsNullOrEmpty(info.Title)) writer.WriteElementString("Title", info.Title);
+        if (!string.IsNullOrEmpty(info.Series)) writer.WriteElementString("Series", info.Series);
+        if (!string.IsNullOrEmpty(info.Number)) writer.WriteElementString("Number", info.Number);
+        if (info.Count.HasValue) writer.WriteElementString("Count", info.Count.Value.ToString());
+        if (info.Volume.HasValue) writer.WriteElementString("Volume", info.Volume.Value.ToString());
+        if (!string.IsNullOrEmpty(info.AlternateSeries)) writer.WriteElementString("AlternateSeries", info.AlternateSeries);
+        if (!string.IsNullOrEmpty(info.AlternateNumber)) writer.WriteElementString("AlternateNumber", info.AlternateNumber);
+        if (info.AlternateCount.HasValue) writer.WriteElementString("AlternateCount", info.AlternateCount.Value.ToString());
+        if (!string.IsNullOrEmpty(info.Summary)) writer.WriteElementString("Summary", info.Summary);
+        if (!string.IsNullOrEmpty(info.Notes)) writer.WriteElementString("Notes", info.Notes);
+        if (info.Year.HasValue) writer.WriteElementString("Year", info.Year.Value.ToString());
+        if (info.Month.HasValue) writer.WriteElementString("Month", info.Month.Value.ToString());
+        if (info.Day.HasValue) writer.WriteElementString("Day", info.Day.Value.ToString());
+        if (!string.IsNullOrEmpty(info.Writer)) writer.WriteElementString("Writer", info.Writer);
+        if (!string.IsNullOrEmpty(info.Penciller)) writer.WriteElementString("Penciller", info.Penciller);
+        if (!string.IsNullOrEmpty(info.Inker)) writer.WriteElementString("Inker", info.Inker);
+        if (!string.IsNullOrEmpty(info.Colorist)) writer.WriteElementString("Colorist", info.Colorist);
+        if (!string.IsNullOrEmpty(info.Letterer)) writer.WriteElementString("Letterer", info.Letterer);
+        if (!string.IsNullOrEmpty(info.CoverArtist)) writer.WriteElementString("CoverArtist", info.CoverArtist);
+        if (!string.IsNullOrEmpty(info.Editor)) writer.WriteElementString("Editor", info.Editor);
+        if (!string.IsNullOrEmpty(info.Publisher)) writer.WriteElementString("Publisher", info.Publisher);
+        if (!string.IsNullOrEmpty(info.Imprint)) writer.WriteElementString("Imprint", info.Imprint);
+        if (!string.IsNullOrEmpty(info.Genre)) writer.WriteElementString("Genre", info.Genre);
+        if (!string.IsNullOrEmpty(info.Tags)) writer.WriteElementString("Tags", info.Tags);
+        if (!string.IsNullOrEmpty(info.Web)) writer.WriteElementString("Web", info.Web);
+        if (info.PageCount.HasValue) writer.WriteElementString("PageCount", info.PageCount.Value.ToString());
+        if (!string.IsNullOrEmpty(info.LanguageISO)) writer.WriteElementString("LanguageISO", info.LanguageISO);
+        if (!string.IsNullOrEmpty(info.Format)) writer.WriteElementString("Format", info.Format);
+        if (info.BlackAndWhite.HasValue) writer.WriteElementString("BlackAndWhite", info.BlackAndWhite.Value.ToString());
+        if (info.Manga.HasValue) writer.WriteElementString("Manga", info.Manga.Value.ToString());
+        if (!string.IsNullOrEmpty(info.Characters)) writer.WriteElementString("Characters", info.Characters);
+        if (!string.IsNullOrEmpty(info.Teams)) writer.WriteElementString("Teams", info.Teams);
+        if (!string.IsNullOrEmpty(info.Locations)) writer.WriteElementString("Locations", info.Locations);
+        if (!string.IsNullOrEmpty(info.StoryArc)) writer.WriteElementString("StoryArc", info.StoryArc);
+        if (!string.IsNullOrEmpty(info.StoryArcNumber)) writer.WriteElementString("StoryArcNumber", info.StoryArcNumber);
+        if (!string.IsNullOrEmpty(info.SeriesGroup)) writer.WriteElementString("SeriesGroup", info.SeriesGroup);
+        if (info.AgeRating.HasValue) writer.WriteElementString("AgeRating", GetAgeRatingString(info.AgeRating.Value));
+        if (info.CommunityRating.HasValue) writer.WriteElementString("CommunityRating", info.CommunityRating.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (!string.IsNullOrEmpty(info.ScanInformation)) writer.WriteElementString("ScanInformation", info.ScanInformation);
+
+        if (info.Pages is { Count: > 0 })
+        {
+            writer.WriteStartElement("Pages");
+            foreach (var page in info.Pages)
+            {
+                writer.WriteStartElement("Page");
+                writer.WriteAttributeString("Image", page.Image.ToString());
+                if (!string.IsNullOrEmpty(page.TypeString)) writer.WriteAttributeString("Type", page.TypeString);
+                if (page.DoublePage) writer.WriteAttributeString("DoublePage", "Yes");
+                if (page.ImageWidth > 0) writer.WriteAttributeString("ImageWidth", page.ImageWidth.ToString());
+                if (page.ImageHeight > 0) writer.WriteAttributeString("ImageHeight", page.ImageHeight.ToString());
+                if (page.ImageSize > 0) writer.WriteAttributeString("ImageSize", page.ImageSize.ToString());
+                if (!string.IsNullOrEmpty(page.Bookmark)) writer.WriteAttributeString("Bookmark", page.Bookmark);
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement();
+        }
+
+        writer.WriteEndElement();
+    }
+
+    private static string GetAgeRatingString(AgeRating rating) => rating switch
+    {
+        AgeRating.AdultsOnly18Plus => "Adults Only 18+",
+        AgeRating.EarlyChildhood => "Early Childhood",
+        AgeRating.Everyone10Plus => "Everyone 10+",
+        AgeRating.KidsToAdults => "Kids to Adults",
+        AgeRating.Mature17Plus => "Mature 17+",
+        AgeRating.RatingPending => "Rating Pending",
+        _ => rating.ToString()
+    };
 
     internal static string SanitizeFileName(string fileName)
     {
