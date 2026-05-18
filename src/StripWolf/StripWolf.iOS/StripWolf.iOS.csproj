@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
     <ProvisioningType>manual</ProvisioningType>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

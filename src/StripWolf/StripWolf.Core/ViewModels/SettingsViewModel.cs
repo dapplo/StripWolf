@@ -85,23 +85,29 @@ public partial class SettingsViewModel : ViewModelBase
         get
         {
             var assembly = typeof(SettingsViewModel).Assembly;
-            var version = assembly.GetName().Version?.ToString(3) ?? "1.0.0";
             var infoVersion = assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
                 .FirstOrDefault() as System.Reflection.AssemblyInformationalVersionAttribute;
             
-            var hash = string.Empty;
-            if (infoVersion?.InformationalVersion is { } v && v.Contains('+'))
-            {
-                hash = v.Split('+').Last();
-                if (hash.Length > 7)
-                {
-                    hash = hash[..7];
-                }
-            }
+            var fullVersion = infoVersion?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "1.0.0";
             
-            return string.IsNullOrEmpty(hash) 
-                ? $"Version {version}" 
-                : $"Version {version} ({hash})";
+            string displayVersion;
+            string? hash = null;
+
+            if (fullVersion.Contains('+'))
+            {
+                var parts = fullVersion.Split('+');
+                displayVersion = parts[0];
+                hash = parts[1];
+                if (hash.Length > 7) hash = hash[..7];
+            }
+            else
+            {
+                displayVersion = fullVersion;
+            }
+
+            return hash != null 
+                ? $"Version {displayVersion} (g{hash})" 
+                : $"Version {displayVersion}";
         }
     }
 

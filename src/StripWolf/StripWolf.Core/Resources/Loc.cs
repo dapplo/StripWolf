@@ -28,7 +28,7 @@ namespace StripWolf.Core.Resources;
 /// </summary>
 public class Loc
 {
-    private static readonly ResourceManager ResourceManager = new("StripWolf.Resources.Strings", typeof(Loc).Assembly);
+    private static readonly ResourceManager ResourceManager = new("StripWolf.Core.Resources.Strings", typeof(Loc).Assembly);
     private static Loc _instance = new();
 
     public static Loc Instance => _instance;
