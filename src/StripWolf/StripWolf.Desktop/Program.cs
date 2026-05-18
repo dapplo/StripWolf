@@ -23,7 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 #if Windows && !DISABLE_EPUB_WEBVIEW
 using StripWolf.Desktop.Services.Windows;
 #endif
-#if Linux
+#if Linux && !DISABLE_EPUB_WEBVIEW
 using StripWolf.Desktop.Services.Linux;
 #endif
 using StripWolf.Services;
@@ -56,7 +56,7 @@ sealed class Program
             }
             else
 #endif
-#if Linux
+#if Linux && !DISABLE_EPUB_WEBVIEW
             if (OperatingSystem.IsLinux())
             {
                 services.AddSingleton<IWebViewPaginationService, LinuxWpeWebViewSnapshotService>();

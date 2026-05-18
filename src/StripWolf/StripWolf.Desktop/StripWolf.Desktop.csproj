@@ -44,7 +44,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Controls.WebView" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    <PackageReference Include="Avalonia.Controls.WebView" Condition="$([MSBuild]::IsOSPlatform('Linux')) and '$(UseEpubSupport)' == 'true'" />
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Diagnostics">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
@@ -75,6 +75,7 @@
 
   <ItemGroup Condition="'$(UseEpubSupport)' == 'false'">
     <Compile Remove="Services\Windows\WindowsWebView2SnapshotService.cs" />
+    <Compile Remove="Services\Linux\LinuxWpeWebViewSnapshotService.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Linux'))">
