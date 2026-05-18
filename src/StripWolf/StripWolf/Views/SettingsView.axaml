@@ -16,6 +16,36 @@
         <!-- Header -->
         <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
         
+        <!-- About Section -->
+        <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
+        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="StripWolf" FontSize="16" FontWeight="Bold"/>
+            <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
+            <TextBlock Text="{Binding AppVersion}" Foreground="Gray" FontSize="12"/>
+            
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+                <Button Content="{Binding ProjectOnGitHub, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenGitHubCommand}"
+                        Background="Transparent" Padding="0"/>
+            </StackPanel>
+
+            <Separator Margin="0,8"/>
+            
+            <Expander IsExpanded="{Binding IsSupportMeVisible}" HorizontalAlignment="Stretch">
+                <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding SupportMe, Source={x:Static res:Loc.Instance}}"/>
+                        <TextBlock Text="❤" Foreground="Red"/>
+                    </StackPanel>
+                </Expander.Header>
+                <StackPanel Spacing="8" Margin="0,8,0,0">
+                    <Button Content="{Binding DonateWithPayPal, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenPayPalCommand}" HorizontalAlignment="Stretch"/>
+                    <Button Content="{Binding DonateWithKoFi, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenKoFiCommand}" HorizontalAlignment="Stretch"/>
+                </StackPanel>
+            </Expander>
+          </StackPanel>
+        </Border>
+
         <!-- Error Message -->
         <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
                 IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -261,59 +291,6 @@
           </StackPanel>
         </Border>
 
-        <!-- About Section -->
-        <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="StripWolf" FontSize="16" FontWeight="Bold"/>
-            <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
-            <TextBlock Text="Version 1.0.0 (Avalonia)" Foreground="Gray" FontSize="12"/>
-            <Button Content="{Binding ViewReleaseNotes, Source={x:Static res:Loc.Instance}}" Command="{Binding ShowReleaseNotesCommand}" 
-                    Background="Transparent" Padding="0" Margin="0,8,0,0"/>
-          </StackPanel>
-        </Border>
-
-        <!-- Release Notes Section (shown when clicking the button) -->
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                Margin="0,8,0,0" IsVisible="{Binding IsReleaseNotesVisible}">
-          <StackPanel Spacing="8">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="{Binding ReleaseNotes, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="Bold"/>
-              <Button Grid.Column="1" Content="✕" Padding="4,2" Background="Transparent"
-                      Command="{Binding HideReleaseNotesCommand}"/>
-            </Grid>
-            <TextBlock Text="Version 1.1.0" FontWeight="SemiBold" Margin="0,4,0,0"/>
-            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
-              <Run Text="• NEW: Zoomed reading mode - split view with page overview and magnified area"/>
-              <LineBreak/>
-              <Run Text="• NEW: Guided reading mode - automatic panel detection for scene-by-scene navigation"/>
-              <LineBreak/>
-              <Run Text="• NEW: Left/right-handed layout options for zoomed and guided modes"/>
-              <LineBreak/>
-              <Run Text="• NEW: Panel navigation with keyboard (M to cycle modes, H to toggle handedness)"/>
-              <LineBreak/>
-              <Run Text="• NEW: Background pre-caching of panel detection for smoother reading"/>
-            </TextBlock>
-            <TextBlock Text="Version 1.0.0" FontWeight="SemiBold" Margin="0,8,0,0"/>
-            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="12">
-              <Run Text="• Initial release with Komga integration"/>
-              <LineBreak/>
-              <Run Text="• Support for CBZ, CBR, and PDF comic formats"/>
-              <LineBreak/>
-              <Run Text="• Offline reading and progress tracking"/>
-              <LineBreak/>
-              <Run Text="• Cross-platform support (Windows, Linux, macOS, Android)"/>
-              <LineBreak/>
-              <Run Text="• Two-page reading mode"/>
-              <LineBreak/>
-              <Run Text="• Library management with read/unread status"/>
-              <LineBreak/>
-              <Run Text="• Black background for comic covers"/>
-              <LineBreak/>
-              <Run Text="• Scroll wheel page navigation"/>
-            </TextBlock>
-          </StackPanel>
-        </Border>
       </StackPanel>
     </ScrollViewer>
 

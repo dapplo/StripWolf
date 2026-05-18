@@ -266,6 +266,18 @@
   <data name="ReleaseNotes" xml:space="preserve">
     <value>Versionshinweise</value>
   </data>
+  <data name="SupportMe" xml:space="preserve">
+    <value>Unterstütze mich</value>
+  </data>
+  <data name="ProjectOnGitHub" xml:space="preserve">
+    <value>Projekt auf GitHub</value>
+  </data>
+  <data name="DonateWithPayPal" xml:space="preserve">
+    <value>Mit PayPal spenden</value>
+  </data>
+  <data name="DonateWithKoFi" xml:space="preserve">
+    <value>Auf Ko-fi unterstützen</value>
+  </data>
   
   <!-- Reader View -->
   <data name="Page" xml:space="preserve">

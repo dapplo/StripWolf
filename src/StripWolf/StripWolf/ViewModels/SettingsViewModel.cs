@@ -36,6 +36,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     private readonly KomgaApiService _komgaApiService;
     private readonly LocalizationService _localizationService;
+    private readonly IDonationService _donationService;
     
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
@@ -77,7 +78,32 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _isPasswordVisible;
 
     [ObservableProperty]
-    private bool _isReleaseNotesVisible;
+    private bool _isSupportMeVisible;
+
+    public string AppVersion
+    {
+        get
+        {
+            var assembly = typeof(SettingsViewModel).Assembly;
+            var version = assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+            var infoVersion = assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .FirstOrDefault() as System.Reflection.AssemblyInformationalVersionAttribute;
+            
+            var hash = string.Empty;
+            if (infoVersion?.InformationalVersion is { } v && v.Contains('+'))
+            {
+                hash = v.Split('+').Last();
+                if (hash.Length > 7)
+                {
+                    hash = hash[..7];
+                }
+            }
+            
+            return string.IsNullOrEmpty(hash) 
+                ? $"Version {version}" 
+                : $"Version {version} ({hash})";
+        }
+    }
 
     public bool SupportsGuidedReading =>
 #if DISABLE_GUIDED_READING
@@ -170,11 +196,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LocalizationService localizationService)
+    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LocalizationService localizationService, IDonationService donationService)
     {
         _settingsService = settingsService;
         _komgaApiService = komgaApiService;
         _localizationService = localizationService;
+        _donationService = donationService;
         Title = "Settings";
     }
 
@@ -286,15 +313,27 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ShowReleaseNotes()
+    private void ToggleSupportMe()
     {
-        IsReleaseNotesVisible = true;
+        IsSupportMeVisible = !IsSupportMeVisible;
     }
 
     [RelayCommand]
-    private void HideReleaseNotes()
+    private void OpenGitHub()
     {
-        IsReleaseNotesVisible = false;
+        _donationService.OpenGitHub();
+    }
+
+    [RelayCommand]
+    private void OpenPayPal()
+    {
+        _donationService.OpenPayPal();
+    }
+
+    [RelayCommand]
+    private void OpenKoFi()
+    {
+        _donationService.OpenKoFi();
     }
 
     [RelayCommand]

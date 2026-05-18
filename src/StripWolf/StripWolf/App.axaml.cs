@@ -157,6 +157,7 @@ public partial class App : Application
         services.AddSingleton<PanelDetectionService>();
         services.AddSingleton<KomgaApiService>();
         services.AddSingleton<ComicConverterService>();
+        services.AddSingleton<IDonationService, DonationService>();
 
         // Register platform-specific PDF renderer
         // Use the custom registration action if set (e.g., for Android), otherwise default to nothing

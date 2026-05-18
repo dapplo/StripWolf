@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="StripFlow.png" alt="StripWolf Logo" width="300" />
+  <img src="media/StripFlow.png" alt="StripWolf Logo" width="300" />
   <p><i>As comics are called strips in Dutch, and follow a flow, Wolf is the reverse of flow.</i></p>
 </div>
 
@@ -13,9 +13,21 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 - **Extended Format Support**: Read CB7 (7-Zip) and CBT (TAR) archives natively, while solid RAR archives are automatically converted to CBZ for reliable reading
 - **ComicInfo.xml Support**: Automatically extracts and displays metadata from ComicInfo.xml files embedded in comic archives
 - **Komga Integration**: Connect to your Komga server to browse and download comics
+- **Multiple Reading Modes**:
+  - **Normal**: Standard full-page reading
+  - **Zoomed**: Split view with page overview and magnified area
+  - **Guided**: Automatic panel detection for scene-by-scene navigation
+- **Handedness Options**: Choose between left-handed and right-handed layouts for Zoomed and Guided modes
 - **Offline Reading**: Download comics from Komga for offline access
 - **Reading Progress**: Automatically tracks your reading progress
 - **Cross-Platform**: Works on Windows, Linux, macOS, and Android
+- **Semantic Versioning**: Powered by GitVersion for clear version tracking
+
+## Support
+
+If you like the project, you can support me:
+- **Ko-fi**: [Support on Ko-fi](https://ko-fi.com/lakritzator)
+- **PayPal**: [Donate with PayPal](https://paypal.me/lakritzator)
 
 ## Supported Formats
 
@@ -136,78 +148,12 @@ Configure your server URL and credentials in the Settings page to:
 
 ## Technology Stack
 
-- **UI Framework**: Avalonia UI 11.x (cross-platform)
+- **UI Framework**: Avalonia UI 12.x (cross-platform)
 - **MVVM**: CommunityToolkit.Mvvm
 - **Storage**: SQLite via sqlite-net-pcl
 - **CBR Support**: SharpCompress
 - **PDF Support**: PDFiumCore for PDF rendering, SixLabors.ImageSharp for image processing
 
-## Publishing to Google Play Store
-
-To publish this app to the Google Play Store, follow these steps:
-
-### Prerequisites
-
-1. **Google Play Developer Account**: Register at [Google Play Console](https://play.google.com/console) ($25 one-time fee)
-2. **Signing Keystore**: Create a production signing keystore (keep it secure - losing it means you can't update your app)
-
-### Generate a Production Keystore
-
-```bash
-keytool -genkeypair -v \
-  -keystore StripWolf-release.keystore \
-  -alias StripWolf-release \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -storepass YOUR_STORE_PASSWORD \
-  -keypass YOUR_KEY_PASSWORD \
-  -dname "CN=StripWolf, OU=Development, O=Your Organization, L=City, ST=State, C=Country"
-```
-
-### Configure GitHub Secrets (for automated releases)
-
-To use the production keystore with GitHub Actions:
-
-1. Base64 encode your keystore: `base64 -i StripWolf-release.keystore -o keystore-base64.txt`
-2. Add these secrets to your GitHub repository:
-   - `ANDROID_KEYSTORE_BASE64`: Contents of `keystore-base64.txt`
-   - `ANDROID_SIGNING_KEY_PASS`: Your key password
-   - `ANDROID_SIGNING_STORE_PASS`: Your store password
-
-### Build for Google Play
-
-For Google Play Store distribution, build an AAB (Android App Bundle) instead of APK:
-
-1. Update `StripWolf.Android.csproj`:
-   ```xml
-   <AndroidPackageFormat>aab</AndroidPackageFormat>
-   ```
-
-2. Build the release:
-   ```bash
-   dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release
-   ```
-
-### Upload to Google Play
-
-1. Go to [Google Play Console](https://play.google.com/console)
-2. Create a new app or select your existing app
-3. Navigate to Production > Create new release
-4. Upload the signed AAB file
-5. Complete the store listing (screenshots, descriptions, etc.)
-6. Submit for review
-
-### App Store Requirements
-
-Before submitting, ensure you have:
-
-- [ ] App icon in various sizes
-- [ ] Feature graphic (1024x500)
-- [ ] Screenshots for phones and tablets
-- [ ] Privacy policy URL
-- [ ] Content rating questionnaire completed
-- [ ] Target audience and content declaration
 
 ## License
 

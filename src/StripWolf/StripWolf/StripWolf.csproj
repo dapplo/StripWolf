@@ -42,6 +42,10 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" />
     <!-- For CBR (RAR) file support -->
     <PackageReference Include="SharpCompress" />
+    <PackageReference Include="GitVersion.MsBuild">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">

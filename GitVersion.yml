@@ -1,0 +1,8 @@
+next-version: 1.0.0
+mode: ContinuousDelivery
+branches:
+  main:
+    regex: ^main$
+    label: ''
+    increment: Patch
+    is-main-branch: true

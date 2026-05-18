@@ -136,6 +136,10 @@ public class Loc
     public string Version => GetString();
     public string ViewReleaseNotes => GetString();
     public string ReleaseNotes => GetString();
+    public string SupportMe => GetString();
+    public string ProjectOnGitHub => GetString();
+    public string DonateWithPayPal => GetString();
+    public string DonateWithKoFi => GetString();
     
     // Reader View
     public string Page => GetString();

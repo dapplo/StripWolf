@@ -177,6 +177,18 @@
   <data name="ReleaseNotes" xml:space="preserve">
     <value>Notes de version</value>
   </data>
+  <data name="SupportMe" xml:space="preserve">
+    <value>Soutenez-moi</value>
+  </data>
+  <data name="ProjectOnGitHub" xml:space="preserve">
+    <value>Projet sur GitHub</value>
+  </data>
+  <data name="DonateWithPayPal" xml:space="preserve">
+    <value>Faire un don avec PayPal</value>
+  </data>
+  <data name="DonateWithKoFi" xml:space="preserve">
+    <value>Soutenir sur Ko-fi</value>
+  </data>
   <data name="ComicInformation" xml:space="preserve">
     <value>Informations sur le comic</value>
   </data>
