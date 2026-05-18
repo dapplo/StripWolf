@@ -22,11 +22,11 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using StripWolf.Models;
-using StripWolf.Models.Komga;
-using StripWolf.Services;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
+using StripWolf.Core.Services;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 public partial class ActivityViewModel : ViewModelBase
 {

@@ -22,7 +22,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Implementation of the donation service

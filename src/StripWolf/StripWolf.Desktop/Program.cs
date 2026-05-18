@@ -21,14 +21,14 @@ using System;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 #if Windows && !DISABLE_EPUB_WEBVIEW
-using StripWolf.Desktop.Services.Windows;
+using StripWolf.Core.Desktop.Services.Windows;
 #endif
 #if Linux && !DISABLE_EPUB_WEBVIEW
-using StripWolf.Desktop.Services.Linux;
+using StripWolf.Core.Desktop.Services.Linux;
 #endif
-using StripWolf.Services;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Desktop;
+namespace StripWolf.Core.Desktop;
 
 sealed class Program
 {

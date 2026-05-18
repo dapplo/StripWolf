@@ -19,7 +19,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 /// <summary>
 /// Base view model with common functionality

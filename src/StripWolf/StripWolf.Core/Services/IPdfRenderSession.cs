@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Represents a reusable PDF render session for a single open document.

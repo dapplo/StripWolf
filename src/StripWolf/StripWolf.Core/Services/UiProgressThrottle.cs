@@ -19,7 +19,7 @@
 
 using Avalonia.Threading;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 internal static class UiProgressThrottle
 {

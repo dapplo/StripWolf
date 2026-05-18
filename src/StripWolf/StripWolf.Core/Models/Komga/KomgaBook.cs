@@ -21,7 +21,7 @@ using System;
 using System.Text.Json.Serialization;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Represents a book (issue) from Komga

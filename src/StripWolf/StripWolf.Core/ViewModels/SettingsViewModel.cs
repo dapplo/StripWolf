@@ -23,10 +23,10 @@ using Avalonia;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using StripWolf.Models;
-using StripWolf.Services;
+using StripWolf.Core.Models;
+using StripWolf.Core.Services;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 /// <summary>
 /// View model for settings page

@@ -20,10 +20,10 @@
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
-using StripWolf.Data;
-using StripWolf.Models;
+using StripWolf.Core.Data;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 public sealed class EpubShadowConversionService
 {

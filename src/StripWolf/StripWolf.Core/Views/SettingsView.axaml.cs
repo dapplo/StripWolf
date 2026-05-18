@@ -18,9 +18,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia.Controls;
-using StripWolf.ViewModels;
+using StripWolf.Core.ViewModels;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class SettingsView : UserControl
 {

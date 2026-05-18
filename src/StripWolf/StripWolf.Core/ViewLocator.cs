@@ -19,8 +19,8 @@
 
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using StripWolf.ViewModels;
-using StripWolf.Views;
+using StripWolf.Core.ViewModels;
+using StripWolf.Core.Views;
 
 namespace StripWolf;
 

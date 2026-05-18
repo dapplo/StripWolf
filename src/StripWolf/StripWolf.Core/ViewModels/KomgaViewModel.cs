@@ -22,12 +22,12 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using StripWolf.Models;
-using StripWolf.Models.Komga;
-using StripWolf.Services;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
+using StripWolf.Core.Services;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 /// <summary>
 /// View model for browsing Komga content

@@ -21,9 +21,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for reading and writing ComicInfo.xml metadata in a Native AOT compatible way.

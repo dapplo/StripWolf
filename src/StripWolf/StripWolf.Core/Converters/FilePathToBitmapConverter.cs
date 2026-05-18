@@ -22,7 +22,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media.Imaging;
 
-namespace StripWolf.Converters;
+namespace StripWolf.Core.Converters;
 
 /// <summary>
 /// Converts a file path string to a Bitmap for display in Image controls.

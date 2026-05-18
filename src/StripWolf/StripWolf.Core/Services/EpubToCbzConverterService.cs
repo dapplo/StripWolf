@@ -25,11 +25,11 @@ using System.Xml;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Styling;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 using VersOne.Epub;
 using VersOne.Epub.Schema;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Converts EPUB books to CBZ by rendering paginated HTML chapters with a platform-native off-screen WebView.

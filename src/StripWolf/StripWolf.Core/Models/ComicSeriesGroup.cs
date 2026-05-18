@@ -23,7 +23,7 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Represents a source-agnostic comic series group

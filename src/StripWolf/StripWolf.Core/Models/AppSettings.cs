@@ -19,7 +19,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Application settings model

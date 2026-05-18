@@ -20,7 +20,7 @@
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 public partial class SectionLayoutPreference : ObservableObject
 {

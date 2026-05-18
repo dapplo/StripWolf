@@ -20,7 +20,7 @@
 using System;
 using System.Text.Json.Serialization;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Read progress from Komga

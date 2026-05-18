@@ -19,9 +19,9 @@
 
 using System.IO.Compression;
 using System.Text;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for converting PDF files to CBZ format.

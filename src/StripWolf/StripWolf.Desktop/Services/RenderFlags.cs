@@ -19,7 +19,7 @@
 
 using System;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// PDFium render flags

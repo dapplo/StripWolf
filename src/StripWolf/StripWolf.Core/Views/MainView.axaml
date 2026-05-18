@@ -2,10 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:vm="using:StripWolf.ViewModels"
-             xmlns:views="using:StripWolf.Views"
+             xmlns:vm="using:StripWolf.Core.ViewModels"
+             xmlns:views="using:StripWolf.Core.Views"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
-             x:Class="StripWolf.Views.MainView"
+             x:Class="StripWolf.Core.Views.MainView"
              x:DataType="vm:MainViewModel">
   
   <Grid RowDefinitions="*,Auto">

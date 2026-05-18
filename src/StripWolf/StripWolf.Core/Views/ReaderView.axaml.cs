@@ -20,9 +20,9 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
-using StripWolf.ViewModels;
+using StripWolf.Core.ViewModels;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class ReaderView : UserControl
 {

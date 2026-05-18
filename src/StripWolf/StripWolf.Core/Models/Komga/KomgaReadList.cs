@@ -22,7 +22,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Represents a read list from Komga

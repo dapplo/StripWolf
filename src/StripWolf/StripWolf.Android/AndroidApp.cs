@@ -22,11 +22,11 @@ using Android.App;
 using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
-using StripWolf.Android.Services;
-using StripWolf.Services;
+using StripWolf.Core.Android.Services;
+using StripWolf.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace StripWolf.Android;
+namespace StripWolf.Core.Android;
 
 [Application]
 public class AndroidApp : AvaloniaAndroidApplication<App>

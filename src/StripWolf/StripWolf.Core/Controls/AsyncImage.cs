@@ -26,7 +26,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
-namespace StripWolf.Controls;
+namespace StripWolf.Core.Controls;
 
 /// <summary>
 /// Image control that loads images asynchronously with optional Basic authentication.

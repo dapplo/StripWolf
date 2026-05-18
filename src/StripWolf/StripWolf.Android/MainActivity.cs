@@ -22,7 +22,7 @@ using Android.Content.PM;
 using Android.OS;
 using Avalonia.Android;
 
-namespace StripWolf.Android;
+namespace StripWolf.Core.Android;
 
 [Activity(
     Label = "StripWolf",

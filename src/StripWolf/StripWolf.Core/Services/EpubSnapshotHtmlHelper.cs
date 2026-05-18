@@ -21,7 +21,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 public static class EpubSnapshotHtmlHelper
 {

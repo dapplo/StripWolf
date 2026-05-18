@@ -21,7 +21,7 @@ using System.Globalization;
 using System.Resources;
 using System.Runtime.CompilerServices;
 
-namespace StripWolf.Resources;
+namespace StripWolf.Core.Resources;
 
 /// <summary>
 /// Provides localized strings for the UI. Bind to this class in XAML.

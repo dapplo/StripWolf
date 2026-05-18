@@ -21,10 +21,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using StripWolf.Data;
-using StripWolf.Models;
+using StripWolf.Core.Data;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for persisting application settings with secure password storage

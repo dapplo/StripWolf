@@ -20,10 +20,10 @@
 using System.Text.Json;
 using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
-using StripWolf.Data;
+using StripWolf.Core.Data;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Represents a custom HTTP header

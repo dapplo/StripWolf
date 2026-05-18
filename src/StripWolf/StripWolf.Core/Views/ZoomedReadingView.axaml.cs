@@ -20,9 +20,9 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
-using StripWolf.ViewModels;
+using StripWolf.Core.ViewModels;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class ZoomedReadingView : ZoomViewBase
 {

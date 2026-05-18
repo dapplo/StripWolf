@@ -19,9 +19,9 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 /// <summary>
 /// Main view model that handles navigation between pages

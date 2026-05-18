@@ -22,10 +22,10 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using StripWolf.Models;
-using StripWolf.Services;
+using StripWolf.Core.Models;
+using StripWolf.Core.Services;
 
-namespace StripWolf.ViewModels;
+namespace StripWolf.Core.ViewModels;
 
 /// <summary>
 /// View model for the comic reader page

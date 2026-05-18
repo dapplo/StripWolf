@@ -22,11 +22,11 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.IO.Pipelines;
-using StripWolf.Data;
-using StripWolf.Models;
-using StripWolf.Models.Komga;
+using StripWolf.Core.Data;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for interacting with Komga API

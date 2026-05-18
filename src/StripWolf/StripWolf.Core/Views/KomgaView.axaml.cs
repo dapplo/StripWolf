@@ -18,13 +18,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia.Controls;
-using StripWolf.ViewModels;
+using StripWolf.Core.ViewModels;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using StripWolf.Models.Komga;
+using StripWolf.Core.Models.Komga;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class KomgaView : UserControl, INotifyPropertyChanged
 {

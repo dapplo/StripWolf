@@ -19,7 +19,7 @@
 
 using UIKit;
 
-namespace StripWolf.iOS;
+namespace StripWolf.Core.iOS;
 
 public class Application
 {

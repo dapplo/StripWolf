@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Represents a request to navigate to a Komga series, optionally on a specific configured server.

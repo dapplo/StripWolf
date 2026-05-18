@@ -17,11 +17,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using StripWolf.Models;
+using StripWolf.Core.Models;
 using SQLite;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.Data;
+namespace StripWolf.Core.Data;
 
 /// <summary>
 /// SQLite database service for local storage

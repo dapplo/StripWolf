@@ -26,9 +26,9 @@ using Android.OS;
 using Android.Views;
 using Android.Webkit;
 using Java.Interop;
-using StripWolf.Services;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Android.Services;
+namespace StripWolf.Core.Android.Services;
 
 /// <summary>
 /// Android off-screen snapshot service backed by a hidden native WebView.

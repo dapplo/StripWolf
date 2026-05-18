@@ -22,10 +22,10 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using StripWolf.ViewModels;
-using StripWolf.Models;
+using StripWolf.Core.ViewModels;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public abstract class ZoomViewBase : UserControl
 {

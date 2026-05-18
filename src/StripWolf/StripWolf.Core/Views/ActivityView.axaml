@@ -2,13 +2,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:vm="using:StripWolf.ViewModels"
-             xmlns:models="using:StripWolf.Models"
-             xmlns:komga="using:StripWolf.Models.Komga"
+             xmlns:vm="using:StripWolf.Core.ViewModels"
+             xmlns:models="using:StripWolf.Core.Models"
+             xmlns:komga="using:StripWolf.Core.Models.Komga"
              xmlns:repeater="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.ItemsRepeater"
              xmlns:layout="clr-namespace:Avalonia.Layout;assembly=Avalonia.Controls.ItemsRepeater"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
-             x:Class="StripWolf.Views.ActivityView"
+             x:Class="StripWolf.Core.Views.ActivityView"
              x:DataType="vm:ActivityViewModel">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="16" Spacing="16">

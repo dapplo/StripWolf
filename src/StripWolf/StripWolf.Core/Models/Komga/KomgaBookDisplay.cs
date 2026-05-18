@@ -20,7 +20,7 @@
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Display model for a Komga book with pre-loaded thumbnail and download status

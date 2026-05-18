@@ -19,9 +19,9 @@
 
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 public class ImportQueueService
 {

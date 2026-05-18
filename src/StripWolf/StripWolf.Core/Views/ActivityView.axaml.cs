@@ -19,7 +19,7 @@
 
 using Avalonia.Controls;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class ActivityView : UserControl
 {

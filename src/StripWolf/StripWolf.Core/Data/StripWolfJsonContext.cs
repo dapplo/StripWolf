@@ -18,11 +18,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using System.Text.Json.Serialization;
-using StripWolf.Models;
-using StripWolf.Models.Komga;
-using StripWolf.Services;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Data;
+namespace StripWolf.Core.Data;
 
 [JsonSourceGenerationOptions(
     WriteIndented = true,

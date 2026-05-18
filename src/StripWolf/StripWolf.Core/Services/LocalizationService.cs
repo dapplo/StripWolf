@@ -20,7 +20,7 @@
 using System.Globalization;
 using System.Resources;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for managing application localization

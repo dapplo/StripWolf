@@ -22,11 +22,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Styling;
 using System.Globalization;
 using Avalonia.Markup.Xaml;
-using StripWolf.Data;
-using StripWolf.Models;
-using StripWolf.Services;
-using StripWolf.ViewModels;
-using StripWolf.Views;
+using StripWolf.Core.Data;
+using StripWolf.Core.Models;
+using StripWolf.Core.Services;
+using StripWolf.Core.ViewModels;
+using StripWolf.Core.Views;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace StripWolf;

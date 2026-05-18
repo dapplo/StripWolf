@@ -21,15 +21,15 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using StripWolf.Services;
-using StripWolf.ViewModels;
+using StripWolf.Core.Services;
+using StripWolf.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class LibraryView : UserControl, INotifyPropertyChanged
 {

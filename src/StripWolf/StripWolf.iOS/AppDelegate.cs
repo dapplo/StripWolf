@@ -21,7 +21,7 @@ using Foundation;
 using Avalonia;
 using Avalonia.iOS;
 
-namespace StripWolf.iOS;
+namespace StripWolf.Core.iOS;
 
 // The UIApplicationDelegate for the application. This class is responsible for launching the
 // User Interface of the application, as well as listening (and optionally responding) to application events from iOS.

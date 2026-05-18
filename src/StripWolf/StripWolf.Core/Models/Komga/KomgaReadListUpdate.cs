@@ -20,7 +20,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Request payload for updating a read list

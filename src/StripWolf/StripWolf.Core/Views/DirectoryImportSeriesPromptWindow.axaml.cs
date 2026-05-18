@@ -20,7 +20,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class DirectoryImportSeriesPromptWindow : Window
 {

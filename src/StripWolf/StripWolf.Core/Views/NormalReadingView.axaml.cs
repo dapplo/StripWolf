@@ -21,9 +21,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using StripWolf.ViewModels;
+using StripWolf.Core.ViewModels;
 
-namespace StripWolf.Views;
+namespace StripWolf.Core.Views;
 
 public partial class NormalReadingView : UserControl
 {

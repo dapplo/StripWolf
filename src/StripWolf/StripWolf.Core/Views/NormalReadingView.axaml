@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:StripWolf.ViewModels"
-             x:Class="StripWolf.Views.NormalReadingView"
+             xmlns:vm="using:StripWolf.Core.ViewModels"
+             x:Class="StripWolf.Core.Views.NormalReadingView"
              x:DataType="vm:ReaderViewModel">
     <ScrollViewer x:Name="ImageScroller" 
                   HorizontalScrollBarVisibility="Auto" 

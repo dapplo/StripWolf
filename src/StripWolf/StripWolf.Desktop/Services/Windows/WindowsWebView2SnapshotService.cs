@@ -28,10 +28,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using DrawingColor = System.Drawing.Color;
 using Microsoft.Web.WebView2.Core;
-using StripWolf.Data;
-using StripWolf.Services;
+using StripWolf.Core.Data;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Desktop.Services.Windows;
+namespace StripWolf.Core.Desktop.Services.Windows;
 
 /// <summary>
 /// Windows off-screen snapshot service backed by a hidden native WebView2 host.

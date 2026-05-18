@@ -19,7 +19,7 @@
 
 using System.Xml.Serialization;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Yes/No enumeration for XML

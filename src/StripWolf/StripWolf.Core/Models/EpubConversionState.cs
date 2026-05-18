@@ -20,7 +20,7 @@
 using SQLite;
 using System.Diagnostics.CodeAnalysis;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public class EpubConversionState

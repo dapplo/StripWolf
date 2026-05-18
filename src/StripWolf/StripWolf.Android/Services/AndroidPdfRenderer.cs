@@ -23,9 +23,9 @@ using System.Threading.Tasks;
 using Android.Graphics;
 using Android.Graphics.Pdf;
 using Android.OS;
-using StripWolf.Services;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Android.Services;
+namespace StripWolf.Core.Android.Services;
 
 /// <summary>
 /// Android-specific PDF renderer using Android.Graphics.Pdf.PdfRenderer.

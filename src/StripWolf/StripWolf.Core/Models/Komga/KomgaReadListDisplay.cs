@@ -19,7 +19,7 @@
 
 using Avalonia.Media.Imaging;
 
-namespace StripWolf.Models.Komga;
+namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Display model for a Komga read list with pre-loaded thumbnail

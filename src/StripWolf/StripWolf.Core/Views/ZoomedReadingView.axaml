@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:StripWolf.ViewModels"
-             x:Class="StripWolf.Views.ZoomedReadingView"
+             xmlns:vm="using:StripWolf.Core.ViewModels"
+             x:Class="StripWolf.Core.Views.ZoomedReadingView"
              x:DataType="vm:ReaderViewModel">
     <Grid>
         <Grid.ColumnDefinitions>

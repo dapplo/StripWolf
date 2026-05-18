@@ -19,7 +19,7 @@
 
 using System.Xml.Serialization;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Page types in comic

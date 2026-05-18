@@ -17,10 +17,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using StripWolf.Models;
-using StripWolf.Models.Komga;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 public sealed class KomgaDownloadedFile
 {

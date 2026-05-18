@@ -1,9 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:StripWolf.ViewModels"
-             xmlns:views="using:StripWolf.Views"
-             xmlns:converters="using:StripWolf.Converters"
-             x:Class="StripWolf.Views.ReaderView"
+             xmlns:vm="using:StripWolf.Core.ViewModels"
+             xmlns:views="using:StripWolf.Core.Views"
+             xmlns:converters="using:StripWolf.Core.Converters"
+             x:Class="StripWolf.Core.Views.ReaderView"
              x:DataType="vm:ReaderViewModel"
              Background="Black"
              Focusable="True">

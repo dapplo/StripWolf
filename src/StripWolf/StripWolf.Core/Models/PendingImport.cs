@@ -19,7 +19,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace StripWolf.Models;
+namespace StripWolf.Core.Models;
 
 /// <summary>
 /// Represents a queued or active local import/conversion task.

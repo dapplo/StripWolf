@@ -19,7 +19,7 @@
 
 using Microsoft.IO;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 public static class RecyclableStreamManagerProvider
 {

@@ -27,7 +27,7 @@ using System;
 using System.Threading.Tasks;
 using System.IO;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// PDFium-based PDF renderer for desktop platforms (Windows, macOS, Linux).

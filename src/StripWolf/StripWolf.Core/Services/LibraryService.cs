@@ -24,11 +24,11 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using StripWolf.Data;
-using StripWolf.Models;
-using StripWolf.Models.Komga;
+using StripWolf.Core.Data;
+using StripWolf.Core.Models;
+using StripWolf.Core.Models.Komga;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// Service for managing the local comic library
