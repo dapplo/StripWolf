@@ -34,6 +34,10 @@
     <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" />
     <PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" />
     <PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.android-x64" />
+    <PackageReference Include="GitVersion.MsBuild">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

@@ -58,6 +58,16 @@
     </PackageReference>
     <PackageReference Include="Tmds.DBus.Protocol" />
     <PackageReference Include="PDFiumCore" />
+    <PackageReference Include="GitVersion.MsBuild">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Icon.ico" Condition="Exists('Icon.ico')">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseEpubSupport)' == 'true'">
