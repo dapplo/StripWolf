@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using StripWolf.Models;
+using StripWolf.Core.Models;
 
-namespace StripWolf.Services;
+namespace StripWolf.Core.Services;
 
 /// <summary>
 /// AOT publish fallback when OpenCV panel detection is excluded from the build.
