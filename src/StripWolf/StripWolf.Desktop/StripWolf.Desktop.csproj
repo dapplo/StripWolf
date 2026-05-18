@@ -5,6 +5,7 @@
     See https://docs.avaloniaui.net/docs/guides/platforms/platform-specific-code/dotnet for more details.-->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <AssemblyName>StripWolf</AssemblyName>
     <PublishAot>true</PublishAot>
     <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
     <UseOpenCvPanelDetection Condition="$([MSBuild]::IsOSPlatform('Linux'))">false</UseOpenCvPanelDetection>
@@ -69,7 +70,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf\StripWolf.csproj" AdditionalProperties="UseOpenCvPanelDetection=$(UseOpenCvPanelDetection);UseEpubSupport=$(UseEpubSupport)" />
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" AdditionalProperties="UseOpenCvPanelDetection=$(UseOpenCvPanelDetection);UseEpubSupport=$(UseEpubSupport)" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
@@ -105,4 +106,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- Aggressively remove all PDB files after publish, including native ones from SkiaSharp, etc. -->
+  <Target Name="DeletePdbFilesAfterPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <PdbFiles Include="$(PublishDir)\**\*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(PdbFiles)" />
+    <Message Text="Deleted PDB files from $(PublishDir)" Importance="high" />
+  </Target>
 </Project>

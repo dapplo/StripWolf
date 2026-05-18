@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>StripWolf.Core</AssemblyName>
     <IsAotCompatible>true</IsAotCompatible>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
@@ -11,6 +12,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
     <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
+    <AssemblyTitle>StripWolf.Core</AssemblyTitle>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">

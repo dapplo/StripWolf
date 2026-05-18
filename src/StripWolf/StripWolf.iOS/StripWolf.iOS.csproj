@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf\StripWolf.csproj" />
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

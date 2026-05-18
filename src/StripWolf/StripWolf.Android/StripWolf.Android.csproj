@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
+    <AssemblyName>StripWolf</AssemblyName>
     <ApplicationId>com.dapplo.StripWolf</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
@@ -35,6 +36,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf\StripWolf.csproj" />
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" />
   </ItemGroup>
 </Project>
