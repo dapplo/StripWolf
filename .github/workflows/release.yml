@@ -94,7 +94,7 @@ jobs:
         run: dotnet restore src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj
 
       - name: Build Windows Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r win-x64 --self-contained -o publish/windows
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r win-x64 --self-contained -o publish/windows -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
 
       - name: Create Windows ZIP
         run: Compress-Archive -Path publish/windows/* -DestinationPath StripWolf-Windows-x64.zip
@@ -125,7 +125,7 @@ jobs:
         run: dotnet restore src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj
 
       - name: Build Linux Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r linux-x64 --self-contained -o publish/linux
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r linux-x64 --self-contained -o publish/linux -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
 
       - name: Create Linux tarball
         run: tar -czvf StripWolf-Linux-x64.tar.gz -C publish/linux .
@@ -156,10 +156,10 @@ jobs:
         run: dotnet restore src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj
 
       - name: Build macOS x64 Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-x64 --self-contained -o publish/macos-x64
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-x64 --self-contained -o publish/macos-x64 -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
 
       - name: Build macOS ARM64 Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-arm64 --self-contained -o publish/macos-arm64
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-arm64 --self-contained -o publish/macos-arm64 -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
 
       - name: Create macOS x64 tarball
         run: tar -czvf StripWolf-macOS-x64.tar.gz -C publish/macos-x64 .
@@ -219,7 +219,7 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Build Android APK
-        run: dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android
+        run: dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
