@@ -32,7 +32,12 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          echo "version=v${{ steps.gitversion.outputs.semVer }}" >> $GITHUB_OUTPUT
+          # Use MajorMinorPatch for a clean v1.0.x tag
+          VERSION="${{ steps.gitversion.outputs.majorMinorPatch }}"
+          # Get the shortened commit hash reliably
+          HASH=$(git rev-parse --short=8 HEAD)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: release_notes

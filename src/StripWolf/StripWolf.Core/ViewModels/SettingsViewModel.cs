@@ -97,8 +97,19 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 var parts = fullVersion.Split('+');
                 displayVersion = parts[0];
-                hash = parts[1];
-                if (hash.Length > 7) hash = hash[..7];
+                var metadata = parts[1];
+                
+                // metadata could be just the hash, or Sha.hash, or other things
+                if (metadata.StartsWith("Sha.", StringComparison.OrdinalIgnoreCase))
+                {
+                    hash = metadata[4..];
+                }
+                else
+                {
+                    hash = metadata;
+                }
+                
+                if (hash.Length > 8) hash = hash[..8];
             }
             else
             {
