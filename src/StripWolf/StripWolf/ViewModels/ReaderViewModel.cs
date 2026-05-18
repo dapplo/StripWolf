@@ -288,18 +288,18 @@ public partial class ReaderViewModel : ViewModelBase
     
     public string ReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "â–¯",
-        ReadingMode.Zoomed => "âŠ•",
-        ReadingMode.Guided => "âŠž",
-        _ => "â–¯"
+        ReadingMode.Normal => "▯",
+        ReadingMode.Zoomed => "⊕",
+        ReadingMode.Guided => "⊞",
+        _ => "▯"
     };
 
     public string NextReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "âŠ•",
-        ReadingMode.Zoomed => "âŠž",
-        ReadingMode.Guided => "â–¯",
-        _ => "âŠ•"
+        ReadingMode.Normal => "⊕",
+        ReadingMode.Zoomed => "⊞",
+        ReadingMode.Guided => "▯",
+        _ => "⊕"
     };
     
     public string PageDisplay
@@ -324,14 +324,14 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string StretchModeIcon => StretchMode switch
     {
-        StretchMode.FitPage => "â†”",
-        StretchMode.FitWidth => "â†•",
+        StretchMode.FitPage => "↔",
+        StretchMode.FitWidth => "↕",
         StretchMode.FitHeight => "1:1",
-        StretchMode.Original => "â–£",
-        _ => "â–£"
+        StretchMode.Original => "▣",
+        _ => "▣"
     };
 
-    public string TwoPageModeIcon => IsTwoPageMode ? "â–¯" : "â—«";
+    public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "◫";
     
     public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 

@@ -750,11 +750,11 @@ public partial class SettingsViewModel : ViewModelBase
             _komgaApiService.Configure(testServer);
             var success = await _komgaApiService.TestConnectionAsync();
 
-            ConnectionStatus = success ? "âœ“ Connection successful!" : "âœ— Connection failed";
+            ConnectionStatus = success ? "✓ Connection successful!" : "✗ Connection failed";
         }
         catch (Exception ex)
         {
-            ConnectionStatus = $"âœ— Error: {ex.Message}";
+            ConnectionStatus = $"✗ Error: {ex.Message}";
         }
         finally
         {

@@ -12,6 +12,8 @@
     <UseOpenCvPanelDetection Condition="'$(RuntimeIdentifier)' != ''">false</UseOpenCvPanelDetection>
     <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
     <UseEpubSupport Condition="'$(RuntimeIdentifier)' != ''">false</UseEpubSupport>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
