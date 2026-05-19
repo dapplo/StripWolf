@@ -224,9 +224,19 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
-      - name: Build Android APK
+      - name: Build Android ARM64
         run: |
-          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android \
+          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-arm64 -o publish/android-arm64 \
+            -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
+            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
+            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
+        env:
+          ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
+          ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
+
+      - name: Build Android x64
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-x64 -o publish/android-x64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
             -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
             -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
@@ -236,26 +246,19 @@ jobs:
 
       - name: Find and rename APKs
         run: |
-          # Find all APKs (handling the per-ABI split files)
           mkdir -p release-artifacts
-          find publish/android -name "*.apk" | while read -r apk; do
-            echo "Processing APK at: $apk"
-            
-            # Detect architecture based on RID in path or filename
-            if [[ "$apk" == *"android-arm64"* ]] || [[ "$apk" == *"arm64-v8a"* ]]; then
-               ABI="arm64-v8a"
-            elif [[ "$apk" == *"android-x64"* ]] || [[ "$apk" == *"x86_64"* ]] || [[ "$apk" == *"x64"* ]]; then
-               ABI="x86_64"
-            else
-               # Final attempt using grep for common ABI patterns
-               ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a|universal)" || echo "universal")
-            fi
+          
+          # Process ARM64
+          APK_ARM=$(find publish/android-arm64 -name "*-Signed.apk" | head -1)
+          if [ -n "$APK_ARM" ]; then
+            cp "$APK_ARM" "release-artifacts/StripWolf-Android-arm64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
+          fi
 
-            # Create a clean filename
-            NEW_NAME="StripWolf-Android-${ABI}-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
-            cp "$apk" "release-artifacts/$NEW_NAME"
-            echo "Prepared: $NEW_NAME"
-          done
+          # Process x64
+          APK_X64=$(find publish/android-x64 -name "*-Signed.apk" | head -1)
+          if [ -n "$APK_X64" ]; then
+            cp "$APK_X64" "release-artifacts/StripWolf-Android-x86_64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
+          fi
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
