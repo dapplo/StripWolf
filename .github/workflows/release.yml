@@ -239,16 +239,16 @@ jobs:
           # Find all APKs (handling the per-ABI split files)
           mkdir -p release-artifacts
           find publish/android -name "*.apk" | while read -r apk; do
-            # Extract ABI name more robustly
-            # Common patterns: arm64-v8a, x86_64, armeabi-v7a
-            # MSBuild often outputs them as part of the filename or directory
-            ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a|universal)" || echo "unknown")
+            echo "Processing APK at: $apk"
             
-            # If still unknown, try checking the full path
-            if [ "$ABI" = "unknown" ]; then
-               if [[ "$apk" == *"arm64"* ]]; then ABI="arm64-v8a";
-               elif [[ "$apk" == *"x64"* ]] || [[ "$apk" == *"x86_64"* ]]; then ABI="x86_64";
-               else ABI="universal"; fi
+            # Detect architecture based on RID in path or filename
+            if [[ "$apk" == *"android-arm64"* ]] || [[ "$apk" == *"arm64-v8a"* ]]; then
+               ABI="arm64-v8a"
+            elif [[ "$apk" == *"android-x64"* ]] || [[ "$apk" == *"x86_64"* ]] || [[ "$apk" == *"x64"* ]]; then
+               ABI="x86_64"
+            else
+               # Final attempt using grep for common ABI patterns
+               ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a|universal)" || echo "universal")
             fi
 
             # Create a clean filename
