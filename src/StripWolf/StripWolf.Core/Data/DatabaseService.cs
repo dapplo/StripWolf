@@ -30,6 +30,8 @@ public class DatabaseService : IAsyncDisposable
 {
     private SQLiteAsyncConnection? _database;
     private readonly string _databasePath;
+    private readonly SemaphoreSlim _initializationSemaphore = new(1, 1);
+    private bool _isInitialized;
 
     public DatabaseService()
     {
@@ -56,25 +58,39 @@ public class DatabaseService : IAsyncDisposable
         typeof(KomgaServer))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
-        if (_database is not null)
+        if (_isInitialized && _database is not null)
         {
             return _database;
         }
 
-        _database = new SQLiteAsyncConnection(_databasePath);
-        
-        // Enable WAL mode for better concurrency and faster writes
-        // Also helps with "database is locked" and recovery after kills
-        await _database.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL");
-        await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
-        
-        await _database.CreateTableAsync<Comic>();
-        await _database.CreateTableAsync<EpubConversionState>();
-        await _database.CreateTableAsync<KomgaServer>();
-        await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
-        await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
-        
-        return _database;
+        await _initializationSemaphore.WaitAsync();
+        try
+        {
+            if (_isInitialized && _database is not null)
+            {
+                return _database;
+            }
+
+            _database = new SQLiteAsyncConnection(_databasePath);
+            
+            // Enable WAL mode for better concurrency and faster writes
+            // Also helps with "database is locked" and recovery after kills
+            await _database.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL");
+            await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
+            
+            await _database.CreateTableAsync<Comic>();
+            await _database.CreateTableAsync<EpubConversionState>();
+            await _database.CreateTableAsync<KomgaServer>();
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
+            
+            _isInitialized = true;
+            return _database;
+        }
+        finally
+        {
+            _initializationSemaphore.Release();
+        }
     }
 
     #region Comics
