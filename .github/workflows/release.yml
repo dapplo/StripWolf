@@ -225,7 +225,11 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
       - name: Build Android APK
-        run: dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android \
+            -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
+            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
+            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}

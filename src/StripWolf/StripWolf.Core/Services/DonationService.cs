@@ -53,14 +53,6 @@ public class DonationService : IDonationService
 
     private static ILauncher? GetLauncher()
     {
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            return desktop.MainWindow?.Launcher;
-        }
-        if (Application.Current?.ApplicationLifetime is ISingleViewApplicationLifetime singleView)
-        {
-            return TopLevel.GetTopLevel(singleView.MainView)?.Launcher;
-        }
-        return null;
+        return App.TopLevel?.Launcher;
     }
 }

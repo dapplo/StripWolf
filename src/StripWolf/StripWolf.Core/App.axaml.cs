@@ -34,6 +34,12 @@ namespace StripWolf;
 public partial class App : Application
 {
     public static IServiceProvider? Services { get; private set; }
+
+    /// <summary>
+    /// Gets the current TopLevel instance.
+    /// This is used to access platform services like ILauncher.
+    /// </summary>
+    public static Avalonia.Controls.TopLevel? TopLevel { get; set; }
     
     /// <summary>
     /// Action to register the platform-specific PDF renderer.
@@ -73,6 +79,7 @@ public partial class App : Application
             {
                 DataContext = mainViewModel
             };
+            App.TopLevel = desktop.MainWindow;
             
             // Handle shutdown to delete pending comics
             desktop.ShutdownRequested += async (sender, args) =>
