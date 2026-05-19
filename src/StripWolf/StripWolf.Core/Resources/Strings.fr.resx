@@ -8,21 +8,48 @@
             <xsd:complexType>
               <xsd:sequence>
                 <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
               </xsd:sequence>
               <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
             </xsd:complexType>
           </xsd:element>
         </xsd:choice>
       </xsd:complexType>
     </xsd:element>
   </xsd:schema>
-  
-  <!-- Common UI Strings -->
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>1.3</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>StripWolf</value>
+  </data>
   <data name="Settings" xml:space="preserve">
     <value>Paramètres</value>
   </data>
   <data name="Library" xml:space="preserve">
     <value>Bibliothèque</value>
+  </data>
+  <data name="Komga" xml:space="preserve">
+    <value>Komga</value>
   </data>
   <data name="Reader" xml:space="preserve">
     <value>Lecteur</value>
@@ -37,7 +64,7 @@
     <value>Actualiser</value>
   </data>
   <data name="AllComics" xml:space="preserve">
-    <value>Tous les Comics</value>
+    <value>Tous les comics</value>
   </data>
   <data name="ReadingNow" xml:space="preserve">
     <value>En cours de lecture</value>
@@ -49,7 +76,7 @@
     <value>Favoris</value>
   </data>
   <data name="ImportComic" xml:space="preserve">
-    <value>Importer un Comic</value>
+    <value>Importer un comic</value>
   </data>
   <data name="ImportFolder" xml:space="preserve">
     <value>Importer un dossier</value>
@@ -58,10 +85,10 @@
     <value>Aucun comic trouvé</value>
   </data>
   <data name="NoComicsInLibrary" xml:space="preserve">
-    <value>Votre bibliothèque est vide. Importez des comics ou téléchargez-les depuis Komga.</value>
+    <value>Votre bibliothèque est vide. Importez des comics ou téléchargez-les depuis Komga pour commencer.</value>
   </data>
   <data name="Pages" xml:space="preserve">
-    <value>pages</value>
+    <value>Pages</value>
   </data>
   <data name="NotConnected" xml:space="preserve">
     <value>Non connecté</value>
@@ -76,13 +103,13 @@
     <value>Continuer la lecture</value>
   </data>
   <data name="OnDeck" xml:space="preserve">
-    <value>À suivre</value>
+    <value>En attente</value>
   </data>
   <data name="RecentlyAddedBooks" xml:space="preserve">
-    <value>Livres récemment ajoutés</value>
+    <value>Livres ajoutés récemment</value>
   </data>
   <data name="RecentlyAddedSeries" xml:space="preserve">
-    <value>Séries récemment ajoutées</value>
+    <value>Séries ajoutées récemment</value>
   </data>
   <data name="Libraries" xml:space="preserve">
     <value>Bibliothèques</value>
@@ -105,8 +132,29 @@
   <data name="LoadMore" xml:space="preserve">
     <value>Charger plus</value>
   </data>
+  <data name="LoadMoreSeries" xml:space="preserve">
+    <value>Charger plus de séries</value>
+  </data>
+  <data name="LoadMoreBooks" xml:space="preserve">
+    <value>Charger plus de livres</value>
+  </data>
+  <data name="LoadMoreReadLists" xml:space="preserve">
+    <value>Charger plus de listes de lecture</value>
+  </data>
   <data name="NoResults" xml:space="preserve">
     <value>Aucun résultat trouvé</value>
+  </data>
+  <data name="SeriesResults" xml:space="preserve">
+    <value>Résultats de séries</value>
+  </data>
+  <data name="BookResults" xml:space="preserve">
+    <value>Résultats de livres</value>
+  </data>
+  <data name="BooksFormat" xml:space="preserve">
+    <value>{0} livres</value>
+  </data>
+  <data name="PagesFormat" xml:space="preserve">
+    <value>{0} pages</value>
   </data>
   <data name="KomgaServers" xml:space="preserve">
     <value>Serveurs Komga</value>
@@ -119,6 +167,9 @@
   </data>
   <data name="NoServersConfigured" xml:space="preserve">
     <value>Aucun serveur configuré</value>
+  </data>
+  <data name="AddServerHint" xml:space="preserve">
+    <value>Ajoutez un serveur Komga pour parcourir et télécharger des comics</value>
   </data>
   <data name="ServerConfiguration" xml:space="preserve">
     <value>Configuration du serveur</value>
@@ -145,10 +196,34 @@
     <value>Annuler</value>
   </data>
   <data name="ConnectionSuccessful" xml:space="preserve">
-    <value>Connexion réussie!</value>
+    <value>Connexion réussie !</value>
   </data>
   <data name="ConnectionFailed" xml:space="preserve">
     <value>Échec de la connexion</value>
+  </data>
+  <data name="TestingConnection" xml:space="preserve">
+    <value>Test de la connexion...</value>
+  </data>
+  <data name="AllFieldsRequired" xml:space="preserve">
+    <value>Tous les champs sont obligatoires.</value>
+  </data>
+  <data name="InvalidUrl" xml:space="preserve">
+    <value>Veuillez entrer une URL valide (ex. https://komga.example.com)</value>
+  </data>
+  <data name="CustomHttpHeaders" xml:space="preserve">
+    <value>En-têtes HTTP personnalisés</value>
+  </data>
+  <data name="CustomHeadersHint" xml:space="preserve">
+    <value>Ajoutez des en-têtes personnalisés pour l'authentification ou le proxy.</value>
+  </data>
+  <data name="HeaderName" xml:space="preserve">
+    <value>Nom de l'en-tête</value>
+  </data>
+  <data name="Value" xml:space="preserve">
+    <value>Valeur</value>
+  </data>
+  <data name="AddHeader" xml:space="preserve">
+    <value>Ajouter un en-tête</value>
   </data>
   <data name="LanguageSettings" xml:space="preserve">
     <value>Paramètres de langue</value>
@@ -166,7 +241,7 @@
     <value>À propos</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Un lecteur de bandes dessinées avec intégration Komga</value>
+    <value>Un lecteur de comics moderne pour fichiers locaux et Komga.</value>
   </data>
   <data name="Version" xml:space="preserve">
     <value>Version</value>
@@ -178,7 +253,7 @@
     <value>Notes de version</value>
   </data>
   <data name="SupportMe" xml:space="preserve">
-    <value>Soutenez-moi</value>
+    <value>Me soutenir</value>
   </data>
   <data name="ProjectOnGitHub" xml:space="preserve">
     <value>Projet sur GitHub</value>
@@ -187,7 +262,31 @@
     <value>Faire un don avec PayPal</value>
   </data>
   <data name="DonateWithKoFi" xml:space="preserve">
-    <value>Soutenir sur Ko-fi</value>
+    <value>Faire un don avec Ko-fi</value>
+  </data>
+  <data name="Page" xml:space="preserve">
+    <value>Page</value>
+  </data>
+  <data name="PageDisplay" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="TwoPagePageDisplay" xml:space="preserve">
+    <value>{0}-{1} / {2}</value>
+  </data>
+  <data name="ShowComicInfo" xml:space="preserve">
+    <value>Info (I)</value>
+  </data>
+  <data name="ToggleTwoPageMode" xml:space="preserve">
+    <value>Basculer en mode deux pages</value>
+  </data>
+  <data name="ChangeFitMode" xml:space="preserve">
+    <value>Changer le mode d'ajustement</value>
+  </data>
+  <data name="ToggleFullscreen" xml:space="preserve">
+    <value>Basculer en plein écran</value>
+  </data>
+  <data name="ResetZoom" xml:space="preserve">
+    <value>Réinitialiser le zoom</value>
   </data>
   <data name="ComicInformation" xml:space="preserve">
     <value>Informations sur le comic</value>
@@ -196,7 +295,7 @@
     <value>Titre</value>
   </data>
   <data name="IssueNumber" xml:space="preserve">
-    <value>Numéro de parution</value>
+    <value>Numéro</value>
   </data>
   <data name="Authors" xml:space="preserve">
     <value>Auteurs</value>
@@ -210,7 +309,481 @@
   <data name="Summary" xml:space="preserve">
     <value>Résumé</value>
   </data>
+  <data name="ExtendedMetadata" xml:space="preserve">
+    <value>Métadonnées étendues (ComicInfo.xml)</value>
+  </data>
+  <data name="Volume" xml:space="preserve">
+    <value>Volume</value>
+  </data>
+  <data name="Genre" xml:space="preserve">
+    <value>Genre</value>
+  </data>
+  <data name="Characters" xml:space="preserve">
+    <value>Personnages</value>
+  </data>
+  <data name="Teams" xml:space="preserve">
+    <value>Équipes</value>
+  </data>
+  <data name="StoryArc" xml:space="preserve">
+    <value>Arc narratif</value>
+  </data>
+  <data name="Notes" xml:space="preserve">
+    <value>Notes</value>
+  </data>
+  <data name="Web" xml:space="preserve">
+    <value>Web</value>
+  </data>
+  <data name="NoExtendedMetadata" xml:space="preserve">
+    <value>Aucune métadonnée étendue (ComicInfo.xml) disponible</value>
+  </data>
   <data name="Error" xml:space="preserve">
     <value>Erreur</value>
+  </data>
+  <data name="FailedToLoad" xml:space="preserve">
+    <value>Échec du chargement</value>
+  </data>
+  <data name="FailedToDownload" xml:space="preserve">
+    <value>Échec du téléchargement</value>
+  </data>
+  <data name="FailedToConnect" xml:space="preserve">
+    <value>Échec de la connexion</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>Rechercher des comics...</value>
+  </data>
+  <data name="Importing" xml:space="preserve">
+    <value>Importation...</value>
+  </data>
+  <data name="ConfirmExternalDelete" xml:space="preserve">
+    <value>Confirmer la suppression du fichier externe</value>
+  </data>
+  <data name="ConfirmExternalDeleteMessage" xml:space="preserve">
+    <value>Ce comic se trouve en dehors du répertoire interne de l'application. Êtes-vous sûr de vouloir le supprimer de son emplacement d'origine ?</value>
+  </data>
+  <data name="RemoveFromLibraryKeepFile" xml:space="preserve">
+    <value>Retirer de la bibliothèque (conserver le fichier)</value>
+  </data>
+  <data name="DeletePermanently" xml:space="preserve">
+    <value>Supprimer définitivement</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>Numéro</value>
+  </data>
+  <data name="ReadNow" xml:space="preserve">
+    <value>Lire maintenant</value>
+  </data>
+  <data name="ConvertNow" xml:space="preserve">
+    <value>Convertir maintenant</value>
+  </data>
+  <data name="Converting" xml:space="preserve">
+    <value>Conversion...</value>
+  </data>
+  <data name="Favorite" xml:space="preserve">
+    <value>Favori</value>
+  </data>
+  <data name="MarkRead" xml:space="preserve">
+    <value>Marquer comme lu</value>
+  </data>
+  <data name="EditMetadata" xml:space="preserve">
+    <value>Modifier les métadonnées</value>
+  </data>
+  <data name="DeleteComic" xml:space="preserve">
+    <value>Supprimer le comic</value>
+  </data>
+  <data name="SaveChanges" xml:space="preserve">
+    <value>Enregistrer les modifications</value>
+  </data>
+  <data name="Format" xml:space="preserve">
+    <value>Format</value>
+  </data>
+  <data name="NotConvertedYet" xml:space="preserve">
+    <value>Pas encore converti</value>
+  </data>
+  <data name="PagesDisplay" xml:space="preserve">
+    <value>{0} / {1} pages</value>
+  </data>
+  <data name="TotalPagesDisplay" xml:space="preserve">
+    <value>{0} pages</value>
+  </data>
+  <data name="Downloads" xml:space="preserve">
+    <value>Téléchargements</value>
+  </data>
+  <data name="PauseAll" xml:space="preserve">
+    <value>Tout suspendre</value>
+  </data>
+  <data name="ResumeAll" xml:space="preserve">
+    <value>Tout reprendre</value>
+  </data>
+  <data name="RetryFailed" xml:space="preserve">
+    <value>Réessayer les échecs</value>
+  </data>
+  <data name="CancelAll" xml:space="preserve">
+    <value>Tout annuler</value>
+  </data>
+  <data name="Queued" xml:space="preserve">
+    <value>En file d'attente</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Échoué</value>
+  </data>
+  <data name="Imports" xml:space="preserve">
+    <value>Importations</value>
+  </data>
+  <data name="EpubConversions" xml:space="preserve">
+    <value>Conversions EPUB</value>
+  </data>
+  <data name="PagesReady" xml:space="preserve">
+    <value>pages prêtes</value>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Deleting" xml:space="preserve">
+    <value>SUPPRESSION...</value>
+  </data>
+  <data name="DeleteStatusSingle" xml:space="preserve">
+    <value>Suppression de 1 comic dans {0}s</value>
+  </data>
+  <data name="DeleteStatusPlural" xml:space="preserve">
+    <value>Suppression de {0} comics dans {1}s</value>
+  </data>
+  <data name="DeleteActionUndo" xml:space="preserve">
+    <value>Annuler ({0})</value>
+  </data>
+  <data name="DeleteActionUndoMultiple" xml:space="preserve">
+    <value>Annuler {0} ({1})</value>
+  </data>
+  <data name="NoNewComics" xml:space="preserve">
+    <value>Aucun nouveau comic</value>
+  </data>
+  <data name="NoNewComicsHint" xml:space="preserve">
+    <value>Importez un fichier de comic ou téléchargez-le depuis Komga pour commencer</value>
+  </data>
+  <data name="ViewSeriesOnKomga" xml:space="preserve">
+    <value>Voir la série sur Komga</value>
+  </data>
+  <data name="OpenFolder" xml:space="preserve">
+    <value>Ouvrir le dossier</value>
+  </data>
+  <data name="SummaryPlaceholder" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="ComicCountDisplay" xml:space="preserve">
+    <value>{0} comics</value>
+  </data>
+  <data name="ReadCountDisplay" xml:space="preserve">
+    <value>{0} lus</value>
+  </data>
+  <data name="ComicsReady" xml:space="preserve">
+    <value>comics prêts</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>Statut</value>
+  </data>
+  <data name="FileName" xml:space="preserve">
+    <value>Nom du fichier</value>
+  </data>
+  <data name="Waiting" xml:space="preserve">
+    <value>En attente...</value>
+  </data>
+  <data name="AnalyzingEpub" xml:space="preserve">
+    <value>Analyse de l'EPUB...</value>
+  </data>
+  <data name="ConvertingPdf" xml:space="preserve">
+    <value>Conversion du PDF...</value>
+  </data>
+  <data name="ConvertingEpub" xml:space="preserve">
+    <value>Conversion de l'EPUB...</value>
+  </data>
+  <data name="PreparingEpub" xml:space="preserve">
+    <value>Préparation de l'EPUB...</value>
+  </data>
+  <data name="CopyingEpub" xml:space="preserve">
+    <value>Copie de l'EPUB...</value>
+  </data>
+  <data name="FinalizingEpub" xml:space="preserve">
+    <value>Finalisation de l'EPUB...</value>
+  </data>
+  <data name="NoSupportedFilesFound" xml:space="preserve">
+    <value>Aucun fichier de comic pris en charge n'a été trouvé dans le dossier sélectionné.</value>
+  </data>
+  <data name="FailedToOpenDirectory" xml:space="preserve">
+    <value>Échec de l'ouverture du répertoire</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Rechercher</value>
+  </data>
+  <data name="SearchResults" xml:space="preserve">
+    <value>Résultats de recherche</value>
+  </data>
+  <data name="ReadingModeGuidedTitle" xml:space="preserve">
+    <value>Mode guidé</value>
+  </data>
+  <data name="HandednessAction" xml:space="preserve">
+    <value>Latéralité</value>
+  </data>
+  <data name="TwoPageMode" xml:space="preserve">
+    <value>Deux pages</value>
+  </data>
+  <data name="ReadingModeZoomedTitle" xml:space="preserve">
+    <value>Mode zoom</value>
+  </data>
+  <data name="ReadingModeNormalTitle" xml:space="preserve">
+    <value>Mode normal</value>
+  </data>
+  <data name="ContinueReadingAction" xml:space="preserve">
+    <value>Continuer la lecture</value>
+  </data>
+  <data name="BackToLibrary" xml:space="preserve">
+    <value>Retour à la bibliothèque</value>
+  </data>
+  <data name="SaveOriginalPage" xml:space="preserve">
+    <value>Enregistrer la page originale (Debug)</value>
+  </data>
+  <data name="EndOfComicQuestion" xml:space="preserve">
+    <value>Que voulez-vous faire ensuite ?</value>
+  </data>
+  <data name="NoNextComic" xml:space="preserve">
+    <value>Le prochain comic de cette série n'est pas disponible localement.</value>
+  </data>
+  <data name="FitMode" xml:space="preserve">
+    <value>Mode d'ajustement</value>
+  </data>
+  <data name="MarkReadAction" xml:space="preserve">
+    <value>Marquer comme lu</value>
+  </data>
+  <data name="EndOfComic" xml:space="preserve">
+    <value>Fin du comic</value>
+  </data>
+  <data name="Creators" xml:space="preserve">
+    <value>Créateurs</value>
+  </data>
+  <data name="Tags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="FullScreen" xml:space="preserve">
+    <value>Plein écran</value>
+  </data>
+  <data name="OpenNextInSeries" xml:space="preserve">
+    <value>Ouvrir le suivant dans la série</value>
+  </data>
+  <data name="DeleteComicAction" xml:space="preserve">
+    <value>Supprimer le comic</value>
+  </data>
+  <data name="SeriesDescription" xml:space="preserve">
+    <value>Séries avec plusieurs comics dans votre bibliothèque</value>
+  </data>
+  <data name="UsernamePasswordTitle" xml:space="preserve">
+    <value>Utilisateur et mot de passe</value>
+  </data>
+  <data name="EpubConversionThemeDescription" xml:space="preserve">
+    <value>Contrôle si les pages EPUB sont rendues avec le thème du système, un thème clair ou un thème sombre lors de la conversion en CBZ.</value>
+  </data>
+  <data name="SectionRecentlyAddedBooks" xml:space="preserve">
+    <value>Livres ajoutés récemment</value>
+  </data>
+  <data name="ReadingModeGuided" xml:space="preserve">
+    <value>Guidé</value>
+  </data>
+  <data name="SkipExternalDeleteConfirmationEnabled" xml:space="preserve">
+    <value>Ignorer la confirmation de suppression externe</value>
+  </data>
+  <data name="HandednessDescription" xml:space="preserve">
+    <value>Droitier : aperçu à gauche, zoom à droite. Gaucher : aperçu à droite, zoom à gauche.</value>
+  </data>
+  <data name="SectionLayout" xml:space="preserve">
+    <value>Disposition des sections</value>
+  </data>
+  <data name="SectionKeepReading" xml:space="preserve">
+    <value>Continuer la lecture</value>
+  </data>
+  <data name="CompactOverviewDescription" xml:space="preserve">
+    <value>Lorsqu'elle est activée, la zone d'aperçu n'occupe que l'espace nécessaire selon les proportions de l'image, laissant plus d'espace à la zone zoomée.</value>
+  </data>
+  <data name="AppTheme" xml:space="preserve">
+    <value>Thème de l'application</value>
+  </data>
+  <data name="ReadingModeZoomed" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="ApiKeyTitle" xml:space="preserve">
+    <value>Clé API (Préféré)</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Clair</value>
+  </data>
+  <data name="HandednessLeft" xml:space="preserve">
+    <value>Gaucher</value>
+  </data>
+  <data name="Activity" xml:space="preserve">
+    <value>Activité</value>
+  </data>
+  <data name="KomgaParallelDownloads" xml:space="preserve">
+    <value>Téléchargements parallèles Komga</value>
+  </data>
+  <data name="SkipExternalDeleteConfirmationDescription" xml:space="preserve">
+    <value>Lorsqu'il est activé, la suppression d'un comic en dehors du dossier de bibliothèque géré le retirera toujours uniquement de la bibliothèque et ne demandera pas si le fichier original doit être supprimé.</value>
+  </data>
+  <data name="ReadingModeNormal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="UsernamePlaceholder" xml:space="preserve">
+    <value>nom d'utilisateur</value>
+  </data>
+  <data name="HandednessRight" xml:space="preserve">
+    <value>Droitier</value>
+  </data>
+  <data name="LibraryView" xml:space="preserve">
+    <value>Vue bibliothèque</value>
+  </data>
+  <data name="EpubOutputResolutionDescription" xml:space="preserve">
+    <value>Choisissez la taille PNG finale pour la conversion EPUB : Basse = 700x1050, Moyenne = 1400x2100, Haute = 2100x3150. Les paramètres plus élevés améliorent la qualité du texte mais augmentent le temps de conversion et la taille du fichier.</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Sombre</value>
+  </data>
+  <data name="SectionReadLists" xml:space="preserve">
+    <value>Listes de lecture</value>
+  </data>
+  <data name="Handedness" xml:space="preserve">
+    <value>Latéralité (pour les modes Zoom/Guidé)</value>
+  </data>
+  <data name="CompactOverviewEnabled" xml:space="preserve">
+    <value>Aperçu compact activé</value>
+  </data>
+  <data name="Or" xml:space="preserve">
+    <value>OU</value>
+  </data>
+  <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
+    <value>Choisissez combien de livres Komga peuvent être téléchargés en même temps.</value>
+  </data>
+  <data name="CompactOverviewDisabled" xml:space="preserve">
+    <value>Aperçu compact désactivé</value>
+  </data>
+  <data name="SectionLibraries" xml:space="preserve">
+    <value>Bibliothèques</value>
+  </data>
+  <data name="Writer" xml:space="preserve">
+    <value>Scénariste</value>
+  </data>
+  <data name="ReadingModeZoomedDescription" xml:space="preserve">
+    <value>• Zoom : Vue divisée avec aperçu et zone agrandie</value>
+  </data>
+  <data name="StartupBehavior" xml:space="preserve">
+    <value>Comportement au démarrage</value>
+  </data>
+  <data name="ResolutionMedium" xml:space="preserve">
+    <value>Moyenne</value>
+  </data>
+  <data name="UnsupportedFormatHandlingConvertOnImport" xml:space="preserve">
+    <value>Convertir lors de l'importation</value>
+  </data>
+  <data name="ApiKeyHint" xml:space="preserve">
+    <value>L'utilisation d'une clé API est plus sécurisée que les identifiants.</value>
+  </data>
+  <data name="PasswordPlaceholder" xml:space="preserve">
+    <value>mot de passe</value>
+  </data>
+  <data name="SectionNewComics" xml:space="preserve">
+    <value>Nouveaux comics</value>
+  </data>
+  <data name="DefaultReadingMode" xml:space="preserve">
+    <value>Mode de lecture par défaut</value>
+  </data>
+  <data name="ApiKeyPlaceholder" xml:space="preserve">
+    <value>Entrez votre clé API Komga</value>
+  </data>
+  <data name="KomgaHome" xml:space="preserve">
+    <value>Accueil Komga</value>
+  </data>
+  <data name="UnsupportedFormatHandlingConvertWhileReading" xml:space="preserve">
+    <value>Convertir pendant la lecture</value>
+  </data>
+  <data name="ResolutionLow" xml:space="preserve">
+    <value>Basse</value>
+  </data>
+  <data name="Shown" xml:space="preserve">
+    <value>Affiché</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>Système</value>
+  </data>
+  <data name="EpubConversionTheme" xml:space="preserve">
+    <value>Thème de conversion EPUB</value>
+  </data>
+  <data name="SectionRead" xml:space="preserve">
+    <value>Lu</value>
+  </data>
+  <data name="SkipExternalDeleteConfirmationDisabled" xml:space="preserve">
+    <value>Demander avant de supprimer des comics externes</value>
+  </data>
+  <data name="SectionFavorites" xml:space="preserve">
+    <value>Favoris</value>
+  </data>
+  <data name="UnsupportedFormatHandling" xml:space="preserve">
+    <value>Gestion des formats non pris en charge</value>
+  </data>
+  <data name="EpubOutputResolution" xml:space="preserve">
+    <value>Résolution de sortie EPUB</value>
+  </data>
+  <data name="SectionSeries" xml:space="preserve">
+    <value>Séries</value>
+  </data>
+  <data name="LanguageDescription" xml:space="preserve">
+    <value>Sélectionnez une langue ou utilisez celle par défaut du système. Les modifications prendront effet après le redémarrage de l'application.</value>
+  </data>
+  <data name="ResolutionHigh" xml:space="preserve">
+    <value>Haute</value>
+  </data>
+  <data name="ReadingSettings" xml:space="preserve">
+    <value>Paramètres de lecture</value>
+  </data>
+  <data name="Collapsed" xml:space="preserve">
+    <value>Réduit</value>
+  </data>
+  <data name="Hidden" xml:space="preserve">
+    <value>Masqué</value>
+  </data>
+  <data name="AuthenticationTitle" xml:space="preserve">
+    <value>Authentification (Choisissez-en une)</value>
+  </data>
+  <data name="SectionContinueReading" xml:space="preserve">
+    <value>Continuer la lecture</value>
+  </data>
+  <data name="SkipExternalDeleteConfirmation" xml:space="preserve">
+    <value>Ignorer la confirmation de suppression externe</value>
+  </data>
+  <data name="Expanded" xml:space="preserve">
+    <value>Développé</value>
+  </data>
+  <data name="StartupBehaviorHint" xml:space="preserve">
+    <value>Choisissez d'ouvrir le dernier comic lu ou d'aller à la vue bibliothèque au démarrage.</value>
+  </data>
+  <data name="SectionLayoutDescription" xml:space="preserve">
+    <value>Choisissez quelles sections sont affichées, si elles sont développées au démarrage, et l'ordre dans lequel elles apparaissent.</value>
+  </data>
+  <data name="CompactOverview" xml:space="preserve">
+    <value>Aperçu compact</value>
+  </data>
+  <data name="SectionRecentlyAddedSeries" xml:space="preserve">
+    <value>Séries ajoutées récemment</value>
+  </data>
+  <data name="ContinueWhereLeftOff" xml:space="preserve">
+    <value>Reprendre là où vous vous étiez arrêté</value>
+  </data>
+  <data name="ReadingModeNormalDescription" xml:space="preserve">
+    <value>• Normal : Lecture standard pleine page</value>
+  </data>
+  <data name="SectionOnDeck" xml:space="preserve">
+    <value>En attente</value>
+  </data>
+  <data name="AppThemeDescription" xml:space="preserve">
+    <value>Contrôle le thème de l'interface utilisateur de l'application. Système suit le thème de l'appareil, tandis que Clair et Sombre forcent l'apparence de l'application.</value>
+  </data>
+  <data name="ReadingModeGuidedDescription" xml:space="preserve">
+    <value>• Guidé : Détection automatique des panneaux pour une lecture scène par scène</value>
+  </data>
+  <data name="Sort" xml:space="preserve">
+    <value>Trier</value>
   </data>
 </root>

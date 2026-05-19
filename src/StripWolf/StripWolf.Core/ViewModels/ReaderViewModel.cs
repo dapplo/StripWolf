@@ -576,6 +576,12 @@ public partial class ReaderViewModel : ViewModelBase
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
             {
+                // Save last opened comic info in settings
+                settings.LastOpenedComicId = Comic.Id;
+                settings.LastOpenedComicPath = Comic.FilePath;
+                settings.WasInReader = true;
+                _ = _settingsService.SaveSettingsAsync(settings);
+
                 Title = Comic.Title;
                 OnPropertyChanged(nameof(MaxSliderValue));
                 OnPropertyChanged(nameof(PageDisplay));
@@ -852,7 +858,7 @@ public partial class ReaderViewModel : ViewModelBase
 
     partial void OnCurrentPageChanged(int value)
     {
-        if (Comic is not null)
+        if (Comic is not null && !_isLoadingPage)
         {
             _ = LoadAndSaveProgressAsync();
         }

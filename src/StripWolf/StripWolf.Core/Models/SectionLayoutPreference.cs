@@ -40,6 +40,30 @@ public partial class SectionLayoutPreference : ObservableObject
     [JsonIgnore]
     private string _label = string.Empty;
 
+    public void RefreshLocalization()
+    {
+        Label = GetSectionLabel(Key);
+    }
+
+    private static string GetSectionLabel(string key)
+    {
+        return key switch
+        {
+            LibrarySectionKeys.ContinueReading => Resources.Loc.Instance.SectionContinueReading,
+            LibrarySectionKeys.NewComics => Resources.Loc.Instance.SectionNewComics,
+            LibrarySectionKeys.Favorites => Resources.Loc.Instance.SectionFavorites,
+            LibrarySectionKeys.Series => Resources.Loc.Instance.SectionSeries,
+            LibrarySectionKeys.Read => Resources.Loc.Instance.SectionRead,
+            KomgaSectionKeys.KeepReading => Resources.Loc.Instance.SectionKeepReading,
+            KomgaSectionKeys.OnDeck => Resources.Loc.Instance.SectionOnDeck,
+            KomgaSectionKeys.RecentlyAddedBooks => Resources.Loc.Instance.SectionRecentlyAddedBooks,
+            KomgaSectionKeys.RecentlyAddedSeries => Resources.Loc.Instance.SectionRecentlyAddedSeries,
+            KomgaSectionKeys.Libraries => Resources.Loc.Instance.SectionLibraries,
+            KomgaSectionKeys.ReadLists => Resources.Loc.Instance.SectionReadLists,
+            _ => key
+        };
+    }
+
     public SectionLayoutPreference Clone()
     {
         return new SectionLayoutPreference
@@ -56,11 +80,11 @@ public partial class SectionLayoutPreference : ObservableObject
     {
         return
         [
-            new SectionLayoutPreference { Key = LibrarySectionKeys.ContinueReading, Order = 0, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = LibrarySectionKeys.NewComics, Order = 1, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = LibrarySectionKeys.Favorites, Order = 2, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = LibrarySectionKeys.Series, Order = 3, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = LibrarySectionKeys.Read, Order = 4, IsVisible = true, IsExpanded = true }
+            new SectionLayoutPreference { Key = LibrarySectionKeys.ContinueReading, Order = 0, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(LibrarySectionKeys.ContinueReading) },
+            new SectionLayoutPreference { Key = LibrarySectionKeys.NewComics, Order = 1, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(LibrarySectionKeys.NewComics) },
+            new SectionLayoutPreference { Key = LibrarySectionKeys.Favorites, Order = 2, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(LibrarySectionKeys.Favorites) },
+            new SectionLayoutPreference { Key = LibrarySectionKeys.Series, Order = 3, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(LibrarySectionKeys.Series) },
+            new SectionLayoutPreference { Key = LibrarySectionKeys.Read, Order = 4, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(LibrarySectionKeys.Read) }
         ];
     }
 
@@ -68,12 +92,12 @@ public partial class SectionLayoutPreference : ObservableObject
     {
         return
         [
-            new SectionLayoutPreference { Key = KomgaSectionKeys.KeepReading, Order = 0, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = KomgaSectionKeys.OnDeck, Order = 1, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = KomgaSectionKeys.RecentlyAddedBooks, Order = 2, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = KomgaSectionKeys.RecentlyAddedSeries, Order = 3, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = KomgaSectionKeys.Libraries, Order = 4, IsVisible = true, IsExpanded = true },
-            new SectionLayoutPreference { Key = KomgaSectionKeys.ReadLists, Order = 5, IsVisible = true, IsExpanded = true }
+            new SectionLayoutPreference { Key = KomgaSectionKeys.KeepReading, Order = 0, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.KeepReading) },
+            new SectionLayoutPreference { Key = KomgaSectionKeys.OnDeck, Order = 1, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.OnDeck) },
+            new SectionLayoutPreference { Key = KomgaSectionKeys.RecentlyAddedBooks, Order = 2, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.RecentlyAddedBooks) },
+            new SectionLayoutPreference { Key = KomgaSectionKeys.RecentlyAddedSeries, Order = 3, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.RecentlyAddedSeries) },
+            new SectionLayoutPreference { Key = KomgaSectionKeys.Libraries, Order = 4, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.Libraries) },
+            new SectionLayoutPreference { Key = KomgaSectionKeys.ReadLists, Order = 5, IsVisible = true, IsExpanded = true, Label = GetSectionLabel(KomgaSectionKeys.ReadLists) }
         ];
     }
 

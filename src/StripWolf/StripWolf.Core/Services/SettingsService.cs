@@ -168,6 +168,9 @@ public class SettingsService
         var snapshot = settings.Clone();
         NormalizeSectionPreferences(snapshot);
 
+        // Update cache immediately to ensure subsequent LoadSettings() calls get the latest data
+        _cachedSettings = snapshot.Clone();
+
         await _saveSemaphore.WaitAsync();
         try
         {
@@ -192,7 +195,6 @@ public class SettingsService
 
             if (requestId == Volatile.Read(ref _latestSaveRequestId))
             {
-                _cachedSettings = snapshot.Clone();
                 SettingsChanged?.Invoke(this, snapshot.Clone());
             }
         }

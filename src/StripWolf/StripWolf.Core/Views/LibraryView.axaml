@@ -46,7 +46,7 @@
                                      VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
                 <!-- Deleting overlay -->
                 <Border Background="#80000000" IsVisible="{Binding IsDeleting}" IsHitTestVisible="False">
-                  <TextBlock Text="DELETING..." Foreground="White" FontWeight="Bold" 
+                  <TextBlock Text="{Binding Deleting, Source={x:Static res:Loc.Instance}}" Foreground="White" FontWeight="Bold" 
                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
               </Panel>
@@ -79,13 +79,13 @@
               <!-- Info -->
               <Button Grid.Column="0" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ShowComicInfoCommand, ElementName=Root}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Information">
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}">
                 <TextBlock Text="ⓘ" FontSize="18" VerticalAlignment="Center"/>
               </Button>
               <!-- Favorite -->
               <Button Grid.Column="1" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ToggleFavoriteCommand, ElementName=Root}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Favorite">
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding Favorite, Source={x:Static res:Loc.Instance}}">
                 <Panel>
                   <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}" FontSize="18" VerticalAlignment="Center"/>
                   <TextBlock Text="★" IsVisible="{Binding IsFavorite}" Foreground="Gold" FontSize="18" VerticalAlignment="Center"/>
@@ -94,7 +94,7 @@
               <!-- Mark Read -->
               <Button Grid.Column="0" Grid.Row="1" Classes="icon-btn" 
                       Command="{Binding ToggleReadStatusCommand, ElementName=Root}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Mark Read/Unread">
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding MarkRead, Source={x:Static res:Loc.Instance}}">
                  <Panel>
                     <TextBlock Text="✓" IsVisible="{Binding !IsCompleted}" FontSize="18" VerticalAlignment="Center"/>
                     <TextBlock Text="☑" IsVisible="{Binding IsCompleted}" Foreground="{DynamicResource SystemAccentColor}" FontSize="18" VerticalAlignment="Center"/>
@@ -103,7 +103,7 @@
               <!-- Delete -->
               <Button Grid.Column="1" Grid.Row="1" Classes="icon-btn"
                       Command="{Binding DeleteComicCommand, ElementName=Root}"
-                      CommandParameter="{Binding}" ToolTip.Tip="Delete">
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding DeleteComic, Source={x:Static res:Loc.Instance}}">
                 <TextBlock Text="✕" FontSize="18" VerticalAlignment="Center"/>
               </Button>
             </Grid>
@@ -115,7 +115,7 @@
                     Command="{Binding UndoComicDeleteCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
               <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="↩ Undo" FontWeight="Bold"/>
+                <TextBlock Text="{Binding Undo, Source={x:Static res:Loc.Instance}, StringFormat='{}↩ {0}'}" FontWeight="Bold"/>
                 <TextBlock Text="{Binding DeletionSecondsRemaining, StringFormat='{}{0}s'}" FontSize="9"/>
               </StackPanel>
             </Button>
@@ -145,12 +145,12 @@
                 <TextBlock Text="{Binding DeleteStatusText}" FontSize="12" Foreground="#D32F2F"
                            TextTrimming="CharacterEllipsis" MaxLines="1"
                            IsVisible="{Binding HasDeletingComics}"/>
-                <TextBlock Text="{Binding ReadCount, StringFormat='{}{0} read'}" FontSize="12" Foreground="Gray"/>
+                <TextBlock Text="{Binding ReadCountDisplay}" FontSize="12" Foreground="Gray"/>
               </StackPanel>
 
               <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="999" Padding="10,4"
                       VerticalAlignment="Top">
-                <TextBlock Text="{Binding ComicCount, StringFormat='{}{0} comics'}" Foreground="White" FontSize="12"/>
+                <TextBlock Text="{Binding ComicCountDisplay}" Foreground="White" FontSize="12"/>
               </Border>
 
               <Button Grid.Column="3"
@@ -160,7 +160,7 @@
                       Foreground="White"
                       Padding="10,4"
                       VerticalAlignment="Top"
-                      ToolTip.Tip="Delete series from library">
+                      ToolTip.Tip="{Binding DeleteComic, Source={x:Static res:Loc.Instance}}">
                 <TextBlock Text="{Binding DeleteActionLabel}" FontSize="12"/>
               </Button>
             </Grid>
@@ -185,7 +185,7 @@
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto">
         <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="📁 Open Folder" Command="{Binding OpenComicsDirectoryCommand}" 
+        <Button Grid.Column="1" Content="{Binding OpenFolder, Source={x:Static res:Loc.Instance}, StringFormat='{}📁 {0}'}" Command="{Binding OpenComicsDirectoryCommand}" 
                 Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
         <Button Grid.Column="2" Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
         <Button Grid.Column="3" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
@@ -202,7 +202,7 @@
         
         <!-- Search Box -->
         <Grid ColumnDefinitions="*,Auto">
-          <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="🔍 Search comics..."
+          <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="{Binding SearchPlaceholder, Source={x:Static res:Loc.Instance}}"
                    VerticalContentAlignment="Center"/>
           <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
                   Padding="8,6" Margin="4,0,0,0"
@@ -211,8 +211,8 @@
 
         <!-- Search Results Section -->
         <StackPanel Spacing="8" IsVisible="{Binding IsSearching}">
-          <TextBlock Text="Search Results" FontSize="18" FontWeight="Bold"/>
-          <TextBlock Text="No comics found" Foreground="Gray" IsVisible="{Binding !SearchResults.Count}" Margin="0,8"/>
+          <TextBlock Text="{Binding SearchResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+          <TextBlock Text="{Binding NoComicsFound, Source={x:Static res:Loc.Instance}}" Foreground="Gray" IsVisible="{Binding !SearchResults.Count}" Margin="0,8"/>
           
           <repeater:ItemsRepeater ItemsSource="{Binding SearchResults}" IsVisible="{Binding SearchResults.Count}"
                                   ItemTemplate="{StaticResource ComicTemplate}">
@@ -234,7 +234,7 @@
 
         <!-- Pending Imports Section -->
         <StackPanel Spacing="8" IsVisible="{Binding PendingImports.Count}">
-          <TextBlock Text="Importing..." FontSize="18" FontWeight="Bold"/>
+          <TextBlock Text="{Binding Importing, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
           <ItemsControl ItemsSource="{Binding PendingImports}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="models:PendingImport">
@@ -268,7 +268,7 @@
                     IsVisible="{Binding ShowContinueReadingSection}"
                     IsExpanded="{Binding IsContinueReadingSectionExpanded}">
             <Expander.Header>
-              <TextBlock Text="Continue Reading" FontSize="18" FontWeight="Bold"/>
+              <TextBlock Text="{Binding SectionContinueReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
             <repeater:ItemsRepeater ItemsSource="{Binding InProgressComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
               <repeater:ItemsRepeater.Layout>
@@ -287,13 +287,13 @@
                     IsVisible="{Binding ShowNewComicsSection}"
                     IsExpanded="{Binding IsNewComicsSectionExpanded}">
             <Expander.Header>
-              <TextBlock Text="New Comics" FontSize="18" FontWeight="Bold"/>
+              <TextBlock Text="{Binding SectionNewComics, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
             <StackPanel Spacing="8" Margin="0,8,0,0" HorizontalAlignment="Stretch">
               <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
                 <TextBlock Text="▤" FontSize="56" HorizontalAlignment="Center"/>
-                <TextBlock Text="No new comics" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-                <TextBlock Text="Import a comic file or download from Komga to get started" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
+                <TextBlock Text="{Binding NoNewComics, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding NoNewComicsHint, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                   <Button Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" HorizontalAlignment="Center"/>
                   <Button Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" HorizontalAlignment="Center" IsVisible="{Binding IsDesktop}"/>
@@ -319,7 +319,7 @@
                     IsVisible="{Binding ShowFavoritesSection}"
                     IsExpanded="{Binding IsFavoritesSectionExpanded}">
             <Expander.Header>
-              <TextBlock Text="⭐ Favorites" FontSize="18" FontWeight="Bold"/>
+              <TextBlock Text="{Binding SectionFavorites, Source={x:Static res:Loc.Instance}, StringFormat='{}⭐ {0}'}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
             <repeater:ItemsRepeater ItemsSource="{Binding FavoriteComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
               <repeater:ItemsRepeater.Layout>
@@ -338,10 +338,10 @@
                     IsVisible="{Binding ShowSeriesSection}"
                     IsExpanded="{Binding IsSeriesSectionExpanded}">
             <Expander.Header>
-              <TextBlock Text="Series" FontSize="18" FontWeight="Bold"/>
+              <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
             <StackPanel Spacing="8" Margin="0,8,0,0" HorizontalAlignment="Stretch">
-              <TextBlock Text="Series with multiple comics in your library" Foreground="Gray"/>
+              <TextBlock Text="{Binding SeriesDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
               <ItemsControl ItemsSource="{Binding SeriesGroups}" ItemTemplate="{StaticResource SeriesGroupTemplate}" HorizontalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -358,7 +358,7 @@
                     IsVisible="{Binding ShowReadSection}"
                     IsExpanded="{Binding IsReadSectionExpanded}">
             <Expander.Header>
-              <TextBlock Text="Read" FontSize="18" FontWeight="Bold"/>
+              <TextBlock Text="{Binding SectionRead, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
             <repeater:ItemsRepeater ItemsSource="{Binding CompletedComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
               <repeater:ItemsRepeater.Layout>
@@ -382,16 +382,16 @@
               HorizontalAlignment="Center" VerticalAlignment="Center"
               BoxShadow="0 4 20 0 #40000000">
         <StackPanel Spacing="16">
-          <TextBlock Text="Confirm External File Deletion" FontSize="20" FontWeight="Bold"/>
-          <TextBlock Text="This comic is located outside of the application's internal directory. Are you sure you want to delete it from its original location?" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding ConfirmExternalDelete, Source={x:Static res:Loc.Instance}}" FontSize="20" FontWeight="Bold"/>
+          <TextBlock Text="{Binding ConfirmExternalDeleteMessage, Source={x:Static res:Loc.Instance}}" TextWrapping="Wrap"/>
           <Border Background="#F5F5F5" Padding="12" CornerRadius="4">
             <TextBlock Text="{Binding DeleteConfirmationPath}" FontSize="12" Foreground="Gray" TextWrapping="Wrap"/>
           </Border>
           <StackPanel Orientation="Vertical" Spacing="8">
-            <Button Content="Remove from Library (Keep File)" Command="{Binding RemoveFromLibraryCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+            <Button Content="{Binding RemoveFromLibraryKeepFile, Source={x:Static res:Loc.Instance}}" Command="{Binding RemoveFromLibraryCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
             <Grid ColumnDefinitions="*,*">
-              <Button Grid.Column="0" Content="Cancel" Command="{Binding CancelDeleteCommand}" HorizontalAlignment="Stretch" Margin="0,0,4,0" HorizontalContentAlignment="Center"/>
-              <Button Grid.Column="1" Content="Delete Permanently" Command="{Binding ConfirmDeleteCommand}" Background="#D32F2F" Foreground="White" HorizontalAlignment="Stretch" Margin="4,0,0,0" HorizontalContentAlignment="Center"/>
+              <Button Grid.Column="0" Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" Command="{Binding CancelDeleteCommand}" HorizontalAlignment="Stretch" Margin="0,0,4,0" HorizontalContentAlignment="Center"/>
+              <Button Grid.Column="1" Content="{Binding DeletePermanently, Source={x:Static res:Loc.Instance}}" Command="{Binding ConfirmDeleteCommand}" Background="#D32F2F" Foreground="White" HorizontalAlignment="Stretch" Margin="4,0,0,0" HorizontalContentAlignment="Center"/>
             </Grid>
           </StackPanel>
         </StackPanel>
@@ -412,7 +412,7 @@
         <Grid RowDefinitions="Auto,*">
           <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="16" CornerRadius="8,8,0,0">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="Comic Information" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
               <Button Grid.Column="1" Content="✕" Command="{Binding CloseComicInfoCommand, ElementName=Root}" Background="Transparent" Foreground="White" FontSize="18" Padding="8,4"/>
             </Grid>
           </Border>
@@ -432,20 +432,24 @@
                     <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
                       <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>
                       <StackPanel IsVisible="{Binding SeriesName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                        <TextBlock Text="Series" FontSize="12" Foreground="Gray"/>
+                        <TextBlock Text="{Binding Series, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
                         <TextBlock Text="{Binding SeriesName}" FontSize="16"/>
                       </StackPanel>
                       <Grid ColumnDefinitions="*,*">
                         <StackPanel Grid.Column="0">
-                           <TextBlock Text="Number" FontSize="12" Foreground="Gray"/>
+                           <TextBlock Text="{Binding Number, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
                            <TextBlock Text="{Binding Number}" FontSize="16"/>
                         </StackPanel>
                          <StackPanel Grid.Column="1">
-                            <TextBlock Text="Pages" FontSize="12" Foreground="Gray"/>
+                            <TextBlock Text="{Binding Pages, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
                             <TextBlock Text="{Binding LibraryPageStatusDisplay}" FontSize="16"/>
                          </StackPanel>
                        </Grid>
-                       <Button Content="🌐 View Series on Komga" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                       <StackPanel>
+                         <TextBlock Text="{Binding Format, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
+                         <TextBlock Text="{Binding FormatDisplay}" FontSize="16"/>
+                       </StackPanel>
+                       <Button Content="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
                         <Button.IsVisible>
                            <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                         </Button.IsVisible>
@@ -459,25 +463,25 @@
                   <StackPanel x:DataType="models:ComicInfo" DataContext="{Binding EditingComicInfo, ElementName=Root}"
                               Spacing="12">
                      <StackPanel>
-                       <TextBlock Text="Title" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                       <TextBox Text="{Binding Title}" PlaceholderText="Comic Title"/>
+                       <TextBlock Text="{Binding Title, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Title}" PlaceholderText="{Binding Title, Source={x:Static res:Loc.Instance}}"/>
                      </StackPanel>
                      <StackPanel>
-                       <TextBlock Text="Series" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                       <TextBox Text="{Binding Series}" PlaceholderText="Series Name"/>
+                       <TextBlock Text="{Binding Series, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Series}" PlaceholderText="{Binding Series, Source={x:Static res:Loc.Instance}}"/>
                      </StackPanel>
 
                      <StackPanel>
-                       <TextBlock Text="Number" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                       <TextBox Text="{Binding Number}" PlaceholderText="Issue Number"/>
+                       <TextBlock Text="{Binding Number, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Number}" PlaceholderText="{Binding Number, Source={x:Static res:Loc.Instance}}"/>
                      </StackPanel>
                      <StackPanel>
-                       <TextBlock Text="Summary" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                       <TextBox Text="{Binding Summary}" PlaceholderText="Description" TextWrapping="Wrap" AcceptsReturn="True" Height="100"/>
+                       <TextBlock Text="{Binding Summary, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Summary}" PlaceholderText="{Binding SummaryPlaceholder, Source={x:Static res:Loc.Instance}}" TextWrapping="Wrap" AcceptsReturn="True" Height="100"/>
                      </StackPanel>
                      <StackPanel>
-                       <TextBlock Text="Writer" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
-                       <TextBox Text="{Binding Writer}" PlaceholderText="Writer(s)"/>
+                       <TextBlock Text="{Binding Writer, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                       <TextBox Text="{Binding Writer}" PlaceholderText="{Binding Writer, Source={x:Static res:Loc.Instance}}"/>
                      </StackPanel>
                   </StackPanel>
                 </StackPanel>
@@ -488,7 +492,7 @@
                 <StackPanel IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
                   <StackPanel DataContext="{Binding SelectedInfoComic, ElementName=Root}" x:DataType="models:Comic"
                               IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Text="Summary" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding Summary, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
                     <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="14" Opacity="0.9"/>
                   </StackPanel>
                 </StackPanel>
@@ -496,32 +500,32 @@
                 <!-- Action Buttons (View Mode) -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" 
                             IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
-                  <Button Content="📖 Read Now" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding SelectedInfoComic.CanOpen, ElementName=Root, FallbackValue=False}"/>
-                  <Button Content="⚙ Convert Now" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding SelectedInfoComic.CanConvertNow, ElementName=Root, FallbackValue=False}"/>
-                  <TextBlock Text="Converting to CBZ..." Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding SelectedInfoComic.IsConverting, ElementName=Root, FallbackValue=False}"/>
+                  <Button Content="{Binding ReadNow, Source={x:Static res:Loc.Instance}, StringFormat='{}📖 {0}'}" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding SelectedInfoComic.CanOpen, ElementName=Root, FallbackValue=False}"/>
+                  <Button Content="{Binding ConvertNow, Source={x:Static res:Loc.Instance}, StringFormat='{}⚙ {0}'}" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding SelectedInfoComic.CanConvertNow, ElementName=Root, FallbackValue=False}"/>
+                  <TextBlock Text="{Binding Converting, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding SelectedInfoComic.IsConverting, ElementName=Root, FallbackValue=False}"/>
                   <Grid ColumnDefinitions="*,*">
                     <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleFavoriteCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}">
                        <StackPanel Orientation="Horizontal" Spacing="8">
                           <TextBlock Text="⭐" IsVisible="{Binding SelectedInfoComic.IsFavorite, ElementName=Root, FallbackValue=False}"/>
                           <TextBlock Text="☆" IsVisible="{Binding !SelectedInfoComic.IsFavorite, ElementName=Root, FallbackValue=True}"/>
-                          <TextBlock Text="Favorite" />
+                          <TextBlock Text="{Binding Favorite, Source={x:Static res:Loc.Instance}}" />
                        </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Margin="4,0,0,0" Content="Mark Read" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}"/>
+                    <Button Grid.Column="1" Margin="4,0,0,0" Content="{Binding MarkRead, Source={x:Static res:Loc.Instance}}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}"/>
                   </Grid>
                   <Grid ColumnDefinitions="*,*">
-                    <Button Grid.Column="0" Content="✏️ Edit Metadata" Margin="0,0,4,0" Command="{Binding EditMetadataCommand, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="🗑️ Delete Comic" Margin="4,0,0,0" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="0" Content="{Binding EditMetadata, Source={x:Static res:Loc.Instance}, StringFormat='{}✏️ {0}'}" Margin="0,0,4,0" Command="{Binding EditMetadataCommand, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="{Binding DeleteComic, Source={x:Static res:Loc.Instance}, StringFormat='{}🗑️ {0}'}" Margin="4,0,0,0" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding SelectedInfoComic, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                   </Grid>
                 </StackPanel>
 
                 <!-- Action Buttons (Edit Mode) -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" 
                             IsVisible="{Binding IsEditingMetadata, ElementName=Root, FallbackValue=False}">
-                   <Button Content="💾 Save Changes" Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                   <Button Content="{Binding SaveChanges, Source={x:Static res:Loc.Instance}, StringFormat='{}💾 {0}'}" Background="{DynamicResource SystemAccentColor}" Foreground="White"
                            Command="{Binding SaveMetadataCommand, ElementName=Root}"
                            HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
-                   <Button Content="Cancel" Command="{Binding CancelMetadataEditCommand, ElementName=Root}"
+                   <Button Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" Command="{Binding CancelMetadataEditCommand, ElementName=Root}"
                            HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                 </StackPanel>
               </StackPanel>

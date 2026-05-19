@@ -24,6 +24,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StripWolf.Core.Models;
 using StripWolf.Core.Models.Komga;
+using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
 
 namespace StripWolf.Core.ViewModels;
@@ -54,12 +55,13 @@ public partial class ActivityViewModel : ViewModelBase
     public ActivityViewModel(
         LibraryViewModel libraryViewModel,
         KomgaViewModel komgaViewModel,
-        EpubShadowConversionService epubShadowConversionService)
+        EpubShadowConversionService epubShadowConversionService,
+        SettingsService settingsService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
         _epubShadowConversionService = epubShadowConversionService;
-        Title = "Activity";
+        Title = Loc.Instance.Activity;
 
         PendingImports.CollectionChanged += OnPendingImportsChanged;
         DownloadQueueItems.CollectionChanged += OnDownloadQueueChanged;
@@ -76,6 +78,22 @@ public partial class ActivityViewModel : ViewModelBase
         _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
         _ = RefreshEpubConversionsAsync();
         RefreshActivityState();
+
+        settingsService.SettingsChanged += (_, _) =>
+        {
+            Dispatcher.UIThread.Post(RefreshLocalization);
+        };
+    }
+
+    private void RefreshLocalization()
+    {
+        Title = Loc.Instance.Activity;
+        OnPropertyChanged(nameof(Title));
+        
+        // Ensure all UI elements bound to Loc.Instance update
+        OnPropertyChanged(nameof(Loc.Instance.Downloads));
+        OnPropertyChanged(nameof(Loc.Instance.Imports));
+        OnPropertyChanged(nameof(Loc.Instance.EpubConversions));
     }
 
     partial void OnActiveItemsCountChanged(int value)
@@ -142,7 +160,7 @@ public partial class ActivityViewModel : ViewModelBase
         }
 
         _activityRefreshPending = true;
-        void Refresh()
+        void RefreshInternal()
         {
             _activityRefreshPending = false;
             RefreshActivityState();
@@ -150,11 +168,11 @@ public partial class ActivityViewModel : ViewModelBase
 
         if (Dispatcher.UIThread.CheckAccess())
         {
-            Refresh();
+            RefreshInternal();
         }
         else
         {
-            Dispatcher.UIThread.Post(Refresh, DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(RefreshInternal, DispatcherPriority.Background);
         }
     }
 

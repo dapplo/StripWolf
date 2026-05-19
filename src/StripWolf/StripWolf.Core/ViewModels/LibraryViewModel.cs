@@ -24,6 +24,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
 using StripWolf.Core.Services;
+using StripWolf.Core.Resources;
 
 namespace StripWolf.Core.ViewModels;
 
@@ -203,16 +204,51 @@ public partial class LibraryViewModel : ViewModelBase
         _comicReaderService = comicReaderService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
-        Title = "Library";
+        Title = Loc.Instance.Library;
 
         ApplySectionLayout(_settingsService.LoadSettings());
         _settingsService.SettingsChanged += (_, settings) =>
         {
-            Dispatcher.UIThread.Post(() => ApplySectionLayout(settings));
+            Dispatcher.UIThread.Post(() => 
+            {
+                ApplySectionLayout(settings);
+                RefreshLocalization();
+            });
         };
         
         // Refresh when library changes
         _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
+    }
+
+    private void RefreshLocalization()
+    {
+        Title = Loc.Instance.Library;
+        OnPropertyChanged(nameof(Title));
+        
+        foreach (var comic in GetComicCollections().SelectMany(c => c))
+        {
+            comic.RefreshLocalization();
+        }
+
+        foreach (var group in SeriesGroups)
+        {
+            group.RefreshLocalization();
+            foreach (var comic in group.Comics)
+            {
+                comic.RefreshLocalization();
+            }
+        }
+
+        RefreshSectionVisibilityState();
+        
+        // Refresh properties bound to Loc.Instance
+        OnPropertyChanged(nameof(Loc.Instance.Library));
+        OnPropertyChanged(nameof(Loc.Instance.SearchPlaceholder));
+        OnPropertyChanged(nameof(Loc.Instance.SectionContinueReading));
+        OnPropertyChanged(nameof(Loc.Instance.SectionNewComics));
+        OnPropertyChanged(nameof(Loc.Instance.SectionFavorites));
+        OnPropertyChanged(nameof(Loc.Instance.SectionSeries));
+        OnPropertyChanged(nameof(Loc.Instance.SectionRead));
     }
 
     public Task EnsureComicsLoadedAsync()

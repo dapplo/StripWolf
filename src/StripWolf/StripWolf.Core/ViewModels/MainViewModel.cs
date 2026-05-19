@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -20,6 +20,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
+using StripWolf.Core.Services;
 
 namespace StripWolf.Core.ViewModels;
 
@@ -33,6 +34,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly ActivityViewModel _activityViewModel;
     private readonly SettingsViewModel _settingsViewModel;
     private readonly ReaderViewModel _readerViewModel;
+    private readonly SettingsService _settingsService;
+    private bool _isInitializing = true;
 
     [ObservableProperty]
     private ViewModelBase _currentView;
@@ -43,18 +46,23 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isInReader;
 
+    [ObservableProperty]
+    private string _title;
+
     public MainViewModel(
         LibraryViewModel libraryViewModel,
         KomgaViewModel komgaViewModel,
         ActivityViewModel activityViewModel,
         SettingsViewModel settingsViewModel,
-        ReaderViewModel readerViewModel)
+        ReaderViewModel readerViewModel,
+        SettingsService settingsService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
         _activityViewModel = activityViewModel;
         _settingsViewModel = settingsViewModel;
         _readerViewModel = readerViewModel;
+        _settingsService = settingsService;
         
         Title = "StripWolf";
         _currentView = _libraryViewModel;
@@ -73,6 +81,52 @@ public partial class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasActivityItems));
             }
         };
+    }
+
+    public async Task InitializeAsync()
+    {
+        var settings = _settingsService.LoadSettings();
+
+        if (settings.StartupBehavior == StartupBehavior.ContinueWhereLeftOff)
+        {
+            if (settings.WasInReader && settings.LastOpenedComicId.HasValue)
+            {
+                // Try to load the last opened comic
+                // We set _isInitializing to false AFTER this so that IsInReader=true is saved correctly if needed,
+                // although it should already be true in settings.
+                await OpenReaderAsync(settings.LastOpenedComicId.Value);
+            }
+            else
+            {
+                SelectedTabIndex = settings.LastTabIndex;
+            }
+        }
+        _isInitializing = false;
+    }
+
+    partial void OnIsInReaderChanged(bool value)
+    {
+        if (_isInitializing) return;
+
+        // Save to settings
+        var settings = _settingsService.LoadSettings();
+        settings.WasInReader = value;
+        _ = _settingsService.SaveSettingsAsync(settings);
+    }
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (_isInitializing) return;
+
+        // Save to settings
+        var settings = _settingsService.LoadSettings();
+        settings.LastTabIndex = value;
+        _ = _settingsService.SaveSettingsAsync(settings);
+
+        if (!IsInReader)
+        {
+            CurrentView = GetViewForTab(value);
+        }
     }
 
     private async void OnViewKomgaSeriesRequested(object? sender, KomgaSeriesNavigationRequest request)
@@ -103,14 +157,6 @@ public partial class MainViewModel : ViewModelBase
     public ReaderViewModel ReaderViewModel => _readerViewModel;
     public int ActivityItemsCount => _activityViewModel.ActiveItemsCount;
     public bool HasActivityItems => ActivityItemsCount > 0;
-
-    partial void OnSelectedTabIndexChanged(int value)
-    {
-        if (!IsInReader)
-        {
-            CurrentView = GetViewForTab(value);
-        }
-    }
 
     private ViewModelBase GetViewForTab(int tabIndex)
     {
@@ -184,4 +230,3 @@ public partial class MainViewModel : ViewModelBase
         await _libraryViewModel.DeleteAllPendingComicsAsync();
     }
 }
-

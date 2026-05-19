@@ -24,9 +24,18 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
+using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
 
 namespace StripWolf.Core.ViewModels;
+
+public record StartupBehaviorOption(StartupBehavior Value, string DisplayName);
+public record ReadingModeOption(ReadingMode Value, string DisplayName);
+public record HandednessOption(Handedness Value, string DisplayName);
+public record AppThemeOption(AppThemePreference Value, string DisplayName);
+public record EpubConversionThemeOption(EpubConversionTheme Value, string DisplayName);
+public record EpubOutputResolutionOption(EpubOutputResolution Value, string DisplayName);
+public record UnsupportedFormatHandlingModeOption(UnsupportedFormatHandlingMode Value, string DisplayName);
 
 /// <summary>
 /// View model for settings page
@@ -146,25 +155,25 @@ public partial class SettingsViewModel : ViewModelBase
     
     // Reading mode settings
     [ObservableProperty]
-    private ReadingMode _selectedReadingMode = ReadingMode.Normal;
+    private ReadingModeOption? _selectedReadingModeOption;
     
     [ObservableProperty]
-    private Handedness _selectedHandedness = Handedness.RightHanded;
+    private HandednessOption? _selectedHandednessOption;
 
     [ObservableProperty]
     private bool _compactOverview;
 
     [ObservableProperty]
-    private AppThemePreference _selectedAppTheme = AppThemePreference.System;
+    private AppThemeOption? _selectedAppThemeOption;
 
     [ObservableProperty]
-    private EpubConversionTheme _selectedEpubConversionTheme = EpubConversionTheme.System;
+    private EpubConversionThemeOption? _selectedEpubConversionThemeOption;
 
     [ObservableProperty]
-    private EpubOutputResolution _selectedEpubOutputResolution = EpubOutputResolution.Low;
+    private EpubOutputResolutionOption? _selectedEpubOutputResolutionOption;
 
     [ObservableProperty]
-    private UnsupportedFormatHandlingMode _selectedUnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode.ConvertOnImport;
+    private UnsupportedFormatHandlingModeOption? _selectedUnsupportedFormatHandlingModeOption;
 
     [ObservableProperty]
     private bool _skipExternalDeleteConfirmation;
@@ -181,33 +190,64 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>
     /// Available reading modes
     /// </summary>
-    public IReadOnlyList<ReadingMode> AvailableReadingModes =>
+    public IReadOnlyList<ReadingModeOption> AvailableReadingModes =>
         SupportsGuidedReading
-            ? [ReadingMode.Normal, ReadingMode.Zoomed, ReadingMode.Guided]
-            : [ReadingMode.Normal, ReadingMode.Zoomed];
+            ? [
+                new(ReadingMode.Normal, Loc.Instance.ReadingModeNormal),
+                new(ReadingMode.Zoomed, Loc.Instance.ReadingModeZoomed),
+                new(ReadingMode.Guided, Loc.Instance.ReadingModeGuided)
+              ]
+            : [
+                new(ReadingMode.Normal, Loc.Instance.ReadingModeNormal),
+                new(ReadingMode.Zoomed, Loc.Instance.ReadingModeZoomed)
+              ];
     
     /// <summary>
     /// Available handedness options
     /// </summary>
-    public IReadOnlyList<Handedness> AvailableHandednessOptions { get; } = 
-        [Handedness.RightHanded, Handedness.LeftHanded];
+    public IReadOnlyList<HandednessOption> AvailableHandednessOptions =>
+    [
+        new(Handedness.RightHanded, Loc.Instance.HandednessRight),
+        new(Handedness.LeftHanded, Loc.Instance.HandednessLeft)
+    ];
 
-    public IReadOnlyList<AppThemePreference> AvailableAppThemes { get; } =
-        [AppThemePreference.System, AppThemePreference.Light, AppThemePreference.Dark];
+    public IReadOnlyList<StartupBehaviorOption> AvailableStartupBehaviors => 
+    [
+        new(StartupBehavior.ContinueWhereLeftOff, Loc.Instance.ContinueWhereLeftOff),
+        new(StartupBehavior.Library, Loc.Instance.LibraryView)
+    ];
 
-    public IReadOnlyList<EpubConversionTheme> AvailableEpubConversionThemes { get; } =
-        [EpubConversionTheme.System, EpubConversionTheme.Light, EpubConversionTheme.Dark];
+    [ObservableProperty]
+    private StartupBehaviorOption? _selectedStartupBehaviorOption;
 
-    public IReadOnlyList<EpubOutputResolution> AvailableEpubOutputResolutions { get; } =
-        [EpubOutputResolution.Low, EpubOutputResolution.Medium, EpubOutputResolution.High];
+    public IReadOnlyList<AppThemeOption> AvailableAppThemes =>
+    [
+        new(AppThemePreference.System, Loc.Instance.ThemeSystem),
+        new(AppThemePreference.Light, Loc.Instance.ThemeLight),
+        new(AppThemePreference.Dark, Loc.Instance.ThemeDark)
+    ];
 
-    public IReadOnlyList<UnsupportedFormatHandlingMode> AvailableUnsupportedFormatHandlingModes { get; } =
-        [UnsupportedFormatHandlingMode.ConvertOnImport, UnsupportedFormatHandlingMode.ConvertWhileReading];
+    public IReadOnlyList<EpubConversionThemeOption> AvailableEpubConversionThemes =>
+    [
+        new(EpubConversionTheme.System, Loc.Instance.ThemeSystem),
+        new(EpubConversionTheme.Light, Loc.Instance.ThemeLight),
+        new(EpubConversionTheme.Dark, Loc.Instance.ThemeDark)
+    ];
 
-    public string UnsupportedFormatHandlingDescription =>
-        SupportsEpubFeatures
-            ? "Convert On Import keeps the current behavior and stores a CBZ. Convert While Reading keeps the original PDF/EPUB and renders pages on demand, while still caching the cover thumbnail separately."
-            : "Convert On Import keeps the current behavior and stores a CBZ. Convert While Reading keeps the original PDF and renders pages on demand, while still caching the cover thumbnail separately.";
+    public IReadOnlyList<EpubOutputResolutionOption> AvailableEpubOutputResolutions =>
+    [
+        new(EpubOutputResolution.Low, Loc.Instance.ResolutionLow),
+        new(EpubOutputResolution.Medium, Loc.Instance.ResolutionMedium),
+        new(EpubOutputResolution.High, Loc.Instance.ResolutionHigh)
+    ];
+
+    public IReadOnlyList<UnsupportedFormatHandlingModeOption> AvailableUnsupportedFormatHandlingModes =>
+    [
+        new(UnsupportedFormatHandlingMode.ConvertOnImport, Loc.Instance.UnsupportedFormatHandlingConvertOnImport),
+        new(UnsupportedFormatHandlingMode.ConvertWhileReading, Loc.Instance.UnsupportedFormatHandlingConvertWhileReading)
+    ];
+
+    public string UnsupportedFormatHandlingDescription => Loc.Instance.UnsupportedFormatHandlingDescription;
 
     public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
 
@@ -244,7 +284,7 @@ public partial class SettingsViewModel : ViewModelBase
         target.Clear();
         foreach (var item in source.OrderBy(section => section.Order))
         {
-            item.Label = GetSectionLabel(item.Key);
+            item.RefreshLocalization();
             item.PropertyChanged += OnSectionPreferenceChanged;
             target.Add(item);
         }
@@ -262,27 +302,8 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        section.Label = GetSectionLabel(section.Key);
+        section.RefreshLocalization();
         _ = _settingsService.SaveSettingsAsync(_appSettings);
-    }
-
-    private string GetSectionLabel(string key)
-    {
-        return key switch
-        {
-            LibrarySectionKeys.ContinueReading => "Continue Reading",
-            LibrarySectionKeys.NewComics => "New Comics",
-            LibrarySectionKeys.Favorites => "Favorites",
-            LibrarySectionKeys.Series => "Series",
-            LibrarySectionKeys.Read => "Read",
-            KomgaSectionKeys.KeepReading => "Keep Reading",
-            KomgaSectionKeys.OnDeck => "On Deck",
-            KomgaSectionKeys.RecentlyAddedBooks => "Recently Added Books",
-            KomgaSectionKeys.RecentlyAddedSeries => "Recently Added Series",
-            KomgaSectionKeys.Libraries => "Libraries",
-            KomgaSectionKeys.ReadLists => "Read Lists",
-            _ => key
-        };
     }
 
     private async Task SaveSectionLayoutAsync()
@@ -381,19 +402,21 @@ public partial class SettingsViewModel : ViewModelBase
         }
             
         // Load reading mode settings
-        SelectedAppTheme = _appSettings.AppTheme;
-        SelectedReadingMode = NormalizeReadingMode(_appSettings.PreferredReadingMode);
-        SelectedHandedness = _appSettings.Handedness;
+        SelectedAppThemeOption = AvailableAppThemes.FirstOrDefault(o => o.Value == _appSettings.AppTheme) ?? AvailableAppThemes[0];
+        var readingMode = NormalizeReadingMode(_appSettings.PreferredReadingMode);
+        SelectedReadingModeOption = AvailableReadingModes.FirstOrDefault(o => o.Value == readingMode) ?? AvailableReadingModes[0];
+        SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness) ?? AvailableHandednessOptions[0];
+        SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior) ?? AvailableStartupBehaviors[0];
         CompactOverview = _appSettings.CompactOverview;
-        SelectedEpubConversionTheme = _appSettings.EpubConversionTheme;
-        SelectedEpubOutputResolution = _appSettings.EpubOutputResolution;
-        SelectedUnsupportedFormatHandlingMode = _appSettings.UnsupportedFormatHandlingMode;
+        SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme) ?? AvailableEpubConversionThemes[0];
+        SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
+        SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode) ?? AvailableUnsupportedFormatHandlingModes[0];
         SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
 
-        if (_appSettings.PreferredReadingMode != SelectedReadingMode)
+        if (_appSettings.PreferredReadingMode != readingMode)
         {
-            _appSettings.PreferredReadingMode = SelectedReadingMode;
+            _appSettings.PreferredReadingMode = readingMode;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
 
@@ -401,13 +424,14 @@ public partial class SettingsViewModel : ViewModelBase
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
     }
 
-    partial void OnSelectedAppThemeChanged(AppThemePreference value)
+    partial void OnSelectedAppThemeOptionChanged(AppThemeOption? value)
     {
-        ApplyAppTheme(value);
+        if (value is null) return;
+        ApplyAppTheme(value.Value);
 
         if (_appSettings is not null)
         {
-            _appSettings.AppTheme = value;
+            _appSettings.AppTheme = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
@@ -427,6 +451,31 @@ public partial class SettingsViewModel : ViewModelBase
         // Apply language change
         _localizationService.SetLanguage(value.CultureCode);
         
+        // Refresh all localized properties
+        OnPropertyChanged(nameof(AvailableReadingModes));
+        OnPropertyChanged(nameof(AvailableHandednessOptions));
+        OnPropertyChanged(nameof(AvailableStartupBehaviors));
+        OnPropertyChanged(nameof(AvailableAppThemes));
+        OnPropertyChanged(nameof(AvailableEpubConversionThemes));
+        OnPropertyChanged(nameof(AvailableEpubOutputResolutions));
+        OnPropertyChanged(nameof(AvailableUnsupportedFormatHandlingModes));
+        OnPropertyChanged(nameof(UnsupportedFormatHandlingDescription));
+
+        // Re-sync current selections to the new localized options
+        if (_appSettings is not null)
+        {
+            SelectedReadingModeOption = AvailableReadingModes.FirstOrDefault(o => o.Value == _appSettings.PreferredReadingMode);
+            SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness);
+            SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior);
+            SelectedAppThemeOption = AvailableAppThemes.FirstOrDefault(o => o.Value == _appSettings.AppTheme);
+            SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme);
+            SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution);
+            SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode);
+        }
+
+        foreach (var section in LibrarySections) section.RefreshLocalization();
+        foreach (var section in KomgaSections) section.RefreshLocalization();
+
         // Save to settings
         if (_appSettings is not null)
         {
@@ -436,12 +485,13 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
     
-    partial void OnSelectedReadingModeChanged(ReadingMode value)
+    partial void OnSelectedReadingModeOptionChanged(ReadingModeOption? value)
     {
-        var normalized = NormalizeReadingMode(value);
-        if (normalized != value)
+        if (value is null) return;
+        var normalized = NormalizeReadingMode(value.Value);
+        if (normalized != value.Value)
         {
-            SelectedReadingMode = normalized;
+            SelectedReadingModeOption = AvailableReadingModes.FirstOrDefault(o => o.Value == normalized);
             return;
         }
 
@@ -453,30 +503,41 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
     
-    partial void OnSelectedHandednessChanged(Handedness value)
+    partial void OnSelectedHandednessOptionChanged(HandednessOption? value)
     {
+        if (value is null) return;
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.Handedness = value;
+            _appSettings.Handedness = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
 
-    partial void OnSelectedEpubConversionThemeChanged(EpubConversionTheme value)
+    partial void OnSelectedStartupBehaviorOptionChanged(StartupBehaviorOption? value)
     {
-        if (_appSettings is not null)
+        // Save to settings
+        if (value is not null && _appSettings is not null)
         {
-            _appSettings.EpubConversionTheme = value;
+            _appSettings.StartupBehavior = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
 
-    partial void OnSelectedEpubOutputResolutionChanged(EpubOutputResolution value)
+    partial void OnSelectedEpubConversionThemeOptionChanged(EpubConversionThemeOption? value)
     {
-        if (_appSettings is not null)
+        if (value is not null && _appSettings is not null)
         {
-            _appSettings.EpubOutputResolution = value;
+            _appSettings.EpubConversionTheme = value.Value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedEpubOutputResolutionOptionChanged(EpubOutputResolutionOption? value)
+    {
+        if (value is not null && _appSettings is not null)
+        {
+            _appSettings.EpubOutputResolution = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
@@ -490,11 +551,11 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    partial void OnSelectedUnsupportedFormatHandlingModeChanged(UnsupportedFormatHandlingMode value)
+    partial void OnSelectedUnsupportedFormatHandlingModeOptionChanged(UnsupportedFormatHandlingModeOption? value)
     {
-        if (_appSettings is not null)
+        if (value is not null && _appSettings is not null)
         {
-            _appSettings.UnsupportedFormatHandlingMode = value;
+            _appSettings.UnsupportedFormatHandlingMode = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

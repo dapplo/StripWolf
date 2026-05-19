@@ -102,6 +102,8 @@ public partial class App : Application
             };
         }
 
+        _ = mainViewModel.InitializeAsync();
+
         base.OnFrameworkInitializationCompleted();
     }
     
@@ -195,7 +197,11 @@ public partial class App : Application
         services.AddSingleton<ReaderViewModel>();
         services.AddSingleton<KomgaViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddSingleton<ActivityViewModel>();
+        services.AddSingleton<ActivityViewModel>(sp => new ActivityViewModel(
+            sp.GetRequiredService<LibraryViewModel>(),
+            sp.GetRequiredService<KomgaViewModel>(),
+            sp.GetRequiredService<EpubShadowConversionService>(),
+            sp.GetRequiredService<SettingsService>()));
         services.AddSingleton<MainViewModel>();
     }
 }

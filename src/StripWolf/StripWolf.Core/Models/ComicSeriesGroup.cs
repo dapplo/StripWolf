@@ -22,6 +22,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StripWolf.Core.Resources;
 
 namespace StripWolf.Core.Models;
 
@@ -59,14 +60,19 @@ public partial class ComicSeriesGroup : ObservableObject
         .Max();
 
     public string DeleteActionLabel => !HasDeletingComics
-        ? "Delete"
+        ? Loc.Instance.DeleteComic
         : DeletingComicCount >= ComicCount
-            ? $"Undo ({DeleteCountdownSeconds})"
-            : $"Undo {DeletingComicCount} ({DeleteCountdownSeconds})";
+            ? string.Format(Loc.Instance.DeleteActionUndo, DeleteCountdownSeconds)
+            : string.Format(Loc.Instance.DeleteActionUndoMultiple, DeletingComicCount, DeleteCountdownSeconds);
 
     public string DeleteStatusText => !HasDeletingComics
         ? string.Empty
-        : $"Deleting {DeletingComicCount} comic{(DeletingComicCount == 1 ? string.Empty : "s")} in {DeleteCountdownSeconds}s";
+        : DeletingComicCount == 1 
+            ? string.Format(Loc.Instance.DeleteStatusSingle, DeleteCountdownSeconds)
+            : string.Format(Loc.Instance.DeleteStatusPlural, DeletingComicCount, DeleteCountdownSeconds);
+
+    public string ComicCountDisplay => string.Format(Loc.Instance.ComicCountDisplay, ComicCount);
+    public string ReadCountDisplay => string.Format(Loc.Instance.ReadCountDisplay, ReadCount);
 
     partial void OnComicsChanged(ObservableCollection<Comic>? oldValue, ObservableCollection<Comic> newValue)
     {
@@ -126,6 +132,13 @@ public partial class ComicSeriesGroup : ObservableObject
         OnPropertyChanged(nameof(DeleteCountdownSeconds));
         OnPropertyChanged(nameof(DeleteActionLabel));
         OnPropertyChanged(nameof(DeleteStatusText));
+        OnPropertyChanged(nameof(ComicCountDisplay));
+        OnPropertyChanged(nameof(ReadCountDisplay));
+    }
+
+    public void RefreshLocalization()
+    {
+        RaiseComputedPropertiesChanged();
     }
 }
 

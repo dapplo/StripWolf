@@ -25,6 +25,7 @@ using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
 using StripWolf.Core.Models.Komga;
 using StripWolf.Core.Services;
+using StripWolf.Core.Resources;
 using System.Diagnostics.CodeAnalysis;
 
 namespace StripWolf.Core.ViewModels;
@@ -463,7 +464,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         _downloadQueueStateRefreshPending = true;
-        void Refresh()
+        void RefreshInternal()
         {
             _downloadQueueStateRefreshPending = false;
             RefreshDownloadQueueState();
@@ -471,11 +472,11 @@ public partial class KomgaViewModel : ViewModelBase
 
         if (Dispatcher.UIThread.CheckAccess())
         {
-            Refresh();
+            RefreshInternal();
         }
         else
         {
-            Dispatcher.UIThread.Post(Refresh, DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(RefreshInternal, DispatcherPriority.Background);
         }
     }
 
@@ -597,7 +598,7 @@ public partial class KomgaViewModel : ViewModelBase
         _libraryService = libraryService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
-        Title = "Komga";
+        Title = Loc.Instance.Komga;
         var initialSettings = _settingsService.LoadSettings();
         ApplySectionLayout(initialSettings);
         ApplyDownloadSettings(initialSettings);
@@ -607,9 +608,31 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 ApplySectionLayout(settings);
                 ApplyDownloadSettings(settings);
+                RefreshLocalization();
             });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
+    }
+
+    private void RefreshLocalization()
+    {
+        Title = Loc.Instance.Komga;
+        OnPropertyChanged(nameof(Title));
+        
+        // Refresh properties bound to Loc.Instance
+        OnPropertyChanged(nameof(Loc.Instance.Komga));
+        OnPropertyChanged(nameof(Loc.Instance.SearchPlaceholder));
+        OnPropertyChanged(nameof(Loc.Instance.SeriesResults));
+        OnPropertyChanged(nameof(Loc.Instance.BookResults));
+        OnPropertyChanged(nameof(Loc.Instance.NoResults));
+        OnPropertyChanged(nameof(Loc.Instance.SectionKeepReading));
+        OnPropertyChanged(nameof(Loc.Instance.SectionOnDeck));
+        OnPropertyChanged(nameof(Loc.Instance.SectionRecentlyAddedBooks));
+        OnPropertyChanged(nameof(Loc.Instance.SectionRecentlyAddedSeries));
+        OnPropertyChanged(nameof(Loc.Instance.SectionLibraries));
+        OnPropertyChanged(nameof(Loc.Instance.SectionReadLists));
+
+        RefreshHomeSectionVisibilityState();
     }
 
     private void ApplyDownloadSettings(AppSettings settings)

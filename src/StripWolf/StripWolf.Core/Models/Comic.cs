@@ -21,6 +21,7 @@ using SQLite;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using StripWolf.Core.Resources;
 
 namespace StripWolf.Core.Models;
 
@@ -180,12 +181,12 @@ public partial class Comic : ObservableObject
 
     [SQLite.Ignore]
     public string ReadingProgressDisplay => IsConverting
-        ? "Converting..."
+        ? Loc.Instance.Converting
         : IsPendingEpubConversion
-            ? "Not converted yet"
+            ? Loc.Instance.NotConvertedYet
             : HasReadingProgress
-                ? $"{Math.Min(CurrentPage + 1, PageCount)} / {PageCount} pages"
-                : $"{PageCount} pages";
+                ? string.Format(Loc.Instance.PagesDisplay, Math.Min(CurrentPage + 1, PageCount), PageCount)
+                : string.Format(Loc.Instance.TotalPagesDisplay, PageCount);
 
     /// <summary>
     /// Format of the comic file (CBZ, CBR)
@@ -240,9 +241,19 @@ public partial class Comic : ObservableObject
 
     [SQLite.Ignore]
     public string LibraryPageStatusDisplay => IsPendingEpubConversion
-        ? "Not converted yet"
+        ? Loc.Instance.NotConvertedYet
         : IsConverting
-            ? "Converting..."
-            : $"{PageCount} pages";
+            ? Loc.Instance.Converting
+            : string.Format(Loc.Instance.TotalPagesDisplay, PageCount);
+
+    [SQLite.Ignore]
+    public string FormatDisplay => Format.ToString().ToUpperInvariant();
+
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(ReadingProgressDisplay));
+        OnPropertyChanged(nameof(LibraryPageStatusDisplay));
+        OnPropertyChanged(nameof(FormatDisplay));
+    }
 }
 

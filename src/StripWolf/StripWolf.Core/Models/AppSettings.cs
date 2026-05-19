@@ -32,6 +32,8 @@ public class AppSettings
 
     public string? LastOpenedComicPath { get; set; }
 
+    public int? LastOpenedComicId { get; set; }
+
     public string? ComicsDirectory { get; set; }
 
     /// <summary>
@@ -43,6 +45,16 @@ public class AppSettings
     /// Whether to use the system language setting
     /// </summary>
     public bool UseSystemLanguage { get; set; } = true;
+
+    /// <summary>
+    /// Behavior when the application starts.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<StartupBehavior>))]
+    public StartupBehavior StartupBehavior { get; set; } = StartupBehavior.ContinueWhereLeftOff;
+
+    public bool WasInReader { get; set; }
+
+    public int LastTabIndex { get; set; }
 
     /// <summary>
     /// Preferred reading mode for the comic reader
@@ -123,9 +135,13 @@ public class AppSettings
             }).ToList(),
             ActiveServerId = ActiveServerId,
             LastOpenedComicPath = LastOpenedComicPath,
+            LastOpenedComicId = LastOpenedComicId,
             ComicsDirectory = ComicsDirectory,
             LanguageCode = LanguageCode,
             UseSystemLanguage = UseSystemLanguage,
+            StartupBehavior = StartupBehavior,
+            WasInReader = WasInReader,
+            LastTabIndex = LastTabIndex,
             AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,

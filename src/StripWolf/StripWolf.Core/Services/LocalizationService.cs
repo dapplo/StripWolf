@@ -20,6 +20,8 @@
 using System.Globalization;
 using System.Resources;
 
+using StripWolf.Core.Resources;
+
 namespace StripWolf.Core.Services;
 
 /// <summary>
@@ -27,7 +29,7 @@ namespace StripWolf.Core.Services;
 /// </summary>
 public class LocalizationService
 {
-    private static readonly ResourceManager ResourceManager = new("StripWolf.Resources.Strings", typeof(LocalizationService).Assembly);
+    private static readonly ResourceManager ResourceManager = new("StripWolf.Core.Resources.Strings", typeof(LocalizationService).Assembly);
     
     private CultureInfo _currentCulture;
     private bool _useSystemLanguage = true;
@@ -45,8 +47,8 @@ public class LocalizationService
         new LanguageOption("System Default", null),
         new LanguageOption("English", "en"),
         new LanguageOption("Deutsch", "de"),
-        new LanguageOption("FranÃ§ais", "fr"),
-        new LanguageOption("EspaÃ±ol", "es"),
+        new LanguageOption("Français", "fr"),
+        new LanguageOption("Español", "es"),
         new LanguageOption("Nederlands", "nl")
     ];
     
@@ -119,6 +121,8 @@ public class LocalizationService
         // DefaultThreadCurrentUICulture affects new threads as well
         CultureInfo.DefaultThreadCurrentUICulture = culture;
         Thread.CurrentThread.CurrentUICulture = culture;
+
+        Loc.Instance.RefreshLocalization();
         
         LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
