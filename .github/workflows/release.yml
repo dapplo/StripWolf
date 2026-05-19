@@ -228,6 +228,7 @@ jobs:
         run: |
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-arm64 -o publish/android-arm64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
+            -p:RuntimeIdentifier=android-arm64 \
             -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
             -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
         env:
@@ -238,6 +239,7 @@ jobs:
         run: |
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-x64 -o publish/android-x64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
+            -p:RuntimeIdentifier=android-x64 \
             -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
             -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
         env:
