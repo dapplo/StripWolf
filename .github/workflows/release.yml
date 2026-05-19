@@ -234,33 +234,23 @@ jobs:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
 
-      - name: Find and rename APK
+      - name: Find and rename APKs
         run: |
-          APK_PATH=$(find publish/android -name "*-Signed.apk" | head -1)
-          if [ -z "$APK_PATH" ]; then
-            APK_PATH=$(find publish/android -name "*.apk" | head -1)
-          fi
-          if [ -n "$APK_PATH" ]; then
-            cp "$APK_PATH" StripWolf-Android-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk
-          else
-            echo "APK not found in publish output, checking signed APK location..."
-            APK_PATH=$(find . -path "*/bin/Release/*/publish/*-Signed.apk" | head -1)
-            if [ -z "$APK_PATH" ]; then
-              APK_PATH=$(find . -path "*/bin/Release/*/publish/*.apk" | head -1)
-            fi
-            if [ -n "$APK_PATH" ]; then
-              cp "$APK_PATH" StripWolf-Android-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk
-            else
-              echo "Error: Could not find APK file"
-              find . -name "*.apk" 2>/dev/null || true
-              exit 1
-            fi
-          fi
+          # Find all APKs (handling the per-ABI split files)
+          mkdir -p release-artifacts
+          find publish/android -name "*.apk" | while read -r apk; do
+            # Extract ABI name (e.g. arm64-v8a) if present in filename, else use 'universal'
+            ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a)" || echo "universal")
+            # Create a clean filename
+            NEW_NAME="StripWolf-Android-${ABI}-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
+            cp "$apk" "release-artifacts/$NEW_NAME"
+            echo "Prepared: $NEW_NAME"
+          done
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
-          files: StripWolf-Android-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk
+          files: release-artifacts/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

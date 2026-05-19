@@ -11,10 +11,15 @@
     <ApplicationDisplayVersion Condition="'$(GitVersion_SemVer)' != ''">$(GitVersion_SemVer)</ApplicationDisplayVersion>
     <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-	<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AndroidEnableProfiledAot>true</AndroidEnableProfiledAot>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>link</TrimMode>
+    <AndroidLinkMode>SdkOnly</AndroidLinkMode>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!-- Exclude PDFium from Android build to reduce APK size -->
     <ExcludePdfium>true</ExcludePdfium>
+    <!-- Enable APK splitting to reduce size per file -->
+    <AndroidCreatePackagePerAbi>true</AndroidCreatePackagePerAbi>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
     <AllowedReferenceRelatedFileExtensions Condition="'$(Configuration)' == 'Release'">none</AllowedReferenceRelatedFileExtensions>
