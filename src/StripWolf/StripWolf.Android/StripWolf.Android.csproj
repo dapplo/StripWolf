@@ -11,6 +11,7 @@
     <ApplicationDisplayVersion Condition="'$(GitVersion_SemVer)' != ''">$(GitVersion_SemVer)</ApplicationDisplayVersion>
     <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RunAOTCompilation>true</RunAOTCompilation>
     <AndroidEnableProfiledAot>true</AndroidEnableProfiledAot>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>link</TrimMode>
