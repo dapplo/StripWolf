@@ -69,7 +69,7 @@ Download the latest APK from the [Releases](https://github.com/dapplo/StripWolf/
 3. Open the downloaded APK file and follow the installation prompts
 4. The app is now ready to use
 
-**Note**: The APK is signed with a development key for sideloading. To install updates, you may need to uninstall the previous version first if the signing key changes.
+**Note**: If you are trying to build the APK yourself or run from Visual Studio, the app is signed with a development key for sideloading. This will conflict with the packages build officially, and you will lose your local comics and information.
 
 ### Windows
 
@@ -148,13 +148,16 @@ Configure your server URL and credentials in the Settings page to:
 
 ## Technology Stack
 
+- **.NET**: Current version 10
 - **UI Framework**: Avalonia UI 12.x (cross-platform)
 - **MVVM**: CommunityToolkit.Mvvm
 - **Storage**: SQLite via sqlite-net-pcl
-- **CBR Support**: SharpCompress
+- **CB(R/T/Z/7) Support**: SharpCompress
 - **PDF Support**: PDFiumCore for PDF rendering, SixLabors.ImageSharp for image processing
+- **EPUB support**: VerseOne.EPub rendered in a WebView, currently only working on Windows (but not the package one) and Android
+- Development is supported by AI, using Gemini and Copilot.
 
 
 ## License
 
-See [LICENSE](LICENSE) file for details.
+GPLv3, see [LICENSE](LICENSE) file for details.
