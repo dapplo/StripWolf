@@ -239,8 +239,18 @@ jobs:
           # Find all APKs (handling the per-ABI split files)
           mkdir -p release-artifacts
           find publish/android -name "*.apk" | while read -r apk; do
-            # Extract ABI name (e.g. arm64-v8a) if present in filename, else use 'universal'
-            ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a)" || echo "universal")
+            # Extract ABI name more robustly
+            # Common patterns: arm64-v8a, x86_64, armeabi-v7a
+            # MSBuild often outputs them as part of the filename or directory
+            ABI=$(echo "$apk" | grep -oP "(arm64-v8a|x86_64|armeabi-v7a|universal)" || echo "unknown")
+            
+            # If still unknown, try checking the full path
+            if [ "$ABI" = "unknown" ]; then
+               if [[ "$apk" == *"arm64"* ]]; then ABI="arm64-v8a";
+               elif [[ "$apk" == *"x64"* ]] || [[ "$apk" == *"x86_64"* ]]; then ABI="x86_64";
+               else ABI="universal"; fi
+            fi
+
             # Create a clean filename
             NEW_NAME="StripWolf-Android-${ABI}-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
             cp "$apk" "release-artifacts/$NEW_NAME"
