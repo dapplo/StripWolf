@@ -9,14 +9,14 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 
 - **Local Comic Reading**: Read CBZ, CBR, CB7, CBT, PDF, and EPUB files stored on your device
 - **PDF Support**: Import PDF files - they are automatically converted to CBZ format for optimal viewing
-- **EPUB Support**: Import EPUB files either by converting them to CBZ on import or by converting pages on demand while you read
+- **EPUB Support**: On supported platforms you can import EPUB files either by converting them to CBZ on import or by converting pages on demand while you read
 - **Extended Format Support**: Read CB7 (7-Zip) and CBT (TAR) archives natively, while solid RAR archives are automatically converted to CBZ for reliable reading
 - **ComicInfo.xml Support**: Automatically extracts and displays metadata from ComicInfo.xml files embedded in comic archives
 - **Komga Integration**: Connect to your Komga server to browse and download comics
 - **Multiple Reading Modes**:
   - **Normal**: Standard full-page reading
   - **Zoomed**: Split view with page overview and magnified area
-  - **Guided**: Automatic panel detection for scene-by-scene navigation
+  - **Guided**: Automatic panel detection for scene-by-scene navigation (available on limited platforms and still in development)
 - **Handedness Options**: Choose between left-handed and right-handed layouts for Zoomed and Guided modes
 - **Offline Reading**: Download comics from Komga for offline access
 - **Reading Progress**: Automatically tracks your reading progress
@@ -38,7 +38,7 @@ If you like the project, you can support me:
 | CB7 (7-Zip) | .cb7 | ✅ Native |
 | CBT (TAR) | .cbt | ✅ Native |
 | PDF | .pdf | ✅ Converted to CBZ |
-| EPUB | .epub | ✅ Supported (convert on import or convert while reading) |
+| EPUB | .epub | ✅ Supported on android (convert on import or convert while reading) |
 
 ### Supported Image Formats
 
@@ -54,9 +54,9 @@ Comics can contain images in the following formats:
 ## Supported Platforms
 
 - Windows
-- Linux
-- macOS
 - Android (APK)
+- Linux (still needs testing)
+- macOS (still needs testing)
 
 ## Installation
 
