@@ -114,6 +114,11 @@ public class AppSettings
     public int KomgaParallelDownloads { get; set; } = 1;
 
     /// <summary>
+    /// Whether to synchronize reading progress with Komga
+    /// </summary>
+    public bool SyncReadProgress { get; set; } = true;
+
+    /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
     public AppSettings Clone()
@@ -153,7 +158,8 @@ public class AppSettings
             SkipExternalDeleteConfirmation = SkipExternalDeleteConfirmation,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
-            KomgaParallelDownloads = KomgaParallelDownloads
+            KomgaParallelDownloads = KomgaParallelDownloads,
+            SyncReadProgress = SyncReadProgress
         };
     }
 }

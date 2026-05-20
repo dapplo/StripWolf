@@ -35,9 +35,11 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaSyncService _komgaSyncService;
     private readonly PanelDetectionService _panelDetectionService;
     private readonly SettingsService _settingsService;
     private readonly EpubShadowConversionService _epubShadowConversionService;
+    private readonly DispatcherTimer _periodicSyncTimer;
     private string? _readerFilePath;
 
     [ObservableProperty]
@@ -58,7 +60,10 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ComicPageCountDisplay))]
     [NotifyPropertyChangedFor(nameof(HasKomgaSeriesLink))]
     [NotifyPropertyChangedFor(nameof(IsFavorite))]
+    [NotifyPropertyChangedFor(nameof(KomgaSyncStatus))]
     private Comic? _comic;
+
+    public string? KomgaSyncStatus => Comic?.KomgaSyncStatus;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
@@ -363,6 +368,7 @@ public partial class ReaderViewModel : ViewModelBase
         LibraryService libraryService, 
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
+        KomgaSyncService komgaSyncService,
         PanelDetectionService panelDetectionService,
         SettingsService settingsService,
         EpubShadowConversionService epubShadowConversionService)
@@ -370,15 +376,24 @@ public partial class ReaderViewModel : ViewModelBase
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
+        _komgaSyncService = komgaSyncService;
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
         _epubShadowConversionService = epubShadowConversionService;
         _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
+        
+        _periodicSyncTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(5)
+        };
+        _periodicSyncTimer.Tick += async (_, _) => await SyncProgressWithKomgaAsync();
+        
         Title = "Reader";
     }
 
     private void ReleaseReaderResources()
     {
+        _periodicSyncTimer.Stop();
         if (Comic is not null && HasPendingEpubConversion)
         {
             _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
@@ -624,7 +639,8 @@ public partial class ReaderViewModel : ViewModelBase
                 // Sync with Komga if this is a Komga comic
                 if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
                 {
-                    await SyncReadProgressFromKomgaAsync();
+                    await _komgaSyncService.SyncComicReadProgressAsync(Comic);
+                    OnPropertyChanged(nameof(KomgaSyncStatus));
                 }
                 
                 _isLoadingPage = true;
@@ -636,6 +652,8 @@ public partial class ReaderViewModel : ViewModelBase
                 
                 // Mark as started reading
                 await SaveProgressAsync();
+
+                _periodicSyncTimer.Start();
             }
         }
         catch (Exception ex)
@@ -648,32 +666,15 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
-    private async Task SyncReadProgressFromKomgaAsync()
+    private async Task SyncProgressWithKomgaAsync()
     {
-        if (Comic is null || string.IsNullOrEmpty(Comic.KomgaId) || !_komgaApiService.IsConfigured)
+        if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId) || !_komgaApiService.IsConfigured)
         {
             return;
         }
 
-        try
-        {
-            var book = await _komgaApiService.GetBookAsync(Comic.KomgaId);
-            if (book?.ReadProgress is not null)
-            {
-                // Komga uses 1-based page numbers
-                var komgaPage = book.ReadProgress.Page - 1;
-                // Ensure page is within valid range
-                if (komgaPage >= 0 && komgaPage < Comic.PageCount && komgaPage > Comic.CurrentPage)
-                {
-                    Comic.CurrentPage = komgaPage;
-                    Comic.IsCompleted = book.ReadProgress.Completed;
-                }
-            }
-        }
-        catch
-        {
-            // Failed to sync, continue with local progress
-        }
+        await _komgaSyncService.PushProgressToKomgaAsync(Comic);
+        OnPropertyChanged(nameof(KomgaSyncStatus));
     }
 
     private async Task LoadPageAsync()
@@ -1726,6 +1727,7 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackAsync()
     {
+        await SyncProgressWithKomgaAsync();
         await SaveProgressAsync();
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);

@@ -35,6 +35,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly SettingsViewModel _settingsViewModel;
     private readonly ReaderViewModel _readerViewModel;
     private readonly SettingsService _settingsService;
+    private readonly KomgaSyncService _komgaSyncService;
     private bool _isInitializing = true;
 
     [ObservableProperty]
@@ -55,7 +56,8 @@ public partial class MainViewModel : ViewModelBase
         ActivityViewModel activityViewModel,
         SettingsViewModel settingsViewModel,
         ReaderViewModel readerViewModel,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        KomgaSyncService komgaSyncService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
@@ -63,6 +65,7 @@ public partial class MainViewModel : ViewModelBase
         _settingsViewModel = settingsViewModel;
         _readerViewModel = readerViewModel;
         _settingsService = settingsService;
+        _komgaSyncService = komgaSyncService;
         
         Title = "StripWolf";
         _currentView = _libraryViewModel;
@@ -81,6 +84,21 @@ public partial class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasActivityItems));
             }
         };
+    }
+
+    /// <summary>
+    /// Called when the application is resumed/activated
+    /// </summary>
+    public async Task OnAppResumedAsync()
+    {
+        // Sync all comics in background
+        _ = _komgaSyncService.SyncAllComicsAsync();
+
+        // If a comic is currently being read, sync it specifically too
+        if (IsInReader && _readerViewModel.Comic != null)
+        {
+            await _komgaSyncService.SyncComicReadProgressAsync(_readerViewModel.Comic);
+        }
     }
 
     public async Task InitializeAsync()

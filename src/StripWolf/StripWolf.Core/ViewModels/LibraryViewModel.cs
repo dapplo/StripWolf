@@ -37,6 +37,8 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly ComicReaderService _comicReaderService;
     private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
+    private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaSyncService _komgaSyncService;
     private CancellationTokenSource? _deleteCountdownLoopCancellation;
     private Task? _deleteCountdownLoopTask;
     private bool _hasLoadedComics;
@@ -198,12 +200,20 @@ public partial class LibraryViewModel : ViewModelBase
     public bool ShowReadSection => IsReadSectionVisible && CompletedComics.Count > 0;
     public ObservableCollection<PendingImport> PendingImports => _importQueueService.PendingImports;
 
-    public LibraryViewModel(LibraryService libraryService, ComicReaderService comicReaderService, ImportQueueService importQueueService, SettingsService settingsService)
+    public LibraryViewModel(
+        LibraryService libraryService, 
+        ComicReaderService comicReaderService, 
+        ImportQueueService importQueueService, 
+        SettingsService settingsService,
+        KomgaApiService komgaApiService,
+        KomgaSyncService komgaSyncService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
+        _komgaApiService = komgaApiService;
+        _komgaSyncService = komgaSyncService;
         Title = Loc.Instance.Library;
 
         ApplySectionLayout(_settingsService.LoadSettings());
@@ -333,6 +343,17 @@ public partial class LibraryViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
+            // Ensure Komga API is configured if possible
+            if (!_komgaApiService.IsConfigured)
+            {
+                var settings = _settingsService.LoadSettings();
+                var activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId && s.IsActive);
+                if (activeServer != null)
+                {
+                    _komgaApiService.Configure(activeServer);
+                }
+            }
+
             var favorites = await _libraryService.GetFavoriteComicsAsync();
             FavoriteComics = ApplyComics(FavoriteComics, favorites);
              
@@ -353,6 +374,12 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 try { await _libraryService.CleanupMissingFilesAsync(); } catch { }
             });
+
+            // Trigger Komga sync in background
+            if (_komgaApiService.IsConfigured)
+            {
+                _ = _komgaSyncService.SyncAllComicsAsync();
+            }
 
             _hasLoadedComics = true;
         });

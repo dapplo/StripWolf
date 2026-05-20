@@ -102,6 +102,17 @@ public partial class App : Application
             };
         }
 
+        if (ApplicationLifetime is IActivatableLifetime activatable)
+        {
+            activatable.Activated += async (s, e) =>
+            {
+                if (e.Kind == ActivationKind.Background)
+                {
+                    await mainViewModel.OnAppResumedAsync();
+                }
+            };
+        }
+
         _ = mainViewModel.InitializeAsync();
 
         base.OnFrameworkInitializationCompleted();
@@ -191,6 +202,7 @@ public partial class App : Application
         services.AddSingleton<EpubShadowConversionService>();
         services.AddSingleton<LibraryService>();
         services.AddSingleton<ImportQueueService>();
+        services.AddSingleton<KomgaSyncService>();
 
         // Register view models
         services.AddSingleton<LibraryViewModel>();

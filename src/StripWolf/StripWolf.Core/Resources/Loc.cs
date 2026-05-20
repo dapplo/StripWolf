@@ -138,6 +138,11 @@ public class Loc : INotifyPropertyChanged
     public string NoResults => GetString();
     public string NoComicsFound => GetString();
     public string Sort => GetString();
+    public string SyncReadProgress => GetString();
+    public string SyncReadProgressEnabled => GetString();
+    public string SyncReadProgressDisabled => GetString();
+    public string SyncReadProgressDescription => GetString();
+    public string KomgaSyncStatus => GetString();
     public string ImportComic => GetString();
     public string ImportFolder => GetString();
     public string OpenFolder => GetString();

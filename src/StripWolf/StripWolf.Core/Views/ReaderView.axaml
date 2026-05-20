@@ -221,6 +221,11 @@
                     <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
                     <TextBlock Text="{Binding SeriesDisplay}" FontSize="16" Foreground="White"/>
                   </StackPanel>
+
+                  <StackPanel IsVisible="{Binding KomgaSyncStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding KomgaSyncStatus, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
+                    <TextBlock Text="{Binding KomgaSyncStatus}" FontSize="14" Foreground="#CCC"/>
+                  </StackPanel>
                   
                   <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0">

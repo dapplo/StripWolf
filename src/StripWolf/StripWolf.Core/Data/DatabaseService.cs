@@ -252,8 +252,12 @@ public class DatabaseService : IAsyncDisposable
         var comic = await GetComicAsync(comicId);
         if (comic is not null)
         {
-            comic.CurrentPage = currentPage;
-            comic.IsCompleted = isCompleted;
+            if (comic.CurrentPage != currentPage || comic.IsCompleted != isCompleted)
+            {
+                comic.CurrentPage = currentPage;
+                comic.IsCompleted = isCompleted;
+                comic.ReadProgressLastModified = DateTime.UtcNow;
+            }
             comic.LastReadDate = DateTime.UtcNow;
             await SaveComicAsync(comic);
         }
@@ -271,6 +275,7 @@ public class DatabaseService : IAsyncDisposable
                 comic.CurrentPage = 0;
                 comic.LastReadDate = null;
             }
+            comic.ReadProgressLastModified = DateTime.UtcNow;
             await SaveComicAsync(comic);
         }
     }

@@ -18,8 +18,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Foundation;
+using UIKit;
 using Avalonia;
 using Avalonia.iOS;
+using Microsoft.Extensions.DependencyInjection;
+using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.iOS;
 

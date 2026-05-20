@@ -786,4 +786,19 @@
   <data name="Sort" xml:space="preserve">
     <value>Ordenar</value>
   </data>
+  <data name="SyncReadProgress" xml:space="preserve">
+    <value>Sincronizar progreso de lectura</value>
+  </data>
+  <data name="SyncReadProgressEnabled" xml:space="preserve">
+    <value>Sincronizar progreso de lectura con Komga</value>
+  </data>
+  <data name="SyncReadProgressDisabled" xml:space="preserve">
+    <value>Solo progreso de lectura local</value>
+  </data>
+  <data name="SyncReadProgressDescription" xml:space="preserve">
+    <value>Si está habilitado, el progreso de lectura se sincronizará con su servidor Komga. El cambio más reciente (local o servidor) se priorizará en función de la marca de tiempo de modificación.</value>
+  </data>
+  <data name="KomgaSyncStatus" xml:space="preserve">
+    <value>Estado de sincronización de Komga</value>
+  </data>
 </root>

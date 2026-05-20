@@ -179,6 +179,9 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _skipExternalDeleteConfirmation;
 
     [ObservableProperty]
+    private bool _syncReadProgress;
+
+    [ObservableProperty]
     private int _selectedKomgaParallelDownloads = 1;
 
     [ObservableProperty]
@@ -412,6 +415,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
         SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode) ?? AvailableUnsupportedFormatHandlingModes[0];
         SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
+        SyncReadProgress = _appSettings.SyncReadProgress;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
 
         if (_appSettings.PreferredReadingMode != readingMode)
@@ -422,6 +426,15 @@ public partial class SettingsViewModel : ViewModelBase
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
+    }
+
+    partial void OnSyncReadProgressChanged(bool value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.SyncReadProgress = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
     }
 
     partial void OnSelectedAppThemeOptionChanged(AppThemeOption? value)

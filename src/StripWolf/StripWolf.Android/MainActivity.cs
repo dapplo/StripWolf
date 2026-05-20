@@ -21,6 +21,8 @@ using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Avalonia.Android;
+using Microsoft.Extensions.DependencyInjection;
+using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Android;
 

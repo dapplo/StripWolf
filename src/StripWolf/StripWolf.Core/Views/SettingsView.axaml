@@ -283,6 +283,16 @@
               <TextBlock Text="{Binding SkipExternalDeleteConfirmationDescription, Source={x:Static res:Loc.Instance}}"
                          Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
+
+            <Separator/>
+
+            <StackPanel Spacing="8">
+              <ToggleSwitch IsChecked="{Binding SyncReadProgress}"
+                            OnContent="{Binding SyncReadProgressEnabled, Source={x:Static res:Loc.Instance}}"
+                            OffContent="{Binding SyncReadProgressDisabled, Source={x:Static res:Loc.Instance}}"/>
+              <TextBlock Text="{Binding SyncReadProgressDescription, Source={x:Static res:Loc.Instance}}"
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
           </StackPanel>
         </Border>
 

@@ -148,6 +148,19 @@ public partial class Comic : ObservableObject
     private DateTime? _lastReadDate;
 
     /// <summary>
+    /// Last time the reading progress was modified locally
+    /// </summary>
+    [ObservableProperty]
+    private DateTime? _readProgressLastModified;
+
+    /// <summary>
+    /// The last synchronization status with Komga
+    /// </summary>
+    [property: SQLite.Ignore]
+    [ObservableProperty]
+    private string? _komgaSyncStatus;
+
+    /// <summary>
     /// Current page the user is on (0-indexed)
     /// </summary>
     [ObservableProperty]

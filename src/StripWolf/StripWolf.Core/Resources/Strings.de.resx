@@ -786,4 +786,19 @@
   <data name="Sort" xml:space="preserve">
     <value>Sortieren</value>
   </data>
+  <data name="SyncReadProgress" xml:space="preserve">
+    <value>Lesefortschritt synchronisieren</value>
+  </data>
+  <data name="SyncReadProgressEnabled" xml:space="preserve">
+    <value>Lesefortschritt mit Komga synchronisieren</value>
+  </data>
+  <data name="SyncReadProgressDisabled" xml:space="preserve">
+    <value>Nur lokaler Lesefortschritt</value>
+  </data>
+  <data name="SyncReadProgressDescription" xml:space="preserve">
+    <value>Wenn aktiviert, wird der Lesefortschritt mit Ihrem Komga-Server synchronisiert. Die neueste Änderung (lokal oder Server) wird basierend auf dem Zeitstempel der Änderung priorisiert.</value>
+  </data>
+  <data name="KomgaSyncStatus" xml:space="preserve">
+    <value>Komga-Synchronisationsstatus</value>
+  </data>
 </root>
