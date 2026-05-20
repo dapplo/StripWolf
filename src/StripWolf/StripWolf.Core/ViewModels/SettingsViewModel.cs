@@ -20,6 +20,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -50,6 +51,7 @@ public partial class SettingsViewModel : ViewModelBase
     
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
+    private bool _suppressSectionLayoutPersistence;
 
     [ObservableProperty]
     private ObservableCollection<KomgaServer> _servers = [];
@@ -197,10 +199,10 @@ public partial class SettingsViewModel : ViewModelBase
     private int _selectedKomgaParallelDownloads = 1;
 
     [ObservableProperty]
-    private ObservableCollection<SectionLayoutPreference> _librarySections = [];
+    private ObservableCollection<SectionLayoutItemViewModel> _librarySections = [];
 
     [ObservableProperty]
-    private ObservableCollection<SectionLayoutPreference> _komgaSections = [];
+    private ObservableCollection<SectionLayoutItemViewModel> _komgaSections = [];
     
     /// <summary>
     /// Available reading modes
@@ -276,6 +278,16 @@ public partial class SettingsViewModel : ViewModelBase
         _localizationService = localizationService;
         _donationService = donationService;
         Title = "Settings";
+        _settingsService.SettingsChanged += (_, settings) =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                _appSettings = settings.Clone();
+                ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
+                ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
+                OnPropertyChanged(nameof(ActiveServerId));
+            });
+        };
     }
 
     private ReadingMode NormalizeReadingMode(ReadingMode value)
@@ -289,50 +301,79 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     private void ReplaceSectionCollection(
-        ObservableCollection<SectionLayoutPreference> target,
-        IEnumerable<SectionLayoutPreference> source)
+        ObservableCollection<SectionLayoutItemViewModel> target,
+        IEnumerable<SectionLayoutSettings> source)
     {
-        foreach (var item in target)
+        _suppressSectionLayoutPersistence = true;
+        try
         {
-            item.PropertyChanged -= OnSectionPreferenceChanged;
-        }
+            foreach (var item in target)
+            {
+                item.PropertyChanged -= OnSectionLayoutItemChanged;
+            }
 
-        target.Clear();
-        foreach (var item in source.OrderBy(section => section.Order))
+            target.Clear();
+            foreach (var item in source.OrderBy(section => section.Order))
+            {
+                var sectionViewModel = new SectionLayoutItemViewModel();
+                sectionViewModel.Apply(item);
+                sectionViewModel.PropertyChanged += OnSectionLayoutItemChanged;
+                target.Add(sectionViewModel);
+            }
+        }
+        finally
         {
-            item.RefreshLocalization();
-            item.PropertyChanged += OnSectionPreferenceChanged;
-            target.Add(item);
+            _suppressSectionLayoutPersistence = false;
         }
     }
 
-    private void OnSectionPreferenceChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnSectionLayoutItemChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_appSettings is null || sender is not SectionLayoutPreference section)
+        if (_suppressSectionLayoutPersistence || sender is not SectionLayoutItemViewModel section)
         {
             return;
         }
 
-        if (e.PropertyName == nameof(SectionLayoutPreference.Label))
+        if (e.PropertyName == nameof(SectionLayoutItemViewModel.Label))
         {
             return;
         }
 
         section.RefreshLocalization();
-        _ = _settingsService.SaveSettingsAsync(_appSettings);
+        _ = PersistSectionLayoutAsync(section);
     }
 
-    private async Task SaveSectionLayoutAsync()
+    private Task PersistSectionLayoutAsync(SectionLayoutItemViewModel section)
     {
-        if (_appSettings is null)
+        var collection = GetSectionCollection(section);
+        if (collection is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        await _settingsService.SaveSettingsAsync(_appSettings);
+        return _settingsService.UpdateSettingsAsync(settings =>
+        {
+            if (ReferenceEquals(collection, LibrarySections))
+            {
+                settings.LibrarySections = CreateSectionSnapshot(LibrarySections, SectionLayoutSettings.CreateDefaultLibrarySections());
+            }
+            else if (ReferenceEquals(collection, KomgaSections))
+            {
+                settings.KomgaSections = CreateSectionSnapshot(KomgaSections, SectionLayoutSettings.CreateDefaultKomgaSections());
+            }
+        });
     }
 
-    private ObservableCollection<SectionLayoutPreference>? GetSectionCollection(SectionLayoutPreference? section)
+    private static List<SectionLayoutSettings> CreateSectionSnapshot(
+        IEnumerable<SectionLayoutItemViewModel> sections,
+        IReadOnlyList<SectionLayoutSettings> defaults)
+    {
+        return SectionLayoutSettings.MergeWithDefaults(
+            sections.Select(section => section.ToSettings()),
+            defaults);
+    }
+
+    private ObservableCollection<SectionLayoutItemViewModel>? GetSectionCollection(SectionLayoutItemViewModel? section)
     {
         if (section is null)
         {
@@ -352,7 +393,7 @@ public partial class SettingsViewModel : ViewModelBase
         return null;
     }
 
-    private static void SyncSectionOrder(IReadOnlyList<SectionLayoutPreference> sections)
+    private static void SyncSectionOrder(IReadOnlyList<SectionLayoutItemViewModel> sections)
     {
         for (var index = 0; index < sections.Count; index++)
         {
@@ -889,7 +930,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task MoveSectionUpAsync(SectionLayoutPreference? section)
+    private async Task MoveSectionUpAsync(SectionLayoutItemViewModel? section)
     {
         var collection = GetSectionCollection(section);
         if (section is null || collection is null)
@@ -903,13 +944,11 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        collection.Move(index, index - 1);
-        SyncSectionOrder(collection);
-        await SaveSectionLayoutAsync();
+        await MoveSectionAsync(section, collection[index - 1]);
     }
 
     [RelayCommand]
-    private async Task MoveSectionDownAsync(SectionLayoutPreference? section)
+    private async Task MoveSectionDownAsync(SectionLayoutItemViewModel? section)
     {
         var collection = GetSectionCollection(section);
         if (section is null || collection is null)
@@ -923,9 +962,41 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
-        collection.Move(index, index + 1);
-        SyncSectionOrder(collection);
-        await SaveSectionLayoutAsync();
+        await MoveSectionAsync(section, collection[index + 1]);
+    }
+
+    public async Task MoveSectionAsync(SectionLayoutItemViewModel? section, SectionLayoutItemViewModel? targetSection)
+    {
+        var sourceCollection = GetSectionCollection(section);
+        var targetCollection = GetSectionCollection(targetSection);
+        if (section is null ||
+            targetSection is null ||
+            sourceCollection is null ||
+            targetCollection is null ||
+            !ReferenceEquals(sourceCollection, targetCollection) ||
+            ReferenceEquals(section, targetSection))
+        {
+            return;
+        }
+
+        var sourceIndex = sourceCollection.IndexOf(section);
+        var targetIndex = targetCollection.IndexOf(targetSection);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+        {
+            return;
+        }
+
+        _suppressSectionLayoutPersistence = true;
+        try
+        {
+            sourceCollection.Move(sourceIndex, targetIndex);
+            SyncSectionOrder(sourceCollection);
+        }
+        finally
+        {
+            _suppressSectionLayoutPersistence = false;
+        }
+
+        await PersistSectionLayoutAsync(section);
     }
 }
-

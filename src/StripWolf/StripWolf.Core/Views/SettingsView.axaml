@@ -306,27 +306,26 @@
 
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding KomgaHome, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
+                <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+              </Grid>
               <ItemsControl ItemsSource="{Binding KomgaSections}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="models:SectionLayoutPreference">
-                    <Border Padding="12" Margin="0,0,0,8" CornerRadius="8"
-                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}">
-                      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
-                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsVisible}" 
-                                      OnContent="{Binding Shown, Source={x:Static res:Loc.Instance}}" 
-                                      OffContent="{Binding Hidden, Source={x:Static res:Loc.Instance}}"
-                                      VerticalAlignment="Center"/>
-                        <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsExpanded}" 
-                                      OnContent="{Binding Expanded, Source={x:Static res:Loc.Instance}}" 
-                                      OffContent="{Binding Collapsed, Source={x:Static res:Loc.Instance}}"
-                                      VerticalAlignment="Center"/>
-                        <Button Grid.Column="3" Content="↑"
-                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
-                                CommandParameter="{Binding}" Width="36"/>
-                        <Button Grid.Column="4" Content="↓"
-                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
-                                CommandParameter="{Binding}" Width="36"/>
+                  <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
+                    <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
+                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
+                            DragDrop.AllowDrop="True"
+                            DragDrop.DragOver="OnSectionDragOver"
+                            DragDrop.Drop="OnSectionDrop">
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                        <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                   PointerPressed="OnSectionDragHandlePointerPressed"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -336,27 +335,26 @@
 
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
+                <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+              </Grid>
               <ItemsControl ItemsSource="{Binding LibrarySections}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="models:SectionLayoutPreference">
-                    <Border Padding="12" Margin="0,0,0,8" CornerRadius="8"
-                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}">
-                      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
-                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsVisible}" 
-                                      OnContent="{Binding Shown, Source={x:Static res:Loc.Instance}}" 
-                                      OffContent="{Binding Hidden, Source={x:Static res:Loc.Instance}}"
-                                      VerticalAlignment="Center"/>
-                        <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsExpanded}" 
-                                      OnContent="{Binding Expanded, Source={x:Static res:Loc.Instance}}" 
-                                      OffContent="{Binding Collapsed, Source={x:Static res:Loc.Instance}}"
-                                      VerticalAlignment="Center"/>
-                        <Button Grid.Column="3" Content="↑"
-                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
-                                CommandParameter="{Binding}" Width="36"/>
-                        <Button Grid.Column="4" Content="↓"
-                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
-                                CommandParameter="{Binding}" Width="36"/>
+                  <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
+                    <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
+                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
+                            DragDrop.AllowDrop="True"
+                            DragDrop.DragOver="OnSectionDragOver"
+                            DragDrop.Drop="OnSectionDrop">
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                        <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                   PointerPressed="OnSectionDragHandlePointerPressed"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
                       </Grid>
                     </Border>
                   </DataTemplate>

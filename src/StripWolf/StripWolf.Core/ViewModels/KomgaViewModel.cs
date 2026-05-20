@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -43,6 +44,7 @@ public partial class KomgaViewModel : ViewModelBase
     
     private KomgaServer? _activeServer;
     private CancellationTokenSource? _loadingCts;
+    private bool _isApplyingSectionLayout;
     
     // Cache timestamps for smart lists
     private DateTime _readListsCacheTime;
@@ -223,59 +225,12 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasRecentSeries;
 
-    [ObservableProperty]
-    private int _keepReadingSectionOrder;
-
-    [ObservableProperty]
-    private bool _isKeepReadingSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isKeepReadingSectionExpanded = true;
-
-    [ObservableProperty]
-    private int _onDeckSectionOrder;
-
-    [ObservableProperty]
-    private bool _isOnDeckSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isOnDeckSectionExpanded = true;
-
-    [ObservableProperty]
-    private int _recentBooksSectionOrder;
-
-    [ObservableProperty]
-    private bool _isRecentBooksSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isRecentBooksSectionExpanded = true;
-
-    [ObservableProperty]
-    private int _recentSeriesSectionOrder;
-
-    [ObservableProperty]
-    private bool _isRecentSeriesSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isRecentSeriesSectionExpanded = true;
-
-    [ObservableProperty]
-    private int _librariesSectionOrder;
-
-    [ObservableProperty]
-    private bool _isLibrariesSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isLibrariesSectionExpanded = true;
-
-    [ObservableProperty]
-    private int _readListsSectionOrder;
-
-    [ObservableProperty]
-    private bool _isReadListsSectionVisible = true;
-
-    [ObservableProperty]
-    private bool _isReadListsSectionExpanded = true;
+    public SectionLayoutItemViewModel KeepReadingSection { get; } = new(KomgaSectionKeys.KeepReading);
+    public SectionLayoutItemViewModel OnDeckSection { get; } = new(KomgaSectionKeys.OnDeck);
+    public SectionLayoutItemViewModel RecentBooksSection { get; } = new(KomgaSectionKeys.RecentlyAddedBooks);
+    public SectionLayoutItemViewModel RecentSeriesSection { get; } = new(KomgaSectionKeys.RecentlyAddedSeries);
+    public SectionLayoutItemViewModel LibrariesSection { get; } = new(KomgaSectionKeys.Libraries);
+    public SectionLayoutItemViewModel ReadListsSection { get; } = new(KomgaSectionKeys.ReadLists);
 
     private bool _suppressServerSelectionChanged;
 
@@ -482,31 +437,44 @@ public partial class KomgaViewModel : ViewModelBase
 
     private void ApplySectionLayout(AppSettings settings)
     {
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.KeepReading, order => KeepReadingSectionOrder = order, visible => IsKeepReadingSectionVisible = visible, expanded => IsKeepReadingSectionExpanded = expanded);
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.OnDeck, order => OnDeckSectionOrder = order, visible => IsOnDeckSectionVisible = visible, expanded => IsOnDeckSectionExpanded = expanded);
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.RecentlyAddedBooks, order => RecentBooksSectionOrder = order, visible => IsRecentBooksSectionVisible = visible, expanded => IsRecentBooksSectionExpanded = expanded);
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.RecentlyAddedSeries, order => RecentSeriesSectionOrder = order, visible => IsRecentSeriesSectionVisible = visible, expanded => IsRecentSeriesSectionExpanded = expanded);
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.Libraries, order => LibrariesSectionOrder = order, visible => IsLibrariesSectionVisible = visible, expanded => IsLibrariesSectionExpanded = expanded);
-        ApplyPreference(settings.KomgaSections, KomgaSectionKeys.ReadLists, order => ReadListsSectionOrder = order, visible => IsReadListsSectionVisible = visible, expanded => IsReadListsSectionExpanded = expanded);
-        RefreshHomeSectionVisibilityState();
+        _isApplyingSectionLayout = true;
+        try
+        {
+            ApplyPreference(settings.KomgaSections, KeepReadingSection);
+            ApplyPreference(settings.KomgaSections, OnDeckSection);
+            ApplyPreference(settings.KomgaSections, RecentBooksSection);
+            ApplyPreference(settings.KomgaSections, RecentSeriesSection);
+            ApplyPreference(settings.KomgaSections, LibrariesSection);
+            ApplyPreference(settings.KomgaSections, ReadListsSection);
+            RefreshHomeSectionVisibilityState();
+        }
+        finally
+        {
+            _isApplyingSectionLayout = false;
+        }
+    }
+
+    private IEnumerable<SectionLayoutItemViewModel> GetHomeSectionLayoutStates()
+    {
+        yield return KeepReadingSection;
+        yield return OnDeckSection;
+        yield return RecentBooksSection;
+        yield return RecentSeriesSection;
+        yield return LibrariesSection;
+        yield return ReadListsSection;
     }
 
     private static void ApplyPreference(
-        IEnumerable<SectionLayoutPreference> preferences,
-        string key,
-        Action<int> setOrder,
-        Action<bool> setVisible,
-        Action<bool> setExpanded)
+        IEnumerable<SectionLayoutSettings> preferences,
+        SectionLayoutItemViewModel section)
     {
-        var preference = preferences.FirstOrDefault(section => string.Equals(section.Key, key, StringComparison.OrdinalIgnoreCase));
+        var preference = preferences.FirstOrDefault(item => string.Equals(item.Key, section.Key, StringComparison.OrdinalIgnoreCase));
         if (preference is null)
         {
             return;
         }
 
-        setOrder(preference.Order);
-        setVisible(preference.IsVisible);
-        setExpanded(preference.IsExpanded);
+        section.Apply(preference);
     }
 
     private void RefreshHomeSectionVisibilityState()
@@ -582,12 +550,12 @@ public partial class KomgaViewModel : ViewModelBase
     public string? BrowsingServerName => _activeServer?.Name;
 
     public bool HasMultipleServers => ConfiguredServers.Count > 1;
-    public bool ShowKeepReadingSection => IsKeepReadingSectionVisible && HasKeepReading;
-    public bool ShowOnDeckSection => IsOnDeckSectionVisible && HasOnDeck;
-    public bool ShowRecentBooksSection => IsRecentBooksSectionVisible && HasRecentBooks;
-    public bool ShowRecentSeriesSection => IsRecentSeriesSectionVisible && HasRecentSeries;
-    public bool ShowLibrariesSection => IsLibrariesSectionVisible && Libraries.Count > 0;
-    public bool ShowReadListsSection => IsReadListsSectionVisible && ReadLists.Count > 0;
+    public bool ShowKeepReadingSection => KeepReadingSection.IsVisible && HasKeepReading;
+    public bool ShowOnDeckSection => OnDeckSection.IsVisible && HasOnDeck;
+    public bool ShowRecentBooksSection => RecentBooksSection.IsVisible && HasRecentBooks;
+    public bool ShowRecentSeriesSection => RecentSeriesSection.IsVisible && HasRecentSeries;
+    public bool ShowLibrariesSection => LibrariesSection.IsVisible && Libraries.Count > 0;
+    public bool ShowReadListsSection => ReadListsSection.IsVisible && ReadLists.Count > 0;
 
     public KomgaViewModel(
         KomgaApiService komgaApiService,
@@ -600,6 +568,14 @@ public partial class KomgaViewModel : ViewModelBase
         _importQueueService = importQueueService;
         _settingsService = settingsService;
         Title = Loc.Instance.Komga;
+
+        RegisterHomeSectionLayoutState(KeepReadingSection);
+        RegisterHomeSectionLayoutState(OnDeckSection);
+        RegisterHomeSectionLayoutState(RecentBooksSection);
+        RegisterHomeSectionLayoutState(RecentSeriesSection);
+        RegisterHomeSectionLayoutState(LibrariesSection);
+        RegisterHomeSectionLayoutState(ReadListsSection);
+
         var initialSettings = _settingsService.LoadSettings();
         ApplySectionLayout(initialSettings);
         ApplyDownloadSettings(initialSettings);
@@ -613,6 +589,40 @@ public partial class KomgaViewModel : ViewModelBase
             });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
+    }
+
+    private void RegisterHomeSectionLayoutState(SectionLayoutItemViewModel section)
+    {
+        section.PropertyChanged += OnHomeSectionLayoutChanged;
+    }
+
+    private void OnHomeSectionLayoutChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SectionLayoutItemViewModel.Label))
+        {
+            return;
+        }
+
+        RefreshHomeSectionVisibilityState();
+
+        if (_isApplyingSectionLayout ||
+            sender is not SectionLayoutItemViewModel ||
+            e.PropertyName != nameof(SectionLayoutItemViewModel.IsExpanded))
+        {
+            return;
+        }
+
+        _ = PersistHomeSectionLayoutAsync();
+    }
+
+    private Task PersistHomeSectionLayoutAsync()
+    {
+        return _settingsService.UpdateSettingsAsync(settings =>
+        {
+            settings.KomgaSections = SectionLayoutSettings.MergeWithDefaults(
+                GetHomeSectionLayoutStates().Select(section => section.ToSettings()),
+                SectionLayoutSettings.CreateDefaultKomgaSections());
+        });
     }
 
     private void RefreshLocalization()
@@ -2576,4 +2586,3 @@ public partial class KomgaViewModel : ViewModelBase
 
     #endregion
 }
-

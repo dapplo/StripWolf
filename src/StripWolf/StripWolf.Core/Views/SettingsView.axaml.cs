@@ -18,12 +18,15 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia.Controls;
+using Avalonia.Input;
 using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
 
 public partial class SettingsView : UserControl
 {
+    private SectionLayoutItemViewModel? _draggedSection;
+
     public SettingsView()
     {
         InitializeComponent();
@@ -46,5 +49,53 @@ public partial class SettingsView : UserControl
             }
         }
     }
-}
 
+    private async void OnSectionDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control { DataContext: SectionLayoutItemViewModel section })
+        {
+            return;
+        }
+
+        _draggedSection = section;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.CreateText(section.Key));
+
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _draggedSection = null;
+        }
+    }
+
+    private void OnSectionDragOver(object? sender, DragEventArgs e)
+    {
+        if (_draggedSection is null ||
+            sender is not Control { DataContext: SectionLayoutItemViewModel targetSection } ||
+            ReferenceEquals(_draggedSection, targetSection))
+        {
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        e.DragEffects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private async void OnSectionDrop(object? sender, DragEventArgs e)
+    {
+        if (_draggedSection is null ||
+            sender is not Control { DataContext: SectionLayoutItemViewModel targetSection } ||
+            DataContext is not SettingsViewModel viewModel)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await viewModel.MoveSectionAsync(_draggedSection, targetSection);
+    }
+}

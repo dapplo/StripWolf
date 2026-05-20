@@ -263,10 +263,10 @@
         <Grid IsVisible="{Binding !IsSearching}" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="24">
 
           <!-- Continue Reading Section -->
-          <Expander Grid.Row="{Binding ContinueReadingSectionOrder}"
+          <Expander Grid.Row="{Binding ContinueReadingSection.Order}"
                     HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowContinueReadingSection}"
-                    IsExpanded="{Binding IsContinueReadingSectionExpanded}">
+                    IsExpanded="{Binding ContinueReadingSection.IsExpanded}">
             <Expander.Header>
               <TextBlock Text="{Binding SectionContinueReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
@@ -282,10 +282,10 @@
           </Expander>
 
           <!-- New Comics Section -->
-          <Expander Grid.Row="{Binding NewComicsSectionOrder}"
+          <Expander Grid.Row="{Binding NewComicsSection.Order}"
                     HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowNewComicsSection}"
-                    IsExpanded="{Binding IsNewComicsSectionExpanded}">
+                    IsExpanded="{Binding NewComicsSection.IsExpanded}">
             <Expander.Header>
               <TextBlock Text="{Binding SectionNewComics, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
@@ -314,10 +314,10 @@
           </Expander>
 
           <!-- Favorites Section -->
-          <Expander Grid.Row="{Binding FavoritesSectionOrder}"
+          <Expander Grid.Row="{Binding FavoritesSection.Order}"
                     HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowFavoritesSection}"
-                    IsExpanded="{Binding IsFavoritesSectionExpanded}">
+                    IsExpanded="{Binding FavoritesSection.IsExpanded}">
             <Expander.Header>
               <TextBlock Text="{Binding SectionFavorites, Source={x:Static res:Loc.Instance}, StringFormat='{}⭐ {0}'}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
@@ -333,10 +333,10 @@
           </Expander>
 
           <!-- Series Section -->
-          <Expander Grid.Row="{Binding SeriesSectionOrder}"
+          <Expander Grid.Row="{Binding SeriesSection.Order}"
                     HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowSeriesSection}"
-                    IsExpanded="{Binding IsSeriesSectionExpanded}">
+                    IsExpanded="{Binding SeriesSection.IsExpanded}">
             <Expander.Header>
               <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>
@@ -353,10 +353,10 @@
           </Expander>
 
           <!-- Read Section -->
-          <Expander Grid.Row="{Binding ReadSectionOrder}"
+          <Expander Grid.Row="{Binding ReadSection.Order}"
                     HorizontalAlignment="Stretch"
                     IsVisible="{Binding ShowReadSection}"
-                    IsExpanded="{Binding IsReadSectionExpanded}">
+                    IsExpanded="{Binding ReadSection.IsExpanded}">
             <Expander.Header>
               <TextBlock Text="{Binding SectionRead, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
             </Expander.Header>

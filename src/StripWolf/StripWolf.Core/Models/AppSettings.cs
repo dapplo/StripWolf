@@ -107,9 +107,9 @@ public class AppSettings
     /// </summary>
     public bool SkipExternalDeleteConfirmation { get; set; }
 
-    public List<SectionLayoutPreference> LibrarySections { get; set; } = SectionLayoutPreference.CreateDefaultLibrarySections();
+    public List<SectionLayoutSettings> LibrarySections { get; set; } = SectionLayoutSettings.CreateDefaultLibrarySections();
 
-    public List<SectionLayoutPreference> KomgaSections { get; set; } = SectionLayoutPreference.CreateDefaultKomgaSections();
+    public List<SectionLayoutSettings> KomgaSections { get; set; } = SectionLayoutSettings.CreateDefaultKomgaSections();
 
     public int KomgaParallelDownloads { get; set; } = 1;
 
@@ -161,4 +161,3 @@ public class AppSettings
         };
     }
 }
-

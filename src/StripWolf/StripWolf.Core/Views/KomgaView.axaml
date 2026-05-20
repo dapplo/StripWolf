@@ -300,8 +300,8 @@
             </Grid.IsVisible>
             
             <!-- Keep Reading Section -->
-            <Expander Grid.Row="{Binding KeepReadingSectionOrder}" IsVisible="{Binding ShowKeepReadingSection}"
-                      IsExpanded="{Binding IsKeepReadingSectionExpanded}">
+            <Expander Grid.Row="{Binding KeepReadingSection.Order}" IsVisible="{Binding ShowKeepReadingSection}"
+                      IsExpanded="{Binding KeepReadingSection.IsExpanded}">
               <Expander.Header>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Text="{Binding SectionKeepReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -322,8 +322,8 @@
             </Expander>
             
             <!-- On Deck Section -->
-            <Expander Grid.Row="{Binding OnDeckSectionOrder}" IsVisible="{Binding ShowOnDeckSection}"
-                      IsExpanded="{Binding IsOnDeckSectionExpanded}">
+            <Expander Grid.Row="{Binding OnDeckSection.Order}" IsVisible="{Binding ShowOnDeckSection}"
+                      IsExpanded="{Binding OnDeckSection.IsExpanded}">
               <Expander.Header>
                 <TextBlock Text="{Binding SectionOnDeck, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
               </Expander.Header>
@@ -340,8 +340,8 @@
             </Expander>
             
             <!-- Recently Added Books Section -->
-            <Expander Grid.Row="{Binding RecentBooksSectionOrder}" IsVisible="{Binding ShowRecentBooksSection}"
-                      IsExpanded="{Binding IsRecentBooksSectionExpanded}">
+            <Expander Grid.Row="{Binding RecentBooksSection.Order}" IsVisible="{Binding ShowRecentBooksSection}"
+                      IsExpanded="{Binding RecentBooksSection.IsExpanded}">
               <Expander.Header>
                 <TextBlock Text="{Binding SectionRecentlyAddedBooks, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
               </Expander.Header>
@@ -358,8 +358,8 @@
             </Expander>
             
             <!-- Recently Added Series Section -->
-            <Expander Grid.Row="{Binding RecentSeriesSectionOrder}" IsVisible="{Binding ShowRecentSeriesSection}"
-                      IsExpanded="{Binding IsRecentSeriesSectionExpanded}">
+            <Expander Grid.Row="{Binding RecentSeriesSection.Order}" IsVisible="{Binding ShowRecentSeriesSection}"
+                      IsExpanded="{Binding RecentSeriesSection.IsExpanded}">
               <Expander.Header>
                 <TextBlock Text="{Binding SectionRecentlyAddedSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
               </Expander.Header>
@@ -376,8 +376,8 @@
             </Expander>
             
             <!-- Libraries List -->
-            <Expander Grid.Row="{Binding LibrariesSectionOrder}" IsVisible="{Binding ShowLibrariesSection}"
-                      IsExpanded="{Binding IsLibrariesSectionExpanded}">
+            <Expander Grid.Row="{Binding LibrariesSection.Order}" IsVisible="{Binding ShowLibrariesSection}"
+                      IsExpanded="{Binding LibrariesSection.IsExpanded}">
               <Expander.Header>
                 <TextBlock Text="{Binding SectionLibraries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
               </Expander.Header>
@@ -398,8 +398,8 @@
             </Expander>
             
             <!-- Read Lists -->
-            <Expander Grid.Row="{Binding ReadListsSectionOrder}" IsVisible="{Binding ShowReadListsSection}"
-                      IsExpanded="{Binding IsReadListsSectionExpanded}">
+            <Expander Grid.Row="{Binding ReadListsSection.Order}" IsVisible="{Binding ShowReadListsSection}"
+                      IsExpanded="{Binding ReadListsSection.IsExpanded}">
               <Expander.Header>
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Text="{Binding SectionReadLists, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>

@@ -38,10 +38,13 @@ public class SettingsService
     private readonly string _settingsPath;
     private readonly string _passwordsPath;
     private readonly byte[] _encryptionKey;
-    private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
+    private readonly Lock _settingsLock = new();
+    private readonly Lock _saveQueueLock = new();
     
     private AppSettings? _cachedSettings;
-    private long _latestSaveRequestId;
+    private AppSettings? _pendingSaveSnapshot;
+    private readonly List<TaskCompletionSource> _pendingSaveCompletions = [];
+    private bool _isProcessingSaveQueue;
 
     public class SensitiveServerData
     {
@@ -124,38 +127,27 @@ public class SettingsService
     /// </summary>
     public AppSettings LoadSettings()
     {
-        if (_cachedSettings is not null)
+        lock (_settingsLock)
         {
-            return _cachedSettings;
+            EnsureSettingsLoaded();
+            return _cachedSettings!.Clone();
+        }
+    }
+
+    public Task UpdateSettingsAsync(Action<AppSettings> updateAction)
+    {
+        AppSettings snapshot;
+
+        lock (_settingsLock)
+        {
+            EnsureSettingsLoaded();
+            snapshot = _cachedSettings!.Clone();
+            updateAction(snapshot);
+            NormalizeSectionPreferences(snapshot);
+            _cachedSettings = snapshot.Clone();
         }
 
-        _cachedSettings = new AppSettings();
-
-        if (File.Exists(_settingsPath))
-        {
-            try
-            {
-                var json = File.ReadAllText(_settingsPath);
-                _cachedSettings = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.AppSettings) ?? new AppSettings();
-            }
-            catch (IOException)
-            {
-                // If settings file cannot be read, start fresh
-                _cachedSettings = new AppSettings();
-            }
-            catch (JsonException)
-            {
-                // If settings file is corrupted, start fresh
-                _cachedSettings = new AppSettings();
-            }
-        }
-
-        NormalizeSectionPreferences(_cachedSettings);
-
-        // Load passwords separately and decrypt them
-        LoadPasswords(_cachedSettings);
-
-        return _cachedSettings;
+        return QueueSettingsSave(snapshot);
     }
 
     /// <summary>
@@ -163,45 +155,15 @@ public class SettingsService
     /// </summary>
     public async Task SaveSettingsAsync(AppSettings settings)
     {
-        NormalizeSectionPreferences(settings);
-        var requestId = Interlocked.Increment(ref _latestSaveRequestId);
         var snapshot = settings.Clone();
         NormalizeSectionPreferences(snapshot);
 
-        // Update cache immediately to ensure subsequent LoadSettings() calls get the latest data
-        _cachedSettings = snapshot.Clone();
-
-        await _saveSemaphore.WaitAsync();
-        try
+        lock (_settingsLock)
         {
-            if (requestId != Volatile.Read(ref _latestSaveRequestId))
-            {
-                return;
-            }
-
-            // Save settings without sensitive data
-            var settingsToSave = snapshot.Clone();
-            foreach (var server in settingsToSave.Servers)
-            {
-                server.Password = string.Empty;
-                server.ApiKey = string.Empty;
-            }
-
-            var json = JsonSerializer.Serialize(settingsToSave, StripWolfJsonContext.Default.AppSettings);
-            await File.WriteAllTextAsync(_settingsPath, json);
-
-            // Save sensitive data separately encrypted
-            await SavePasswordsAsync(snapshot);
-
-            if (requestId == Volatile.Read(ref _latestSaveRequestId))
-            {
-                SettingsChanged?.Invoke(this, snapshot.Clone());
-            }
+            _cachedSettings = snapshot.Clone();
         }
-        finally
-        {
-            _saveSemaphore.Release();
-        }
+
+        await QueueSettingsSave(snapshot);
     }
 
     /// <summary>
@@ -331,13 +293,118 @@ public class SettingsService
 
     private static void NormalizeSectionPreferences(AppSettings settings)
     {
-        settings.LibrarySections = SectionLayoutPreference.MergeWithDefaults(
+        settings.LibrarySections = SectionLayoutSettings.MergeWithDefaults(
             settings.LibrarySections,
-            SectionLayoutPreference.CreateDefaultLibrarySections());
+            SectionLayoutSettings.CreateDefaultLibrarySections());
 
-        settings.KomgaSections = SectionLayoutPreference.MergeWithDefaults(
+        settings.KomgaSections = SectionLayoutSettings.MergeWithDefaults(
             settings.KomgaSections,
-            SectionLayoutPreference.CreateDefaultKomgaSections());
+            SectionLayoutSettings.CreateDefaultKomgaSections());
+    }
+
+    private void EnsureSettingsLoaded()
+    {
+        if (_cachedSettings is not null)
+        {
+            return;
+        }
+
+        var loadedSettings = new AppSettings();
+
+        if (File.Exists(_settingsPath))
+        {
+            try
+            {
+                var json = File.ReadAllText(_settingsPath);
+                loadedSettings = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.AppSettings) ?? new AppSettings();
+            }
+            catch (IOException)
+            {
+                loadedSettings = new AppSettings();
+            }
+            catch (JsonException)
+            {
+                loadedSettings = new AppSettings();
+            }
+        }
+
+        NormalizeSectionPreferences(loadedSettings);
+        LoadPasswords(loadedSettings);
+        _cachedSettings = loadedSettings;
+    }
+
+    private Task QueueSettingsSave(AppSettings snapshot)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        lock (_saveQueueLock)
+        {
+            _pendingSaveSnapshot = snapshot.Clone();
+            _pendingSaveCompletions.Add(completion);
+
+            if (_isProcessingSaveQueue)
+            {
+                return completion.Task;
+            }
+
+            _isProcessingSaveQueue = true;
+        }
+
+        _ = ProcessSaveQueueAsync();
+        return completion.Task;
+    }
+
+    private async Task ProcessSaveQueueAsync()
+    {
+        while (true)
+        {
+            AppSettings snapshot;
+            List<TaskCompletionSource> completions;
+
+            lock (_saveQueueLock)
+            {
+                if (_pendingSaveSnapshot is null)
+                {
+                    _isProcessingSaveQueue = false;
+                    return;
+                }
+
+                snapshot = _pendingSaveSnapshot;
+                _pendingSaveSnapshot = null;
+                completions = [.. _pendingSaveCompletions];
+                _pendingSaveCompletions.Clear();
+            }
+
+            try
+            {
+                await PersistSettingsSnapshotAsync(snapshot);
+                SettingsChanged?.Invoke(this, snapshot.Clone());
+                foreach (var completion in completions)
+                {
+                    completion.TrySetResult();
+                }
+            }
+            catch (Exception ex)
+            {
+                foreach (var completion in completions)
+                {
+                    completion.TrySetException(ex);
+                }
+            }
+        }
+    }
+
+    private async Task PersistSettingsSnapshotAsync(AppSettings snapshot)
+    {
+        var settingsToSave = snapshot.Clone();
+        foreach (var server in settingsToSave.Servers)
+        {
+            server.Password = string.Empty;
+            server.ApiKey = string.Empty;
+        }
+
+        var json = JsonSerializer.Serialize(settingsToSave, StripWolfJsonContext.Default.AppSettings);
+        await File.WriteAllTextAsync(_settingsPath, json);
+        await SavePasswordsAsync(snapshot);
     }
 }
-
