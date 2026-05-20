@@ -801,4 +801,19 @@
   <data name="KomgaSyncStatus" xml:space="preserve">
     <value>Estado de sincronización de Komga</value>
   </data>
+  <data name="Browsing" xml:space="preserve">
+    <value>Explorando</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Eliminar</value>
+  </data>
+  <data name="SetAsBrowsingServer" xml:space="preserve">
+    <value>Establecer como servidor de exploración</value>
+  </data>
+  <data name="ConfirmDeleteServer" xml:space="preserve">
+    <value>Confirmar eliminación del servidor</value>
+  </data>
+  <data name="ConfirmDeleteServerMessage" xml:space="preserve">
+    <value>Hay {0} cómics vinculados a este servidor. Si lo elimina, su progreso de lectura ya no se sincronizará. ¿Desea continuar?</value>
+  </data>
 </root>

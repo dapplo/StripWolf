@@ -105,7 +105,9 @@ public class Loc : INotifyPropertyChanged
     public string Hidden => GetString();
     public string Expanded => GetString();
     public string Collapsed => GetString();
-    public string Active => GetString();
+    public string Browsing => GetString();
+    public string Delete => GetString();
+    public string Cancel => GetString();
     
     // Setting Hints
     public string LanguageDescription => GetString();
@@ -143,6 +145,9 @@ public class Loc : INotifyPropertyChanged
     public string SyncReadProgressDisabled => GetString();
     public string SyncReadProgressDescription => GetString();
     public string KomgaSyncStatus => GetString();
+    public string SetAsBrowsingServer => GetString();
+    public string ConfirmDeleteServer => GetString();
+    public string ConfirmDeleteServerMessage => GetString();
     public string ImportComic => GetString();
     public string ImportFolder => GetString();
     public string OpenFolder => GetString();
@@ -200,7 +205,6 @@ public class Loc : INotifyPropertyChanged
     public string EditMetadata => GetString();
     public string DeleteComic => GetString();
     public string SaveChanges => GetString();
-    public string Cancel => GetString();
     public string Undo => GetString();
     public string Deleting => GetString();
     public string DeleteStatusSingle => GetString();

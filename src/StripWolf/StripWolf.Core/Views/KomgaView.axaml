@@ -158,9 +158,9 @@
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <TextBlock Text="{Binding Komga, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
           <TextBlock Text="-" FontSize="24" VerticalAlignment="Center"
-                     IsVisible="{Binding ActiveServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-          <TextBlock Text="{Binding ActiveServerName}" FontSize="18" VerticalAlignment="Center" Foreground="Gray"
-                     IsVisible="{Binding ActiveServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                     IsVisible="{Binding BrowsingServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          <TextBlock Text="{Binding BrowsingServerName}" FontSize="18" VerticalAlignment="Center" Foreground="Gray"
+                     IsVisible="{Binding BrowsingServerName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </StackPanel>
         <ComboBox Grid.Column="1" Width="220"
                   ItemsSource="{Binding ConfiguredServers}"

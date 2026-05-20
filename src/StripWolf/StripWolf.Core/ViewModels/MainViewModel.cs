@@ -94,10 +94,10 @@ public partial class MainViewModel : ViewModelBase
         // Sync all comics in background
         _ = _komgaSyncService.SyncAllComicsAsync();
 
-        // If a comic is currently being read, sync it specifically too
-        if (IsInReader && _readerViewModel.Comic != null)
+        // If a comic is currently being read, sync and refresh its state
+        if (IsInReader)
         {
-            await _komgaSyncService.SyncComicReadProgressAsync(_readerViewModel.Comic);
+            await _readerViewModel.SyncAndRefreshProgressAsync();
         }
     }
 
@@ -110,9 +110,10 @@ public partial class MainViewModel : ViewModelBase
             if (settings.WasInReader && settings.LastOpenedComicId.HasValue)
             {
                 // Try to load the last opened comic
-                // We set _isInitializing to false AFTER this so that IsInReader=true is saved correctly if needed,
-                // although it should already be true in settings.
                 await OpenReaderAsync(settings.LastOpenedComicId.Value);
+                
+                // After opening, sync with Komga to jump to newer page if needed
+                await _readerViewModel.SyncAndRefreshProgressAsync();
             }
             else
             {

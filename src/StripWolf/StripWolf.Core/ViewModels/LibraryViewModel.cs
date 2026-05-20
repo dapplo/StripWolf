@@ -347,10 +347,10 @@ public partial class LibraryViewModel : ViewModelBase
             if (!_komgaApiService.IsConfigured)
             {
                 var settings = _settingsService.LoadSettings();
-                var activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId && s.IsActive);
-                if (activeServer != null)
+                var browsingServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId);
+                if (browsingServer != null)
                 {
-                    _komgaApiService.Configure(activeServer);
+                    _komgaApiService.Configure(browsingServer);
                 }
             }
 
@@ -450,6 +450,8 @@ public partial class LibraryViewModel : ViewModelBase
                     existing.IsCompleted = newItem.IsCompleted;
                     existing.IsFavorite = newItem.IsFavorite;
                     existing.LastReadDate = newItem.LastReadDate;
+                    existing.ReadProgressLastModified = newItem.ReadProgressLastModified;
+                    existing.KomgaSyncStatus = newItem.KomgaSyncStatus;
                     existing.AddedDate = newItem.AddedDate;
                     existing.Source = newItem.Source;
                     existing.KomgaId = newItem.KomgaId;

@@ -763,20 +763,28 @@ public class LibraryService
         });
     }
 
-    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage)
+    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage, DateTime? lastModified = null, bool? isCompletedOverride = null)
     {
         if (comic.PageCount <= 0)
         {
             return;
         }
 
-        var conversionState = await _epubShadowConversionService.GetConversionStateAsync(comic.Id);
-        var isCompleted = conversionState is null && currentPage >= comic.PageCount - 1;
+        bool isCompleted;
+        if (isCompletedOverride.HasValue)
+        {
+            isCompleted = isCompletedOverride.Value;
+        }
+        else
+        {
+            var conversionState = await _epubShadowConversionService.GetConversionStateAsync(comic.Id);
+            isCompleted = conversionState is null && currentPage >= comic.PageCount - 1;
+        }
         
-        await _databaseService.UpdateReadingProgressAsync(comic.Id, currentPage, isCompleted);
+        await _databaseService.UpdateReadingProgressAsync(comic.Id, currentPage, isCompleted, lastModified);
         
-        // Sync with Komga if this is a Komga comic
-        if (comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaId) && _komgaApiService.IsConfigured)
+        // Sync with Komga if this is a Komga comic and it's a local update (lastModified == null)
+        if (lastModified == null && comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaId) && _komgaApiService.IsConfigured)
         {
             try
             {
@@ -787,6 +795,8 @@ public class LibraryService
                 // Failed to sync with Komga, continue anyway
             }
         }
+
+        OnLibraryChanged();
     }
 
     public Task<EpubConversionState?> GetEpubConversionStateAsync(int comicId)

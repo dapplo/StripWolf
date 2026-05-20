@@ -801,4 +801,19 @@
   <data name="KomgaSyncStatus" xml:space="preserve">
     <value>État de synchronisation Komga</value>
   </data>
+  <data name="Browsing" xml:space="preserve">
+    <value>Navigation</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Supprimer</value>
+  </data>
+  <data name="SetAsBrowsingServer" xml:space="preserve">
+    <value>Définir comme serveur de navigation</value>
+  </data>
+  <data name="ConfirmDeleteServer" xml:space="preserve">
+    <value>Confirmer la suppression du serveur</value>
+  </data>
+  <data name="ConfirmDeleteServerMessage" xml:space="preserve">
+    <value>Il y a {0} bandes dessinées liées à ce serveur. Si vous le supprimez, leur progression de lecture ne sera plus synchronisée. Voulez-vous continuer ?</value>
+  </data>
 </root>

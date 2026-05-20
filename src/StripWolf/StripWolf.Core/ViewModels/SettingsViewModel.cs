@@ -44,6 +44,7 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly SettingsService _settingsService;
     private readonly KomgaApiService _komgaApiService;
+    private readonly LibraryService _libraryService;
     private readonly LocalizationService _localizationService;
     private readonly IDonationService _donationService;
     
@@ -55,6 +56,17 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private KomgaServer? _selectedServer;
+
+    [ObservableProperty]
+    private bool _showServerDeleteConfirmation;
+
+    [ObservableProperty]
+    private int _linkedComicsCount;
+
+    [ObservableProperty]
+    private KomgaServer? _serverPendingDeletion;
+
+    public int? ActiveServerId => _appSettings?.ActiveServerId;
 
     [ObservableProperty]
     private string _serverName = string.Empty;
@@ -256,10 +268,11 @@ public partial class SettingsViewModel : ViewModelBase
 
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LocalizationService localizationService, IDonationService donationService)
+    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LibraryService libraryService, LocalizationService localizationService, IDonationService donationService)
     {
         _settingsService = settingsService;
         _komgaApiService = komgaApiService;
+        _libraryService = libraryService;
         _localizationService = localizationService;
         _donationService = donationService;
         Title = "Settings";
@@ -711,10 +724,9 @@ public partial class SettingsViewModel : ViewModelBase
             server.ApiKey = ApiKey;
             server.CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList();
             
-            // Ensure we have an active server ID set if this is the only server or if none is active
+            // Ensure we have a browsing server ID set if this is the only server
             if (_appSettings.ActiveServerId == null || _appSettings.Servers.Count == 0)
             {
-                server.IsActive = true;
                 _appSettings.ActiveServerId = server.Id;
             }
             
@@ -751,16 +763,57 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task DeleteServerAsync(KomgaServer? server)
     {
-        if (server is null)
+        if (server is null || _appSettings is null)
         {
             return;
         }
 
+        // Check if comics are linked to this server
+        var linkedComics = await _libraryService.GetComicsByKomgaServerIdAsync(server.Id);
+        if (linkedComics.Count > 0)
+        {
+            // Show confirmation overlay
+            ServerPendingDeletion = server;
+            LinkedComicsCount = linkedComics.Count;
+            ShowServerDeleteConfirmation = true;
+            return;
+        }
+
+        // No linked comics, delete directly
+        await PerformDeleteServerAsync(server);
+    }
+
+    [RelayCommand]
+    private async Task ConfirmDeleteServerAsync()
+    {
+        if (ServerPendingDeletion != null)
+        {
+            await PerformDeleteServerAsync(ServerPendingDeletion);
+            CancelDeleteServer();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelDeleteServer()
+    {
+        ShowServerDeleteConfirmation = false;
+        ServerPendingDeletion = null;
+        LinkedComicsCount = 0;
+    }
+
+    private async Task PerformDeleteServerAsync(KomgaServer server)
+    {
         await ExecuteAsync(async () =>
         {
             _appSettings?.Servers.RemoveAll(s => s.Id == server.Id);
             Servers.Remove(server);
             
+            // If the deleted server was the browsing server, reset it
+            if (_appSettings?.ActiveServerId == server.Id)
+            {
+                _appSettings.ActiveServerId = _appSettings.Servers.FirstOrDefault()?.Id;
+            }
+
             if (_appSettings is not null)
             {
                 await _settingsService.SaveSettingsAsync(_appSettings);
@@ -769,7 +822,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SetActiveServerAsync(KomgaServer? server)
+    private async Task SetBrowsingServerAsync(KomgaServer? server)
     {
         if (server is null || _appSettings is null)
         {
@@ -778,32 +831,14 @@ public partial class SettingsViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            // Deactivate all servers
-            foreach (var s in _appSettings.Servers)
-            {
-                s.IsActive = false;
-            }
-            foreach (var s in Servers)
-            {
-                s.IsActive = false;
-            }
-
-            // Activate selected server
-            server.IsActive = true;
             _appSettings.ActiveServerId = server.Id;
-            
-            var settingsServer = _appSettings.Servers.FirstOrDefault(s => s.Id == server.Id);
-            if (settingsServer is not null)
-            {
-                settingsServer.IsActive = true;
-            }
 
             // Persist the change
             await _settingsService.SaveSettingsAsync(_appSettings);
 
             // Refresh the list
             LoadServers();
-        }, "Failed to set active server");
+        }, "Failed to set browsing server");
     }
 
     [RelayCommand]

@@ -811,4 +811,19 @@
   <data name="KomgaSyncStatus" xml:space="preserve">
     <value>Komga Sync Status</value>
   </data>
+  <data name="Browsing" xml:space="preserve">
+    <value>Browsing</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="SetAsBrowsingServer" xml:space="preserve">
+    <value>Set as browsing server</value>
+  </data>
+  <data name="ConfirmDeleteServer" xml:space="preserve">
+    <value>Confirm Server Deletion</value>
+  </data>
+  <data name="ConfirmDeleteServerMessage" xml:space="preserve">
+    <value>There are {0} comics linked to this server. If you delete it, their reading progress will no longer be synchronized. Do you want to proceed?</value>
+  </data>
 </root>

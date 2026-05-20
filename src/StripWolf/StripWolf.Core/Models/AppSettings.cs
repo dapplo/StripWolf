@@ -134,8 +134,6 @@ public class AppSettings
                 Password = s.Password,
                 ApiKey = s.ApiKey,
                 CustomHeaders = s.CustomHeaders.Select(h => new KomgaHeader { Name = h.Name, Value = h.Value }).ToList(),
-                IsActive = s.IsActive,
-                AddedDate = s.AddedDate,
                 LastConnected = s.LastConnected
             }).ToList(),
             ActiveServerId = ActiveServerId,

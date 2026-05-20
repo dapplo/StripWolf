@@ -88,16 +88,6 @@ public class KomgaServer
     }
 
     /// <summary>
-    /// Whether this is the active/default server
-    /// </summary>
-    public bool IsActive { get; set; }
-
-    /// <summary>
-    /// When the server was added
-    /// </summary>
-    public DateTime AddedDate { get; set; } = DateTime.UtcNow;
-
-    /// <summary>
     /// Last successful connection time
     /// </summary>
     public DateTime? LastConnected { get; set; }

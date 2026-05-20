@@ -156,7 +156,6 @@ public partial class Comic : ObservableObject
     /// <summary>
     /// The last synchronization status with Komga
     /// </summary>
-    [property: SQLite.Ignore]
     [ObservableProperty]
     private string? _komgaSyncStatus;
 

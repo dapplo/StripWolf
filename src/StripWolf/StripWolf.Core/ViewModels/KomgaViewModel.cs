@@ -566,19 +566,20 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Username for the active server (used for authenticated image loading)
+    /// Username for the server currently being browsed (used for authenticated image loading)
     /// </summary>
     public string? ServerUsername => _activeServer?.Username;
 
     /// <summary>
-    /// Password for the active server (used for authenticated image loading)
+    /// Password for the server currently being browsed (used for authenticated image loading)
     /// </summary>
     public string? ServerPassword => _activeServer?.Password;
 
     /// <summary>
-    /// Name of the active Komga server
+    /// Name of the Komga server currently being browsed.
+    /// Note: Reading progress synchronization is independent and uses each comic's original server.
     /// </summary>
-    public string? ActiveServerName => _activeServer?.Name;
+    public string? BrowsingServerName => _activeServer?.Name;
 
     public bool HasMultipleServers => ConfiguredServers.Count > 1;
     public bool ShowKeepReadingSection => IsKeepReadingSectionVisible && HasKeepReading;
@@ -822,10 +823,10 @@ public partial class KomgaViewModel : ViewModelBase
             var settings = _settingsService.LoadSettings();
             RefreshConfiguredServers(settings);
 
-            var activeServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId)
-                               ?? settings.Servers.FirstOrDefault(s => s.IsActive);
+            var browsingServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId)
+                               ?? settings.Servers.FirstOrDefault();
 
-            await ApplyServerAsync(activeServer, useCache: true, persistSelection: false);
+            await ApplyServerAsync(browsingServer, useCache: true, persistSelection: false);
         }
         catch (Exception ex)
         {
@@ -1193,7 +1194,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ServerUsername));
         OnPropertyChanged(nameof(ServerPassword));
-        OnPropertyChanged(nameof(ActiveServerName));
+        OnPropertyChanged(nameof(BrowsingServerName));
 
         ResetNavigationState();
         ErrorMessage = string.Empty;
@@ -1291,11 +1292,6 @@ public partial class KomgaViewModel : ViewModelBase
     private async Task PersistActiveServerSelectionAsync(int serverId)
     {
         var settings = _settingsService.LoadSettings();
-        foreach (var server in settings.Servers)
-        {
-            server.IsActive = server.Id == serverId;
-        }
-
         settings.ActiveServerId = serverId;
         await _settingsService.SaveSettingsAsync(settings);
     }

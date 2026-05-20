@@ -247,7 +247,7 @@ public class DatabaseService : IAsyncDisposable
             .ToListAsync();
     }
 
-    public async Task UpdateReadingProgressAsync(int comicId, int currentPage, bool isCompleted)
+    public async Task UpdateReadingProgressAsync(int comicId, int currentPage, bool isCompleted, DateTime? lastModified = null)
     {
         var comic = await GetComicAsync(comicId);
         if (comic is not null)
@@ -256,9 +256,15 @@ public class DatabaseService : IAsyncDisposable
             {
                 comic.CurrentPage = currentPage;
                 comic.IsCompleted = isCompleted;
-                comic.ReadProgressLastModified = DateTime.UtcNow;
+                comic.ReadProgressLastModified = lastModified ?? DateTime.UtcNow;
             }
-            comic.LastReadDate = DateTime.UtcNow;
+            
+            // Only update LastReadDate if this is a real read action (not a sync from an older state)
+            if (lastModified == null || (comic.LastReadDate ?? DateTime.MinValue) < lastModified)
+            {
+                comic.LastReadDate = lastModified ?? DateTime.UtcNow;
+            }
+            
             await SaveComicAsync(comic);
         }
     }
@@ -308,12 +314,6 @@ public class DatabaseService : IAsyncDisposable
         return await db.Table<KomgaServer>().ToListAsync();
     }
 
-    public async Task<KomgaServer?> GetActiveServerAsync()
-    {
-        var db = await GetDatabaseAsync();
-        return await db.Table<KomgaServer>().FirstOrDefaultAsync(s => s.IsActive);
-    }
-
     public async Task<KomgaServer?> GetServerAsync(int id)
     {
         var db = await GetDatabaseAsync();
@@ -323,26 +323,12 @@ public class DatabaseService : IAsyncDisposable
     public async Task<int> SaveServerAsync(KomgaServer server)
     {
         var db = await GetDatabaseAsync();
-        
-        // If this server is being set as active, deactivate all others
-        if (server.IsActive)
-        {
-            var allServers = await GetServersAsync();
-            foreach (var s in allServers.Where(s => s.Id != server.Id && s.IsActive))
-            {
-                s.IsActive = false;
-                await db.UpdateAsync(s);
-            }
-        }
-        
+
         if (server.Id != 0)
         {
             return await db.UpdateAsync(server);
         }
-        else
-        {
-            return await db.InsertAsync(server);
-        }
+        return await db.InsertAsync(server);
     }
 
     public async Task<int> DeleteServerAsync(KomgaServer server)

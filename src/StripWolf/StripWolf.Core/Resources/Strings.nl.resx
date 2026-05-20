@@ -811,4 +811,19 @@
   <data name="KomgaSyncStatus" xml:space="preserve">
     <value>Komga-synchronisatiestatus</value>
   </data>
+  <data name="Browsing" xml:space="preserve">
+    <value>Browsen</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Verwijderen</value>
+  </data>
+  <data name="SetAsBrowsingServer" xml:space="preserve">
+    <value>Instellen als browsing-server</value>
+  </data>
+  <data name="ConfirmDeleteServer" xml:space="preserve">
+    <value>Serververwijdering bevestigen</value>
+  </data>
+  <data name="ConfirmDeleteServerMessage" xml:space="preserve">
+    <value>Er zijn {0} comics gekoppeld aan deze server. Als je deze verwijdert, wordt hun leesvoortgang niet meer gesynchroniseerd. Wil je doorgaan?</value>
+  </data>
 </root>

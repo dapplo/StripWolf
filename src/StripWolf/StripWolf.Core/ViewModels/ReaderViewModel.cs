@@ -666,6 +666,27 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
+    public async Task SyncAndRefreshProgressAsync()
+    {
+        if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId))
+        {
+            return;
+        }
+
+        var oldPage = CurrentPage;
+        await _komgaSyncService.SyncComicReadProgressAsync(Comic);
+        OnPropertyChanged(nameof(KomgaSyncStatus));
+
+        // If the sync updated the comic's current page to something newer, jump to it
+        if (Comic.CurrentPage != oldPage)
+        {
+            _isLoadingPage = true;
+            CurrentPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
+            _isLoadingPage = false;
+            await LoadPageAsync();
+        }
+    }
+
     private async Task SyncProgressWithKomgaAsync()
     {
         if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId) || !_komgaApiService.IsConfigured)
@@ -1727,7 +1748,9 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackAsync()
     {
-        await SyncProgressWithKomgaAsync();
+        // Fire and forget the Komga sync in the background so it doesn't delay UI closing
+        _ = SyncProgressWithKomgaAsync();
+
         await SaveProgressAsync();
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
