@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -41,6 +41,7 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly EpubShadowConversionService _epubShadowConversionService;
     private readonly DispatcherTimer _periodicSyncTimer;
     private string? _readerFilePath;
+    private CancellationTokenSource? _saveProgressCts;
 
     [ObservableProperty]
     private int _comicId;
@@ -397,6 +398,18 @@ public partial class ReaderViewModel : ViewModelBase
         if (Comic is not null && HasPendingEpubConversion)
         {
             _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
+        }
+
+        var cts = Interlocked.Exchange(ref _saveProgressCts, null);
+        if (cts is not null)
+        {
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException) { }
+            catch (AggregateException) { }
+            cts.Dispose();
         }
 
         ClearAllCaches();
@@ -1163,20 +1176,45 @@ public partial class ReaderViewModel : ViewModelBase
         await GoBackAsync();
     }
 
-    private async Task SaveProgressAsync()
+    private async Task SaveProgressAsync(bool forceImmediate = false)
     {
         if (Comic is null)
         {
             return;
         }
 
+        var oldCts = Interlocked.Exchange(ref _saveProgressCts, forceImmediate ? null : new CancellationTokenSource());
+        if (oldCts is not null)
+        {
+            try
+            {
+                oldCts.Cancel();
+            }
+            catch (ObjectDisposedException) { }
+            catch (AggregateException) { }
+            oldCts.Dispose();
+        }
+
         try
         {
+            if (!forceImmediate)
+            {
+                var cts = _saveProgressCts;
+                if (cts is null) return;
+                
+                await Task.Delay(500, cts.Token);
+            }
+
             await _libraryService.UpdateReadingProgressAsync(Comic, CurrentPage);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            // Silently fail - don't interrupt reading
+            // Gracefully ignore cancellation
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - don't interrupt reading but log to debug
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to save progress: {ex.Message}");
         }
     }
     
@@ -1751,7 +1789,7 @@ public partial class ReaderViewModel : ViewModelBase
         // Fire and forget the Komga sync in the background so it doesn't delay UI closing
         _ = SyncProgressWithKomgaAsync();
 
-        await SaveProgressAsync();
+        await SaveProgressAsync(forceImmediate: true);
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
 

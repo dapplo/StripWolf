@@ -134,17 +134,17 @@ public class KomgaSyncService
         }
         catch (OperationCanceledException)
         {
-            // Expected
+            Logger.Info($"Komga sync cancelled for comic '{comic.Title}' (Komga ID: {comic.KomgaId})");
         }
         catch (HttpRequestException ex)
         {
             comic.KomgaSyncStatus = "Network error";
-            System.Diagnostics.Debug.WriteLine($"Komga sync network error: {ex.Message}");
+            Logger.Error($"Komga sync network error for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         catch (Exception ex)
         {
             comic.KomgaSyncStatus = "Sync failed";
-            System.Diagnostics.Debug.WriteLine($"Komga sync error: {ex}");
+            Logger.Error($"Komga sync failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         finally
         {
@@ -274,9 +274,10 @@ public class KomgaSyncService
                 comic.KomgaSyncStatus = "In sync";
             }
         }
-        catch
+        catch (Exception ex)
         {
             comic.KomgaSyncStatus = "Sync failed";
+            Logger.Error($"Komga internal sync failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         finally
         {
@@ -316,9 +317,10 @@ public class KomgaSyncService
             await _komgaApiService.UpdateReadProgressAsync(comic.KomgaId, comic.CurrentPage + 1, comic.IsCompleted);
             comic.KomgaSyncStatus = "Synced to Komga";
         }
-        catch
+        catch (Exception ex)
         {
             comic.KomgaSyncStatus = "Sync failed";
+            Logger.Error($"Push progress to Komga failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
     }
 }

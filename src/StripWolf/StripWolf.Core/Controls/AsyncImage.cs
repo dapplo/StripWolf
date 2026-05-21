@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -47,6 +47,7 @@ public class AsyncImage : Control
     private bool _isLoading;
     private int _loadVersion;
     private int _activeLoadVersion;
+    private CancellationTokenSource? _cts;
 
     static AsyncImage()
     {
@@ -158,11 +159,16 @@ public class AsyncImage : Control
     /// <summary>
     /// Safely loads the image with proper exception handling for fire-and-forget scenarios
     /// </summary>
-    private async Task LoadImageSafeAsync(int loadVersion)
+    private async Task LoadImageSafeAsync(int loadVersion, CancellationToken cancellationToken)
     {
         try
         {
-            await LoadImageAsync(loadVersion);
+            await LoadImageAsync(loadVersion, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Gracefully handle cancellation - do not log as failure.
+            System.Diagnostics.Debug.WriteLine($"AsyncImage: Load cancelled for '{SourceUrl}'");
         }
         catch (Exception ex)
         {
@@ -180,7 +186,7 @@ public class AsyncImage : Control
         }
     }
 
-    private async Task LoadImageAsync(int loadVersion)
+    private async Task LoadImageAsync(int loadVersion, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(SourceUrl))
         {
@@ -214,15 +220,15 @@ public class AsyncImage : Control
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
             }
 
-            using var response = await SharedHttpClient.SendAsync(request);
+            using var response = await SharedHttpClient.SendAsync(request, cancellationToken);
             
             if (response.IsSuccessStatusCode)
             {
-                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
                 Bitmap? bitmap = null;
                 try
                 {
-                    await BitmapDecodeSemaphore.WaitAsync();
+                    await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
                     try
                     {
                         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -281,15 +287,15 @@ public class AsyncImage : Control
                 return;
             }
 
-            await Task.Delay(UncachedLocalLoadDelayMs);
+            await Task.Delay(UncachedLocalLoadDelayMs, cancellationToken);
             if (IsStale(loadVersion))
             {
                 return;
             }
 
-            var imageBytes = await File.ReadAllBytesAsync(SourceUrl);
+            var imageBytes = await File.ReadAllBytesAsync(SourceUrl, cancellationToken);
             Bitmap? sharedBitmap = null;
-            await BitmapDecodeSemaphore.WaitAsync();
+            await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
             try
             {
                 await Dispatcher.UIThread.InvokeAsync(() =>
@@ -503,14 +509,40 @@ public class AsyncImage : Control
         }
 
         _isLoading = true;
+
+        var newCts = new CancellationTokenSource();
+        var oldCts = Interlocked.Exchange(ref _cts, newCts);
+        if (oldCts is not null)
+        {
+            try
+            {
+                oldCts.Cancel();
+            }
+            catch (ObjectDisposedException) { }
+            catch (AggregateException) { }
+            oldCts.Dispose();
+        }
+
         var loadVersion = Volatile.Read(ref _loadVersion);
         Volatile.Write(ref _activeLoadVersion, loadVersion);
-        _ = LoadImageSafeAsync(loadVersion);
+        _ = LoadImageSafeAsync(loadVersion, newCts.Token);
     }
 
     private void ResetImageState()
     {
         Interlocked.Increment(ref _loadVersion);
+
+        var cts = Interlocked.Exchange(ref _cts, null);
+        if (cts is not null)
+        {
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException) { }
+            catch (AggregateException) { }
+            cts.Dispose();
+        }
 
         if (_ownsLoadedBitmap)
         {

@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -790,9 +790,10 @@ public class LibraryService
             {
                 await _komgaApiService.UpdateReadProgressAsync(comic.KomgaId, currentPage + 1, isCompleted);
             }
-            catch
+            catch (Exception ex)
             {
                 // Failed to sync with Komga, continue anyway
+                Logger.Error($"Failed to sync reading progress to Komga for comic '{comic.Title}' (Komga ID: {comic.KomgaId}), Page: {currentPage + 1}", ex);
             }
         }
 
