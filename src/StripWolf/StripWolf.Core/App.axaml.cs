@@ -53,6 +53,11 @@ public partial class App : Application
     /// </summary>
     public static Action<IServiceCollection>? RegisterWebViewSnapshotService { get; set; }
 
+    /// <summary>
+    /// Action to register platform-specific network connection inspection.
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterNetworkConnectionService { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -197,6 +202,14 @@ public partial class App : Application
 
         services.AddSingleton<IWebViewSnapshotService>(serviceProvider =>
             serviceProvider.GetRequiredService<IWebViewPaginationService>());
+        if (RegisterNetworkConnectionService is not null)
+        {
+            RegisterNetworkConnectionService(services);
+        }
+        else
+        {
+            services.AddSingleton<INetworkConnectionService, DefaultNetworkConnectionService>();
+        }
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<EpubToCbzConverterService>();
         services.AddSingleton<EpubShadowConversionService>();
@@ -217,4 +230,3 @@ public partial class App : Application
         services.AddSingleton<MainViewModel>();
     }
 }
-

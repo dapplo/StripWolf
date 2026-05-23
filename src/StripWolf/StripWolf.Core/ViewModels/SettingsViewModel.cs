@@ -199,6 +199,9 @@ public partial class SettingsViewModel : ViewModelBase
     private int _selectedKomgaParallelDownloads = 1;
 
     [ObservableProperty]
+    private bool _allowMeteredKomgaDownloads;
+
+    [ObservableProperty]
     private ObservableCollection<SectionLayoutItemViewModel> _librarySections = [];
 
     [ObservableProperty]
@@ -471,6 +474,7 @@ public partial class SettingsViewModel : ViewModelBase
         SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
         SyncReadProgress = _appSettings.SyncReadProgress;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
+        AllowMeteredKomgaDownloads = _appSettings.AllowMeteredKomgaDownloads;
 
         if (_appSettings.PreferredReadingMode != readingMode)
         {
@@ -614,6 +618,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.KomgaParallelDownloads = Math.Max(1, value);
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnAllowMeteredKomgaDownloadsChanged(bool value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.AllowMeteredKomgaDownloads = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

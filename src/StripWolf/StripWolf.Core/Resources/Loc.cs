@@ -74,6 +74,7 @@ public class Loc : INotifyPropertyChanged
     public string EpubOutputResolution => GetString();
     public string UnsupportedFormatHandling => GetString();
     public string KomgaParallelDownloads => GetString();
+    public string AllowMeteredKomgaDownloads => GetString();
     public string SkipExternalDeleteConfirmation => GetString();
     public string Name => GetString();
     public string ServerUrl => GetString();
@@ -101,6 +102,8 @@ public class Loc : INotifyPropertyChanged
     public string CompactOverviewDisabled => GetString();
     public string SkipExternalDeleteConfirmationEnabled => GetString();
     public string SkipExternalDeleteConfirmationDisabled => GetString();
+    public string AllowMeteredKomgaDownloadsEnabled => GetString();
+    public string AllowMeteredKomgaDownloadsDisabled => GetString();
     public string Shown => GetString();
     public string Hidden => GetString();
     public string Expanded => GetString();
@@ -122,6 +125,7 @@ public class Loc : INotifyPropertyChanged
     public string EpubOutputResolutionDescription => GetString();
     public string UnsupportedFormatHandlingDescription => GetString();
     public string KomgaParallelDownloadsDescription => GetString();
+    public string AllowMeteredKomgaDownloadsDescription => GetString();
     public string SkipExternalDeleteConfirmationDescription => GetString();
     public string SectionLayoutDescription => GetString();
     public string AppDescription => GetString();

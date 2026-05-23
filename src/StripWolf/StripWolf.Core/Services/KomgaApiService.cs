@@ -427,70 +427,147 @@ public class KomgaApiService : IDisposable
     public async Task<bool> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
-        
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        
-        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return false;
-        }
 
-        var totalBytes = response.Content.Headers.ContentLength ?? 0;
-        var bytesRead = 0L;
-        
-        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
-        
-        var reader = PipeReader.Create(contentStream);
-        var writer = PipeWriter.Create(fileStream);
-        try
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        var partialPath = outputPath + ".partial";
+        const int maxAttempts = 4;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            while (true)
+            try
             {
-                var result = await reader.ReadAsync(cancellationToken);
-                var buffer = result.Buffer;
+                cancellationToken.ThrowIfCancellationRequested();
+                var existingBytes = File.Exists(partialPath)
+                    ? new FileInfo(partialPath).Length
+                    : 0;
 
-                if (buffer.IsEmpty && result.IsCompleted)
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+                if (existingBytes > 0)
                 {
-                    break;
+                    request.Headers.Range = new RangeHeaderValue(existingBytes, null);
                 }
 
-                double lastReportedProgress = -1;
-                foreach (var segment in buffer)
+                using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
                 {
-                    await writer.WriteAsync(segment, cancellationToken);
-                    bytesRead += segment.Length;
-                    
-                    if (totalBytes > 0 && progress != null)
+                    var completeLength = response.Content.Headers.ContentRange?.Length;
+                    if (completeLength.HasValue && existingBytes >= completeLength.Value)
                     {
-                        double currentProgress = (double)bytesRead / totalBytes;
-                        // Only report if progress increased by at least 1% to avoid overwhelming UI thread
-                        if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                        File.Move(partialPath, outputPath, true);
+                        progress?.Report(1.0);
+                        return true;
+                    }
+
+                    File.Delete(partialPath);
+                    continue;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                        continue;
+                    }
+
+                    return false;
+                }
+
+                var append = existingBytes > 0 && response.StatusCode == HttpStatusCode.PartialContent;
+                if (!append && existingBytes > 0)
+                {
+                    existingBytes = 0;
+                    File.Delete(partialPath);
+                }
+
+                var totalBytes = response.Content.Headers.ContentLength.HasValue
+                    ? existingBytes + response.Content.Headers.ContentLength.Value
+                    : 0;
+                var bytesRead = existingBytes;
+                double lastReportedProgress = -1;
+
+                if (totalBytes > 0 && existingBytes > 0)
+                {
+                    progress?.Report((double)existingBytes / totalBytes);
+                }
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using var fileStream = new FileStream(partialPath, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+                var reader = PipeReader.Create(contentStream);
+                var writer = PipeWriter.Create(fileStream);
+                try
+                {
+                    while (true)
+                    {
+                        var result = await reader.ReadAsync(cancellationToken);
+                        var buffer = result.Buffer;
+
+                        if (buffer.IsEmpty && result.IsCompleted)
                         {
-                            progress.Report(currentProgress);
-                            lastReportedProgress = currentProgress;
+                            break;
+                        }
+
+                        foreach (var segment in buffer)
+                        {
+                            await writer.WriteAsync(segment, cancellationToken);
+                            bytesRead += segment.Length;
+
+                            if (totalBytes > 0 && progress is not null)
+                            {
+                                var currentProgress = (double)bytesRead / totalBytes;
+                                if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                                {
+                                    progress.Report(currentProgress);
+                                    lastReportedProgress = currentProgress;
+                                }
+                            }
+                        }
+
+                        reader.AdvanceTo(buffer.End);
+
+                        if (result.IsCompleted)
+                        {
+                            break;
                         }
                     }
+
+                    await writer.FlushAsync(cancellationToken);
                 }
-
-                reader.AdvanceTo(buffer.End);
-
-                if (result.IsCompleted)
+                finally
                 {
-                    break;
+                    await writer.CompleteAsync();
+                    await reader.CompleteAsync();
                 }
-            }
 
-            await writer.FlushAsync(cancellationToken);
-            return true;
+                File.Move(partialPath, outputPath, true);
+                progress?.Report(1.0);
+                return true;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+            }
+            catch (HttpRequestException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+            }
         }
-        finally
-        {
-            await writer.CompleteAsync();
-            await reader.CompleteAsync();
-        }
+
+        return false;
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode statusCode)
+    {
+        return statusCode is HttpStatusCode.RequestTimeout or
+            HttpStatusCode.TooManyRequests or
+            HttpStatusCode.BadGateway or
+            HttpStatusCode.ServiceUnavailable or
+            HttpStatusCode.GatewayTimeout;
     }
 
     #endregion
@@ -754,4 +831,3 @@ public class KomgaApiService : IDisposable
         _httpClient = null;
     }
 }
-

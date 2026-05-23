@@ -43,9 +43,10 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
             services.AddSingleton<IPdfRenderer, AndroidPdfRenderer>();
         App.RegisterWebViewSnapshotService = services =>
             services.AddSingleton<IWebViewPaginationService, AndroidWebViewSnapshotService>();
-             
+        App.RegisterNetworkConnectionService = services =>
+            services.AddSingleton<INetworkConnectionService, AndroidNetworkConnectionService>();
+              
         return base.CustomizeAppBuilder(builder)
             .WithInterFont();
     }
 }
-
