@@ -2156,6 +2156,7 @@ public partial class KomgaViewModel : ViewModelBase
 
                     if (_cancelRequestedBookIds.Remove(queueItem.Id))
                     {
+                        _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
                         _downloadPendingBookIds.Remove(queueItem.Id);
                         _downloadItemsByBookId.Remove(queueItem.Id);
                         ResetDownloadState(queueItem.Id);
@@ -2172,7 +2173,7 @@ public partial class KomgaViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    if (attempt < MaxDownloadRetryCount)
+                    if (attempt < MaxDownloadRetryCount && ex is not InvalidOperationException)
                     {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), token);
                         continue;
@@ -2236,6 +2237,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         _downloadPendingBookIds.Remove(queueItem.Id);
         _downloadItemsByBookId.Remove(queueItem.Id);
+        _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
         ResetDownloadState(queueItem.Id);
         DownloadQueueItems.Remove(queueItem);
         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
@@ -2249,6 +2251,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             _downloadPendingBookIds.Remove(queueItem.Id);
             _downloadItemsByBookId.Remove(queueItem.Id);
+            _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
             ResetDownloadState(queueItem.Id);
             DownloadQueueItems.Remove(queueItem);
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);

@@ -43,6 +43,7 @@ public class LibraryService
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaApiService _komgaApiService;
     private readonly SettingsService _settingsService;
+    private readonly INetworkConnectionService _networkConnectionService;
     private readonly PdfToCbzConverterService _pdfConverter;
     private readonly EpubToCbzConverterService _epubConverter;
     private readonly EpubShadowConversionService _epubShadowConversionService;
@@ -64,6 +65,7 @@ public class LibraryService
         ComicReaderService comicReaderService,
         KomgaApiService komgaApiService,
         SettingsService settingsService,
+        INetworkConnectionService networkConnectionService,
         PdfToCbzConverterService pdfConverter,
         EpubToCbzConverterService epubConverter,
         EpubShadowConversionService epubShadowConversionService,
@@ -73,6 +75,7 @@ public class LibraryService
         _comicReaderService = comicReaderService;
         _komgaApiService = komgaApiService;
         _settingsService = settingsService;
+        _networkConnectionService = networkConnectionService;
         _pdfConverter = pdfConverter;
         _epubConverter = epubConverter;
         _epubShadowConversionService = epubShadowConversionService;
@@ -439,15 +442,18 @@ public class LibraryService
     /// </summary>
     public async Task<KomgaDownloadedFile?> DownloadKomgaBookAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
+        if (_networkConnectionService.IsConnectionMetered() && !_settingsService.LoadSettings().AllowMeteredKomgaDownloads)
+        {
+            throw new InvalidOperationException("Downloads on metered connections are disabled. Enable the setting to allow this.");
+        }
+
         var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
         if (existing is not null)
         {
             return null;
         }
 
-        var extension = GetKomgaDownloadExtension(book);
-        var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
-        var filePath = Path.Combine(_comicsDirectory, fileName);
+        var filePath = GetKomgaDownloadFilePath(book);
 
         try
         {
@@ -471,14 +477,26 @@ public class LibraryService
         }
         catch (OperationCanceledException)
         {
-            CleanupPartialFile(filePath);
             throw;
         }
         catch
         {
-            CleanupPartialFile(filePath);
             throw;
         }
+    }
+
+    public void CleanupPendingKomgaDownload(KomgaBook book)
+    {
+        var filePath = GetKomgaDownloadFilePath(book);
+        CleanupPartialFile(filePath);
+        CleanupPartialFile(filePath + ".partial");
+    }
+
+    private string GetKomgaDownloadFilePath(KomgaBook book)
+    {
+        var extension = GetKomgaDownloadExtension(book);
+        var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
+        return Path.Combine(_comicsDirectory, fileName);
     }
 
     /// <summary>
@@ -1443,4 +1461,3 @@ public class LibraryService
         }
     }
 }
-

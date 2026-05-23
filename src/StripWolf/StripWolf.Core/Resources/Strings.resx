@@ -631,6 +631,9 @@
   <data name="KomgaParallelDownloads" xml:space="preserve">
     <value>Komga Parallel Downloads</value>
   </data>
+  <data name="AllowMeteredKomgaDownloads" xml:space="preserve">
+    <value>Allow Downloads on Metered Networks</value>
+  </data>
   <data name="SkipExternalDeleteConfirmationDescription" xml:space="preserve">
     <value>When enabled, deleting a comic outside the managed library folder will always remove it from the library only and will not ask whether to delete the original file.</value>
   </data>
@@ -666,6 +669,9 @@
   </data>
   <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
     <value>Choose how many Komga books may download at the same time.</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
+    <value>Disabled by default to avoid mobile data usage. Enable this to allow Komga downloads on metered connections.</value>
   </data>
   <data name="CompactOverviewDisabled" xml:space="preserve">
     <value>Compact Overview Disabled</value>
@@ -726,6 +732,12 @@
   </data>
   <data name="SkipExternalDeleteConfirmationDisabled" xml:space="preserve">
     <value>Ask before deleting external comics</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsEnabled" xml:space="preserve">
+    <value>Metered downloads allowed</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDisabled" xml:space="preserve">
+    <value>Metered downloads blocked</value>
   </data>
   <data name="SectionFavorites" xml:space="preserve">
     <value>Favorites</value>
