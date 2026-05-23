@@ -1162,10 +1162,11 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
+        var nextComicId = NextSeriesComic.Id;
         IsEndOfComicOptionsVisible = false;
         IsInfoPanelVisible = false;
-        await SaveProgressAsync();
-        ComicOpenRequested?.Invoke(this, NextSeriesComic.Id);
+        _ = SaveProgressAsync(forceImmediate: true);
+        ComicOpenRequested?.Invoke(this, nextComicId);
     }
 
     [RelayCommand]
@@ -1178,10 +1179,12 @@ public partial class ReaderViewModel : ViewModelBase
 
     private async Task SaveProgressAsync(bool forceImmediate = false)
     {
-        if (Comic is null)
+        var comic = Comic;
+        if (comic is null)
         {
             return;
         }
+        var currentPage = CurrentPage;
 
         var oldCts = Interlocked.Exchange(ref _saveProgressCts, forceImmediate ? null : new CancellationTokenSource());
         if (oldCts is not null)
@@ -1205,7 +1208,7 @@ public partial class ReaderViewModel : ViewModelBase
                 await Task.Delay(500, cts.Token);
             }
 
-            await _libraryService.UpdateReadingProgressAsync(Comic, CurrentPage);
+            await _libraryService.UpdateReadingProgressAsync(comic, currentPage);
         }
         catch (OperationCanceledException)
         {
@@ -1789,7 +1792,7 @@ public partial class ReaderViewModel : ViewModelBase
         // Fire and forget the Komga sync in the background so it doesn't delay UI closing
         _ = SyncProgressWithKomgaAsync();
 
-        await SaveProgressAsync(forceImmediate: true);
+        _ = SaveProgressAsync(forceImmediate: true);
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
 
@@ -1815,4 +1818,3 @@ public partial class ReaderViewModel : ViewModelBase
         IsEndOfComicOptionsVisible = true;
     }
 }
-
