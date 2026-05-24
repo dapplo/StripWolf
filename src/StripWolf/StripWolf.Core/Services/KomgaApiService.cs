@@ -524,8 +524,9 @@ public class KomgaApiService : IDisposable
                     var bytesReadThisChunk = 0L;
                     await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
                     await using var fileStream = new FileStream(partialPath, downloadedBytes > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                    var reader = PipeReader.Create(contentStream);
-                    var writer = PipeWriter.Create(fileStream);
+                    var reader = PipeReader.Create(contentStream, new StreamPipeReaderOptions(bufferSize: 64 * 1024, minimumReadSize: 16 * 1024, leaveOpen: false));
+                    var writer = PipeWriter.Create(fileStream, new StreamPipeWriterOptions(minimumBufferSize: 64 * 1024, leaveOpen: false));
+                    Exception? copyException = null;
                     try
                     {
                         while (true)
@@ -540,7 +541,9 @@ public class KomgaApiService : IDisposable
 
                             foreach (var segment in buffer)
                             {
-                                await writer.WriteAsync(segment, cancellationToken);
+                                var destination = writer.GetSpan(segment.Length);
+                                segment.Span.CopyTo(destination);
+                                writer.Advance(segment.Length);
                                 bytesReadThisChunk += segment.Length;
 
                                 if (totalBytes.HasValue && progress is not null)
@@ -555,19 +558,27 @@ public class KomgaApiService : IDisposable
                             }
 
                             reader.AdvanceTo(buffer.End);
+                            var flushResult = await writer.FlushAsync(cancellationToken);
+                            if (flushResult.IsCompleted)
+                            {
+                                break;
+                            }
 
                             if (result.IsCompleted)
                             {
                                 break;
                             }
                         }
-
-                        await writer.FlushAsync(cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        copyException = ex;
+                        throw;
                     }
                     finally
                     {
-                        await writer.CompleteAsync();
-                        await reader.CompleteAsync();
+                        await writer.CompleteAsync(copyException);
+                        await reader.CompleteAsync(copyException);
                     }
 
                     downloadedBytes += bytesReadThisChunk;
