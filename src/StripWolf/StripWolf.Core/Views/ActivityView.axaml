@@ -40,10 +40,17 @@
                       <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                       <TextBlock Text="{Binding SeriesTitle}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Button Grid.RowSpan="3" Grid.Column="1" Content="✕"
-                            Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}" Padding="8,4"
-                            IsEnabled="{Binding !IsCancelling}"/>
+                    <StackPanel Grid.RowSpan="3" Grid.Column="1" Spacing="4" HorizontalAlignment="Right">
+                      <Button Content="↻"
+                              Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.RetryDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" Padding="8,4"
+                              ToolTip.Tip="{Binding RetryFailed, Source={x:Static res:Loc.Instance}}"
+                              IsVisible="{Binding IsFailed}"/>
+                      <Button Content="✕"
+                              Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" Padding="8,4"
+                              IsEnabled="{Binding !IsCancelling}"/>
+                    </StackPanel>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Queued, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" IsVisible="{Binding IsQueued}"/>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Downloading, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" IsVisible="{Binding IsDownloading}"/>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Failed, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#C62828" IsVisible="{Binding IsFailed}"/>

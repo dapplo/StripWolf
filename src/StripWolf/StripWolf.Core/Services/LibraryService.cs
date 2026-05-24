@@ -457,10 +457,10 @@ public class LibraryService
 
         try
         {
-            var success = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, cancellationToken);
-            if (!success)
+            var downloadResult = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, cancellationToken);
+            if (!downloadResult.Success)
             {
-                throw new Exception("Failed to download comic from Komga");
+                throw new Exception(downloadResult.ErrorMessage ?? "Failed to download comic from Komga");
             }
 
             cancellationToken.ThrowIfCancellationRequested();
