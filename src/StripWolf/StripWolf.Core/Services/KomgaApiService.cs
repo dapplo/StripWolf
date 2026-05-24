@@ -433,149 +433,189 @@ public class KomgaApiService : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         var partialPath = outputPath + ".partial";
         const int maxAttempts = 4;
+        const long chunkSize = 4L * 1024L * 1024L;
         string? lastErrorMessage = null;
+        var downloadedBytes = File.Exists(partialPath)
+            ? new FileInfo(partialPath).Length
+            : 0L;
+        long? totalBytes = null;
+        double lastReportedProgress = -1;
 
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        while (true)
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (totalBytes.HasValue && downloadedBytes >= totalBytes.Value)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var existingBytes = File.Exists(partialPath)
-                    ? new FileInfo(partialPath).Length
-                    : 0;
+                File.Move(partialPath, outputPath, true);
+                progress?.Report(1.0);
+                return new KomgaDownloadResult(true);
+            }
 
-                using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-                if (existingBytes > 0)
+            var currentChunkStart = downloadedBytes;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
                 {
-                    request.Headers.Range = new RangeHeaderValue(existingBytes, null);
-                }
+                    using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+                    request.Headers.Range = new RangeHeaderValue(currentChunkStart, currentChunkStart + chunkSize - 1);
 
-                using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
-                {
-                    var completeLength = response.Content.Headers.ContentRange?.Length;
-                    if (completeLength.HasValue && existingBytes >= completeLength.Value)
+                    using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
+                    {
+                        var completeLength = response.Content.Headers.ContentRange?.Length;
+                        if (completeLength.HasValue && downloadedBytes >= completeLength.Value)
+                        {
+                            File.Move(partialPath, outputPath, true);
+                            progress?.Report(1.0);
+                            return new KomgaDownloadResult(true);
+                        }
+
+                        downloadedBytes = 0;
+                        totalBytes = null;
+                        lastReportedProgress = -1;
+                        File.Delete(partialPath);
+                        break;
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        lastErrorMessage = $"Komga returned {(int)response.StatusCode} ({response.ReasonPhrase ?? response.StatusCode.ToString()}).";
+                        if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                            continue;
+                        }
+
+                        return new KomgaDownloadResult(false, lastErrorMessage);
+                    }
+
+                    var responseIsPartial = response.StatusCode == HttpStatusCode.PartialContent;
+                    if (!responseIsPartial && currentChunkStart > 0)
+                    {
+                        downloadedBytes = 0;
+                        totalBytes = null;
+                        lastReportedProgress = -1;
+                        File.Delete(partialPath);
+                        break;
+                    }
+
+                    var serverTotalBytes = response.Content.Headers.ContentRange?.Length;
+                    if (serverTotalBytes.HasValue)
+                    {
+                        totalBytes = serverTotalBytes.Value;
+                    }
+                    else if (!responseIsPartial && response.Content.Headers.ContentLength.HasValue)
+                    {
+                        totalBytes = response.Content.Headers.ContentLength.Value;
+                    }
+
+                    if (totalBytes.HasValue && downloadedBytes > 0 && progress is not null)
+                    {
+                        var existingProgress = (double)downloadedBytes / totalBytes.Value;
+                        if (existingProgress - lastReportedProgress >= 0.01)
+                        {
+                            progress.Report(existingProgress);
+                            lastReportedProgress = existingProgress;
+                        }
+                    }
+
+                    var bytesReadThisChunk = 0L;
+                    await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    await using var fileStream = new FileStream(partialPath, downloadedBytes > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+                    var reader = PipeReader.Create(contentStream);
+                    var writer = PipeWriter.Create(fileStream);
+                    try
+                    {
+                        while (true)
+                        {
+                            var result = await reader.ReadAsync(cancellationToken);
+                            var buffer = result.Buffer;
+
+                            if (buffer.IsEmpty && result.IsCompleted)
+                            {
+                                break;
+                            }
+
+                            foreach (var segment in buffer)
+                            {
+                                await writer.WriteAsync(segment, cancellationToken);
+                                bytesReadThisChunk += segment.Length;
+
+                                if (totalBytes.HasValue && progress is not null)
+                                {
+                                    var currentProgress = (double)(downloadedBytes + bytesReadThisChunk) / totalBytes.Value;
+                                    if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
+                                    {
+                                        progress.Report(currentProgress);
+                                        lastReportedProgress = currentProgress;
+                                    }
+                                }
+                            }
+
+                            reader.AdvanceTo(buffer.End);
+
+                            if (result.IsCompleted)
+                            {
+                                break;
+                            }
+                        }
+
+                        await writer.FlushAsync(cancellationToken);
+                    }
+                    finally
+                    {
+                        await writer.CompleteAsync();
+                        await reader.CompleteAsync();
+                    }
+
+                    downloadedBytes += bytesReadThisChunk;
+                    if (bytesReadThisChunk == 0)
+                    {
+                        return new KomgaDownloadResult(false, "Komga returned an empty chunk before download completion.");
+                    }
+
+                    if (!responseIsPartial || (totalBytes.HasValue && downloadedBytes >= totalBytes.Value))
                     {
                         File.Move(partialPath, outputPath, true);
                         progress?.Report(1.0);
                         return new KomgaDownloadResult(true);
                     }
 
-                    File.Delete(partialPath);
-                    continue;
+                    break;
                 }
-
-                if (!response.IsSuccessStatusCode)
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
                 {
-                    lastErrorMessage = $"Komga returned {(int)response.StatusCode} ({response.ReasonPhrase ?? response.StatusCode.ToString()}).";
-                    if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-                        continue;
-                    }
-
+                    lastErrorMessage = "Download timed out while reading data from Komga.";
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    return new KomgaDownloadResult(false, lastErrorMessage ?? "Download timed out while reading data from Komga.");
+                }
+                catch (HttpRequestException ex) when (attempt < maxAttempts)
+                {
+                    lastErrorMessage = ex.Message;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                }
+                catch (IOException ex) when (attempt < maxAttempts)
+                {
+                    lastErrorMessage = ex.Message;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+                }
+                catch (HttpRequestException ex)
+                {
+                    lastErrorMessage = ex.Message;
                     return new KomgaDownloadResult(false, lastErrorMessage);
                 }
-
-                var append = existingBytes > 0 && response.StatusCode == HttpStatusCode.PartialContent;
-                if (!append && existingBytes > 0)
+                catch (IOException ex)
                 {
-                    existingBytes = 0;
-                    File.Delete(partialPath);
+                    lastErrorMessage = ex.Message;
+                    return new KomgaDownloadResult(false, lastErrorMessage);
                 }
-
-                var totalBytes = response.Content.Headers.ContentLength.HasValue
-                    ? existingBytes + response.Content.Headers.ContentLength.Value
-                    : 0;
-                var bytesRead = existingBytes;
-                double lastReportedProgress = -1;
-
-                if (totalBytes > 0 && existingBytes > 0)
-                {
-                    progress?.Report((double)existingBytes / totalBytes);
-                }
-
-                await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                await using var fileStream = new FileStream(partialPath, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-                var reader = PipeReader.Create(contentStream);
-                var writer = PipeWriter.Create(fileStream);
-                try
-                {
-                    while (true)
-                    {
-                        var result = await reader.ReadAsync(cancellationToken);
-                        var buffer = result.Buffer;
-
-                        if (buffer.IsEmpty && result.IsCompleted)
-                        {
-                            break;
-                        }
-
-                        foreach (var segment in buffer)
-                        {
-                            await writer.WriteAsync(segment, cancellationToken);
-                            bytesRead += segment.Length;
-
-                            if (totalBytes > 0 && progress is not null)
-                            {
-                                var currentProgress = (double)bytesRead / totalBytes;
-                                if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
-                                {
-                                    progress.Report(currentProgress);
-                                    lastReportedProgress = currentProgress;
-                                }
-                            }
-                        }
-
-                        reader.AdvanceTo(buffer.End);
-
-                        if (result.IsCompleted)
-                        {
-                            break;
-                        }
-                    }
-
-                    await writer.FlushAsync(cancellationToken);
-                }
-                finally
-                {
-                    await writer.CompleteAsync();
-                    await reader.CompleteAsync();
-                }
-
-                File.Move(partialPath, outputPath, true);
-                progress?.Report(1.0);
-                return new KomgaDownloadResult(true);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
-            {
-                lastErrorMessage = "Download timed out while reading data from Komga.";
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-            }
-            catch (HttpRequestException ex) when (attempt < maxAttempts)
-            {
-                lastErrorMessage = ex.Message;
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-            }
-            catch (IOException ex) when (attempt < maxAttempts)
-            {
-                lastErrorMessage = ex.Message;
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
-            }
-            catch (HttpRequestException ex)
-            {
-                lastErrorMessage = ex.Message;
-                break;
-            }
-            catch (IOException ex)
-            {
-                lastErrorMessage = ex.Message;
-                break;
             }
         }
-
-        return new KomgaDownloadResult(false, lastErrorMessage ?? $"Failed to download '{bookId}' after {maxAttempts} attempts.");
     }
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
