@@ -2312,20 +2312,7 @@ public partial class KomgaViewModel : ViewModelBase
     {
         foreach (var queueItem in DownloadQueueItems.Where(item => item.IsFailed).ToList())
         {
-            queueItem.IsFailed = false;
-            queueItem.ErrorMessage = null;
-            queueItem.IsQueued = true;
-            queueItem.IsDownloading = false;
-            queueItem.IsCancelling = false;
-            queueItem.Progress = 0;
-            SetDownloadState(queueItem.Id, trackedBook =>
-            {
-                trackedBook.IsQueued = true;
-                trackedBook.IsDownloading = false;
-                trackedBook.IsCancelling = false;
-                trackedBook.DownloadProgress = 0;
-            });
-            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            RetryDownloadInternal(queueItem);
         }
 
         if (!_isProcessingQueue && DownloadQueueItems.Any(item => item.IsQueued))
@@ -2333,6 +2320,41 @@ public partial class KomgaViewModel : ViewModelBase
             _isProcessingQueue = true;
             _ = ProcessDownloadQueueAsync();
         }
+    }
+
+    [RelayCommand]
+    private void RetryDownload(KomgaDownloadQueueItem? queueItem)
+    {
+        if (queueItem is null || !queueItem.IsFailed)
+        {
+            return;
+        }
+
+        RetryDownloadInternal(queueItem);
+
+        if (!_isProcessingQueue && DownloadQueueItems.Any(item => item.IsQueued))
+        {
+            _isProcessingQueue = true;
+            _ = ProcessDownloadQueueAsync();
+        }
+    }
+
+    private void RetryDownloadInternal(KomgaDownloadQueueItem queueItem)
+    {
+        queueItem.IsFailed = false;
+        queueItem.ErrorMessage = null;
+        queueItem.IsQueued = true;
+        queueItem.IsDownloading = false;
+        queueItem.IsCancelling = false;
+        queueItem.Progress = 0;
+        SetDownloadState(queueItem.Id, trackedBook =>
+        {
+            trackedBook.IsQueued = true;
+            trackedBook.IsDownloading = false;
+            trackedBook.IsCancelling = false;
+            trackedBook.DownloadProgress = 0;
+        });
+        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
     }
 
     [RelayCommand]

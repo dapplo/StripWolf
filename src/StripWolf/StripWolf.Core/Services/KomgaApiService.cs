@@ -28,6 +28,8 @@ using StripWolf.Core.Models.Komga;
 
 namespace StripWolf.Core.Services;
 
+public sealed record KomgaDownloadResult(bool Success, string? ErrorMessage = null);
+
 /// <summary>
 /// Service for interacting with Komga API
 /// </summary>
@@ -424,13 +426,14 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Downloads a book file to a local path using System.IO.Pipelines for maximum performance.
     /// </summary>
-    public async Task<bool> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<KomgaDownloadResult> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         var partialPath = outputPath + ".partial";
         const int maxAttempts = 4;
+        string? lastErrorMessage = null;
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -456,7 +459,7 @@ public class KomgaApiService : IDisposable
                     {
                         File.Move(partialPath, outputPath, true);
                         progress?.Report(1.0);
-                        return true;
+                        return new KomgaDownloadResult(true);
                     }
 
                     File.Delete(partialPath);
@@ -465,13 +468,14 @@ public class KomgaApiService : IDisposable
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    lastErrorMessage = $"Komga returned {(int)response.StatusCode} ({response.ReasonPhrase ?? response.StatusCode.ToString()}).";
                     if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
                     {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                         continue;
                     }
 
-                    return false;
+                    return new KomgaDownloadResult(false, lastErrorMessage);
                 }
 
                 var append = existingBytes > 0 && response.StatusCode == HttpStatusCode.PartialContent;
@@ -542,23 +546,36 @@ public class KomgaApiService : IDisposable
 
                 File.Move(partialPath, outputPath, true);
                 progress?.Report(1.0);
-                return true;
+                return new KomgaDownloadResult(true);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
             {
+                lastErrorMessage = "Download timed out while reading data from Komga.";
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
             }
-            catch (HttpRequestException) when (attempt < maxAttempts)
+            catch (HttpRequestException ex) when (attempt < maxAttempts)
             {
+                lastErrorMessage = ex.Message;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
             }
-            catch (IOException) when (attempt < maxAttempts)
+            catch (IOException ex) when (attempt < maxAttempts)
             {
+                lastErrorMessage = ex.Message;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                lastErrorMessage = ex.Message;
+                break;
+            }
+            catch (IOException ex)
+            {
+                lastErrorMessage = ex.Message;
+                break;
             }
         }
 
-        return false;
+        return new KomgaDownloadResult(false, lastErrorMessage ?? $"Failed to download '{bookId}' after {maxAttempts} attempts.");
     }
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
