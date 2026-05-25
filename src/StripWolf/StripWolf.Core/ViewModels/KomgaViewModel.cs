@@ -1214,44 +1214,60 @@ public partial class KomgaViewModel : ViewModelBase
 
     private async Task ApplyServerAsync(KomgaServer? server, bool useCache, bool persistSelection)
     {
-        _activeServer = server;
-        UpdateSelectedServer(server);
-
-        OnPropertyChanged(nameof(ServerUsername));
-        OnPropertyChanged(nameof(ServerPassword));
-        OnPropertyChanged(nameof(BrowsingServerName));
-
-        ResetNavigationState();
-        ErrorMessage = string.Empty;
-
         if (server is null)
         {
+            _activeServer = null;
+            UpdateSelectedServer(null);
+            OnPropertyChanged(nameof(ServerUsername));
+            OnPropertyChanged(nameof(ServerPassword));
+            OnPropertyChanged(nameof(BrowsingServerName));
+            ResetNavigationState();
+            ErrorMessage = string.Empty;
             IsConnected = false;
             return;
         }
+
+        var previousServer = _activeServer;
+        var hasExistingData = Libraries.Count > 0 ||
+                              ReadLists.Count > 0 ||
+                              KeepReadingBooks.Count > 0 ||
+                              OnDeckBooks.Count > 0 ||
+                              RecentlyAddedBooks.Count > 0 ||
+                              RecentlyAddedSeries.Count > 0 ||
+                              Series.Count > 0 ||
+                              Books.Count > 0;
+        var activeServer = server;
 
         if (persistSelection)
         {
             await PersistActiveServerSelectionAsync(server.Id);
             var settings = _settingsService.LoadSettings();
             RefreshConfiguredServers(settings);
-            var refreshedServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id);
-            if (refreshedServer is not null)
-            {
-                _activeServer = refreshedServer;
-                UpdateSelectedServer(refreshedServer);
-            }
+            activeServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id) ?? server;
         }
 
-        var activeServer = _activeServer ?? server;
-        _activeServer = activeServer;
         _komgaApiService.Configure(activeServer);
-        IsConnected = await _komgaApiService.TestConnectionAsync();
-
-        if (!IsConnected)
+        var isConnected = await _komgaApiService.TestConnectionAsync();
+        if (!isConnected)
         {
+            if (previousServer is not null)
+            {
+                _komgaApiService.Configure(previousServer);
+            }
+
+            IsConnected = !persistSelection && hasExistingData;
             return;
         }
+
+        _activeServer = activeServer;
+        UpdateSelectedServer(activeServer);
+        OnPropertyChanged(nameof(ServerUsername));
+        OnPropertyChanged(nameof(ServerPassword));
+        OnPropertyChanged(nameof(BrowsingServerName));
+
+        ResetNavigationState();
+        ErrorMessage = string.Empty;
+        IsConnected = true;
 
         if (!useCache)
         {
@@ -2060,7 +2076,6 @@ public partial class KomgaViewModel : ViewModelBase
 
         _lastDownloadConnectionProbeUtc = DateTime.UtcNow;
         _lastDownloadConnectionProbeResult = await _komgaApiService.TestConnectionAsync();
-        IsConnected = _lastDownloadConnectionProbeResult;
         return _lastDownloadConnectionProbeResult;
     }
 
@@ -2190,16 +2205,19 @@ public partial class KomgaViewModel : ViewModelBase
                         continue;
                     }
 
-                    var hasConnection = await IsDownloadConnectionAvailableAsync();
-                    if (!hasConnection)
+                    if (activeCount == 0)
                     {
-                        PauseQueueForConnectionLoss();
-                        ScheduleRefreshDownloadQueueState();
-                        await Task.Delay(1000);
-                        continue;
-                    }
+                        var hasConnection = await IsDownloadConnectionAvailableAsync();
+                        if (!hasConnection)
+                        {
+                            PauseQueueForConnectionLoss();
+                            ScheduleRefreshDownloadQueueState();
+                            await Task.Delay(1000);
+                            continue;
+                        }
 
-                    ResumeQueueAfterConnectionRestore();
+                        ResumeQueueAfterConnectionRestore();
+                    }
                 }
 
                 if (!IsDownloadQueuePaused)
