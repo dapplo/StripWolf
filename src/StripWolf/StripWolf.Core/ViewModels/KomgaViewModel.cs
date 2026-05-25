@@ -19,6 +19,7 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -124,8 +125,15 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _downloadQueueStateRefreshPending;
     [ObservableProperty]
     private bool _isDownloadQueuePaused;
+    [ObservableProperty]
+    private double _downloadThrottleParallel = 1;
     private int _maxParallelDownloads = 1;
     private const int MaxDownloadRetryCount = 3;
+    private bool _isQueuePausedByConnection;
+    private DateTime _lastDownloadConnectionProbeUtc = DateTime.MinValue;
+    private bool _lastDownloadConnectionProbeResult = true;
+    private static readonly TimeSpan DownloadConnectionProbeInterval = TimeSpan.FromSeconds(3);
+    private int? _recentFailedServerId;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -648,7 +656,14 @@ public partial class KomgaViewModel : ViewModelBase
 
     private void ApplyDownloadSettings(AppSettings settings)
     {
-        _maxParallelDownloads = Math.Max(1, settings.KomgaParallelDownloads);
+        var parallelDownloads = Math.Max(1, settings.KomgaParallelDownloads);
+        _maxParallelDownloads = parallelDownloads;
+        DownloadThrottleParallel = parallelDownloads;
+    }
+
+    partial void OnDownloadThrottleParallelChanged(double value)
+    {
+        _maxParallelDownloads = Math.Max(1, (int)Math.Round(value));
     }
 
     partial void OnSearchTextChanged(string value)
@@ -1816,6 +1831,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             BookDisplay = bookDisplay,
             ServerId = _activeServer?.Id,
+            ServerName = _activeServer?.Name,
             IsQueued = true,
             Progress = 0,
             IsFailed = false,
@@ -2029,6 +2045,128 @@ public partial class KomgaViewModel : ViewModelBase
         await _importQueueService.RemoveAsync(pendingImport);
     }
 
+    private async Task<bool> IsDownloadConnectionAvailableAsync(bool forceProbe = false)
+    {
+        if (_activeServer is null)
+        {
+            return false;
+        }
+
+        if (!forceProbe &&
+            DateTime.UtcNow - _lastDownloadConnectionProbeUtc < DownloadConnectionProbeInterval)
+        {
+            return _lastDownloadConnectionProbeResult;
+        }
+
+        _lastDownloadConnectionProbeUtc = DateTime.UtcNow;
+        _lastDownloadConnectionProbeResult = await _komgaApiService.TestConnectionAsync();
+        IsConnected = _lastDownloadConnectionProbeResult;
+        return _lastDownloadConnectionProbeResult;
+    }
+
+    private void PauseQueueForConnectionLoss()
+    {
+        if (!_isQueuePausedByConnection)
+        {
+            IsDownloadQueuePaused = true;
+            _isQueuePausedByConnection = true;
+        }
+
+        foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
+        {
+            _pauseRequestedBookIds.Add(queueItem.Id);
+            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var cts))
+            {
+                cts.Cancel();
+            }
+        }
+    }
+
+    private void ResumeQueueAfterConnectionRestore()
+    {
+        if (!_isQueuePausedByConnection)
+        {
+            return;
+        }
+
+        _isQueuePausedByConnection = false;
+        IsDownloadQueuePaused = false;
+    }
+
+    private IEnumerable<KomgaDownloadQueueItem> OrderQueuedItemsForScheduling(IReadOnlyList<KomgaDownloadQueueItem> queuedItems)
+    {
+        if (!_recentFailedServerId.HasValue)
+        {
+            return queuedItems;
+        }
+
+        var alternateServerItems = queuedItems.Where(item => item.ServerId != _recentFailedServerId).ToList();
+        if (alternateServerItems.Count == 0)
+        {
+            return queuedItems;
+        }
+
+        return alternateServerItems.Concat(queuedItems.Where(item => item.ServerId == _recentFailedServerId));
+    }
+
+    private static bool IsLikelyConnectivityIssue(Exception ex)
+    {
+        if (ex is HttpRequestException or IOException or TimeoutException)
+        {
+            return true;
+        }
+
+        var message = ex.Message;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("host", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("503", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("502", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("504", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatSpeedText(double bytesPerSecond)
+    {
+        if (bytesPerSecond <= 0)
+        {
+            return string.Empty;
+        }
+
+        var units = new[] { "B/s", "KB/s", "MB/s", "GB/s" };
+        var value = bytesPerSecond;
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return $"{value:0.0} {units[unitIndex]}";
+    }
+
+    private static string FormatEtaText(double remainingSeconds)
+    {
+        if (remainingSeconds <= 0 || double.IsInfinity(remainingSeconds) || double.IsNaN(remainingSeconds))
+        {
+            return string.Empty;
+        }
+
+        var remaining = TimeSpan.FromSeconds(remainingSeconds);
+        if (remaining.TotalHours >= 1)
+        {
+            return $"{(int)remaining.TotalHours:D2}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+        }
+
+        return $"{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+    }
+
     private async Task ProcessDownloadQueueAsync()
     {
         try
@@ -2043,12 +2181,33 @@ public partial class KomgaViewModel : ViewModelBase
                     break;
                 }
 
+                if (queuedItems.Count > 0)
+                {
+                    if (IsDownloadQueuePaused && !_isQueuePausedByConnection)
+                    {
+                        ScheduleRefreshDownloadQueueState();
+                        await Task.Delay(150);
+                        continue;
+                    }
+
+                    var hasConnection = await IsDownloadConnectionAvailableAsync();
+                    if (!hasConnection)
+                    {
+                        PauseQueueForConnectionLoss();
+                        ScheduleRefreshDownloadQueueState();
+                        await Task.Delay(1000);
+                        continue;
+                    }
+
+                    ResumeQueueAfterConnectionRestore();
+                }
+
                 if (!IsDownloadQueuePaused)
                 {
                     var availableSlots = Math.Max(1, _maxParallelDownloads) - activeCount;
                     if (availableSlots > 0)
                     {
-                        foreach (var queueItem in queuedItems.Take(availableSlots))
+                        foreach (var queueItem in OrderQueuedItemsForScheduling(queuedItems).Take(availableSlots))
                         {
                             var cts = new CancellationTokenSource();
                             _downloadCancellationTokens[queueItem.Id] = cts;
@@ -2093,6 +2252,8 @@ public partial class KomgaViewModel : ViewModelBase
             queueItem.IsFailed = false;
             queueItem.ErrorMessage = null;
             queueItem.Progress = 0;
+            queueItem.SpeedText = string.Empty;
+            queueItem.EtaText = string.Empty;
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
             ScheduleRefreshDownloadQueueState();
 
@@ -2100,15 +2261,48 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 try
                 {
+                    var speedStopwatch = Stopwatch.StartNew();
+                    var lastSpeedSampleAt = speedStopwatch.Elapsed;
+                    var lastSampleBytes = 0L;
                     var progress = UiProgressThrottle.Create(p =>
                     {
                         queueItem.Progress = p;
                         SetDownloadState(queueItem.Id, trackedBook => trackedBook.DownloadProgress = p);
                         ScheduleRefreshDownloadQueueState();
                     });
+                    var detailedProgress = UiProgressThrottle.Create<KomgaDownloadProgress>(downloadProgress =>
+                    {
+                        var currentSampleAt = speedStopwatch.Elapsed;
+                        var elapsed = (currentSampleAt - lastSpeedSampleAt).TotalSeconds;
+                        if (elapsed >= 0.4 && downloadProgress.DownloadedBytes >= lastSampleBytes)
+                        {
+                            var speed = (downloadProgress.DownloadedBytes - lastSampleBytes) / elapsed;
+                            queueItem.SpeedText = FormatSpeedText(speed);
+                            if (downloadProgress.TotalBytes.HasValue && speed > 0)
+                            {
+                                var remainingBytes = Math.Max(0, downloadProgress.TotalBytes.Value - downloadProgress.DownloadedBytes);
+                                queueItem.EtaText = FormatEtaText(remainingBytes / speed);
+                            }
+                            else
+                            {
+                                queueItem.EtaText = string.Empty;
+                            }
 
-                    var downloadedFile = await _libraryService.DownloadKomgaBookAsync(queueItem.BookDisplay.Book, queueItem.ServerId, progress, token);
+                            lastSampleBytes = downloadProgress.DownloadedBytes;
+                            lastSpeedSampleAt = currentSampleAt;
+                        }
+                    });
+
+                    var downloadedFile = await _libraryService.DownloadKomgaBookAsync(
+                        queueItem.BookDisplay.Book,
+                        queueItem.ServerId,
+                        progress,
+                        detailedProgress,
+                        token);
                     queueItem.Progress = 1.0;
+                    queueItem.SpeedText = string.Empty;
+                    queueItem.EtaText = string.Empty;
+                    _recentFailedServerId = null;
                     _downloadItemsByBookId.Remove(queueItem.Id);
                     DownloadQueueItems.Remove(queueItem);
 
@@ -2138,17 +2332,19 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (_pauseRequestedBookIds.Remove(queueItem.Id))
                     {
+                        var pausedProgress = queueItem.Progress;
                         SetDownloadState(queueItem.Id, trackedBook =>
                         {
                             trackedBook.IsQueued = true;
                             trackedBook.IsDownloading = false;
                             trackedBook.IsCancelling = false;
-                            trackedBook.DownloadProgress = 0;
+                            trackedBook.DownloadProgress = pausedProgress;
                         });
                         queueItem.IsQueued = true;
                         queueItem.IsDownloading = false;
                         queueItem.IsCancelling = false;
-                        queueItem.Progress = 0;
+                        queueItem.SpeedText = string.Empty;
+                        queueItem.EtaText = string.Empty;
                         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
                         ScheduleRefreshDownloadQueueState();
                         return;
@@ -2162,6 +2358,8 @@ public partial class KomgaViewModel : ViewModelBase
                         ResetDownloadState(queueItem.Id);
                         queueItem.IsDownloading = false;
                         queueItem.IsCancelling = false;
+                        queueItem.SpeedText = string.Empty;
+                        queueItem.EtaText = string.Empty;
                         DownloadQueueItems.Remove(queueItem);
                         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
                         ScheduleRefreshDownloadQueueState();
@@ -2173,10 +2371,31 @@ public partial class KomgaViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
+                    _recentFailedServerId = queueItem.ServerId;
                     if (attempt < MaxDownloadRetryCount && ex is not InvalidOperationException)
                     {
                         await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), token);
                         continue;
+                    }
+
+                    if (IsLikelyConnectivityIssue(ex))
+                    {
+                        queueItem.IsFailed = false;
+                        queueItem.ErrorMessage = "Paused, waiting for connection...";
+                        queueItem.IsDownloading = false;
+                        queueItem.IsCancelling = false;
+                        queueItem.IsQueued = true;
+                        queueItem.SpeedText = string.Empty;
+                        queueItem.EtaText = string.Empty;
+                        SetDownloadState(queueItem.Id, trackedBook =>
+                        {
+                            trackedBook.IsQueued = true;
+                            trackedBook.IsDownloading = false;
+                            trackedBook.IsCancelling = false;
+                        });
+                        PauseQueueForConnectionLoss();
+                        ScheduleRefreshDownloadQueueState();
+                        return;
                     }
 
                     queueItem.IsFailed = true;
@@ -2184,6 +2403,8 @@ public partial class KomgaViewModel : ViewModelBase
                     queueItem.IsDownloading = false;
                     queueItem.IsCancelling = false;
                     queueItem.IsQueued = false;
+                    queueItem.SpeedText = string.Empty;
+                    queueItem.EtaText = string.Empty;
                     SetDownloadState(queueItem.Id, trackedBook =>
                     {
                         trackedBook.IsQueued = false;
@@ -2278,6 +2499,42 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void MoveDownloadUp(KomgaDownloadQueueItem? queueItem)
+    {
+        if (queueItem is null || queueItem.IsDownloading || queueItem.IsCancelling)
+        {
+            return;
+        }
+
+        var index = DownloadQueueItems.IndexOf(queueItem);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        DownloadQueueItems.Move(index, index - 1);
+        ScheduleRefreshDownloadQueueState();
+    }
+
+    [RelayCommand]
+    private void MoveDownloadDown(KomgaDownloadQueueItem? queueItem)
+    {
+        if (queueItem is null || queueItem.IsDownloading || queueItem.IsCancelling)
+        {
+            return;
+        }
+
+        var index = DownloadQueueItems.IndexOf(queueItem);
+        if (index < 0 || index >= DownloadQueueItems.Count - 1)
+        {
+            return;
+        }
+
+        DownloadQueueItems.Move(index, index + 1);
+        ScheduleRefreshDownloadQueueState();
+    }
+
+    [RelayCommand]
     private void PauseAllDownloads()
     {
         if (IsDownloadQueuePaused)
@@ -2285,6 +2542,7 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
+        _isQueuePausedByConnection = false;
         IsDownloadQueuePaused = true;
         foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
         {
@@ -2299,7 +2557,9 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private void ResumeAllDownloads()
     {
+        _isQueuePausedByConnection = false;
         IsDownloadQueuePaused = false;
+        _lastDownloadConnectionProbeUtc = DateTime.MinValue;
         if (!_isProcessingQueue && DownloadQueueItems.Any(item => item.IsQueued))
         {
             _isProcessingQueue = true;
@@ -2341,6 +2601,7 @@ public partial class KomgaViewModel : ViewModelBase
 
     private void RetryDownloadInternal(KomgaDownloadQueueItem queueItem)
     {
+        _recentFailedServerId = null;
         queueItem.IsFailed = false;
         queueItem.ErrorMessage = null;
         queueItem.IsQueued = true;

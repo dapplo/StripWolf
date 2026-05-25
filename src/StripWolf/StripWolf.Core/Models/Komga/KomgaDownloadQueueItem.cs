@@ -28,6 +28,7 @@ public partial class KomgaDownloadQueueItem : ObservableObject
 {
     public KomgaBookDisplay BookDisplay { get; init; } = new();
     public int? ServerId { get; init; }
+    public string? ServerName { get; init; }
 
     public string Id => BookDisplay.Id;
     public string Name => BookDisplay.Name;
@@ -50,5 +51,10 @@ public partial class KomgaDownloadQueueItem : ObservableObject
 
     [ObservableProperty]
     private string? _errorMessage;
-}
 
+    [ObservableProperty]
+    private string _speedText = string.Empty;
+
+    [ObservableProperty]
+    private string _etaText = string.Empty;
+}
