@@ -619,25 +619,75 @@ public class KomgaApiService : IDisposable
                 catch (HttpRequestException ex) when (attempt < maxAttempts)
                 {
                     lastErrorMessage = ex.Message;
+                    if (TryFinalizeDownloadFromPartial(partialPath, outputPath, totalBytes, ref downloadedBytes, progress, detailedProgress))
+                    {
+                        return new KomgaDownloadResult(true);
+                    }
+
                     await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 }
                 catch (IOException ex) when (attempt < maxAttempts)
                 {
                     lastErrorMessage = ex.Message;
+                    if (TryFinalizeDownloadFromPartial(partialPath, outputPath, totalBytes, ref downloadedBytes, progress, detailedProgress))
+                    {
+                        return new KomgaDownloadResult(true);
+                    }
+
                     await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 }
                 catch (HttpRequestException ex)
                 {
                     lastErrorMessage = ex.Message;
+                    if (TryFinalizeDownloadFromPartial(partialPath, outputPath, totalBytes, ref downloadedBytes, progress, detailedProgress))
+                    {
+                        return new KomgaDownloadResult(true);
+                    }
+
                     return new KomgaDownloadResult(false, lastErrorMessage);
                 }
                 catch (IOException ex)
                 {
                     lastErrorMessage = ex.Message;
+                    if (TryFinalizeDownloadFromPartial(partialPath, outputPath, totalBytes, ref downloadedBytes, progress, detailedProgress))
+                    {
+                        return new KomgaDownloadResult(true);
+                    }
+
                     return new KomgaDownloadResult(false, lastErrorMessage);
                 }
             }
         }
+    }
+
+    private static bool TryFinalizeDownloadFromPartial(
+        string partialPath,
+        string outputPath,
+        long? totalBytes,
+        ref long downloadedBytes,
+        IProgress<double>? progress,
+        IProgress<KomgaDownloadProgress>? detailedProgress)
+    {
+        if (!File.Exists(partialPath))
+        {
+            return false;
+        }
+
+        var partialLength = new FileInfo(partialPath).Length;
+        if (partialLength > downloadedBytes)
+        {
+            downloadedBytes = partialLength;
+        }
+
+        if (!totalBytes.HasValue || partialLength < totalBytes.Value)
+        {
+            return false;
+        }
+
+        File.Move(partialPath, outputPath, true);
+        progress?.Report(1.0);
+        detailedProgress?.Report(new KomgaDownloadProgress(partialLength, totalBytes));
+        return true;
     }
 
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
