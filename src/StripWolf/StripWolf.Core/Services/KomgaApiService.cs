@@ -29,6 +29,7 @@ using StripWolf.Core.Models.Komga;
 namespace StripWolf.Core.Services;
 
 public sealed record KomgaDownloadResult(bool Success, string? ErrorMessage = null);
+public sealed record KomgaDownloadProgress(long DownloadedBytes, long? TotalBytes);
 
 /// <summary>
 /// Service for interacting with Komga API
@@ -426,7 +427,12 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Downloads a book file to a local path using System.IO.Pipelines for maximum performance.
     /// </summary>
-    public async Task<KomgaDownloadResult> DownloadBookToFileAsync(string bookId, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<KomgaDownloadResult> DownloadBookToFileAsync(
+        string bookId,
+        string outputPath,
+        IProgress<double>? progress = null,
+        IProgress<KomgaDownloadProgress>? detailedProgress = null,
+        CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
@@ -449,6 +455,7 @@ public class KomgaApiService : IDisposable
             {
                 File.Move(partialPath, outputPath, true);
                 progress?.Report(1.0);
+                detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, totalBytes));
                 return new KomgaDownloadResult(true);
             }
 
@@ -469,6 +476,7 @@ public class KomgaApiService : IDisposable
                         {
                             File.Move(partialPath, outputPath, true);
                             progress?.Report(1.0);
+                            detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, completeLength));
                             return new KomgaDownloadResult(true);
                         }
 
@@ -517,6 +525,7 @@ public class KomgaApiService : IDisposable
                         if (existingProgress - lastReportedProgress >= 0.01)
                         {
                             progress.Report(existingProgress);
+                            detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, totalBytes));
                             lastReportedProgress = existingProgress;
                         }
                     }
@@ -552,6 +561,7 @@ public class KomgaApiService : IDisposable
                                     if (currentProgress - lastReportedProgress >= 0.01 || currentProgress >= 1.0)
                                     {
                                         progress.Report(currentProgress);
+                                        detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes + bytesReadThisChunk, totalBytes));
                                         lastReportedProgress = currentProgress;
                                     }
                                 }
@@ -591,6 +601,7 @@ public class KomgaApiService : IDisposable
                     {
                         File.Move(partialPath, outputPath, true);
                         progress?.Report(1.0);
+                        detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, totalBytes));
                         return new KomgaDownloadResult(true);
                     }
 

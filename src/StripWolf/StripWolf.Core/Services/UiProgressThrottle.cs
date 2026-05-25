@@ -69,5 +69,39 @@ internal static class UiProgressThrottle
             }
         });
     }
-}
 
+    public static IProgress<T> Create<T>(
+        Action<T> apply,
+        int minIntervalMilliseconds = 125)
+    {
+        ArgumentNullException.ThrowIfNull(apply);
+
+        var gate = new object();
+        long lastTick = 0;
+
+        return new Progress<T>(value =>
+        {
+            lock (gate)
+            {
+                var now = Environment.TickCount64;
+                var elapsed = now - lastTick;
+                var shouldReport = lastTick == 0 || elapsed >= minIntervalMilliseconds;
+                if (!shouldReport)
+                {
+                    return;
+                }
+
+                lastTick = now;
+            }
+
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                apply(value);
+            }
+            else
+            {
+                Dispatcher.UIThread.Post(() => apply(value), DispatcherPriority.Background);
+            }
+        });
+    }
+}

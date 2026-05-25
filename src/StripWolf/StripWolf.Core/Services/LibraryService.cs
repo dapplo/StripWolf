@@ -440,7 +440,12 @@ public class LibraryService
     /// Downloads a Komga book to the managed comics directory without importing it into the library yet.
     /// Returns null when the book is already present in the library.
     /// </summary>
-    public async Task<KomgaDownloadedFile?> DownloadKomgaBookAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<KomgaDownloadedFile?> DownloadKomgaBookAsync(
+        KomgaBook book,
+        int? serverId = null,
+        IProgress<double>? progress = null,
+        IProgress<KomgaDownloadProgress>? detailedProgress = null,
+        CancellationToken cancellationToken = default)
     {
         if (_networkConnectionService.IsConnectionMetered() && !_settingsService.LoadSettings().AllowMeteredKomgaDownloads)
         {
@@ -457,7 +462,7 @@ public class LibraryService
 
         try
         {
-            var downloadResult = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, cancellationToken);
+            var downloadResult = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, detailedProgress, cancellationToken);
             if (!downloadResult.Success)
             {
                 throw new Exception(downloadResult.ErrorMessage ?? "Failed to download comic from Komga");
@@ -701,7 +706,7 @@ public class LibraryService
     /// </summary>
     public async Task<Comic> DownloadFromKomgaAsync(KomgaBook book, int? serverId = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
-        var downloadedFile = await DownloadKomgaBookAsync(book, serverId, progress, cancellationToken);
+        var downloadedFile = await DownloadKomgaBookAsync(book, serverId, progress, cancellationToken: cancellationToken);
         if (downloadedFile is null)
         {
             return await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash)

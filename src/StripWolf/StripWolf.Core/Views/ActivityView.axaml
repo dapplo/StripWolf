@@ -25,6 +25,15 @@
             <Button Grid.Column="2" Content="{Binding RetryFailed, Source={x:Static res:Loc.Instance}}" Command="{Binding Komga.RetryFailedDownloadsCommand}"/>
             <Button Grid.Column="3" Content="{Binding CancelAll, Source={x:Static res:Loc.Instance}}" HorizontalAlignment="Right" Command="{Binding Komga.CancelAllDownloadsCommand}"/>
           </Grid>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Text="{Binding KomgaParallelDownloads, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center" FontSize="11"/>
+            <Slider Grid.Column="1"
+                    Minimum="1"
+                    Maximum="5"
+                    TickFrequency="1"
+                    IsSnapToTickEnabled="True"
+                    Value="{Binding Komga.DownloadThrottleParallel}"/>
+          </Grid>
           <TextBlock Text="{Binding Komga.DownloadingBookName}" IsVisible="{Binding Komga.IsDownloading}" FontSize="12"/>
           <ProgressBar Value="{Binding Komga.DownloadProgress}" Maximum="1" Height="6" IsVisible="{Binding Komga.IsDownloading}"/>
           <repeater:ItemsRepeater ItemsSource="{Binding DownloadQueueItems}">
@@ -39,8 +48,17 @@
                     <StackPanel Grid.Row="0" Grid.Column="0">
                       <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                       <TextBlock Text="{Binding SeriesTitle}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding ServerName}" FontSize="11" Foreground="Gray" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <StackPanel Grid.RowSpan="3" Grid.Column="1" Spacing="4" HorizontalAlignment="Right">
+                      <Button Content="↑"
+                              Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.MoveDownloadUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" Padding="8,4"
+                              IsVisible="{Binding IsQueued}"/>
+                      <Button Content="↓"
+                              Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.MoveDownloadDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" Padding="8,4"
+                              IsVisible="{Binding IsQueued}"/>
                       <Button Content="↻"
                               Command="{Binding ((vm:ActivityViewModel)DataContext).Komga.RetryDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                               CommandParameter="{Binding}" Padding="8,4"
@@ -54,6 +72,10 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Queued, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" IsVisible="{Binding IsQueued}"/>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Downloading, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" IsVisible="{Binding IsDownloading}"/>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Failed, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#C62828" IsVisible="{Binding IsFailed}"/>
+                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDownloading}">
+                      <TextBlock Text="{Binding SpeedText}" FontSize="10" Foreground="Gray"/>
+                      <TextBlock Text="{Binding EtaText, StringFormat='ETA {0}'}" FontSize="10" Foreground="Gray"/>
+                    </StackPanel>
                     <ProgressBar Grid.Row="2" Grid.Column="0" Value="{Binding Progress}" Maximum="1" Height="4" IsVisible="{Binding IsDownloading}"/>
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding ErrorMessage}" FontSize="10" Foreground="#C62828" TextWrapping="Wrap" IsVisible="{Binding IsFailed}"/>
                   </Grid>
