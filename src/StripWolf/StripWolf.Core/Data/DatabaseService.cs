@@ -56,6 +56,9 @@ public class DatabaseService : IAsyncDisposable
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
         typeof(KomgaServer))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(KomgaPendingDownload))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
         if (_isInitialized && _database is not null)
@@ -81,6 +84,7 @@ public class DatabaseService : IAsyncDisposable
             await _database.CreateTableAsync<Comic>();
             await _database.CreateTableAsync<EpubConversionState>();
             await _database.CreateTableAsync<KomgaServer>();
+            await _database.CreateTableAsync<KomgaPendingDownload>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
             
@@ -339,6 +343,70 @@ public class DatabaseService : IAsyncDisposable
 
     #endregion
 
+    #region Komga Download Queue
+
+    public async Task<List<string>> GetPendingKomgaDownloadBookIdsAsync()
+    {
+        var db = await GetDatabaseAsync();
+        var pendingDownloads = await db.Table<KomgaPendingDownload>().ToListAsync();
+        return pendingDownloads
+            .Select(pendingDownload => pendingDownload.BookId)
+            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public async Task<int> SavePendingKomgaDownloadAsync(string bookId)
+    {
+        if (string.IsNullOrWhiteSpace(bookId))
+        {
+            return 0;
+        }
+
+        var db = await GetDatabaseAsync();
+        return await db.InsertOrReplaceAsync(new KomgaPendingDownload
+        {
+            BookId = bookId,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    public async Task<int> DeletePendingKomgaDownloadAsync(string bookId)
+    {
+        if (string.IsNullOrWhiteSpace(bookId))
+        {
+            return 0;
+        }
+
+        var db = await GetDatabaseAsync();
+        return await db.DeleteAsync<KomgaPendingDownload>(bookId);
+    }
+
+    public async Task ReplacePendingKomgaDownloadsAsync(IEnumerable<string> bookIds)
+    {
+        var normalizedBookIds = bookIds
+            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var db = await GetDatabaseAsync();
+        await db.RunInTransactionAsync(connection =>
+        {
+            connection.DeleteAll<KomgaPendingDownload>();
+            var now = DateTime.UtcNow;
+            foreach (var bookId in normalizedBookIds)
+            {
+                connection.Insert(new KomgaPendingDownload
+                {
+                    BookId = bookId,
+                    UpdatedAtUtc = now
+                });
+            }
+        });
+    }
+
+    #endregion
+
     public async ValueTask DisposeAsync()
     {
         if (_database is not null)
@@ -348,4 +416,3 @@ public class DatabaseService : IAsyncDisposable
         }
     }
 }
-

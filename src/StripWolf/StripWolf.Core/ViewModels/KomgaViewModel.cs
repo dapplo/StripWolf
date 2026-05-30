@@ -24,6 +24,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StripWolf.Core.Data;
 using StripWolf.Core.Models;
 using StripWolf.Core.Models.Komga;
 using StripWolf.Core.Services;
@@ -42,6 +43,7 @@ public partial class KomgaViewModel : ViewModelBase
     private readonly LibraryService _libraryService;
     private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
+    private readonly DatabaseService _databaseService;
     
     private KomgaServer? _activeServer;
     private CancellationTokenSource? _loadingCts;
@@ -569,12 +571,14 @@ public partial class KomgaViewModel : ViewModelBase
         KomgaApiService komgaApiService,
         LibraryService libraryService,
         ImportQueueService importQueueService,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        DatabaseService databaseService)
     {
         _komgaApiService = komgaApiService;
         _libraryService = libraryService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
+        _databaseService = databaseService;
         Title = Loc.Instance.Komga;
 
         RegisterHomeSectionLayoutState(KeepReadingSection);
@@ -661,28 +665,32 @@ public partial class KomgaViewModel : ViewModelBase
         DownloadThrottleParallel = parallelDownloads;
     }
 
-    private Task PersistPendingKomgaDownloadsAsync()
+    private Task PersistPendingKomgaDownloadAddedAsync(string bookId)
     {
-        var pendingBookIds = _downloadPendingBookIds.ToList();
-        return _settingsService.UpdateSettingsAsync(settings =>
-        {
-            settings.PendingKomgaDownloadBookIds = pendingBookIds;
-        });
+        return _databaseService.SavePendingKomgaDownloadAsync(bookId);
     }
 
-    private async Task RestorePendingKomgaDownloadsAsync(AppSettings settings)
+    private Task PersistPendingKomgaDownloadRemovedAsync(string bookId)
     {
-        if (!_komgaApiService.IsConfigured || settings.PendingKomgaDownloadBookIds.Count == 0)
+        return _databaseService.DeletePendingKomgaDownloadAsync(bookId);
+    }
+
+    private async Task RestorePendingKomgaDownloadsAsync()
+    {
+        if (!_komgaApiService.IsConfigured)
         {
             return;
         }
 
-        var pendingBookIds = settings.PendingKomgaDownloadBookIds
+        var pendingBookIds = (await _databaseService.GetPendingKomgaDownloadBookIdsAsync())
             .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        if (pendingBookIds.Count == 0)
+        {
+            return;
+        }
 
-        var obsoleteBookIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var bookId in pendingBookIds)
         {
             if (_downloadPendingBookIds.Contains(bookId))
@@ -709,22 +717,13 @@ public partial class KomgaViewModel : ViewModelBase
 
             if (book is null || await CheckIfDownloadedAsync(book))
             {
-                obsoleteBookIds.Add(bookId);
                 continue;
             }
 
             QueueBookDownload(CreateBookDisplay(book, null, isDownloaded: false));
         }
 
-        if (obsoleteBookIds.Count > 0)
-        {
-            await _settingsService.UpdateSettingsAsync(currentSettings =>
-            {
-                currentSettings.PendingKomgaDownloadBookIds = currentSettings.PendingKomgaDownloadBookIds
-                    .Where(bookId => !obsoleteBookIds.Contains(bookId))
-                    .ToList();
-            });
-        }
+        await _databaseService.ReplacePendingKomgaDownloadsAsync(_downloadPendingBookIds);
     }
 
     partial void OnDownloadThrottleParallelChanged(double value)
@@ -918,7 +917,7 @@ public partial class KomgaViewModel : ViewModelBase
                                ?? settings.Servers.FirstOrDefault();
 
             await ApplyServerAsync(browsingServer, useCache: true, persistSelection: false);
-            await RestorePendingKomgaDownloadsAsync(settings);
+            await RestorePendingKomgaDownloadsAsync();
         }
         catch (Exception ex)
         {
@@ -1944,7 +1943,7 @@ public partial class KomgaViewModel : ViewModelBase
             _ = ProcessDownloadQueueAsync();
         }
 
-        _ = PersistPendingKomgaDownloadsAsync();
+        _ = PersistPendingKomgaDownloadAddedAsync(bookDisplay.Id);
     }
 
     private void ResetDownloadState(string bookId)
@@ -2093,7 +2092,7 @@ public partial class KomgaViewModel : ViewModelBase
                 });
 
                 _downloadPendingBookIds.Remove(bookId);
-                _ = PersistPendingKomgaDownloadsAsync();
+                _ = PersistPendingKomgaDownloadRemovedAsync(bookId);
                 _postDownloadWorkItemsByBookId.Remove(bookId);
                 RefreshSeriesDownloadState(seriesId);
             });
@@ -2110,7 +2109,7 @@ public partial class KomgaViewModel : ViewModelBase
                 workItem.PendingImport.ErrorMessage = ex.Message;
 
                 _downloadPendingBookIds.Remove(bookId);
-                _ = PersistPendingKomgaDownloadsAsync();
+                _ = PersistPendingKomgaDownloadRemovedAsync(bookId);
                 _postDownloadWorkItemsByBookId.Remove(bookId);
                 ResetDownloadState(bookId);
                 RefreshSeriesDownloadState(seriesId);
@@ -2409,7 +2408,7 @@ public partial class KomgaViewModel : ViewModelBase
                         });
                         queueItem.BookDisplay.IsDownloaded = true;
                         _downloadPendingBookIds.Remove(queueItem.Id);
-                        _ = PersistPendingKomgaDownloadsAsync();
+                        _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
                     }
                     else
                     {
@@ -2446,7 +2445,7 @@ public partial class KomgaViewModel : ViewModelBase
                     {
                         _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
                         _downloadPendingBookIds.Remove(queueItem.Id);
-                        _ = PersistPendingKomgaDownloadsAsync();
+                        _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
                         _downloadItemsByBookId.Remove(queueItem.Id);
                         ResetDownloadState(queueItem.Id);
                         queueItem.IsDownloading = false;
@@ -2550,7 +2549,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         _downloadPendingBookIds.Remove(queueItem.Id);
-        _ = PersistPendingKomgaDownloadsAsync();
+        _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
         _downloadItemsByBookId.Remove(queueItem.Id);
         _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
         ResetDownloadState(queueItem.Id);
@@ -2565,7 +2564,7 @@ public partial class KomgaViewModel : ViewModelBase
         foreach (var queueItem in DownloadQueueItems.Where(item => !item.IsDownloading).ToList())
         {
             _downloadPendingBookIds.Remove(queueItem.Id);
-            _ = PersistPendingKomgaDownloadsAsync();
+            _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
             _downloadItemsByBookId.Remove(queueItem.Id);
             _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
             ResetDownloadState(queueItem.Id);

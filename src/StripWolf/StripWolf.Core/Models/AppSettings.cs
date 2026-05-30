@@ -115,8 +115,6 @@ public class AppSettings
 
     public bool AllowMeteredKomgaDownloads { get; set; }
 
-    public List<string> PendingKomgaDownloadBookIds { get; set; } = [];
-
     /// <summary>
     /// Whether to synchronize reading progress with Komga
     /// </summary>
@@ -162,7 +160,6 @@ public class AppSettings
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
             KomgaParallelDownloads = KomgaParallelDownloads,
             AllowMeteredKomgaDownloads = AllowMeteredKomgaDownloads,
-            PendingKomgaDownloadBookIds = [.. PendingKomgaDownloadBookIds],
             SyncReadProgress = SyncReadProgress
         };
     }
