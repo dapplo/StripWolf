@@ -776,7 +776,7 @@ public partial class KomgaViewModel : ViewModelBase
 
     partial void OnSelectedServerChanged(KomgaServer? value)
     {
-        if (_suppressServerSelectionChanged || value is null || value.Id == _activeServer?.Id)
+        if (_suppressServerSelectionChanged || value is null || ReferenceEquals(value, _activeServer))
         {
             return;
         }
@@ -1298,7 +1298,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task SwitchServerAsync(KomgaServer? server)
     {
-        if (server is null || server.Id == _activeServer?.Id)
+        if (server is null || ReferenceEquals(server, _activeServer))
         {
             return;
         }
@@ -1340,7 +1340,13 @@ public partial class KomgaViewModel : ViewModelBase
             await PersistActiveServerSelectionAsync(server.Id);
             var settings = _settingsService.LoadSettings();
             RefreshConfiguredServers(settings);
-            activeServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id) ?? server;
+            activeServer = settings.Servers.FirstOrDefault(configuredServer =>
+                              configuredServer.Id == server.Id &&
+                              string.Equals(configuredServer.BaseUrl, server.BaseUrl, StringComparison.OrdinalIgnoreCase))
+                           ?? settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id)
+                           ?? settings.Servers.FirstOrDefault(configuredServer =>
+                              string.Equals(configuredServer.BaseUrl, server.BaseUrl, StringComparison.OrdinalIgnoreCase))
+                           ?? server;
         }
 
         _komgaApiService.Configure(activeServer);
