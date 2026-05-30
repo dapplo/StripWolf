@@ -678,6 +678,21 @@
         </Border>
       </Panel>
 
+      <!-- Floating back button – rendered above the busy overlay so it is always accessible -->
+      <Button HorizontalAlignment="Left" VerticalAlignment="Top"
+              Margin="16,16"
+              Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
+              Command="{Binding GoBackToSeriesCommand}"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+              Padding="12,6" CornerRadius="4">
+        <Button.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsBusy"/>
+            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+          </MultiBinding>
+        </Button.IsVisible>
+      </Button>
+
       <!-- Read List Picker Overlay -->
       <Panel IsVisible="{Binding BookPendingReadListSelection, Converter={x:Static ObjectConverters.IsNotNull}}">
         <Button Background="#80000000" Command="{Binding CancelReadListSelectionCommand}"

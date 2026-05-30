@@ -49,6 +49,11 @@ public class KomgaApiService : IDisposable
     public string? BaseUrl => _currentServer?.BaseUrl;
 
     /// <summary>
+    /// Gets the ID of the currently configured server, or null if not configured
+    /// </summary>
+    public int? CurrentServerId => _currentServer?.Id;
+
+    /// <summary>
     /// Gets the thumbnail URL for a series
     /// </summary>
     public string GetSeriesThumbnailUrl(string seriesId)

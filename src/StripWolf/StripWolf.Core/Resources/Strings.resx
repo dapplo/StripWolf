@@ -670,6 +670,12 @@
   <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
     <value>Choose how many Komga books may download at the same time.</value>
   </data>
+  <data name="KomgaSeriesPageSize" xml:space="preserve">
+    <value>Komga Series Page Size</value>
+  </data>
+  <data name="KomgaSeriesPageSizeDescription" xml:space="preserve">
+    <value>Number of books loaded per page when opening a series. All remaining books are loaded automatically in the background after the first page.</value>
+  </data>
   <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
     <value>Disabled by default to avoid mobile data usage. Enable this to allow Komga downloads on metered connections.</value>
   </data>
