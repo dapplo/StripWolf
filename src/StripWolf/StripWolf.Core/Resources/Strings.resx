@@ -553,6 +553,18 @@
   <data name="EndOfComicQuestion" xml:space="preserve">
     <value>What would you like to do next?</value>
   </data>
+  <data name="KomgaSyncPromptTitle" xml:space="preserve">
+    <value>Komga progress found</value>
+  </data>
+  <data name="KomgaSyncPromptMessage" xml:space="preserve">
+    <value>Komga synced a newer location while you kept reading. Jump to page {0} of {1}?</value>
+  </data>
+  <data name="KomgaSyncPromptAccept" xml:space="preserve">
+    <value>Jump to synced page</value>
+  </data>
+  <data name="KomgaSyncPromptDecline" xml:space="preserve">
+    <value>Stay here</value>
+  </data>
   <data name="NoNextComic" xml:space="preserve">
     <value>No next comic from this series is available locally.</value>
   </data>

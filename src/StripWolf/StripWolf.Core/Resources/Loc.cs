@@ -24,7 +24,7 @@ public class Loc : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
     }
-    
+
     private string GetString([CallerMemberName] string? key = null)
     {
         if (key == null) return string.Empty;
@@ -45,11 +45,11 @@ public class Loc : INotifyPropertyChanged
     public string Activity => GetString();
     public string Reader => GetString();
     public string Refresh => GetString();
-    
+
     // Navigation
     public string Back => GetString();
     public string Home => GetString();
-    
+
     // Settings Sections
     public string LanguageSettings => GetString();
     public string ReadingSettings => GetString();
@@ -62,7 +62,7 @@ public class Loc : INotifyPropertyChanged
     public string About => GetString();
     public string KomgaServers => GetString();
     public string SupportMe => GetString();
-    
+
     // Setting Labels
     public string Language => GetString();
     public string StartupBehavior => GetString();
@@ -82,7 +82,7 @@ public class Loc : INotifyPropertyChanged
     public string Username => GetString();
     public string Password => GetString();
     public string CustomHttpHeaders => GetString();
-    
+
     // Setting Values / Options
     public string ContinueWhereLeftOff => GetString();
     public string LibraryView => GetString();
@@ -112,7 +112,7 @@ public class Loc : INotifyPropertyChanged
     public string Browsing => GetString();
     public string Delete => GetString();
     public string Cancel => GetString();
-    
+
     // Setting Hints
     public string LanguageDescription => GetString();
     public string StartupBehaviorHint => GetString();
@@ -137,7 +137,7 @@ public class Loc : INotifyPropertyChanged
     public string AddServerHint => GetString();
     public string ApiKeyHint => GetString();
     public string CustomHeadersHint => GetString();
-    
+
     // Library View
     public string SearchPlaceholder => GetString();
     public string SearchResults => GetString();
@@ -164,7 +164,7 @@ public class Loc : INotifyPropertyChanged
     public string ConfirmExternalDeleteMessage => GetString();
     public string RemoveFromLibraryKeepFile => GetString();
     public string DeletePermanently => GetString();
-    
+
     // Section Keys
     public string SectionContinueReading => GetString();
     public string SectionNewComics => GetString();
@@ -179,7 +179,7 @@ public class Loc : INotifyPropertyChanged
     public string SectionReadLists => GetString();
     public string SeriesDescription => GetString();
     public string KomgaHome => GetString();
-    
+
     // Comic Info & Metadata
     public string ComicInformation => GetString();
     public string Title => GetString();
@@ -201,7 +201,7 @@ public class Loc : INotifyPropertyChanged
     public string ReadCountDisplay => GetString();
     public string LoadMoreSeries => GetString();
     public string LoadMoreBooks => GetString();
-    
+
     // Actions
     public string ReadNow => GetString();
     public string ConvertNow => GetString();
@@ -236,7 +236,7 @@ public class Loc : INotifyPropertyChanged
     public string AddToReadList => GetString();
     public string Download => GetString();
     public string DownloadSeries => GetString();
-    
+
     // Reader View
     public string ReadingModeNormalTitle => GetString();
     public string ReadingModeZoomedTitle => GetString();
@@ -245,12 +245,16 @@ public class Loc : INotifyPropertyChanged
     public string FullScreen => GetString();
     public string EndOfComic => GetString();
     public string EndOfComicQuestion => GetString();
+    public string KomgaSyncPromptTitle => GetString();
+    public string KomgaSyncPromptMessage => GetString();
+    public string KomgaSyncPromptAccept => GetString();
+    public string KomgaSyncPromptDecline => GetString();
     public string OpenNextInSeries => GetString();
     public string NoNextComic => GetString();
     public string BackToLibrary => GetString();
     public string TwoPageMode => GetString();
     public string SaveOriginalPage => GetString();
-    
+
     // Activity View
     public string Downloads => GetString();
     public string PauseAll => GetString();
@@ -265,13 +269,13 @@ public class Loc : INotifyPropertyChanged
     public string PagesReady => GetString();
     public string Waiting => GetString();
     public string NoServersConfigured => GetString();
-    
+
     // Errors
     public string Error => GetString();
     public string FailedToLoad => GetString();
     public string FailedToDownload => GetString();
     public string FailedToConnect => GetString();
-    
+
     // Placeholders
     public string ApiKeyPlaceholder => GetString();
     public string UsernamePlaceholder => GetString();

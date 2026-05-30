@@ -13,7 +13,7 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -59,6 +59,9 @@ public class DatabaseService : IAsyncDisposable
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
         typeof(KomgaPendingDownload))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(KomgaPendingReadProgress))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
         if (_isInitialized && _database is not null)
@@ -75,19 +78,20 @@ public class DatabaseService : IAsyncDisposable
             }
 
             _database = new SQLiteAsyncConnection(_databasePath);
-            
+
             // Enable WAL mode for better concurrency and faster writes
             // Also helps with "database is locked" and recovery after kills
             await _database.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL");
             await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
-            
+
             await _database.CreateTableAsync<Comic>();
             await _database.CreateTableAsync<EpubConversionState>();
             await _database.CreateTableAsync<KomgaServer>();
             await _database.CreateTableAsync<KomgaPendingDownload>();
+            await _database.CreateTableAsync<KomgaPendingReadProgress>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
-            
+
             _isInitialized = true;
             return _database;
         }
@@ -108,7 +112,7 @@ public class DatabaseService : IAsyncDisposable
     public async Task<List<Comic>> GetRecentComicsAsync(int count = 10)
     {
         var db = await GetDatabaseAsync();
-        // Fetch all comics and sort in memory since SQLite-net doesn't support 
+        // Fetch all comics and sort in memory since SQLite-net doesn't support
         // null-coalescing operator in OrderBy expressions
         var allComics = await db.Table<Comic>().ToListAsync();
         return allComics
@@ -169,12 +173,12 @@ public class DatabaseService : IAsyncDisposable
     {
         var db = await GetDatabaseAsync();
         var comic = await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaId == komgaId);
-        
+
         if (comic is null && !string.IsNullOrEmpty(fileHash))
         {
             comic = await db.Table<Comic>().FirstOrDefaultAsync(c => c.KomgaHash == fileHash);
         }
-        
+
         return comic;
     }
 
@@ -196,11 +200,11 @@ public class DatabaseService : IAsyncDisposable
         {
             return [];
         }
-        
+
         var db = await GetDatabaseAsync();
         var allComics = await db.Table<Comic>().ToListAsync();
         var lowerSearch = searchText.ToLowerInvariant();
-        
+
         return allComics
             .Where(c => (c.Title?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
                         (c.SeriesName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
@@ -264,13 +268,13 @@ public class DatabaseService : IAsyncDisposable
                 comic.IsCompleted = isCompleted;
                 comic.ReadProgressLastModified = lastModified ?? DateTime.UtcNow;
             }
-            
+
             // Only update LastReadDate if this is a real read action (not a sync from an older state)
             if (lastModified == null || (comic.LastReadDate ?? DateTime.MinValue) < lastModified)
             {
                 comic.LastReadDate = lastModified ?? DateTime.UtcNow;
             }
-            
+
             await SaveComicAsync(comic);
         }
     }
@@ -341,6 +345,48 @@ public class DatabaseService : IAsyncDisposable
     {
         var db = await GetDatabaseAsync();
         return await db.DeleteAsync(server);
+    }
+
+    #endregion
+
+    #region Komga Read Progress Queue
+
+    public async Task<KomgaPendingReadProgress?> GetPendingKomgaReadProgressAsync(int comicId)
+    {
+        var db = await GetDatabaseAsync();
+        return await db.Table<KomgaPendingReadProgress>()
+            .FirstOrDefaultAsync(pendingReadProgress => pendingReadProgress.ComicId == comicId);
+    }
+
+    public async Task<int> SavePendingKomgaReadProgressAsync(int comicId, string bookId, int? serverId, int page, bool isCompleted, DateTime readProgressLastModifiedUtc)
+    {
+        if (comicId <= 0 || string.IsNullOrWhiteSpace(bookId))
+        {
+            return 0;
+        }
+
+        var db = await GetDatabaseAsync();
+        return await db.InsertOrReplaceAsync(new KomgaPendingReadProgress
+        {
+            ComicId = comicId,
+            BookId = bookId,
+            ServerId = serverId,
+            Page = page,
+            IsCompleted = isCompleted,
+            ReadProgressLastModifiedUtc = readProgressLastModifiedUtc.ToUniversalTime(),
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    public async Task<int> DeletePendingKomgaReadProgressAsync(int comicId)
+    {
+        if (comicId <= 0)
+        {
+            return 0;
+        }
+
+        var db = await GetDatabaseAsync();
+        return await db.DeleteAsync<KomgaPendingReadProgress>(comicId);
     }
 
     #endregion

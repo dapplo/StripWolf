@@ -8,7 +8,7 @@
              x:DataType="vm:ReaderViewModel"
              Background="Black"
              Focusable="True">
-  
+
   <UserControl.Styles>
     <Style Selector="Button.reading-mode">
       <Setter Property="Background" Value="Transparent"/>
@@ -37,7 +37,7 @@
     </Panel>
 
     <!-- Shared UI Overlays -->
-    
+
     <!-- Loading Indicator -->
     <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}"
                  HorizontalAlignment="Center" VerticalAlignment="Center" Width="100"/>
@@ -51,39 +51,39 @@
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"
             IsVisible="{Binding IsControlsVisible}">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-        <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackCommand}" 
+        <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackCommand}"
                 Background="Transparent" Foreground="White"/>
-        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18" 
+        <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="White" FontSize="18"
                    VerticalAlignment="Center" HorizontalAlignment="Center"
                    TextTrimming="CharacterEllipsis" Margin="16,0"/>
-        
+
         <!-- Save Page Button (Debug Only) -->
         <Button Grid.Column="2" Command="{Binding SaveCurrentPageCommand}"
                 IsVisible="{Binding IsDebug}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding SaveOriginalPage, Source={x:Static res:Loc.Instance}}">
           <TextBlock Text="⇩" FontSize="24"/>
         </Button>
-        
+
         <Button Grid.Column="3" Command="{Binding ToggleInfoPanelCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding ShowComicInfo, Source={x:Static res:Loc.Instance}}">
           <TextBlock Text="ⓘ" FontSize="24"/>
         </Button>
-        
+
         <!-- Reading Modes -->
         <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="8,0" VerticalAlignment="Center">
-          <Button Classes="reading-mode" 
+          <Button Classes="reading-mode"
                   Classes.active="{Binding IsNormalMode}"
                   Command="{Binding SetNormalModeCommand}"
                   ToolTip.Tip="{Binding ReadingModeNormalTitle, Source={x:Static res:Loc.Instance}}">
             <TextBlock Text="▯" FontSize="20"/>
           </Button>
-          <Button Classes="reading-mode" 
+          <Button Classes="reading-mode"
                   Classes.active="{Binding IsZoomedMode}"
                   Command="{Binding SetZoomedModeCommand}"
                   ToolTip.Tip="{Binding ReadingModeZoomedTitle, Source={x:Static res:Loc.Instance}}">
             <TextBlock Text="⊕" FontSize="20"/>
           </Button>
-          <Button Classes="reading-mode" 
+          <Button Classes="reading-mode"
                   Classes.active="{Binding IsGuidedMode}"
                   Command="{Binding SetGuidedModeCommand}"
                   IsVisible="{Binding IsGuidedReadingAvailable}"
@@ -91,25 +91,25 @@
             <TextBlock Text="⊞" FontSize="20"/>
           </Button>
         </StackPanel>
-        
+
         <Button Grid.Column="5" Command="{Binding ToggleHandednessCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding HandednessAction, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding !IsNormalMode}">
           <TextBlock Text="⇄" FontSize="24"/>
         </Button>
-        
+
         <Button Grid.Column="6" Command="{Binding ToggleTwoPageModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding TwoPageMode, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding CanUseTwoPageMode}">
           <TextBlock Text="{Binding TwoPageModeIcon}" FontSize="24"/>
         </Button>
-        
+
         <Button Grid.Column="7" Command="{Binding CycleStretchModeCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding FitMode, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding IsNormalMode}">
           <TextBlock Text="{Binding StretchModeIcon}" FontSize="24"/>
         </Button>
-        
+
         <Button Grid.Column="8" Command="{Binding ToggleFullScreenCommand}"
                 Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding FullScreen, Source={x:Static res:Loc.Instance}}">
           <TextBlock Text="⛶" FontSize="24"/>
@@ -125,16 +125,16 @@
                 Background="Transparent" Foreground="White" IsEnabled="{Binding HasPreviousPage}">
           <TextBlock Text="◀" FontSize="28"/>
         </Button>
-        
+
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="16,0">
-          <Slider Grid.Column="0" Minimum="0" Maximum="{Binding MaxSliderValue}" 
-                  Value="{Binding CurrentPage}" 
+          <Slider Grid.Column="0" Minimum="0" Maximum="{Binding MaxSliderValue}"
+                  Value="{Binding CurrentPage}"
                   Foreground="Red"/>
-          <TextBlock Grid.Column="1" Text="{Binding PageDisplay}" Foreground="White" 
+          <TextBlock Grid.Column="1" Text="{Binding PageDisplay}" Foreground="White"
                      VerticalAlignment="Center" Margin="12,0,0,0" Width="100" TextAlignment="Right"
                      FontSize="16"/>
         </Grid>
-        
+
         <Button Grid.Column="2" Command="{Binding GoToNextPageCommand}"
                 Background="Transparent" Foreground="White" IsEnabled="{Binding CanAdvanceOrShowEndChoices}">
           <TextBlock Text="▶" FontSize="28"/>
@@ -187,10 +187,44 @@
       </Border>
     </Panel>
 
+    <!-- Komga Sync Prompt -->
+    <Panel IsVisible="{Binding ShowKomgaSyncLocationPrompt}" ZIndex="115">
+      <Button Background="#F0000000" Command="{Binding DismissKomgaSyncLocationPromptCommand}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" BorderThickness="0"/>
+
+      <Border Background="#E0222222" CornerRadius="8" Padding="24" MaxWidth="520" Margin="24"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 4 20 0 #40000000">
+        <StackPanel Spacing="16">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding KomgaSyncPromptTitle, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+            <Button Grid.Column="1" Command="{Binding DismissKomgaSyncLocationPromptCommand}"
+                    Background="Transparent" Foreground="White">
+              <TextBlock Text="✕" FontSize="24"/>
+            </Button>
+          </Grid>
+
+          <TextBlock Text="{Binding KomgaSyncPromptMessage}" Foreground="White" Opacity="0.9" FontSize="16" TextWrapping="Wrap"/>
+
+          <Button Command="{Binding AcceptKomgaSyncLocationCommand}"
+                  Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                  HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center">
+            <TextBlock Text="{Binding KomgaSyncPromptAccept, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+          </Button>
+
+          <Button Command="{Binding DismissKomgaSyncLocationPromptCommand}"
+                  Background="#444" Foreground="White"
+                  HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center">
+            <TextBlock Text="{Binding KomgaSyncPromptDecline, Source={x:Static res:Loc.Instance}}"/>
+          </Button>
+        </StackPanel>
+      </Border>
+    </Panel>
+
     <!-- Info Panel Overlay -->
     <Panel IsVisible="{Binding IsInfoPanelVisible}" ZIndex="100">
       <!-- Click background to close -->
-      <Button Background="#F0000000" Command="{Binding ToggleInfoPanelCommand}" 
+      <Button Background="#F0000000" Command="{Binding ToggleInfoPanelCommand}"
               HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" BorderThickness="0"/>
 
       <Border Background="#E0222222" CornerRadius="8" Padding="0" MaxWidth="600" Margin="24"
@@ -212,11 +246,11 @@
                 <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
                   <Image Source="{Binding ComicCoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
                 </Border>
-                
+
                 <!-- Basic Meta -->
                 <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
                   <TextBlock Text="{Binding ComicTitleDisplay}" FontSize="20" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
-                  
+
                   <StackPanel IsVisible="{Binding SeriesDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
                     <TextBlock Text="{Binding SeriesDisplay}" FontSize="16" Foreground="White"/>
@@ -226,7 +260,7 @@
                     <TextBlock Text="{Binding KomgaSyncStatus, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
                     <TextBlock Text="{Binding KomgaSyncStatus}" FontSize="14" Foreground="#CCC"/>
                   </StackPanel>
-                  
+
                   <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0">
                        <TextBlock Text="{Binding Number, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
@@ -238,7 +272,7 @@
                     </StackPanel>
                   </Grid>
 
-                  <Button Content="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}" 
+                  <Button Content="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
                           Command="{Binding ViewSeriesOnKomgaCommand}"
                           Background="#444" Foreground="White"
                           HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
@@ -248,9 +282,9 @@
                   </Button>
                 </StackPanel>
               </Grid>
-              
+
               <Separator Background="#333" IsVisible="{Binding ComicInfo, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-              
+
               <!-- Metadata from ComicInfo -->
               <StackPanel Spacing="8" IsVisible="{Binding ComicInfo, Converter={x:Static ObjectConverters.IsNotNull}}">
                  <StackPanel IsVisible="{Binding AuthorsDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -262,7 +296,7 @@
                     <TextBlock Text="{Binding Publisher, Source={x:Static res:Loc.Instance}}" Foreground="#888" FontSize="12"/>
                    <TextBlock Text="{Binding ComicInfoPublisher}" Foreground="White"/>
                  </StackPanel>
-                  
+
                   <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
                    <StackPanel Grid.Column="0" IsVisible="{Binding ComicInfoGenre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                      <TextBlock Text="{Binding Genre, Source={x:Static res:Loc.Instance}}" Foreground="#888" FontSize="12"/>
@@ -281,7 +315,7 @@
                </StackPanel>
 
               <Separator Background="#333" IsVisible="{Binding ComicInfoSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-               
+
                <!-- Summary -->
                <StackPanel IsVisible="{Binding ComicInfoSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                  <TextBlock Text="{Binding Summary, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888" Margin="0,0,0,4"/>
@@ -293,7 +327,7 @@
                 <Button Content="{Binding ContinueReadingAction, Source={x:Static res:Loc.Instance}, StringFormat='{}📖 {0}'}" Background="{DynamicResource SystemAccentColor}" Foreground="White"
                         Command="{Binding ToggleInfoPanelCommand}"
                         HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
-                
+
                 <Grid ColumnDefinitions="*,*">
                   <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           Command="{Binding ToggleFavoriteCommand}" Background="#444" Foreground="White">
