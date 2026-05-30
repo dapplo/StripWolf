@@ -661,6 +661,72 @@ public partial class KomgaViewModel : ViewModelBase
         DownloadThrottleParallel = parallelDownloads;
     }
 
+    private Task PersistPendingKomgaDownloadsAsync()
+    {
+        var pendingBookIds = _downloadPendingBookIds.ToList();
+        return _settingsService.UpdateSettingsAsync(settings =>
+        {
+            settings.PendingKomgaDownloadBookIds = pendingBookIds;
+        });
+    }
+
+    private async Task RestorePendingKomgaDownloadsAsync(AppSettings settings)
+    {
+        if (!_komgaApiService.IsConfigured || settings.PendingKomgaDownloadBookIds.Count == 0)
+        {
+            return;
+        }
+
+        var pendingBookIds = settings.PendingKomgaDownloadBookIds
+            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var obsoleteBookIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var bookId in pendingBookIds)
+        {
+            if (_downloadPendingBookIds.Contains(bookId))
+            {
+                continue;
+            }
+
+            var existingDisplay = GetTrackedBookDisplays(bookId).FirstOrDefault();
+            if (existingDisplay is not null && !existingDisplay.IsDownloaded)
+            {
+                QueueBookDownload(existingDisplay);
+                continue;
+            }
+
+            KomgaBook? book;
+            try
+            {
+                book = await _komgaApiService.GetBookAsync(bookId);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (book is null || await CheckIfDownloadedAsync(book))
+            {
+                obsoleteBookIds.Add(bookId);
+                continue;
+            }
+
+            QueueBookDownload(CreateBookDisplay(book, null, isDownloaded: false));
+        }
+
+        if (obsoleteBookIds.Count > 0)
+        {
+            await _settingsService.UpdateSettingsAsync(currentSettings =>
+            {
+                currentSettings.PendingKomgaDownloadBookIds = currentSettings.PendingKomgaDownloadBookIds
+                    .Where(bookId => !obsoleteBookIds.Contains(bookId))
+                    .ToList();
+            });
+        }
+    }
+
     partial void OnDownloadThrottleParallelChanged(double value)
     {
         _maxParallelDownloads = Math.Max(1, (int)Math.Round(value));
@@ -852,6 +918,7 @@ public partial class KomgaViewModel : ViewModelBase
                                ?? settings.Servers.FirstOrDefault();
 
             await ApplyServerAsync(browsingServer, useCache: true, persistSelection: false);
+            await RestorePendingKomgaDownloadsAsync(settings);
         }
         catch (Exception ex)
         {
@@ -1876,6 +1943,8 @@ public partial class KomgaViewModel : ViewModelBase
             _isProcessingQueue = true;
             _ = ProcessDownloadQueueAsync();
         }
+
+        _ = PersistPendingKomgaDownloadsAsync();
     }
 
     private void ResetDownloadState(string bookId)
@@ -2024,6 +2093,7 @@ public partial class KomgaViewModel : ViewModelBase
                 });
 
                 _downloadPendingBookIds.Remove(bookId);
+                _ = PersistPendingKomgaDownloadsAsync();
                 _postDownloadWorkItemsByBookId.Remove(bookId);
                 RefreshSeriesDownloadState(seriesId);
             });
@@ -2040,6 +2110,7 @@ public partial class KomgaViewModel : ViewModelBase
                 workItem.PendingImport.ErrorMessage = ex.Message;
 
                 _downloadPendingBookIds.Remove(bookId);
+                _ = PersistPendingKomgaDownloadsAsync();
                 _postDownloadWorkItemsByBookId.Remove(bookId);
                 ResetDownloadState(bookId);
                 RefreshSeriesDownloadState(seriesId);
@@ -2142,6 +2213,8 @@ public partial class KomgaViewModel : ViewModelBase
                message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("host", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("exception_was_thrown", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("runtimeexception", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("503", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("502", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("504", StringComparison.OrdinalIgnoreCase);
@@ -2336,6 +2409,7 @@ public partial class KomgaViewModel : ViewModelBase
                         });
                         queueItem.BookDisplay.IsDownloaded = true;
                         _downloadPendingBookIds.Remove(queueItem.Id);
+                        _ = PersistPendingKomgaDownloadsAsync();
                     }
                     else
                     {
@@ -2372,6 +2446,7 @@ public partial class KomgaViewModel : ViewModelBase
                     {
                         _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
                         _downloadPendingBookIds.Remove(queueItem.Id);
+                        _ = PersistPendingKomgaDownloadsAsync();
                         _downloadItemsByBookId.Remove(queueItem.Id);
                         ResetDownloadState(queueItem.Id);
                         queueItem.IsDownloading = false;
@@ -2475,6 +2550,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         _downloadPendingBookIds.Remove(queueItem.Id);
+        _ = PersistPendingKomgaDownloadsAsync();
         _downloadItemsByBookId.Remove(queueItem.Id);
         _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
         ResetDownloadState(queueItem.Id);
@@ -2489,6 +2565,7 @@ public partial class KomgaViewModel : ViewModelBase
         foreach (var queueItem in DownloadQueueItems.Where(item => !item.IsDownloading).ToList())
         {
             _downloadPendingBookIds.Remove(queueItem.Id);
+            _ = PersistPendingKomgaDownloadsAsync();
             _downloadItemsByBookId.Remove(queueItem.Id);
             _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
             ResetDownloadState(queueItem.Id);
