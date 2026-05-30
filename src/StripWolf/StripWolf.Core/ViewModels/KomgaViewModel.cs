@@ -665,9 +665,9 @@ public partial class KomgaViewModel : ViewModelBase
         DownloadThrottleParallel = parallelDownloads;
     }
 
-    private Task PersistPendingKomgaDownloadAddedAsync(string bookId)
+    private Task PersistPendingKomgaDownloadAddedAsync(string bookId, int? serverId)
     {
-        return _databaseService.SavePendingKomgaDownloadAsync(bookId);
+        return _databaseService.SavePendingKomgaDownloadAsync(bookId, serverId);
     }
 
     private Task PersistPendingKomgaDownloadRemovedAsync(string bookId)
@@ -682,26 +682,43 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        var pendingBookIds = (await _databaseService.GetPendingKomgaDownloadBookIdsAsync())
-            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        var settings = _settingsService.LoadSettings();
+        var serverById = settings.Servers.ToDictionary(server => server.Id);
+        var pendingDownloads = (await _databaseService.GetPendingKomgaDownloadsAsync())
+            .Where(pendingDownload => !string.IsNullOrWhiteSpace(pendingDownload.BookId))
             .ToList();
-        if (pendingBookIds.Count == 0)
+        if (pendingDownloads.Count == 0)
         {
             return;
         }
 
-        foreach (var bookId in pendingBookIds)
+        foreach (var pendingDownload in pendingDownloads)
         {
+            var bookId = pendingDownload.BookId;
             if (_downloadPendingBookIds.Contains(bookId))
             {
                 continue;
             }
 
+            var pendingServerId = pendingDownload.ServerId;
+            if (pendingServerId.HasValue && _activeServer?.Id != pendingServerId.Value)
+            {
+                if (!serverById.TryGetValue(pendingServerId.Value, out var pendingServer))
+                {
+                    continue;
+                }
+
+                await ApplyServerAsync(pendingServer, useCache: true, persistSelection: false);
+                if (!_komgaApiService.IsConfigured || _activeServer?.Id != pendingServerId.Value)
+                {
+                    continue;
+                }
+            }
+
             var existingDisplay = GetTrackedBookDisplays(bookId).FirstOrDefault();
             if (existingDisplay is not null && !existingDisplay.IsDownloaded)
             {
-                QueueBookDownload(existingDisplay);
+                QueueBookDownload(existingDisplay, pendingServerId);
                 continue;
             }
 
@@ -720,10 +737,14 @@ public partial class KomgaViewModel : ViewModelBase
                 continue;
             }
 
-            QueueBookDownload(CreateBookDisplay(book, null, isDownloaded: false));
+            QueueBookDownload(CreateBookDisplay(book, null, isDownloaded: false), pendingServerId);
         }
 
-        await _databaseService.ReplacePendingKomgaDownloadsAsync(_downloadPendingBookIds);
+        await _databaseService.ReplacePendingKomgaDownloadsAsync(DownloadQueueItems.Select(queueItem => new KomgaPendingDownload
+        {
+            BookId = queueItem.Id,
+            ServerId = queueItem.ServerId
+        }));
     }
 
     partial void OnDownloadThrottleParallelChanged(double value)
@@ -1902,7 +1923,7 @@ public partial class KomgaViewModel : ViewModelBase
         }, $"Failed to add '{pendingBook.Name}' to '{readList.Name}'");
     }
 
-    private void QueueBookDownload(KomgaBookDisplay bookDisplay)
+    private void QueueBookDownload(KomgaBookDisplay bookDisplay, int? serverId = null)
     {
         if (!_downloadPendingBookIds.Add(bookDisplay.Id))
         {
@@ -1912,8 +1933,8 @@ public partial class KomgaViewModel : ViewModelBase
         var queueItem = new KomgaDownloadQueueItem
         {
             BookDisplay = bookDisplay,
-            ServerId = _activeServer?.Id,
-            ServerName = _activeServer?.Name,
+            ServerId = serverId ?? _activeServer?.Id,
+            ServerName = serverId.HasValue ? ConfiguredServers.FirstOrDefault(server => server.Id == serverId.Value)?.Name : _activeServer?.Name,
             IsQueued = true,
             Progress = 0,
             IsFailed = false,
@@ -1943,7 +1964,7 @@ public partial class KomgaViewModel : ViewModelBase
             _ = ProcessDownloadQueueAsync();
         }
 
-        _ = PersistPendingKomgaDownloadAddedAsync(bookDisplay.Id);
+        _ = PersistPendingKomgaDownloadAddedAsync(bookDisplay.Id, queueItem.ServerId);
     }
 
     private void ResetDownloadState(string bookId)

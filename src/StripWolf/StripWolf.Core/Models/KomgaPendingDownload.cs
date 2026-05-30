@@ -28,5 +28,8 @@ public class KomgaPendingDownload
     [PrimaryKey]
     public string BookId { get; set; } = string.Empty;
 
+    [Indexed]
+    public int? ServerId { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

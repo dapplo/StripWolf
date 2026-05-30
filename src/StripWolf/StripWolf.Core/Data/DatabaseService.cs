@@ -345,18 +345,24 @@ public class DatabaseService : IAsyncDisposable
 
     #region Komga Download Queue
 
-    public async Task<List<string>> GetPendingKomgaDownloadBookIdsAsync()
+    public async Task<List<KomgaPendingDownload>> GetPendingKomgaDownloadsAsync()
     {
         var db = await GetDatabaseAsync();
-        var pendingDownloads = await db.Table<KomgaPendingDownload>().ToListAsync();
+        return await db.Table<KomgaPendingDownload>()
+            .Where(pendingDownload => !string.IsNullOrWhiteSpace(pendingDownload.BookId))
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> GetPendingKomgaDownloadBookIdsAsync()
+    {
+        var pendingDownloads = await GetPendingKomgaDownloadsAsync();
         return pendingDownloads
             .Select(pendingDownload => pendingDownload.BookId)
-            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
-    public async Task<int> SavePendingKomgaDownloadAsync(string bookId)
+    public async Task<int> SavePendingKomgaDownloadAsync(string bookId, int? serverId = null)
     {
         if (string.IsNullOrWhiteSpace(bookId))
         {
@@ -367,6 +373,7 @@ public class DatabaseService : IAsyncDisposable
         return await db.InsertOrReplaceAsync(new KomgaPendingDownload
         {
             BookId = bookId,
+            ServerId = serverId,
             UpdatedAtUtc = DateTime.UtcNow
         });
     }
@@ -382,11 +389,12 @@ public class DatabaseService : IAsyncDisposable
         return await db.DeleteAsync<KomgaPendingDownload>(bookId);
     }
 
-    public async Task ReplacePendingKomgaDownloadsAsync(IEnumerable<string> bookIds)
+    public async Task ReplacePendingKomgaDownloadsAsync(IEnumerable<KomgaPendingDownload> pendingDownloads)
     {
-        var normalizedBookIds = bookIds
-            .Where(bookId => !string.IsNullOrWhiteSpace(bookId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        var normalizedPendingDownloads = pendingDownloads
+            .Where(pendingDownload => !string.IsNullOrWhiteSpace(pendingDownload.BookId))
+            .GroupBy(pendingDownload => pendingDownload.BookId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
             .ToList();
 
         var db = await GetDatabaseAsync();
@@ -394,11 +402,12 @@ public class DatabaseService : IAsyncDisposable
         {
             connection.DeleteAll<KomgaPendingDownload>();
             var now = DateTime.UtcNow;
-            foreach (var bookId in normalizedBookIds)
+            foreach (var pendingDownload in normalizedPendingDownloads)
             {
                 connection.Insert(new KomgaPendingDownload
                 {
-                    BookId = bookId,
+                    BookId = pendingDownload.BookId,
+                    ServerId = pendingDownload.ServerId,
                     UpdatedAtUtc = now
                 });
             }
