@@ -202,6 +202,9 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _allowMeteredKomgaDownloads;
 
     [ObservableProperty]
+    private int _selectedKomgaSeriesPageSize = 20;
+
+    [ObservableProperty]
     private ObservableCollection<SectionLayoutItemViewModel> _librarySections = [];
 
     [ObservableProperty]
@@ -270,6 +273,8 @@ public partial class SettingsViewModel : ViewModelBase
     public string UnsupportedFormatHandlingDescription => Loc.Instance.UnsupportedFormatHandlingDescription;
 
     public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
+
+    public IReadOnlyList<int> AvailableKomgaSeriesPageSizeOptions { get; } = [10, 20, 50, 100];
 
     private KomgaServer? _editingServer;
 
@@ -475,6 +480,7 @@ public partial class SettingsViewModel : ViewModelBase
         SyncReadProgress = _appSettings.SyncReadProgress;
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
         AllowMeteredKomgaDownloads = _appSettings.AllowMeteredKomgaDownloads;
+        SelectedKomgaSeriesPageSize = Math.Max(1, _appSettings.KomgaSeriesPageSize);
 
         if (_appSettings.PreferredReadingMode != readingMode)
         {
@@ -618,6 +624,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.KomgaParallelDownloads = Math.Max(1, value);
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedKomgaSeriesPageSizeChanged(int value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.KomgaSeriesPageSize = Math.Max(1, value);
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
