@@ -13,7 +13,7 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -23,6 +23,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
+using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
 
 namespace StripWolf.Core.ViewModels;
@@ -34,7 +35,6 @@ public partial class ReaderViewModel : ViewModelBase
 {
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
-    private readonly KomgaApiService _komgaApiService;
     private readonly KomgaSyncService _komgaSyncService;
     private readonly PanelDetectionService _panelDetectionService;
     private readonly SettingsService _settingsService;
@@ -62,6 +62,7 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(HasKomgaSeriesLink))]
     [NotifyPropertyChangedFor(nameof(IsFavorite))]
     [NotifyPropertyChangedFor(nameof(KomgaSyncStatus))]
+    [NotifyPropertyChangedFor(nameof(KomgaSyncPromptMessage))]
     private Comic? _comic;
 
     public string? KomgaSyncStatus => Comic?.KomgaSyncStatus;
@@ -130,7 +131,7 @@ public partial class ReaderViewModel : ViewModelBase
     // Static semaphore to limit concurrent bitmap decodes globally in the reader
     // This prevents memory spikes during rapid page flipping
     private static readonly SemaphoreSlim GlobalDecodeSemaphore = new(2, 2);
-    
+
     // Pre-decoded bitmap cache for instant page display without loading bar
     private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
     private readonly object _bitmapPrefetchLock = new();
@@ -162,6 +163,19 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isEndOfComicOptionsVisible;
 
+    [ObservableProperty]
+    private bool _showKomgaSyncLocationPrompt;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KomgaSyncPromptMessage))]
+    private int _pendingKomgaSyncPage = -1;
+
+    [ObservableProperty]
+    private bool _pendingKomgaSyncCompleted;
+
+    [ObservableProperty]
+    private DateTime? _pendingKomgaSyncLastModified;
+
     public string FormattedFileSize => Comic is null ? "" : FormatBytes(Comic.FileSize);
     public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
     public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
@@ -176,6 +190,9 @@ public partial class ReaderViewModel : ViewModelBase
     public bool IsFavorite => Comic?.IsFavorite ?? false;
     public bool HasNextSeriesComic => NextSeriesComic is not null;
     public string NextSeriesComicTitle => NextSeriesComic?.Title ?? string.Empty;
+    public string KomgaSyncPromptMessage => Comic is null || PendingKomgaSyncPage < 0
+        ? string.Empty
+        : string.Format(Loc.Instance.KomgaSyncPromptMessage, Math.Min(PendingKomgaSyncPage + 1, Comic.PageCount), Comic.PageCount);
 
     public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
 
@@ -194,7 +211,7 @@ public partial class ReaderViewModel : ViewModelBase
         if (i >= suffix.Length) i = suffix.Length - 1;
         return $"{bytes / Math.Pow(1024, i):0.##} {suffix[i]}";
     }
-    
+
     // Reading mode properties
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ReadingModeIcon))]
@@ -222,28 +239,28 @@ public partial class ReaderViewModel : ViewModelBase
             CurrentPanelIndex = 0;
         }
     }
-    
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
     [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
     [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Handedness _handedness = Handedness.RightHanded;
-    
+
     [ObservableProperty]
     private ZoomRegion _zoomRegion = new();
-    
+
     [ObservableProperty]
     private PagePanelInfo? _currentPagePanels;
-    
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPreviousPanel))]
     [NotifyPropertyChangedFor(nameof(HasNextPanel))]
     [NotifyPropertyChangedFor(nameof(CurrentPanelDisplay))]
     private int _currentPanelIndex;
-    
+
     [ObservableProperty]
     private ComicPanel? _currentPanel;
-    
+
     partial void OnCurrentPanelChanged(ComicPanel? value)
     {
         if (value != null && ReadingMode == ReadingMode.Guided)
@@ -251,10 +268,10 @@ public partial class ReaderViewModel : ViewModelBase
             SetZoomRegionToPanel(value);
         }
     }
-    
+
     [ObservableProperty]
     private bool _isDetectingPanels;
-    
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
     [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
@@ -278,20 +295,20 @@ public partial class ReaderViewModel : ViewModelBase
     public bool IsNormalMode => ReadingMode == ReadingMode.Normal;
     public bool IsZoomedMode => ReadingMode == ReadingMode.Zoomed;
     public bool IsGuidedMode => ReadingMode == ReadingMode.Guided;
-    
+
     public bool CanUseTwoPageMode => ReadingMode == ReadingMode.Normal;
     public bool IsOverviewOnLeft => Handedness == Handedness.RightHanded;
-    
+
     public bool HasPreviousPanel => CurrentPanelIndex > 0 || HasPreviousPage;
-    public bool HasNextPanel => 
-        (CurrentPagePanels is not null && CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1) || 
+    public bool HasNextPanel =>
+        (CurrentPagePanels is not null && CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1) ||
         HasNextPage;
-    
-    public string CurrentPanelDisplay => 
+
+    public string CurrentPanelDisplay =>
         CurrentPagePanels is not null && CurrentPagePanels.Panels.Count > 0
             ? $"Panel {CurrentPanelIndex + 1}/{CurrentPagePanels.Panels.Count}"
             : "";
-    
+
     public string ReadingModeIcon => ReadingMode switch
     {
         ReadingMode.Normal => "▯",
@@ -307,7 +324,7 @@ public partial class ReaderViewModel : ViewModelBase
         ReadingMode.Guided => "▯",
         _ => "⊕"
     };
-    
+
     public string PageDisplay
     {
         get
@@ -325,7 +342,7 @@ public partial class ReaderViewModel : ViewModelBase
                 : $"{CurrentPage + 1} / {Comic.PageCount}";
         }
     }
-    
+
     public string ZoomDisplay => $"{ZoomLevel:P0}";
 
     public string StretchModeIcon => StretchMode switch
@@ -338,12 +355,12 @@ public partial class ReaderViewModel : ViewModelBase
     };
 
     public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "◫";
-    
+
     public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 
     public bool IsGuidedReadingAvailable => _panelDetectionService.IsAvailable;
 
-    public bool IsDebug => 
+    public bool IsDebug =>
 #if DEBUG
         true;
 #else
@@ -366,9 +383,8 @@ public partial class ReaderViewModel : ViewModelBase
     public event EventHandler? CloseRequested;
 
     public ReaderViewModel(
-        LibraryService libraryService, 
+        LibraryService libraryService,
         ComicReaderService comicReaderService,
-        KomgaApiService komgaApiService,
         KomgaSyncService komgaSyncService,
         PanelDetectionService panelDetectionService,
         SettingsService settingsService,
@@ -376,25 +392,25 @@ public partial class ReaderViewModel : ViewModelBase
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
-        _komgaApiService = komgaApiService;
         _komgaSyncService = komgaSyncService;
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
         _epubShadowConversionService = epubShadowConversionService;
         _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
-        
+
         _periodicSyncTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMinutes(5)
         };
         _periodicSyncTimer.Tick += async (_, _) => await SyncProgressWithKomgaAsync();
-        
+
         Title = "Reader";
     }
 
     private void ReleaseReaderResources()
     {
         _periodicSyncTimer.Stop();
+        ClearKomgaSyncPrompt();
         if (Comic is not null && HasPendingEpubConversion)
         {
             _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
@@ -449,10 +465,10 @@ public partial class ReaderViewModel : ViewModelBase
         _panelDetectionService.ClearAllCache();
         _comicReaderService.ClearCache();
         ClearBitmapPrefetchCache();
-        
+
         // Force ImageSharp to release its internal memory pools
         SixLabors.ImageSharp.Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
-        
+
         // Suggest a collection to the runtime
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
     }
@@ -565,7 +581,7 @@ public partial class ReaderViewModel : ViewModelBase
             var filePath = Path.Combine(imagesDir, fileName);
 
             await File.WriteAllBytesAsync(filePath, pageData);
-            
+
             // Optional: Provide some feedback, though not strictly requested
             System.Diagnostics.Debug.WriteLine($"Saved page to: {filePath}");
         }
@@ -588,19 +604,20 @@ public partial class ReaderViewModel : ViewModelBase
             ComicInfo = null;
             Title = "Reader";
             ReaderStatusMessage = null;
-              
+            ClearKomgaSyncPrompt();
+
             // Clear previous comic data
             ReleaseReaderResources();
             Comic = null;
             CurrentPage = 0;
-             
+
             // Load reading mode preferences
             var settings = _settingsService.LoadSettings();
             ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
             CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
-             
+
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
             {
@@ -648,21 +665,20 @@ public partial class ReaderViewModel : ViewModelBase
                         : "This book could not be prepared for reading.";
                     return;
                 }
-                 
-                // Sync with Komga if this is a Komga comic
-                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
-                {
-                    await _komgaSyncService.SyncComicReadProgressAsync(Comic);
-                    OnPropertyChanged(nameof(KomgaSyncStatus));
-                }
-                
+
                 _isLoadingPage = true;
                 // Ensure CurrentPage is within valid range (0 to PageCount-1)
                 var validPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
                 CurrentPage = Comic.PageCount > 0 ? validPage : 0;
                 _isLoadingPage = false;
                 await LoadPageAsync();
-                
+
+                // Load the first page before syncing with Komga so server issues never block opening the reader.
+                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && Comic.KomgaServerId.HasValue)
+                {
+                    _ = RunInitialKomgaSyncAsync();
+                }
+
                 // Mark as started reading
                 await SaveProgressAsync();
 
@@ -681,28 +697,55 @@ public partial class ReaderViewModel : ViewModelBase
 
     public async Task SyncAndRefreshProgressAsync()
     {
-        if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId))
+        var comic = Comic;
+        if (comic is null || comic.Source != ComicSource.Komga || string.IsNullOrEmpty(comic.KomgaId))
         {
             return;
         }
 
         var oldPage = CurrentPage;
-        await _komgaSyncService.SyncComicReadProgressAsync(Comic);
+        var oldCompleted = comic.IsCompleted;
+
+        await _komgaSyncService.SyncComicReadProgressAsync(comic);
+        if (!ReferenceEquals(Comic, comic))
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(KomgaSyncStatus));
 
         // If the sync updated the comic's current page to something newer, jump to it
-        if (Comic.CurrentPage != oldPage)
+        if (comic.CurrentPage != oldPage || comic.IsCompleted != oldCompleted)
         {
-            _isLoadingPage = true;
-            CurrentPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
-            _isLoadingPage = false;
-            await LoadPageAsync();
+            var syncedPage = Math.Max(0, Math.Min(comic.CurrentPage, comic.PageCount - 1));
+            if (CurrentPage != oldPage)
+            {
+                PendingKomgaSyncPage = syncedPage;
+                PendingKomgaSyncCompleted = comic.IsCompleted;
+                PendingKomgaSyncLastModified = comic.ReadProgressLastModified;
+                ShowKomgaSyncLocationPrompt = syncedPage != CurrentPage || comic.IsCompleted != oldCompleted;
+                return;
+            }
+
+            await ApplyKomgaSyncedLocationAsync(syncedPage, comic.IsCompleted, comic.ReadProgressLastModified);
+        }
+    }
+
+    private async Task RunInitialKomgaSyncAsync()
+    {
+        try
+        {
+            await SyncAndRefreshProgressAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Initial Komga sync failed: {ex.Message}");
         }
     }
 
     private async Task SyncProgressWithKomgaAsync()
     {
-        if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId) || !_komgaApiService.IsConfigured)
+        if (Comic is null || Comic.Source != ComicSource.Komga || string.IsNullOrEmpty(Comic.KomgaId) || !Comic.KomgaServerId.HasValue)
         {
             return;
         }
@@ -757,21 +800,21 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     IsBusy = true;
                 }
-                
+
                 try
                 {
                     // Store page data for panel detection in guided mode
                     byte[]? pageData = null;
-                    
+
                     if (IsTwoPageMode)
                     {
                         // Load two pages for two-page mode
                         var readPath = GetActiveReadPath();
-                        
+
                         // Load in parallel but with cancellation support
                         var leftTask = LoadBitmapAsync(readPath, pageIndex, ct);
-                        var rightTask = pageIndex + 1 < Comic.PageCount 
-                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct) 
+                        var rightTask = pageIndex + 1 < Comic.PageCount
+                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct)
                             : Task.FromResult<Bitmap?>(null);
 
                         var newLeftBitmap = await leftTask;
@@ -787,10 +830,10 @@ public partial class ReaderViewModel : ViewModelBase
                         var oldLeftBitmap = LeftPageImage;
                         LeftPageImage = newLeftBitmap;
                         oldLeftBitmap?.Dispose();
-                         
+
                         // Also update the single page image for consistency
                         CurrentPageImage = LeftPageImage;
-                         
+
                         var oldRightBitmap = RightPageImage;
                         RightPageImage = newRightBitmap;
                         oldRightBitmap?.Dispose();
@@ -828,14 +871,14 @@ public partial class ReaderViewModel : ViewModelBase
                         CurrentPageImage = newBitmap;
                         oldBitmap?.Dispose();
                     }
-                    
+
                     // If in guided mode, detect panels
                     if (ReadingMode == ReadingMode.Guided && pageData is not null)
                     {
                         await DetectPanelsForCurrentPageAsync(pageData, pageIndex);
                         if (ct.IsCancellationRequested) return;
                     }
-                    
+
                     // Pre-detect panels for next page in background if in guided mode
                     if (ReadingMode == ReadingMode.Guided && pageIndex + 1 < Comic.PageCount)
                     {
@@ -843,7 +886,7 @@ public partial class ReaderViewModel : ViewModelBase
                     }
 
                     _lastLoadedPageIndex = pageIndex;
-                    
+
                     // Reset zoom when changing pages
                     ZoomLevel = 1.0;
                 }
@@ -898,7 +941,7 @@ public partial class ReaderViewModel : ViewModelBase
             _ = LoadAndSaveProgressAsync();
         }
     }
-    
+
     private async Task LoadAndSaveProgressAsync()
     {
         await LoadPageAsync();
@@ -1155,6 +1198,30 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task AcceptKomgaSyncLocationAsync()
+    {
+        if (Comic is null || PendingKomgaSyncPage < 0)
+        {
+            ClearKomgaSyncPrompt();
+            return;
+        }
+
+        var syncedPage = PendingKomgaSyncPage;
+        var syncedCompleted = PendingKomgaSyncCompleted;
+        var syncedLastModified = PendingKomgaSyncLastModified;
+        ClearKomgaSyncPrompt();
+
+        await ApplyKomgaSyncedLocationAsync(syncedPage, syncedCompleted, syncedLastModified);
+    }
+
+    [RelayCommand]
+    private async Task DismissKomgaSyncLocationPromptAsync()
+    {
+        ClearKomgaSyncPrompt();
+        await SaveProgressAsync(forceImmediate: true);
+    }
+
+    [RelayCommand]
     private async Task OpenNextSeriesComicAsync()
     {
         if (NextSeriesComic is null)
@@ -1204,11 +1271,12 @@ public partial class ReaderViewModel : ViewModelBase
             {
                 var cts = _saveProgressCts;
                 if (cts is null) return;
-                
+
                 await Task.Delay(500, cts.Token);
             }
 
             await _libraryService.UpdateReadingProgressAsync(comic, currentPage);
+            OnPropertyChanged(nameof(KomgaSyncStatus));
         }
         catch (OperationCanceledException)
         {
@@ -1220,9 +1288,33 @@ public partial class ReaderViewModel : ViewModelBase
             System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to save progress: {ex.Message}");
         }
     }
-    
+
+    private async Task ApplyKomgaSyncedLocationAsync(int syncedPage, bool syncedCompleted, DateTime? syncedLastModified)
+    {
+        if (Comic is null)
+        {
+            return;
+        }
+
+        await _libraryService.UpdateReadingProgressAsync(Comic, syncedPage, syncedLastModified, syncedCompleted);
+
+        _isLoadingPage = true;
+        CurrentPage = Math.Max(0, Math.Min(syncedPage, Comic.PageCount - 1));
+        _isLoadingPage = false;
+        await LoadPageAsync();
+        OnPropertyChanged(nameof(KomgaSyncStatus));
+    }
+
+    private void ClearKomgaSyncPrompt()
+    {
+        ShowKomgaSyncLocationPrompt = false;
+        PendingKomgaSyncPage = -1;
+        PendingKomgaSyncCompleted = false;
+        PendingKomgaSyncLastModified = null;
+    }
+
     #region Reading Mode Methods
-    
+
     /// <summary>
     /// Cycle through reading modes (Normal -> Zoomed -> Guided -> Normal)
     /// </summary>
@@ -1237,26 +1329,26 @@ public partial class ReaderViewModel : ViewModelBase
             ReadingMode.Guided => ReadingMode.Normal,
             _ => ReadingMode.Normal
         });
-        
+
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
-        
+
         // If switching to guided mode, detect panels
         if (ReadingMode == ReadingMode.Guided && Comic is not null)
         {
             var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
-        
+
         // Notify properties that depend on reading mode
         OnPropertyChanged(nameof(HasPreviousPanel));
         OnPropertyChanged(nameof(HasNextPanel));
         OnPropertyChanged(nameof(CurrentPanelDisplay));
     }
-    
+
     /// <summary>
     /// Set reading mode to Normal
     /// </summary>
@@ -1264,19 +1356,19 @@ public partial class ReaderViewModel : ViewModelBase
     private void SetNormalMode()
     {
         ReadingMode = ReadingMode.Normal;
-        
+
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
-        
+
         // Notify properties that depend on reading mode
         OnPropertyChanged(nameof(HasPreviousPanel));
         OnPropertyChanged(nameof(HasNextPanel));
         OnPropertyChanged(nameof(CurrentPanelDisplay));
     }
-    
+
     /// <summary>
     /// Set reading mode to Zoomed
     /// </summary>
@@ -1284,19 +1376,19 @@ public partial class ReaderViewModel : ViewModelBase
     private void SetZoomedMode()
     {
         ReadingMode = ReadingMode.Zoomed;
-        
+
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
-        
+
         // Notify properties that depend on reading mode
         OnPropertyChanged(nameof(HasPreviousPanel));
         OnPropertyChanged(nameof(HasNextPanel));
         OnPropertyChanged(nameof(CurrentPanelDisplay));
     }
-    
+
     /// <summary>
     /// Set reading mode to Guided
     /// </summary>
@@ -1309,26 +1401,26 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         ReadingMode = ReadingMode.Guided;
-        
+
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
-        
+
         // If switching to guided mode, detect panels
         if (Comic is not null)
         {
             var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
-        
+
         // Notify properties that depend on reading mode
         OnPropertyChanged(nameof(HasPreviousPanel));
         OnPropertyChanged(nameof(HasNextPanel));
         OnPropertyChanged(nameof(CurrentPanelDisplay));
     }
-    
+
     /// <summary>
     /// Set reading mode directly
     /// </summary>
@@ -1341,15 +1433,15 @@ public partial class ReaderViewModel : ViewModelBase
         {
             return;
         }
-        
+
         ReadingMode = mode;
-        
+
         // Disable two-page mode when switching to zoomed or guided
         if (!IsNormalMode && IsTwoPageMode)
         {
             IsTwoPageMode = false;
         }
-        
+
         // If switching to guided mode, detect panels
         if (mode == ReadingMode.Guided && Comic is not null)
         {
@@ -1357,22 +1449,22 @@ public partial class ReaderViewModel : ViewModelBase
             await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
         }
     }
-    
+
     /// <summary>
     /// Toggle handedness (swap overview and zoom areas)
     /// </summary>
     [RelayCommand]
     private void ToggleHandedness()
     {
-        Handedness = Handedness == Handedness.RightHanded 
-            ? Handedness.LeftHanded 
+        Handedness = Handedness == Handedness.RightHanded
+            ? Handedness.LeftHanded
             : Handedness.RightHanded;
     }
-    
+
     #endregion
-    
+
     #region Panel Detection Methods
-    
+
     /// <summary>
     /// Detect panels for the current page
     /// </summary>
@@ -1382,22 +1474,22 @@ public partial class ReaderViewModel : ViewModelBase
         {
             return;
         }
-        
+
         IsDetectingPanels = true;
         try
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
             var result = await _panelDetectionService.DetectPanelsAsync(
-                GetActiveReadPath(), 
-                pageIndex, 
+                GetActiveReadPath(),
+                pageIndex,
                 pageData,
                 isManga);
-            
+
             // Only apply if the page hasn't changed since we started detection
             if (pageIndex == CurrentPage)
             {
                 CurrentPagePanels = result;
-                
+
                 // Reset to correct panel
                 if (_shouldSelectLastPanel && CurrentPagePanels.Panels.Count > 0)
                 {
@@ -1417,7 +1509,7 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     CurrentPanel = null;
                 }
-                
+
                 OnPropertyChanged(nameof(HasPreviousPanel));
                 OnPropertyChanged(nameof(HasNextPanel));
                 OnPropertyChanged(nameof(CurrentPanelDisplay));
@@ -1432,7 +1524,7 @@ public partial class ReaderViewModel : ViewModelBase
             }
         }
     }
-    
+
     /// <summary>
     /// Pre-detect panels for the next page in background
     /// </summary>
@@ -1442,14 +1534,14 @@ public partial class ReaderViewModel : ViewModelBase
         {
             return;
         }
-        
+
         // Check if already cached
         var readPath = GetActiveReadPath();
         if (_panelDetectionService.IsCached(readPath, nextPageIndex))
         {
             return;
         }
-        
+
         try
         {
             var isManga = ComicInfo?.Manga == YesNo.Yes;
@@ -1466,7 +1558,7 @@ public partial class ReaderViewModel : ViewModelBase
     {
         using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ReaderViewModel));
         await _comicReaderService.CopyPageAsync(filePath, pageIndex, stream);
-        
+
         if (ct.IsCancellationRequested) return null;
         stream.Position = 0;
 
@@ -1499,7 +1591,7 @@ public partial class ReaderViewModel : ViewModelBase
             GlobalDecodeSemaphore.Release();
         }
     }
-    
+
     #endregion
 
     #region Bitmap Prefetch Cache
@@ -1626,9 +1718,9 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     #endregion
-    
+
     #region Panel Navigation Methods
-    
+
     /// <summary>
     /// Navigate to the next panel (or next page if at last panel)
     /// </summary>
@@ -1641,7 +1733,7 @@ public partial class ReaderViewModel : ViewModelBase
             await GoToNextPageAsync();
             return;
         }
-        
+
         if (CurrentPanelIndex < CurrentPagePanels.Panels.Count - 1)
         {
             // Go to next panel on same page
@@ -1666,7 +1758,7 @@ public partial class ReaderViewModel : ViewModelBase
             await ShowEndOfComicOptionsAsync();
         }
     }
-    
+
     /// <summary>
     /// Navigate to the previous panel (or previous page if at first panel)
     /// </summary>
@@ -1680,7 +1772,7 @@ public partial class ReaderViewModel : ViewModelBase
             await GoToPreviousPageAsync();
             return;
         }
-        
+
         if (CurrentPanelIndex > 0)
         {
             // Go to previous panel on same page
@@ -1697,7 +1789,7 @@ public partial class ReaderViewModel : ViewModelBase
             await GoToPreviousPageAsync();
         }
     }
-    
+
     /// <summary>
     /// Select a specific panel by index
     /// </summary>
@@ -1708,18 +1800,18 @@ public partial class ReaderViewModel : ViewModelBase
         {
             return;
         }
-        
+
         CurrentPanelIndex = panelIndex;
         CurrentPanel = CurrentPagePanels.Panels[panelIndex];
         OnPropertyChanged(nameof(HasPreviousPanel));
         OnPropertyChanged(nameof(HasNextPanel));
         OnPropertyChanged(nameof(CurrentPanelDisplay));
     }
-    
+
     #endregion
-    
+
     #region Zoom Region Methods
-    
+
     /// <summary>
     /// Move the zoom region by delta amounts
     /// </summary>
@@ -1728,7 +1820,7 @@ public partial class ReaderViewModel : ViewModelBase
         ZoomRegion.Move(deltaX, deltaY);
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     /// <summary>
     /// Resize the zoom region
     /// </summary>
@@ -1738,7 +1830,7 @@ public partial class ReaderViewModel : ViewModelBase
         ZoomRegion.Resize(sizeDelta);
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     /// <summary>
     /// Increase zoom region size
     /// </summary>
@@ -1748,7 +1840,7 @@ public partial class ReaderViewModel : ViewModelBase
         ZoomRegion.Resize(0.05);
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     /// <summary>
     /// Decrease zoom region size
     /// </summary>
@@ -1758,7 +1850,7 @@ public partial class ReaderViewModel : ViewModelBase
         ZoomRegion.Resize(-0.05);
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     /// <summary>
     /// Reset zoom region to center with default size
     /// </summary>
@@ -1768,7 +1860,7 @@ public partial class ReaderViewModel : ViewModelBase
         ZoomRegion = new ZoomRegion();
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     /// <summary>
     /// Set zoom region to match a panel's bounds
     /// </summary>
@@ -1783,7 +1875,7 @@ public partial class ReaderViewModel : ViewModelBase
         };
         OnPropertyChanged(nameof(ZoomRegion));
     }
-    
+
     #endregion
 
     [RelayCommand]

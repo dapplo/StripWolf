@@ -13,7 +13,7 @@
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -80,11 +80,11 @@ public class LibraryService
         _epubConverter = epubConverter;
         _epubShadowConversionService = epubShadowConversionService;
         _comicConverter = comicConverter;
-        
+
         _appDataDirectory = GetAppDataDirectory();
         _comicsDirectory = Path.Combine(_appDataDirectory, "Comics");
         _coversDirectory = Path.Combine(_appDataDirectory, "Covers");
-        
+
         Directory.CreateDirectory(_comicsDirectory);
         Directory.CreateDirectory(_coversDirectory);
 
@@ -177,17 +177,17 @@ public class LibraryService
     {
         var comics = await _databaseService.GetComicsAsync();
         var missingComics = comics.Where(c => !File.Exists(c.FilePath)).ToList();
-        
+
         foreach (var comic in missingComics)
         {
             await _databaseService.DeleteComicAsync(comic);
-            
+
             if (!string.IsNullOrEmpty(comic.CoverPath) && File.Exists(comic.CoverPath))
             {
                 try { File.Delete(comic.CoverPath); } catch { /* Ignore cleanup errors */ }
             }
         }
-        
+
         return missingComics.Count;
     }
 
@@ -373,10 +373,10 @@ public class LibraryService
         var comicInfo = importData.ComicInfo;
         var pageCount = importData.PageCount;
         var fileSize = importData.FileSize;
-        
+
         // Generate a unique ID for the cover filename
         var coverId = Guid.NewGuid().ToString();
-        
+
         // Extract cover to the unified covers directory with unique filename
         string? coverPath = null;
         if (importData.CoverImageStream is not null)
@@ -727,12 +727,12 @@ public class LibraryService
         // 1. Update the comic object and database
         comic.Title = !string.IsNullOrWhiteSpace(comicInfo.Title) ? comicInfo.Title : comic.Title;
         comic.SeriesName = !string.IsNullOrWhiteSpace(comicInfo.Series) ? comicInfo.Series : comic.SeriesName;
-        
+
         if (!string.IsNullOrEmpty(comicInfo.Number) && float.TryParse(comicInfo.Number, out var parsedNumber))
         {
             comic.Number = parsedNumber;
         }
-        
+
         comic.Summary = comicInfo.Summary;
         comic.Publisher = comicInfo.Publisher;
         comic.Authors = comicInfo.GetSimpleAuthors();
@@ -759,14 +759,14 @@ public class LibraryService
                 using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
                 {
                     // Remove existing ComicInfo.xml if present
-                    var existingEntry = archive.Entries.FirstOrDefault(e => 
+                    var existingEntry = archive.Entries.FirstOrDefault(e =>
                         Path.GetFileName(e.FullName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase));
                     existingEntry?.Delete();
 
                     // Create new entry
                     var entry = archive.CreateEntry("ComicInfo.xml", CompressionLevel.Optimal);
                     using var entryStream = entry.Open();
-                    
+
                     var settings = new System.Xml.XmlWriterSettings
                     {
                         Indent = true,
@@ -803,21 +803,25 @@ public class LibraryService
             var conversionState = await _epubShadowConversionService.GetConversionStateAsync(comic.Id);
             isCompleted = conversionState is null && currentPage >= comic.PageCount - 1;
         }
-        
-        await _databaseService.UpdateReadingProgressAsync(comic.Id, currentPage, isCompleted, lastModified);
-        
-        // Sync with Komga if this is a Komga comic and it's a local update (lastModified == null)
-        if (lastModified == null && comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaId) && _komgaApiService.IsConfigured)
+
+        var effectiveLastModified = (lastModified ?? DateTime.UtcNow).ToUniversalTime();
+
+        await _databaseService.UpdateReadingProgressAsync(comic.Id, currentPage, isCompleted, effectiveLastModified);
+
+        comic.CurrentPage = currentPage;
+        comic.IsCompleted = isCompleted;
+        comic.ReadProgressLastModified = effectiveLastModified;
+
+        if (lastModified == null && comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaId))
         {
-            try
-            {
-                await _komgaApiService.UpdateReadProgressAsync(comic.KomgaId, currentPage + 1, isCompleted);
-            }
-            catch (Exception ex)
-            {
-                // Failed to sync with Komga, continue anyway
-                Logger.Error($"Failed to sync reading progress to Komga for comic '{comic.Title}' (Komga ID: {comic.KomgaId}), Page: {currentPage + 1}", ex);
-            }
+            await _databaseService.SavePendingKomgaReadProgressAsync(
+                comic.Id,
+                comic.KomgaId,
+                comic.KomgaServerId,
+                currentPage,
+                isCompleted,
+                effectiveLastModified);
+            comic.KomgaSyncStatus = "Pending sync";
         }
 
         OnLibraryChanged();
@@ -957,7 +961,7 @@ public class LibraryService
     public async Task<List<Comic>> ScanAndImportDirectoryAsync(string directoryPath)
     {
         var comics = new List<Comic>();
-        
+
         if (!Directory.Exists(directoryPath))
         {
             return comics;
@@ -1263,7 +1267,7 @@ public class LibraryService
     private async Task WriteComicInfoSidecarAsync(ComicInfo comicInfo, string comicFilePath)
     {
         var sidecarPath = Path.ChangeExtension(comicFilePath, ".xml");
-        
+
         await Task.Run(() =>
         {
             try
@@ -1288,7 +1292,7 @@ public class LibraryService
     private static void WriteComicInfo(System.Xml.XmlWriter writer, ComicInfo info)
     {
         writer.WriteStartElement("ComicInfo");
-        
+
         if (!string.IsNullOrEmpty(info.Title)) writer.WriteElementString("Title", info.Title);
         if (!string.IsNullOrEmpty(info.Series)) writer.WriteElementString("Series", info.Series);
         if (!string.IsNullOrEmpty(info.Number)) writer.WriteElementString("Number", info.Number);
