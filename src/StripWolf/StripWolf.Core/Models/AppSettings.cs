@@ -116,6 +116,11 @@ public class AppSettings
     public bool AllowMeteredKomgaDownloads { get; set; }
 
     /// <summary>
+    /// Number of books to load per page when browsing a Komga series
+    /// </summary>
+    public int KomgaSeriesPageSize { get; set; } = 20;
+
+    /// <summary>
     /// Whether to synchronize reading progress with Komga
     /// </summary>
     public bool SyncReadProgress { get; set; } = true;
@@ -160,6 +165,7 @@ public class AppSettings
             KomgaSections = KomgaSections.Select(section => section.Clone()).ToList(),
             KomgaParallelDownloads = KomgaParallelDownloads,
             AllowMeteredKomgaDownloads = AllowMeteredKomgaDownloads,
+            KomgaSeriesPageSize = KomgaSeriesPageSize,
             SyncReadProgress = SyncReadProgress
         };
     }
