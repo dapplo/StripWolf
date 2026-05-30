@@ -122,9 +122,11 @@ public class DatabaseService : IAsyncDisposable
         var db = await GetDatabaseAsync();
         // Include comics that have been read (LastReadDate is set) and are not completed
         // For Komga comics, also include those with CurrentPage > 0 OR that have been opened
-        return await db.Table<Comic>()
+        // Sort in memory since SQLite-net doesn't support null-coalescing operator in OrderBy expressions
+        var comics = await db.Table<Comic>()
             .Where(c => !c.IsCompleted && (c.CurrentPage > 0 || c.LastReadDate != null))
             .ToListAsync();
+        return comics.OrderByDescending(c => c.LastReadDate).ToList();
     }
 
     public async Task<List<Comic>> GetCompletedComicsAsync()
