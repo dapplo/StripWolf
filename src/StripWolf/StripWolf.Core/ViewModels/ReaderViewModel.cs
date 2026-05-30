@@ -649,19 +649,18 @@ public partial class ReaderViewModel : ViewModelBase
                     return;
                 }
                  
-                // Sync with Komga if this is a Komga comic
-                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
-                {
-                    await _komgaSyncService.SyncComicReadProgressAsync(Comic);
-                    OnPropertyChanged(nameof(KomgaSyncStatus));
-                }
-                
                 _isLoadingPage = true;
                 // Ensure CurrentPage is within valid range (0 to PageCount-1)
                 var validPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
                 CurrentPage = Comic.PageCount > 0 ? validPage : 0;
                 _isLoadingPage = false;
                 await LoadPageAsync();
+
+                // Load the first page before syncing with Komga so server issues never block opening the reader.
+                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && _komgaApiService.IsConfigured)
+                {
+                    await SyncAndRefreshProgressAsync();
+                }
                 
                 // Mark as started reading
                 await SaveProgressAsync();
