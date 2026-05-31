@@ -218,6 +218,9 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task SelectPrefixAsync(string? prefix)
     {
+        // Cancel any ongoing loading
+        ResetLoadingCancellation();
+
         SelectedSeriesPrefix = prefix;
 
         if (SelectedLibrary != null)
@@ -1447,10 +1450,11 @@ public partial class KomgaViewModel : ViewModelBase
             IsBusy = true;
             
             var prefix = SelectedSeriesPrefix == "All" ? null : SelectedSeriesPrefix;
+            var pageSize = Math.Max(1, _settingsService.LoadSettings().KomgaSeriesPageSize);
             
             var result = await _komgaApiService.GetSeriesAsync(
                 page: _currentPage,
-                size: 20,
+                size: pageSize,
                 libraryId: SelectedLibrary?.Id,
                 searchPrefix: prefix);
 
@@ -1466,6 +1470,12 @@ public partial class KomgaViewModel : ViewModelBase
                 // Start background thumbnail loading
                 _ = LoadSeriesThumbnailAsync(s, ct);
             }
+
+            // Auto-load remaining pages in the background without showing the busy overlay
+            if (HasMoreSeries && !ct.IsCancellationRequested)
+            {
+                _ = AutoLoadRemainingSeriesAsync(SelectedLibrary?.Id, prefix, ct);
+            }
         }
         catch (Exception ex)
         {
@@ -1475,6 +1485,49 @@ public partial class KomgaViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Continues loading all remaining series pages in the background without showing the busy overlay.
+    /// </summary>
+    private async Task AutoLoadRemainingSeriesAsync(string? libraryId, string? prefix, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested && HasMoreSeries)
+        {
+            try
+            {
+                var pageSize = Math.Max(1, _settingsService.LoadSettings().KomgaSeriesPageSize);
+                var page = _currentPage;
+                var result = await _komgaApiService.GetSeriesAsync(page, pageSize, libraryId, prefix);
+
+                if (ct.IsCancellationRequested)
+                    break;
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        HasMoreSeries = !result.Last;
+                        _currentPage++;
+                    }
+                });
+
+                foreach (var s in result.Content)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    _ = LoadSeriesThumbnailAsync(s, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error auto-loading remaining series: {ex.Message}");
+                break;
+            }
         }
     }
 
@@ -1615,7 +1668,7 @@ public partial class KomgaViewModel : ViewModelBase
         
         if (SelectedSeries is not null)
         {
-            await LoadBooksAsync();
+            _ = LoadBooksAsync();
         }
     }
 
