@@ -188,7 +188,7 @@
       </StackPanel>
 
       <!-- Connected Content -->
-      <ScrollViewer IsVisible="{Binding IsConnected}" Padding="16">
+      <ScrollViewer x:Name="ConnectedScrollViewer" IsVisible="{Binding IsConnected}" Padding="16">
         <StackPanel Spacing="16" Margin="0,0,0,76">
           <!-- Search Box -->
           <Grid ColumnDefinitions="*,Auto">
@@ -632,6 +632,42 @@
         </Border.IsVisible>
         <Button Content="{Binding LoadMoreBooks, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}" Padding="16,8"
                 Command="{Binding LoadMoreBooksForReadListCommand}"/>
+      </Border>
+
+      <!-- Floating Back Button -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Left"
+              Margin="16,0,0,16" Padding="4" CornerRadius="20"
+              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsConnected"/>
+            <Binding Path="!IsSearching"/>
+            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+              <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+              <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+              <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+            </MultiBinding>
+          </MultiBinding>
+        </Border.IsVisible>
+        <Grid>
+          <Button Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
+                  Padding="16,8"
+                  Command="{Binding GoBackToSeriesCommand}"
+                  IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+          <Button Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
+                  Padding="16,8"
+                  Command="{Binding GoBackToLibrariesCommand}">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                </MultiBinding>
+              </MultiBinding>
+            </Button.IsVisible>
+          </Button>
+        </Grid>
       </Border>
 
       <!-- Series Download Picker Overlay -->

@@ -17,7 +17,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using StripWolf.Core.ViewModels;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -29,11 +31,19 @@ namespace StripWolf.Core.Views;
 public partial class KomgaView : UserControl, INotifyPropertyChanged
 {
     private KomgaViewModel? _subscribedViewModel;
+    private readonly ScrollViewer? _connectedScrollViewer;
+    private bool _hadSelectedSeries;
+    private double _savedSeriesScrollOffsetY;
     private event PropertyChangedEventHandler? ProxyPropertyChanged;
 
     public KomgaView()
     {
         InitializeComponent();
+        _connectedScrollViewer = this.FindControl<ScrollViewer>("ConnectedScrollViewer");
+        if (_connectedScrollViewer is not null)
+        {
+            _connectedScrollViewer.PropertyChanged += OnConnectedScrollViewerPropertyChanged;
+        }
     }
 
     event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
@@ -67,6 +77,11 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
         if (_subscribedViewModel is not null)
         {
             _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _hadSelectedSeries = _subscribedViewModel.SelectedSeries is not null;
+        }
+        else
+        {
+            _hadSelectedSeries = false;
         }
 
         RaiseProxyPropertyChanges();
@@ -90,6 +105,7 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
         switch (e.PropertyName)
         {
             case nameof(KomgaViewModel.SelectedSeries):
+                HandleSelectedSeriesChanged();
                 OnPropertyChanged(nameof(SelectedSeries));
                 break;
             case nameof(KomgaViewModel.SelectedLibrary):
@@ -107,6 +123,58 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
         }
     }
 
+    private void OnConnectedScrollViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != ScrollViewer.OffsetProperty ||
+            _connectedScrollViewer is null ||
+            _subscribedViewModel is null)
+        {
+            return;
+        }
+
+        if (_subscribedViewModel.SelectedLibrary is not null &&
+            _subscribedViewModel.SelectedSeries is null &&
+            _subscribedViewModel.SelectedReadList is null)
+        {
+            _savedSeriesScrollOffsetY = _connectedScrollViewer.Offset.Y;
+        }
+    }
+
+    private void HandleSelectedSeriesChanged()
+    {
+        var hasSelectedSeries = _subscribedViewModel?.SelectedSeries is not null;
+        if (!hasSelectedSeries &&
+            _hadSelectedSeries &&
+            _subscribedViewModel?.SelectedLibrary is not null &&
+            _subscribedViewModel.SelectedReadList is null)
+        {
+            RestoreSeriesScrollOffset();
+        }
+
+        _hadSelectedSeries = hasSelectedSeries;
+    }
+
+    private void RestoreSeriesScrollOffset()
+    {
+        if (_connectedScrollViewer is null)
+        {
+            return;
+        }
+
+        void ApplyOffset()
+        {
+            if (_connectedScrollViewer is null)
+            {
+                return;
+            }
+
+            _connectedScrollViewer.Offset = new Vector(_connectedScrollViewer.Offset.X, _savedSeriesScrollOffsetY);
+        }
+
+        Dispatcher.UIThread.Post(ApplyOffset, DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(ApplyOffset, DispatcherPriority.Loaded);
+    }
+
     private void RaiseProxyPropertyChanges()
     {
         OnPropertyChanged(nameof(GoBackToSeriesCommand));
@@ -122,4 +190,3 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
         ProxyPropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
-
