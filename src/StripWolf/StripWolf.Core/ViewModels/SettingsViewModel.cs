@@ -943,9 +943,13 @@ public partial class SettingsViewModel : ViewModelBase
             };
 
             _komgaApiService.Configure(testServer);
-            var success = await _komgaApiService.TestConnectionAsync();
+            var result = await _komgaApiService.TestConnectionWithDetailsAsync();
 
-            ConnectionStatus = success ? "✓ Connection successful!" : "✗ Connection failed";
+            ConnectionStatus = result.Success
+                ? "✓ Connection successful!"
+                : string.IsNullOrWhiteSpace(result.ErrorMessage)
+                    ? "✗ Connection failed"
+                    : $"✗ Connection failed: {result.ErrorMessage}";
         }
         catch (Exception ex)
         {
