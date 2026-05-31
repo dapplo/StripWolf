@@ -200,10 +200,10 @@ public partial class KomgaViewModel : ViewModelBase
     private int _currentReadListPage;
     
     [ObservableProperty]
-    private string? _selectedSeriesPrefix = "All";
+    private string? _selectedSeriesPrefix;
 
     public List<string> AvailablePrefixes { get; } = 
-        ["All", "0-9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
+        ["0-9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 
     partial void OnSelectedSeriesPrefixChanged(string? value)
     {
@@ -1440,7 +1440,7 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoadSeriesAsync()
     {
-        if (!_komgaApiService.IsConfigured || !HasMoreSeries)
+        if (!_komgaApiService.IsConfigured || !HasMoreSeries || string.IsNullOrEmpty(SelectedSeriesPrefix))
         {
             return;
         }
@@ -1449,7 +1449,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             IsBusy = true;
             
-            var prefix = SelectedSeriesPrefix == "All" ? null : SelectedSeriesPrefix;
+            var prefix = SelectedSeriesPrefix;
             var pageSize = Math.Max(1, _settingsService.LoadSettings().KomgaSeriesPageSize);
             
             var result = await _komgaApiService.GetSeriesAsync(
@@ -1673,14 +1673,26 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DownloadSelectedSeries()
+    private async Task DownloadSelectedSeriesAsync()
     {
         if (SelectedSeries is null || IsSelectedSeriesQueuedForDownload || IsSelectedSeriesDownloading)
         {
             return;
         }
 
-        SeriesPendingDownloadSelection = CreateSeriesDisplay(SelectedSeries, null);
+        var seriesDisplay = CreateSeriesDisplay(SelectedSeries, null);
+
+        // Skip the popup when there is no reason to ask: if none of the loaded books are
+        // already read or already downloaded, "all missing" equals "unread missing", so
+        // we can go straight to downloading everything.
+        var hasReadOrDownloaded = Books.Any(b => b.IsRead || b.IsDownloaded);
+        if (!hasReadOrDownloaded)
+        {
+            await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
+            return;
+        }
+
+        SeriesPendingDownloadSelection = seriesDisplay;
     }
 
     [RelayCommand]
@@ -1957,7 +1969,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            var success = await _komgaApiService.MarkBookAsReadAsync(bookDisplay.Id);
+            var success = await _komgaApiService.MarkBookAsReadAsync(bookDisplay.Id, bookDisplay.PagesCount ?? 0);
             if (!success)
             {
                 throw new InvalidOperationException($"Komga rejected marking '{bookDisplay.Name}' as read.");
