@@ -58,11 +58,7 @@ public class KomgaApiService : IDisposable
     /// </summary>
     public string GetSeriesThumbnailUrl(string seriesId)
     {
-        if (_currentServer is null)
-        {
-            return string.Empty;
-        }
-        return $"{_currentServer.BaseUrl}/api/v1/series/{seriesId}/thumbnail";
+        return GetAbsoluteApiUrl($"api/v1/series/{seriesId}/thumbnail");
     }
 
     /// <summary>
@@ -70,11 +66,7 @@ public class KomgaApiService : IDisposable
     /// </summary>
     public string GetBookThumbnailUrl(string bookId)
     {
-        if (_currentServer is null)
-        {
-            return string.Empty;
-        }
-        return $"{_currentServer.BaseUrl}/api/v1/books/{bookId}/thumbnail";
+        return GetAbsoluteApiUrl($"api/v1/books/{bookId}/thumbnail");
     }
 
     /// <summary>
@@ -99,7 +91,7 @@ public class KomgaApiService : IDisposable
         _httpClient?.Dispose();
         _httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri(server.BaseUrl.TrimEnd('/') + "/"),
+            BaseAddress = new Uri(NormalizeServerBaseUrl(server.BaseUrl).TrimEnd('/') + "/"),
             Timeout = TimeSpan.FromMinutes(20)
         };
         
@@ -137,19 +129,39 @@ public class KomgaApiService : IDisposable
     /// </summary>
     public async Task<bool> TestConnectionAsync()
     {
+        var result = await TestConnectionWithDetailsAsync();
+        return result.Success;
+    }
+
+    /// <summary>
+    /// Tests the connection to the Komga server and returns diagnostics for failures.
+    /// </summary>
+    public async Task<(bool Success, string? ErrorMessage)> TestConnectionWithDetailsAsync()
+    {
         if (!IsConfigured)
         {
-            return false;
+            return (false, "Service is not configured");
         }
 
         try
         {
-            var response = await _httpClient!.GetAsync("api/v1/libraries");
-            return response.IsSuccessStatusCode;
+            using var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
+            if (response.IsSuccessStatusCode)
+            {
+                return (true, null);
+            }
+
+            var statusCodeText = $"{(int)response.StatusCode} {response.ReasonPhrase}".Trim();
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                statusCodeText += " (check server URL; use the Komga base URL without /api or /api/v1)";
+            }
+
+            return (false, statusCodeText);
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return (false, ex.Message);
         }
     }
 
@@ -874,11 +886,7 @@ public class KomgaApiService : IDisposable
     /// </summary>
     public string GetReadListThumbnailUrl(string readListId)
     {
-        if (_currentServer is null)
-        {
-            return string.Empty;
-        }
-        return $"{_currentServer.BaseUrl}/api/v1/readlists/{readListId}/thumbnail";
+        return GetAbsoluteApiUrl($"api/v1/readlists/{readListId}/thumbnail");
     }
 
     #endregion
@@ -957,6 +965,47 @@ public class KomgaApiService : IDisposable
         {
             throw new InvalidOperationException("Komga API service is not configured. Call Configure() first.");
         }
+    }
+
+    private string GetAbsoluteApiUrl(string relativePath)
+    {
+        if (!IsConfigured)
+        {
+            return string.Empty;
+        }
+
+        return new Uri(_httpClient!.BaseAddress!, relativePath).ToString();
+    }
+
+    private static string NormalizeServerBaseUrl(string baseUrl)
+    {
+        var trimmedBaseUrl = baseUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(trimmedBaseUrl, UriKind.Absolute, out var parsedUri))
+        {
+            return trimmedBaseUrl;
+        }
+
+        var normalizedPath = parsedUri.AbsolutePath.TrimEnd('/');
+        if (normalizedPath.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedPath = normalizedPath[..^7];
+        }
+        else if (normalizedPath.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedPath = normalizedPath[..^4];
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            normalizedPath = "/";
+        }
+
+        var builder = new UriBuilder(parsedUri)
+        {
+            Path = normalizedPath
+        };
+
+        return builder.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
     }
 
     public void Dispose()
