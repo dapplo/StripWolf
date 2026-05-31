@@ -396,9 +396,13 @@ public class DatabaseService : IAsyncDisposable
     public async Task<List<KomgaPendingDownload>> GetPendingKomgaDownloadsAsync()
     {
         var db = await GetDatabaseAsync();
-        return await db.Table<KomgaPendingDownload>()
-            .Where(pendingDownload => !string.IsNullOrWhiteSpace(pendingDownload.BookId))
+        var pendingDownloads = await db.Table<KomgaPendingDownload>()
+            .Where(pendingDownload => pendingDownload.BookId != null && pendingDownload.BookId != string.Empty)
             .ToListAsync();
+
+        return pendingDownloads
+            .Where(pendingDownload => !string.IsNullOrWhiteSpace(pendingDownload.BookId))
+            .ToList();
     }
 
     public async Task<List<string>> GetPendingKomgaDownloadBookIdsAsync()
