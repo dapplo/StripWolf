@@ -339,8 +339,18 @@
                             DragDrop.DragOver="OnSectionDragOver"
                             DragDrop.Drop="OnSectionDrop">
                       <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                        <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
-                                   PointerPressed="OnSectionDragHandlePointerPressed"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                          <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                     PointerPressed="OnSectionDragHandlePointerPressed"/>
+                          <StackPanel Orientation="Vertical" Spacing="1">
+                            <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
+                                    CommandParameter="{Binding}"/>
+                            <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
+                                    CommandParameter="{Binding}"/>
+                          </StackPanel>
+                        </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
                         <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
@@ -368,8 +378,18 @@
                             DragDrop.DragOver="OnSectionDragOver"
                             DragDrop.Drop="OnSectionDrop">
                       <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                        <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
-                                   PointerPressed="OnSectionDragHandlePointerPressed"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                          <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                     PointerPressed="OnSectionDragHandlePointerPressed"/>
+                          <StackPanel Orientation="Vertical" Spacing="1">
+                            <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
+                                    CommandParameter="{Binding}"/>
+                            <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
+                                    CommandParameter="{Binding}"/>
+                          </StackPanel>
+                        </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
                         <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
