@@ -38,7 +38,7 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly ComicReaderService _comicReaderService;
     private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
-    private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly KomgaSyncService _komgaSyncService;
     private CancellationTokenSource? _deleteCountdownLoopCancellation;
     private Task? _deleteCountdownLoopTask;
@@ -168,14 +168,14 @@ public partial class LibraryViewModel : ViewModelBase
         ComicReaderService comicReaderService, 
         ImportQueueService importQueueService, 
         SettingsService settingsService,
-        KomgaApiService komgaApiService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
         KomgaSyncService komgaSyncService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
-        _komgaApiService = komgaApiService;
+        _komgaApiServiceFactory = komgaApiServiceFactory;
         _komgaSyncService = komgaSyncService;
         Title = Loc.Instance.Library;
 
@@ -313,15 +313,11 @@ public partial class LibraryViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             // Ensure Komga API is configured if possible
-            if (!_komgaApiService.IsConfigured)
-            {
-                var settings = _settingsService.LoadSettings();
-                var browsingServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId);
-                if (browsingServer != null)
-                {
-                    _komgaApiService.Configure(browsingServer);
-                }
-            }
+            var settings = _settingsService.LoadSettings();
+            var browsingServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId);
+            var browsingKomgaApiService = browsingServer is not null
+                ? _komgaApiServiceFactory.GetForServer(browsingServer)
+                : null;
 
             var favorites = await _libraryService.GetFavoriteComicsAsync();
             FavoriteComics = ApplyComics(FavoriteComics, favorites);
@@ -345,7 +341,7 @@ public partial class LibraryViewModel : ViewModelBase
             });
 
             // Trigger Komga sync in background
-            if (_komgaApiService.IsConfigured)
+            if (browsingKomgaApiService is not null)
             {
                 _ = _komgaSyncService.SyncAllComicsAsync();
             }

@@ -180,7 +180,7 @@ public partial class App : Application
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<PanelDetectionService>();
-        services.AddSingleton<KomgaApiService>();
+        services.AddSingleton<KomgaApiServiceFactory>();
         services.AddSingleton<ComicConverterService>();
         services.AddSingleton<IDonationService, DonationService>();
 

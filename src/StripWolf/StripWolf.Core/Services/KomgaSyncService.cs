@@ -28,7 +28,7 @@ namespace StripWolf.Core.Services;
 public class KomgaSyncService
 {
     private readonly LibraryService _libraryService;
-    private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly SettingsService _settingsService;
     private readonly DatabaseService _databaseService;
     private readonly SemaphoreSlim _syncAllSemaphore = new(1, 1);
@@ -36,12 +36,12 @@ public class KomgaSyncService
 
     public KomgaSyncService(
         LibraryService libraryService,
-        KomgaApiService komgaApiService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
         SettingsService settingsService,
         DatabaseService databaseService)
     {
         _libraryService = libraryService;
-        _komgaApiService = komgaApiService;
+        _komgaApiServiceFactory = komgaApiServiceFactory;
         _settingsService = settingsService;
         _databaseService = databaseService;
     }
@@ -69,7 +69,7 @@ public class KomgaSyncService
         comic.KomgaSyncStatus = "Pending sync";
     }
 
-    private async Task<bool> TryPushPendingReadProgressAsync(Comic comic, KomgaServer? configuredServer = null)
+    private async Task<bool> TryPushPendingReadProgressAsync(Comic comic, KomgaServer? configuredServer = null, KomgaApiService? configuredApiService = null)
     {
         var pendingReadProgress = await _databaseService.GetPendingKomgaReadProgressAsync(comic.Id);
         if (pendingReadProgress is null || string.IsNullOrWhiteSpace(pendingReadProgress.BookId))
@@ -90,9 +90,8 @@ public class KomgaSyncService
             return false;
         }
 
-        _komgaApiService.Configure(server);
-
-        await _komgaApiService.UpdateReadProgressAsync(
+        var komgaApiService = configuredApiService ?? _komgaApiServiceFactory.GetForServer(server);
+        await komgaApiService.UpdateReadProgressAsync(
             pendingReadProgress.BookId,
             pendingReadProgress.Page + 1,
             pendingReadProgress.IsCompleted);
@@ -131,17 +130,14 @@ public class KomgaSyncService
                 return;
             }
 
-            // Configure API service for this specific server
-            _komgaApiService.Configure(server);
+            var komgaApiService = _komgaApiServiceFactory.GetForServer(server);
 
-            if (!await TryPushPendingReadProgressAsync(comic, server))
+            if (!await TryPushPendingReadProgressAsync(comic, server, komgaApiService))
             {
                 return;
             }
 
-            _komgaApiService.Configure(server);
-
-            var book = await _komgaApiService.GetBookAsync(comic.KomgaId);
+            var book = await komgaApiService.GetBookAsync(comic.KomgaId);
             if (book is null)
             {
                 return;
@@ -153,7 +149,7 @@ public class KomgaSyncService
                 if (comic.CurrentPage > 0 || comic.IsCompleted)
                 {
                     await QueueCurrentProgressAsync(comic);
-                    await TryPushPendingReadProgressAsync(comic, server);
+                    await TryPushPendingReadProgressAsync(comic, server, komgaApiService);
                 }
                 return;
             }
@@ -183,7 +179,7 @@ public class KomgaSyncService
             {
                 // Local is newer, update Komga
                 await QueueCurrentProgressAsync(comic);
-                await TryPushPendingReadProgressAsync(comic, server);
+                await TryPushPendingReadProgressAsync(comic, server, komgaApiService);
             }
             else
             {
@@ -238,9 +234,6 @@ public class KomgaSyncService
             // Defer library changed notifications to avoid flickering while syncing many comics
             using var deferredScope = _libraryService.DeferLibraryChanged();
 
-            // Store original API configuration (browsing server)
-            var browsingServer = settings.Servers.FirstOrDefault(s => s.Id == settings.ActiveServerId);
-
             foreach (var serverGroup in komgaComics)
             {
                 var serverId = serverGroup.Key;
@@ -255,19 +248,12 @@ public class KomgaSyncService
                     continue;
                 }
 
-                // Configure API service once per server
-                _komgaApiService.Configure(server);
+                var komgaApiService = _komgaApiServiceFactory.GetForServer(server);
 
                 foreach (var comic in serverGroup)
                 {
-                    await SyncComicReadProgressInternalAsync(comic, server);
+                    await SyncComicReadProgressInternalAsync(comic, server, komgaApiService);
                 }
-            }
-
-            // Restore browsing server configuration
-            if (browsingServer != null)
-            {
-                _komgaApiService.Configure(browsingServer);
             }
         }
         catch
@@ -281,23 +267,21 @@ public class KomgaSyncService
     }
 
     /// <summary>
-    /// Internal sync logic that assumes _komgaApiService is already configured for the correct server.
+    /// Internal sync logic for a specific server API service.
     /// </summary>
-    private async Task SyncComicReadProgressInternalAsync(Comic comic, KomgaServer server)
+    private async Task SyncComicReadProgressInternalAsync(Comic comic, KomgaServer server, KomgaApiService komgaApiService)
     {
         var semaphore = GetComicSemaphore(comic.Id);
         await semaphore.WaitAsync();
 
         try
         {
-            if (!await TryPushPendingReadProgressAsync(comic, server))
+            if (!await TryPushPendingReadProgressAsync(comic, server, komgaApiService))
             {
                 return;
             }
 
-            _komgaApiService.Configure(server);
-
-            var book = await _komgaApiService.GetBookAsync(comic.KomgaId!);
+            var book = await komgaApiService.GetBookAsync(comic.KomgaId!);
             if (book is null)
             {
                 return;
@@ -308,7 +292,7 @@ public class KomgaSyncService
                 if (comic.CurrentPage > 0 || comic.IsCompleted)
                 {
                     await QueueCurrentProgressAsync(comic);
-                    await TryPushPendingReadProgressAsync(comic);
+                    await TryPushPendingReadProgressAsync(comic, server, komgaApiService);
                 }
                 return;
             }
@@ -332,7 +316,7 @@ public class KomgaSyncService
             else if (diff.TotalSeconds < -2)
             {
                 await QueueCurrentProgressAsync(comic);
-                await TryPushPendingReadProgressAsync(comic);
+                await TryPushPendingReadProgressAsync(comic, server, komgaApiService);
             }
             else
             {

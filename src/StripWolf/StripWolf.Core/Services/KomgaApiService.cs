@@ -38,6 +38,7 @@ public class KomgaApiService : IDisposable
 {
     private HttpClient? _httpClient;
     private KomgaServer? _currentServer;
+    private static readonly TimeSpan ConnectionTestTimeout = TimeSpan.FromSeconds(8);
 
     public KomgaApiService()
     {
@@ -127,16 +128,16 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Tests the connection to the Komga server
     /// </summary>
-    public async Task<bool> TestConnectionAsync()
+    public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var result = await TestConnectionWithDetailsAsync();
+        var result = await TestConnectionWithDetailsAsync(cancellationToken);
         return result.Success;
     }
 
     /// <summary>
     /// Tests the connection to the Komga server and returns diagnostics for failures.
     /// </summary>
-    public async Task<(bool Success, string? ErrorMessage)> TestConnectionWithDetailsAsync()
+    public async Task<(bool Success, string? ErrorMessage)> TestConnectionWithDetailsAsync(CancellationToken cancellationToken = default)
     {
         if (!IsConfigured)
         {
@@ -145,7 +146,10 @@ public class KomgaApiService : IDisposable
 
         try
         {
-            using var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(ConnectionTestTimeout);
+
+            using var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
             if (response.IsSuccessStatusCode)
             {
                 return (true, null);
@@ -158,6 +162,14 @@ public class KomgaApiService : IDisposable
             }
 
             return (false, statusCodeText);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return (false, "Operation cancelled");
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, $"Connection test timed out after {ConnectionTestTimeout.TotalSeconds:0} seconds");
         }
         catch (Exception ex)
         {

@@ -44,7 +44,6 @@ public record UnsupportedFormatHandlingModeOption(UnsupportedFormatHandlingMode 
 public partial class SettingsViewModel : ViewModelBase
 {
     private readonly SettingsService _settingsService;
-    private readonly KomgaApiService _komgaApiService;
     private readonly LibraryService _libraryService;
     private readonly LocalizationService _localizationService;
     private readonly IDonationService _donationService;
@@ -52,6 +51,7 @@ public partial class SettingsViewModel : ViewModelBase
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
     private bool _suppressSectionLayoutPersistence;
+    private CancellationTokenSource? _testConnectionCts;
 
     [ObservableProperty]
     private ObservableCollection<KomgaServer> _servers = [];
@@ -278,10 +278,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(SettingsService settingsService, KomgaApiService komgaApiService, LibraryService libraryService, LocalizationService localizationService, IDonationService donationService)
+    public SettingsViewModel(SettingsService settingsService, LibraryService libraryService, LocalizationService localizationService, IDonationService donationService)
     {
         _settingsService = settingsService;
-        _komgaApiService = komgaApiService;
         _libraryService = libraryService;
         _localizationService = localizationService;
         _donationService = donationService;
@@ -736,10 +735,25 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void CancelEdit()
     {
+        CancelConnectionTest();
         IsEditing = false;
         IsPasswordVisible = false;
         _editingServer = null;
         CustomHeaders.Clear();
+    }
+
+    private void CancelConnectionTest()
+    {
+        var testConnectionCts = _testConnectionCts;
+        _testConnectionCts = null;
+        if (testConnectionCts is null)
+        {
+            return;
+        }
+
+        testConnectionCts.Cancel();
+        testConnectionCts.Dispose();
+        IsTestingConnection = false;
     }
 
     [RelayCommand]
@@ -928,6 +942,9 @@ public partial class SettingsViewModel : ViewModelBase
             return;
         }
 
+        CancelConnectionTest();
+        var testConnectionCts = new CancellationTokenSource();
+        _testConnectionCts = testConnectionCts;
         IsTestingConnection = true;
         ConnectionStatus = "Testing connection...";
 
@@ -942,8 +959,14 @@ public partial class SettingsViewModel : ViewModelBase
                 CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList()
             };
 
-            _komgaApiService.Configure(testServer);
-            var result = await _komgaApiService.TestConnectionWithDetailsAsync();
+            using var testKomgaApiService = new KomgaApiService();
+            testKomgaApiService.Configure(testServer);
+            var result = await testKomgaApiService.TestConnectionWithDetailsAsync(testConnectionCts.Token);
+
+            if (!ReferenceEquals(_testConnectionCts, testConnectionCts))
+            {
+                return;
+            }
 
             ConnectionStatus = result.Success
                 ? "✓ Connection successful!"
@@ -957,7 +980,12 @@ public partial class SettingsViewModel : ViewModelBase
         }
         finally
         {
-            IsTestingConnection = false;
+            if (ReferenceEquals(_testConnectionCts, testConnectionCts))
+            {
+                _testConnectionCts = null;
+                testConnectionCts.Dispose();
+                IsTestingConnection = false;
+            }
         }
     }
 
