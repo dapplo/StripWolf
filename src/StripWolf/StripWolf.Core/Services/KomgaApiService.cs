@@ -755,12 +755,11 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Marks a book as read on Komga
     /// </summary>
-    public async Task<bool> MarkBookAsReadAsync(string bookId)
+    public async Task<bool> MarkBookAsReadAsync(string bookId, int page = 0)
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.PostAsync($"api/v1/books/{bookId}/read-progress", null);
-        return response.IsSuccessStatusCode;
+        return await UpdateReadProgressAsync(bookId, page, completed: true);
     }
 
     /// <summary>
