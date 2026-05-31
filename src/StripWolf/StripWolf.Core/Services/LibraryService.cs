@@ -41,7 +41,7 @@ public class LibraryService
 
     private readonly DatabaseService _databaseService;
     private readonly ComicReaderService _comicReaderService;
-    private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly SettingsService _settingsService;
     private readonly INetworkConnectionService _networkConnectionService;
     private readonly PdfToCbzConverterService _pdfConverter;
@@ -63,7 +63,7 @@ public class LibraryService
     public LibraryService(
         DatabaseService databaseService,
         ComicReaderService comicReaderService,
-        KomgaApiService komgaApiService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
         SettingsService settingsService,
         INetworkConnectionService networkConnectionService,
         PdfToCbzConverterService pdfConverter,
@@ -73,7 +73,7 @@ public class LibraryService
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
-        _komgaApiService = komgaApiService;
+        _komgaApiServiceFactory = komgaApiServiceFactory;
         _settingsService = settingsService;
         _networkConnectionService = networkConnectionService;
         _pdfConverter = pdfConverter;
@@ -462,7 +462,8 @@ public class LibraryService
 
         try
         {
-            var downloadResult = await _komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, detailedProgress, cancellationToken);
+            var komgaApiService = ResolveKomgaApiService(serverId);
+            var downloadResult = await komgaApiService.DownloadBookToFileAsync(book.Id, filePath, progress, detailedProgress, cancellationToken);
             if (!downloadResult.Success)
             {
                 throw new Exception(downloadResult.ErrorMessage ?? "Failed to download comic from Komga");
@@ -502,6 +503,19 @@ public class LibraryService
         var extension = GetKomgaDownloadExtension(book);
         var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
         return Path.Combine(_comicsDirectory, fileName);
+    }
+
+    private KomgaApiService ResolveKomgaApiService(int? serverId)
+    {
+        var settings = _settingsService.LoadSettings();
+        var resolvedServerId = serverId ?? settings.ActiveServerId;
+        var server = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == resolvedServerId);
+        if (server is null)
+        {
+            throw new InvalidOperationException("No configured Komga server available for this operation.");
+        }
+
+        return _komgaApiServiceFactory.GetForServer(server);
     }
 
     /// <summary>
@@ -599,7 +613,8 @@ public class LibraryService
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var thumbnailData = await _komgaApiService.GetBookThumbnailAsync(downloadedFile.Book.Id);
+            var komgaApiService = ResolveKomgaApiService(downloadedFile.ServerId);
+            var thumbnailData = await komgaApiService.GetBookThumbnailAsync(downloadedFile.Book.Id);
             if (thumbnailData is not null)
             {
                 coverPath = Path.Combine(_coversDirectory, $"{downloadedFile.Book.Id}.jpg");

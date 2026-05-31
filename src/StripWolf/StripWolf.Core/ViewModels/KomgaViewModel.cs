@@ -39,7 +39,9 @@ namespace StripWolf.Core.ViewModels;
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicFields)]
 public partial class KomgaViewModel : ViewModelBase
 {
-    private readonly KomgaApiService _komgaApiService;
+    private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
+    private readonly KomgaApiService _inactiveKomgaApiService = new();
+    private KomgaApiService _komgaApiService;
     private readonly LibraryService _libraryService;
     private readonly ImportQueueService _importQueueService;
     private readonly SettingsService _settingsService;
@@ -585,13 +587,14 @@ public partial class KomgaViewModel : ViewModelBase
     public bool ShowReadListsSection => ReadListsSection.IsVisible && ReadLists.Count > 0;
 
     public KomgaViewModel(
-        KomgaApiService komgaApiService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
         LibraryService libraryService,
         ImportQueueService importQueueService,
         SettingsService settingsService,
         DatabaseService databaseService)
     {
-        _komgaApiService = komgaApiService;
+        _komgaApiServiceFactory = komgaApiServiceFactory;
+        _komgaApiService = _inactiveKomgaApiService;
         _libraryService = libraryService;
         _importQueueService = importQueueService;
         _settingsService = settingsService;
@@ -1313,6 +1316,7 @@ public partial class KomgaViewModel : ViewModelBase
     {
         if (server is null)
         {
+            _komgaApiService = _inactiveKomgaApiService;
             _activeServer = null;
             UpdateSelectedServer(null);
             OnPropertyChanged(nameof(ServerUsername));
@@ -1325,6 +1329,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
 
         var previousServer = _activeServer;
+        var previousKomgaApiService = _komgaApiService;
         var hasExistingData = Libraries.Count > 0 ||
                               ReadLists.Count > 0 ||
                               KeepReadingBooks.Count > 0 ||
@@ -1343,19 +1348,16 @@ public partial class KomgaViewModel : ViewModelBase
             activeServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id) ?? server;
         }
 
-        _komgaApiService.Configure(activeServer);
-        var isConnected = await _komgaApiService.TestConnectionAsync();
+        var activeKomgaApiService = _komgaApiServiceFactory.GetForServer(activeServer);
+        var isConnected = await activeKomgaApiService.TestConnectionAsync();
         if (!isConnected)
         {
-            if (previousServer is not null)
-            {
-                _komgaApiService.Configure(previousServer);
-            }
-
+            _komgaApiService = previousServer is not null ? previousKomgaApiService : _inactiveKomgaApiService;
             IsConnected = !persistSelection && hasExistingData;
             return;
         }
 
+        _komgaApiService = activeKomgaApiService;
         _activeServer = activeServer;
         UpdateSelectedServer(activeServer);
         OnPropertyChanged(nameof(ServerUsername));
