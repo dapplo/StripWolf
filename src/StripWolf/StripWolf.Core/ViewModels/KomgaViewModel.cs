@@ -1881,16 +1881,10 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        // Skip the popup when there is no reason to ask: if no books in the series have
-        // been completed (read), the "all vs. unread" distinction is meaningless — both
-        // options produce the same download list, so go straight to downloading everything.
-        if (seriesDisplay.Series.BooksReadCount == 0)
-        {
-            await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
-            return;
-        }
-
-        SeriesPendingDownloadSelection = seriesDisplay;
+        // The series-list download button is a "download all missing" action — always skip the
+        // popup. Already-downloaded books are filtered out inside QueueSeriesDownloadAsync.
+        // The "Unread only" option is available from the books view (DownloadSelectedSeriesAsync).
+        await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
     }
 
     [RelayCommand]
