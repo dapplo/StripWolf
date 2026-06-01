@@ -91,9 +91,9 @@ public class FilePathToBitmapConverter : IValueConverter
         new FuncValueConverter<double, bool>(val => Math.Abs(val) < 0.0001);
 
     /// <summary>
-    /// Converts a boolean (IsDescending) to a sort direction icon (â†‘/â†“)
+    /// Converts a boolean (IsDescending) to a sort direction icon (↑/↓)
     /// </summary>
     public static readonly IValueConverter SortDirectionIconConverter = 
-        new FuncValueConverter<bool, string>(isDescending => isDescending ? "â†“" : "â†‘");
+        new FuncValueConverter<bool, string>(isDescending => isDescending ? "↓" : "↑");
 }
 

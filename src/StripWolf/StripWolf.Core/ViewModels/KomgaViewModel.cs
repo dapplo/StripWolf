@@ -1874,14 +1874,17 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DownloadSeries(KomgaSeriesDisplay? seriesDisplay)
+    private async Task DownloadSeriesAsync(KomgaSeriesDisplay? seriesDisplay)
     {
         if (seriesDisplay?.Series is null || seriesDisplay.IsDownloading || seriesDisplay.IsQueuedForDownload)
         {
             return;
         }
 
-        SeriesPendingDownloadSelection = seriesDisplay;
+        // The series-list download button is a "download all missing" action — always skip the
+        // popup. Already-downloaded books are filtered out inside QueueSeriesDownloadAsync.
+        // The "Unread only" option is available from the books view (DownloadSelectedSeriesAsync).
+        await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
     }
 
     [RelayCommand]
