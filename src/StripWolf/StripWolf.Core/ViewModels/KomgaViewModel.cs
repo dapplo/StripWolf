@@ -1874,10 +1874,19 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DownloadSeries(KomgaSeriesDisplay? seriesDisplay)
+    private async Task DownloadSeriesAsync(KomgaSeriesDisplay? seriesDisplay)
     {
         if (seriesDisplay?.Series is null || seriesDisplay.IsDownloading || seriesDisplay.IsQueuedForDownload)
         {
+            return;
+        }
+
+        // Skip the popup when there is no reason to ask: if no books in the series have
+        // been completed (read), the "all vs. unread" distinction is meaningless — both
+        // options produce the same download list, so go straight to downloading everything.
+        if (seriesDisplay.Series.BooksReadCount == 0)
+        {
+            await QueueSeriesDownloadAsync(seriesDisplay, unreadOnly: false);
             return;
         }
 
