@@ -63,6 +63,8 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsFavorite))]
     [NotifyPropertyChangedFor(nameof(KomgaSyncStatus))]
     [NotifyPropertyChangedFor(nameof(KomgaSyncPromptMessage))]
+    [NotifyPropertyChangedFor(nameof(FormattedFileSize))]
+    [NotifyPropertyChangedFor(nameof(ComicFormatDisplay))]
     private Comic? _comic;
 
     public string? KomgaSyncStatus => Comic?.KomgaSyncStatus;
@@ -177,6 +179,7 @@ public partial class ReaderViewModel : ViewModelBase
     private DateTime? _pendingKomgaSyncLastModified;
 
     public string FormattedFileSize => Comic is null ? "" : FormatBytes(Comic.FileSize);
+    public string ComicFormatDisplay => Comic?.FormatDisplay ?? string.Empty;
     public string SourceDisplayName => Comic?.Source.ToString() ?? "Unknown";
     public bool IsFromKomga => Comic?.Source == ComicSource.Komga;
     public string Location => Comic?.FilePath ?? "";

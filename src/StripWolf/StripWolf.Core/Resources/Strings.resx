@@ -406,6 +406,9 @@
   <data name="Format" xml:space="preserve">
     <value>Format</value>
   </data>
+  <data name="FileSize" xml:space="preserve">
+    <value>File Size</value>
+  </data>
   <data name="NotConvertedYet" xml:space="preserve">
     <value>Not converted yet</value>
   </data>
@@ -687,6 +690,18 @@
   </data>
   <data name="KomgaSeriesPageSizeDescription" xml:space="preserve">
     <value>Number of books loaded per page when opening a series. All remaining books are loaded automatically in the background after the first page.</value>
+  </data>
+  <data name="KomgaSearchLimit" xml:space="preserve">
+    <value>Komga Search Result Limit</value>
+  </data>
+  <data name="KomgaSearchLimitDescription" xml:space="preserve">
+    <value>Maximum number of series and books returned when searching in Komga.</value>
+  </data>
+  <data name="KomgaSmartListSize" xml:space="preserve">
+    <value>Komga Smart List Size</value>
+  </data>
+  <data name="KomgaSmartListSizeDescription" xml:space="preserve">
+    <value>Number of items shown in Keep Reading, On Deck, Recently Added Books and Recently Added Series panels.</value>
   </data>
   <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
     <value>Disabled by default to avoid mobile data usage. Enable this to allow Komga downloads on metered connections.</value>

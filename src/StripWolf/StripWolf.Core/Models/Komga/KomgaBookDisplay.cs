@@ -73,6 +73,26 @@ public partial class KomgaBookDisplay : ObservableObject
         ? (double)CurrentPage.Value / PagesCount.Value 
         : 0;
 
+    /// <summary>
+    /// Human-readable file size from Komga (e.g. "14.5 MB")
+    /// </summary>
+    public string FileSize => Book.Size;
+
+    /// <summary>
+    /// Display format derived from the media MIME type (e.g. "CBZ", "PDF")
+    /// </summary>
+    public string Format => Book.Media?.MediaType switch
+    {
+        "application/x-cbz"  => "CBZ",
+        "application/x-cbr"  => "CBR",
+        "application/x-cb7"  => "CB7",
+        "application/x-cbt"  => "CBT",
+        "application/pdf"    => "PDF",
+        "application/epub+zip" => "EPUB",
+        var t when !string.IsNullOrEmpty(t) => t.Split('/').Last().ToUpperInvariant(),
+        _ => string.Empty
+    };
+
     public void RefreshComputedProperties()
     {
         OnPropertyChanged(nameof(IsRead));

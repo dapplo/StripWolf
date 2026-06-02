@@ -205,6 +205,12 @@ public partial class SettingsViewModel : ViewModelBase
     private int _selectedKomgaSeriesPageSize = 20;
 
     [ObservableProperty]
+    private int _selectedKomgaSearchLimit = 10;
+
+    [ObservableProperty]
+    private int _selectedKomgaSmartListSize = 10;
+
+    [ObservableProperty]
     private ObservableCollection<SectionLayoutItemViewModel> _librarySections = [];
 
     [ObservableProperty]
@@ -275,6 +281,10 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<int> AvailableKomgaParallelDownloadOptions { get; } = [1, 2, 3, 4];
 
     public IReadOnlyList<int> AvailableKomgaSeriesPageSizeOptions { get; } = [10, 20, 50, 100];
+
+    public IReadOnlyList<int> AvailableKomgaSearchLimitOptions { get; } = [5, 10, 20, 50];
+
+    public IReadOnlyList<int> AvailableKomgaSmartListSizeOptions { get; } = [5, 10, 20, 50];
 
     private KomgaServer? _editingServer;
 
@@ -480,6 +490,8 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedKomgaParallelDownloads = Math.Max(1, _appSettings.KomgaParallelDownloads);
         AllowMeteredKomgaDownloads = _appSettings.AllowMeteredKomgaDownloads;
         SelectedKomgaSeriesPageSize = Math.Max(1, _appSettings.KomgaSeriesPageSize);
+        SelectedKomgaSearchLimit = Math.Max(1, _appSettings.KomgaSearchLimit);
+        SelectedKomgaSmartListSize = Math.Max(1, _appSettings.KomgaSmartListSize);
 
         if (_appSettings.PreferredReadingMode != readingMode)
         {
@@ -632,6 +644,24 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.KomgaSeriesPageSize = Math.Max(1, value);
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedKomgaSearchLimitChanged(int value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.KomgaSearchLimit = Math.Max(1, value);
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedKomgaSmartListSizeChanged(int value)
+    {
+        if (_appSettings is not null)
+        {
+            _appSettings.KomgaSmartListSize = Math.Max(1, value);
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
