@@ -854,6 +854,7 @@ public partial class ReaderViewModel : ViewModelBase
             SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == settings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
             CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
+            IsFullScreen = settings.UseFullScreenWhenReading;
 
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
@@ -2146,6 +2147,9 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackAsync()
     {
+        // Reset fullscreen before leaving the reader
+        IsFullScreen = false;
+
         // Fire and forget the Komga sync in the background so it doesn't delay UI closing
         _ = SyncProgressWithKomgaAsync();
 

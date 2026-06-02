@@ -85,6 +85,11 @@ public class AppSettings
     public bool CompactOverview { get; set; } = false;
 
     /// <summary>
+    /// Whether to automatically enter fullscreen mode when opening a comic
+    /// </summary>
+    public bool UseFullScreenWhenReading { get; set; } = false;
+
+    /// <summary>
     /// Theme to use for the application UI.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AppThemePreference>))]
@@ -174,6 +179,7 @@ public class AppSettings
             PreferredReadingDirectionMode = PreferredReadingDirectionMode,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
             CompactOverview = CompactOverview,
+            UseFullScreenWhenReading = UseFullScreenWhenReading,
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
             UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,

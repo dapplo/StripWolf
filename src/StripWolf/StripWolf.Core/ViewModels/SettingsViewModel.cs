@@ -182,6 +182,9 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _compactOverview;
 
     [ObservableProperty]
+    private bool _useFullScreenWhenReading;
+
+    [ObservableProperty]
     private AppThemeOption? _selectedAppThemeOption;
 
     [ObservableProperty]
@@ -499,6 +502,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness) ?? AvailableHandednessOptions[0];
         SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior) ?? AvailableStartupBehaviors[0];
         CompactOverview = _appSettings.CompactOverview;
+        UseFullScreenWhenReading = _appSettings.UseFullScreenWhenReading;
         SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme) ?? AvailableEpubConversionThemes[0];
         SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
         SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode) ?? AvailableUnsupportedFormatHandlingModes[0];
@@ -547,6 +551,16 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.CompactOverview = value;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnUseFullScreenWhenReadingChanged(bool value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            _appSettings.UseFullScreenWhenReading = value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }
