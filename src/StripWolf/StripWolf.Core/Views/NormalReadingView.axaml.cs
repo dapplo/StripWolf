@@ -58,11 +58,10 @@ public partial class NormalReadingView : UserControl
         {
             // Use Tunneling strategy to intercept the wheel event before the ScrollViewer processes it
             _imageScroller.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
-
-            _imageScroller.PointerPressed += OnPointerPressed;
-            _imageScroller.PointerMoved += OnPointerMoved;
-            _imageScroller.PointerReleased += OnPointerReleased;
-            _imageScroller.PointerCaptureLost += OnPointerCaptureLost;
+            _imageScroller.AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
+            _imageScroller.AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel, true);
+            _imageScroller.AddHandler(PointerReleasedEvent, OnPointerReleased, RoutingStrategies.Tunnel, true);
+            _imageScroller.AddHandler(PointerCaptureLostEvent, OnPointerCaptureLost, RoutingStrategies.Tunnel, true);
             _imageScroller.PropertyChanged += (s, e) =>
             {
                 if (e.Property == ScrollViewer.ViewportProperty) UpdateImageSize();
@@ -350,14 +349,30 @@ public partial class NormalReadingView : UserControl
 
         if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) > SwipeThreshold && Math.Abs(deltaY) < SwipeMaxVerticalDeviation)
         {
-            if (deltaX > 0) vm.GoToPreviousPageCommand.Execute(null);
-            else vm.GoToNextPageCommand.Execute(null);
+            if (deltaX > 0)
+            {
+                if (vm.IsRightToLeftNavigation) vm.GoToNextPageCommand.Execute(null);
+                else vm.GoToPreviousPageCommand.Execute(null);
+            }
+            else
+            {
+                if (vm.IsRightToLeftNavigation) vm.GoToPreviousPageCommand.Execute(null);
+                else vm.GoToNextPageCommand.Execute(null);
+            }
         }
         else if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < 10 && Math.Abs(deltaY) < 10)
         {
             double width = Bounds.Width;
-            if (position.X < width * 0.25) vm.GoToPreviousPageCommand.Execute(null);
-            else if (position.X > width * 0.75) vm.GoToNextPageCommand.Execute(null);
+            if (position.X < width * 0.25)
+            {
+                if (vm.IsRightToLeftNavigation) vm.GoToNextPageCommand.Execute(null);
+                else vm.GoToPreviousPageCommand.Execute(null);
+            }
+            else if (position.X > width * 0.75)
+            {
+                if (vm.IsRightToLeftNavigation) vm.GoToPreviousPageCommand.Execute(null);
+                else vm.GoToNextPageCommand.Execute(null);
+            }
             else vm.ToggleControlsCommand.Execute(null);
         }
 
@@ -369,4 +384,3 @@ public partial class NormalReadingView : UserControl
         return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
     }
 }
-
