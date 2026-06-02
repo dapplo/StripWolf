@@ -272,6 +272,17 @@
                     </StackPanel>
                   </Grid>
 
+                  <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" IsVisible="{Binding ComicFormatDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                       <TextBlock Text="{Binding Format, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
+                       <TextBlock Text="{Binding ComicFormatDisplay}" FontSize="14" Foreground="White"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" IsVisible="{Binding FormattedFileSize, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                       <TextBlock Text="{Binding FileSize, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#888"/>
+                       <TextBlock Text="{Binding FormattedFileSize}" FontSize="14" Foreground="White"/>
+                    </StackPanel>
+                  </Grid>
+
                   <Button Content="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
                           Command="{Binding ViewSeriesOnKomgaCommand}"
                           Background="#444" Foreground="White"

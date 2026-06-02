@@ -816,6 +816,16 @@
                           <TextBlock Text="{Binding PagesCount}" FontSize="16"/>
                         </StackPanel>
                       </Grid>
+                      <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0" IsVisible="{Binding Format, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding Format, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
+                          <TextBlock Text="{Binding Format}" FontSize="14"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" IsVisible="{Binding FileSize, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding FileSize, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
+                          <TextBlock Text="{Binding FileSize}" FontSize="14"/>
+                        </StackPanel>
+                      </Grid>
                       <StackPanel IsVisible="{Binding AuthorsDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                         <TextBlock Text="{Binding Creators, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
                         <TextBlock Text="{Binding AuthorsDisplay}" FontSize="14" TextWrapping="Wrap"/>

@@ -149,6 +149,8 @@ public partial class KomgaViewModel : ViewModelBase
     [ObservableProperty]
     private double _downloadThrottleParallel = 1;
     private int _maxParallelDownloads = 1;
+    private int _searchLimit = 10;
+    private int _smartListSize = 10;
     private const int MaxDownloadRetryCount = 3;
     private bool _isQueuePausedByConnection;
     private DateTime _lastDownloadConnectionProbeUtc = DateTime.MinValue;
@@ -686,6 +688,8 @@ public partial class KomgaViewModel : ViewModelBase
         var parallelDownloads = Math.Max(1, settings.KomgaParallelDownloads);
         _maxParallelDownloads = parallelDownloads;
         DownloadThrottleParallel = parallelDownloads;
+        _searchLimit = Math.Max(1, settings.KomgaSearchLimit);
+        _smartListSize = Math.Max(1, settings.KomgaSmartListSize);
     }
 
     private Task PersistPendingKomgaDownloadAddedAsync(string bookId, int? serverId)
@@ -808,7 +812,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             
             // Search series
-            var seriesResults = await _komgaApiService.SearchSeriesAsync(SearchText, 0, 10);
+            var seriesResults = await _komgaApiService.SearchSeriesAsync(SearchText, 0, _searchLimit);
             SearchSeriesResults.Clear();
             foreach (var s in seriesResults.Content)
             {
@@ -817,7 +821,7 @@ public partial class KomgaViewModel : ViewModelBase
             }
 
             // Search books
-            var bookResults = await _komgaApiService.SearchBooksAsync(SearchText, 0, 10);
+            var bookResults = await _komgaApiService.SearchBooksAsync(SearchText, 0, _searchLimit);
             SearchBookResults.Clear();
             foreach (var b in bookResults.Content)
             {
@@ -1017,7 +1021,7 @@ public partial class KomgaViewModel : ViewModelBase
             try
             {
                 KeepReadingBooks.Clear();
-                var keepReading = await _komgaApiService.GetBooksInProgressAsync(0, 10);
+                var keepReading = await _komgaApiService.GetBooksInProgressAsync(0, _smartListSize);
                 HasKeepReading = keepReading.Content.Count > 0;
                 
                 foreach (var book in keepReading.Content)
@@ -1040,7 +1044,7 @@ public partial class KomgaViewModel : ViewModelBase
             try
             {
                 OnDeckBooks.Clear();
-                var onDeck = await _komgaApiService.GetBooksOnDeckAsync(0, 10);
+                var onDeck = await _komgaApiService.GetBooksOnDeckAsync(0, _smartListSize);
                 HasOnDeck = onDeck.Content.Count > 0;
                 
                 foreach (var book in onDeck.Content)
@@ -1063,7 +1067,7 @@ public partial class KomgaViewModel : ViewModelBase
             try
             {
                 RecentlyAddedBooks.Clear();
-                var recentBooks = await _komgaApiService.GetBooksLatestAsync(0, 10);
+                var recentBooks = await _komgaApiService.GetBooksLatestAsync(0, _smartListSize);
                 HasRecentBooks = recentBooks.Content.Count > 0;
                 
                 foreach (var book in recentBooks.Content)
@@ -1086,7 +1090,7 @@ public partial class KomgaViewModel : ViewModelBase
             try
             {
                 RecentlyAddedSeries.Clear();
-                var recentSeries = await _komgaApiService.GetSeriesLatestAsync(0, 10);
+                var recentSeries = await _komgaApiService.GetSeriesLatestAsync(0, _smartListSize);
                 HasRecentSeries = recentSeries.Content.Count > 0;
                 
                 foreach (var s in recentSeries.Content)
@@ -1367,7 +1371,16 @@ public partial class KomgaViewModel : ViewModelBase
         OnPropertyChanged(nameof(ServerPassword));
         OnPropertyChanged(nameof(BrowsingServerName));
 
-        ResetNavigationState();
+        var isSameActiveServer = useCache && previousServer?.Id == activeServer.Id;
+        if (!isSameActiveServer)
+        {
+            ResetNavigationState();
+        }
+        else
+        {
+            // Same server re-activated with cache: cancel any in-progress loading but preserve view state
+            ResetLoadingCancellation();
+        }
         ErrorMessage = string.Empty;
         IsConnected = true;
 
@@ -1983,6 +1996,21 @@ public partial class KomgaViewModel : ViewModelBase
                 trackedBook.Book.ReadProgress = CreateCompletedReadProgress(trackedBook);
                 trackedBook.RefreshComputedProperties();
             });
+
+            // Remove from "Keep Reading" and "On Deck" since the book is now fully read
+            var keepReadingItem = KeepReadingBooks.FirstOrDefault(b => string.Equals(b.Id, bookDisplay.Id, StringComparison.OrdinalIgnoreCase));
+            if (keepReadingItem is not null)
+            {
+                KeepReadingBooks.Remove(keepReadingItem);
+                HasKeepReading = KeepReadingBooks.Count > 0;
+            }
+            var onDeckItem = OnDeckBooks.FirstOrDefault(b => string.Equals(b.Id, bookDisplay.Id, StringComparison.OrdinalIgnoreCase));
+            if (onDeckItem is not null)
+            {
+                OnDeckBooks.Remove(onDeckItem);
+                HasOnDeck = OnDeckBooks.Count > 0;
+            }
+            RefreshHomeSectionVisibilityState();
         }, $"Failed to mark '{bookDisplay.Name}' as read");
     }
 

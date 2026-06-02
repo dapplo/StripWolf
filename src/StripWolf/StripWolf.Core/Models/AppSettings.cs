@@ -121,6 +121,16 @@ public class AppSettings
     public int KomgaSeriesPageSize { get; set; } = 20;
 
     /// <summary>
+    /// Maximum number of search results (series and books) returned from Komga search
+    /// </summary>
+    public int KomgaSearchLimit { get; set; } = 10;
+
+    /// <summary>
+    /// Number of items shown in Keep Reading, On Deck, Recently Added Books and Recently Added Series panels
+    /// </summary>
+    public int KomgaSmartListSize { get; set; } = 10;
+
+    /// <summary>
     /// Whether to synchronize reading progress with Komga
     /// </summary>
     public bool SyncReadProgress { get; set; } = true;
@@ -166,6 +176,8 @@ public class AppSettings
             KomgaParallelDownloads = KomgaParallelDownloads,
             AllowMeteredKomgaDownloads = AllowMeteredKomgaDownloads,
             KomgaSeriesPageSize = KomgaSeriesPageSize,
+            KomgaSearchLimit = KomgaSearchLimit,
+            KomgaSmartListSize = KomgaSmartListSize,
             SyncReadProgress = SyncReadProgress
         };
     }

@@ -75,6 +75,8 @@ public class Loc : INotifyPropertyChanged
     public string UnsupportedFormatHandling => GetString();
     public string KomgaParallelDownloads => GetString();
     public string KomgaSeriesPageSize => GetString();
+    public string KomgaSearchLimit => GetString();
+    public string KomgaSmartListSize => GetString();
     public string AllowMeteredKomgaDownloads => GetString();
     public string SkipExternalDeleteConfirmation => GetString();
     public string Name => GetString();
@@ -127,6 +129,8 @@ public class Loc : INotifyPropertyChanged
     public string UnsupportedFormatHandlingDescription => GetString();
     public string KomgaParallelDownloadsDescription => GetString();
     public string KomgaSeriesPageSizeDescription => GetString();
+    public string KomgaSearchLimitDescription => GetString();
+    public string KomgaSmartListSizeDescription => GetString();
     public string AllowMeteredKomgaDownloadsDescription => GetString();
     public string SkipExternalDeleteConfirmationDescription => GetString();
     public string SectionLayoutDescription => GetString();
@@ -187,6 +191,7 @@ public class Loc : INotifyPropertyChanged
     public string Number => GetString();
     public string Pages => GetString();
     public string Format => GetString();
+    public string FileSize => GetString();
     public string Summary => GetString();
     public string SummaryPlaceholder => GetString();
     public string Writer => GetString();
