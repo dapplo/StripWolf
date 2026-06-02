@@ -32,6 +32,7 @@ namespace StripWolf.Core.ViewModels;
 
 public record StartupBehaviorOption(StartupBehavior Value, string DisplayName);
 public record ReadingModeOption(ReadingMode Value, string DisplayName);
+public record ReadingDirectionModeOption(ReadingDirectionMode Value, string DisplayName);
 public record HandednessOption(Handedness Value, string DisplayName);
 public record AppThemeOption(AppThemePreference Value, string DisplayName);
 public record EpubConversionThemeOption(EpubConversionTheme Value, string DisplayName);
@@ -170,6 +171,9 @@ public partial class SettingsViewModel : ViewModelBase
     // Reading mode settings
     [ObservableProperty]
     private ReadingModeOption? _selectedReadingModeOption;
+
+    [ObservableProperty]
+    private ReadingDirectionModeOption? _selectedReadingDirectionModeOption;
     
     [ObservableProperty]
     private HandednessOption? _selectedHandednessOption;
@@ -238,6 +242,18 @@ public partial class SettingsViewModel : ViewModelBase
     [
         new(Handedness.RightHanded, Loc.Instance.HandednessRight),
         new(Handedness.LeftHanded, Loc.Instance.HandednessLeft)
+    ];
+
+    /// <summary>
+    /// Available reading direction options
+    /// </summary>
+    public IReadOnlyList<ReadingDirectionModeOption> AvailableReadingDirectionModes =>
+    [
+        new(ReadingDirectionMode.Automatic, Loc.Instance.ReadingDirectionAutomatic),
+        new(ReadingDirectionMode.LeftToRight, Loc.Instance.ReadingDirectionLeftToRight),
+        new(ReadingDirectionMode.RightToLeft, Loc.Instance.ReadingDirectionRightToLeft),
+        new(ReadingDirectionMode.LeftToRightReversedPages, Loc.Instance.ReadingDirectionLeftToRightReversedPages),
+        new(ReadingDirectionMode.RightToLeftReversedPages, Loc.Instance.ReadingDirectionRightToLeftReversedPages)
     ];
 
     public IReadOnlyList<StartupBehaviorOption> AvailableStartupBehaviors => 
@@ -479,6 +495,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedAppThemeOption = AvailableAppThemes.FirstOrDefault(o => o.Value == _appSettings.AppTheme) ?? AvailableAppThemes[0];
         var readingMode = NormalizeReadingMode(_appSettings.PreferredReadingMode);
         SelectedReadingModeOption = AvailableReadingModes.FirstOrDefault(o => o.Value == readingMode) ?? AvailableReadingModes[0];
+        SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == _appSettings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
         SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness) ?? AvailableHandednessOptions[0];
         SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior) ?? AvailableStartupBehaviors[0];
         CompactOverview = _appSettings.CompactOverview;
@@ -541,6 +558,7 @@ public partial class SettingsViewModel : ViewModelBase
         
         // Refresh all localized properties
         OnPropertyChanged(nameof(AvailableReadingModes));
+        OnPropertyChanged(nameof(AvailableReadingDirectionModes));
         OnPropertyChanged(nameof(AvailableHandednessOptions));
         OnPropertyChanged(nameof(AvailableStartupBehaviors));
         OnPropertyChanged(nameof(AvailableAppThemes));
@@ -553,6 +571,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             SelectedReadingModeOption = AvailableReadingModes.FirstOrDefault(o => o.Value == _appSettings.PreferredReadingMode);
+            SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == _appSettings.PreferredReadingDirectionMode);
             SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness);
             SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior);
             SelectedAppThemeOption = AvailableAppThemes.FirstOrDefault(o => o.Value == _appSettings.AppTheme);
@@ -587,6 +606,16 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             _appSettings.PreferredReadingMode = normalized;
+            _ = _settingsService.SaveSettingsAsync(_appSettings);
+        }
+    }
+
+    partial void OnSelectedReadingDirectionModeOptionChanged(ReadingDirectionModeOption? value)
+    {
+        if (value is null) return;
+        if (_appSettings is not null)
+        {
+            _appSettings.PreferredReadingDirectionMode = value.Value;
             _ = _settingsService.SaveSettingsAsync(_appSettings);
         }
     }

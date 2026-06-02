@@ -36,6 +36,7 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly LibraryService _libraryService;
     private readonly ComicReaderService _comicReaderService;
     private readonly KomgaSyncService _komgaSyncService;
+    private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly PanelDetectionService _panelDetectionService;
     private readonly SettingsService _settingsService;
     private readonly EpubShadowConversionService _epubShadowConversionService;
@@ -139,10 +140,12 @@ public partial class ReaderViewModel : ViewModelBase
     private readonly object _bitmapPrefetchLock = new();
     private const int MaxPrefetchedBitmaps = 3; // Reverted from 2 for better speed
 
-    public bool HasPreviousPage => CurrentPage > 0;
-    public bool HasNextPage => Comic is not null && (CurrentPage < Comic.PageCount - 1 || HasPendingEpubConversion);
-    public bool IsFirstPage => CurrentPage == 0;
-    public bool IsLastPage => Comic is not null && !HasPendingEpubConversion && CurrentPage == Comic.PageCount - 1;
+    public bool HasPreviousPage => CanMoveWithinBounds(-GetNavigationDirectionSign());
+    public bool HasNextPage =>
+        CanMoveWithinBounds(GetNavigationDirectionSign()) ||
+        (GetNavigationDirectionSign() > 0 && Comic is not null && HasPendingEpubConversion && CurrentPage >= Comic.PageCount - 1);
+    public bool IsFirstPage => Comic is null || Comic.PageCount <= 0 || CurrentPage == GetReadingStartPageIndex();
+    public bool IsLastPage => Comic is not null && Comic.PageCount > 0 && !HasPendingEpubConversion && CurrentPage == GetReadingEndPageIndex();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AuthorsDisplay))]
@@ -195,7 +198,12 @@ public partial class ReaderViewModel : ViewModelBase
     public string NextSeriesComicTitle => NextSeriesComic?.Title ?? string.Empty;
     public string KomgaSyncPromptMessage => Comic is null || PendingKomgaSyncPage < 0
         ? string.Empty
-        : string.Format(Loc.Instance.KomgaSyncPromptMessage, Math.Min(PendingKomgaSyncPage + 1, Comic.PageCount), Comic.PageCount);
+        : string.Format(
+            Loc.Instance.KomgaSyncPromptMessage,
+            Comic.PageCount <= 0
+                ? PendingKomgaSyncPage + 1
+                : ToDisplayPageNumber(Math.Min(PendingKomgaSyncPage, Comic.PageCount - 1)),
+            Comic.PageCount);
 
     public string AuthorsDisplay => ComicInfo?.GetAuthors() ?? Comic?.Authors ?? "Unknown";
 
@@ -243,11 +251,46 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
+    partial void OnSelectedReadingDirectionModeOptionChanged(ReadingDirectionModeOption? value)
+    {
+        OnPropertyChanged(nameof(HasPreviousPage));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(PageDisplay));
+        OnPropertyChanged(nameof(IsFirstPage));
+        OnPropertyChanged(nameof(IsLastPage));
+        OnPropertyChanged(nameof(EffectiveReadingDirectionMode));
+        OnPropertyChanged(nameof(IsRightToLeftNavigation));
+        OnPropertyChanged(nameof(PreviousPageButtonGlyph));
+        OnPropertyChanged(nameof(NextPageButtonGlyph));
+        if (value?.Value == ReadingDirectionMode.Automatic && Comic is not null)
+        {
+            _ = ResolveAutomaticReadingDirectionAsync();
+        }
+        if (ReadingMode == ReadingMode.Guided && Comic is not null)
+        {
+            _ = RefreshCurrentPagePanelsAsync();
+        }
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
     [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
     [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Handedness _handedness = Handedness.RightHanded;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
+    [NotifyPropertyChangedFor(nameof(HasNextPage))]
+    [NotifyPropertyChangedFor(nameof(PageDisplay))]
+    [NotifyPropertyChangedFor(nameof(IsFirstPage))]
+    [NotifyPropertyChangedFor(nameof(IsLastPage))]
+    [NotifyPropertyChangedFor(nameof(EffectiveReadingDirectionMode))]
+    [NotifyPropertyChangedFor(nameof(IsRightToLeftNavigation))]
+    [NotifyPropertyChangedFor(nameof(PreviousPageButtonGlyph))]
+    [NotifyPropertyChangedFor(nameof(NextPageButtonGlyph))]
+    private ReadingDirectionModeOption? _selectedReadingDirectionModeOption;
+
+    private ReadingDirectionMode? _detectedReadingDirectionMode;
 
     [ObservableProperty]
     private ZoomRegion _zoomRegion = new();
@@ -334,15 +377,22 @@ public partial class ReaderViewModel : ViewModelBase
         {
             if (Comic is null) return "";
             if (Comic.PageCount <= 0) return HasPendingEpubConversion ? "Preparing..." : "0 / 0";
-            if (IsTwoPageMode && CurrentPage + 1 < Comic.PageCount)
+            var currentDisplayPage = ToDisplayPageNumber(CurrentPage);
+            if (IsTwoPageMode)
             {
-                return HasPendingEpubConversion
-                    ? $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}+"
-                    : $"{CurrentPage + 1}-{CurrentPage + 2} / {Comic.PageCount}";
+                var secondPageIndex = CurrentPage + GetNavigationDirectionSign();
+                if (secondPageIndex >= 0 && secondPageIndex < Comic.PageCount)
+                {
+                    var secondDisplayPage = ToDisplayPageNumber(secondPageIndex);
+                    return HasPendingEpubConversion
+                        ? $"{currentDisplayPage}-{secondDisplayPage} / {Comic.PageCount}+"
+                        : $"{currentDisplayPage}-{secondDisplayPage} / {Comic.PageCount}";
+                }
             }
+
             return HasPendingEpubConversion
-                ? $"{CurrentPage + 1} / {Comic.PageCount}+"
-                : $"{CurrentPage + 1} / {Comic.PageCount}";
+                ? $"{currentDisplayPage} / {Comic.PageCount}+"
+                : $"{currentDisplayPage} / {Comic.PageCount}";
         }
     }
 
@@ -363,6 +413,28 @@ public partial class ReaderViewModel : ViewModelBase
 
     public bool IsGuidedReadingAvailable => _panelDetectionService.IsAvailable;
 
+    public IReadOnlyList<ReadingDirectionModeOption> AvailableReadingDirectionModes =>
+    [
+        new(ReadingDirectionMode.Automatic, Loc.Instance.ReadingDirectionAutomatic),
+        new(ReadingDirectionMode.LeftToRight, Loc.Instance.ReadingDirectionLeftToRight),
+        new(ReadingDirectionMode.RightToLeft, Loc.Instance.ReadingDirectionRightToLeft),
+        new(ReadingDirectionMode.LeftToRightReversedPages, Loc.Instance.ReadingDirectionLeftToRightReversedPages),
+        new(ReadingDirectionMode.RightToLeftReversedPages, Loc.Instance.ReadingDirectionRightToLeftReversedPages)
+    ];
+
+    public ReadingDirectionMode EffectiveReadingDirectionMode => SelectedReadingDirectionModeOption?.Value switch
+    {
+        null => _detectedReadingDirectionMode ?? ReadingDirectionMode.LeftToRight,
+        ReadingDirectionMode.Automatic => _detectedReadingDirectionMode ?? ReadingDirectionMode.LeftToRight,
+        var mode => mode ?? ReadingDirectionMode.LeftToRight
+    };
+
+    public bool IsRightToLeftNavigation => GetNavigationDirectionSign() < 0;
+    public string PreviousPageButtonGlyph => IsRightToLeftNavigation ? "▶" : "◀";
+    public string NextPageButtonGlyph => IsRightToLeftNavigation ? "◀" : "▶";
+    public int ReadingStartPageIndex => GetReadingStartPageIndex();
+    public int ReadingEndPageIndex => GetReadingEndPageIndex();
+
     public bool IsDebug =>
 #if DEBUG
         true;
@@ -380,6 +452,162 @@ public partial class ReaderViewModel : ViewModelBase
         return mode;
     }
 
+    private int GetNavigationDirectionSign() => EffectiveReadingDirectionMode switch
+    {
+        ReadingDirectionMode.RightToLeft => -1,
+        ReadingDirectionMode.RightToLeftReversedPages => -1,
+        _ => 1
+    };
+
+    private bool StartsAtBack() => EffectiveReadingDirectionMode switch
+    {
+        ReadingDirectionMode.RightToLeft => true,
+        ReadingDirectionMode.LeftToRightReversedPages => true,
+        _ => false
+    };
+
+    private int GetReadingStartPageIndex()
+    {
+        if (Comic is null || Comic.PageCount <= 0)
+        {
+            return 0;
+        }
+
+        return StartsAtBack() ? Comic.PageCount - 1 : 0;
+    }
+
+    private int GetReadingEndPageIndex()
+    {
+        if (Comic is null || Comic.PageCount <= 0)
+        {
+            return 0;
+        }
+
+        return StartsAtBack() ? 0 : Comic.PageCount - 1;
+    }
+
+    private bool CanMoveWithinBounds(int delta)
+    {
+        if (Comic is null || Comic.PageCount <= 0)
+        {
+            return false;
+        }
+
+        var target = CurrentPage + delta;
+        return target >= 0 && target < Comic.PageCount;
+    }
+
+    private int ToDisplayPageNumber(int pageIndex)
+    {
+        if (Comic is null || Comic.PageCount <= 0)
+        {
+            return 0;
+        }
+
+        return StartsAtBack() ? Comic.PageCount - pageIndex : pageIndex + 1;
+    }
+
+    private bool IsMangaReadingDirection() => GetNavigationDirectionSign() < 0;
+
+    private static ReadingDirectionMode? ParseDirectionValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Replace("_", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("-", "", StringComparison.OrdinalIgnoreCase)
+            .Replace(" ", "", StringComparison.OrdinalIgnoreCase)
+            .Trim()
+            .ToLowerInvariant();
+
+        return normalized switch
+        {
+            "righttoleft" or "rtl" => ReadingDirectionMode.RightToLeft,
+            "lefttoright" or "ltr" => ReadingDirectionMode.LeftToRight,
+            _ => null
+        };
+    }
+
+    private async Task RefreshCurrentPagePanelsAsync()
+    {
+        if (Comic is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var pageData = await _comicReaderService.GetPageAsync(GetActiveReadPath(), CurrentPage);
+            await DetectPanelsForCurrentPageAsync(pageData, CurrentPage);
+        }
+        catch
+        {
+            // Best-effort refresh when direction changes
+        }
+    }
+
+    private async Task ResolveAutomaticReadingDirectionAsync()
+    {
+        _detectedReadingDirectionMode = null;
+        var comic = Comic;
+        if (comic is null || SelectedReadingDirectionModeOption?.Value != ReadingDirectionMode.Automatic)
+        {
+            return;
+        }
+
+        if (comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(comic.KomgaSeriesId) && comic.KomgaServerId.HasValue)
+        {
+            try
+            {
+                var settings = _settingsService.LoadSettings();
+                var server = settings.Servers.FirstOrDefault(s => s.Id == comic.KomgaServerId.Value);
+                if (server is not null)
+                {
+                    var komgaApiService = _komgaApiServiceFactory.GetForServer(server);
+                    var series = await komgaApiService.GetSeriesAsync(comic.KomgaSeriesId);
+                    _detectedReadingDirectionMode = ParseDirectionValue(series?.Metadata?.ReadingDirection);
+                }
+            }
+            catch
+            {
+                // Ignore Komga direction detection errors
+            }
+        }
+
+        if (_detectedReadingDirectionMode is null)
+        {
+            if (ComicInfo is null)
+            {
+                try
+                {
+                    ComicInfo = await _libraryService.GetComicInfoAsync(comic.FilePath);
+                }
+                catch
+                {
+                    // Metadata is optional
+                }
+            }
+
+            _detectedReadingDirectionMode = ParseDirectionValue(ComicInfo?.PageProgressionDirection);
+            if (_detectedReadingDirectionMode is null)
+            {
+                _detectedReadingDirectionMode = ComicInfo?.Manga switch
+                {
+                    YesNo.Yes => ReadingDirectionMode.RightToLeft,
+                    YesNo.No => ReadingDirectionMode.LeftToRight,
+                    _ => null
+                };
+            }
+        }
+
+        OnPropertyChanged(nameof(EffectiveReadingDirectionMode));
+        OnPropertyChanged(nameof(IsRightToLeftNavigation));
+        OnPropertyChanged(nameof(PreviousPageButtonGlyph));
+        OnPropertyChanged(nameof(NextPageButtonGlyph));
+    }
+
     /// <summary>
     /// Event raised when the reader should be closed
     /// </summary>
@@ -389,6 +617,7 @@ public partial class ReaderViewModel : ViewModelBase
         LibraryService libraryService,
         ComicReaderService comicReaderService,
         KomgaSyncService komgaSyncService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
         PanelDetectionService panelDetectionService,
         SettingsService settingsService,
         EpubShadowConversionService epubShadowConversionService)
@@ -396,6 +625,7 @@ public partial class ReaderViewModel : ViewModelBase
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
         _komgaSyncService = komgaSyncService;
+        _komgaApiServiceFactory = komgaApiServiceFactory;
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
         _epubShadowConversionService = epubShadowConversionService;
@@ -461,6 +691,7 @@ public partial class ReaderViewModel : ViewModelBase
         CurrentPanel = null;
         CurrentPanelIndex = 0;
         IsDetectingPanels = false;
+        _detectedReadingDirectionMode = null;
     }
 
     private void ClearAllCaches()
@@ -538,7 +769,9 @@ public partial class ReaderViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(MaxSliderValue));
         OnPropertyChanged(nameof(PageDisplay));
+        OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(IsFirstPage));
         OnPropertyChanged(nameof(IsLastPage));
         OnPropertyChanged(nameof(CanAdvanceOrShowEndChoices));
     }
@@ -618,6 +851,7 @@ public partial class ReaderViewModel : ViewModelBase
             var settings = _settingsService.LoadSettings();
             ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
+            SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == settings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
             CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
 
@@ -660,6 +894,7 @@ public partial class ReaderViewModel : ViewModelBase
 
                 Title = Comic.Title;
                 await RefreshSeriesNavigationTargetsAsync();
+                await ResolveAutomaticReadingDirectionAsync();
 
                 if (Comic.PageCount <= 0)
                 {
@@ -672,7 +907,14 @@ public partial class ReaderViewModel : ViewModelBase
                 _isLoadingPage = true;
                 // Ensure CurrentPage is within valid range (0 to PageCount-1)
                 var validPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
-                CurrentPage = Comic.PageCount > 0 ? validPage : 0;
+                if (Comic.PageCount > 0 && validPage == 0 && !Comic.IsCompleted && StartsAtBack())
+                {
+                    CurrentPage = Comic.PageCount - 1;
+                }
+                else
+                {
+                    CurrentPage = Comic.PageCount > 0 ? validPage : 0;
+                }
                 _isLoadingPage = false;
                 await LoadPageAsync();
 
@@ -1028,9 +1270,15 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        // In two-page mode, go back 2 pages
         var step = IsTwoPageMode ? 2 : 1;
-        CurrentPage = Math.Max(0, CurrentPage - step);
+        var delta = -GetNavigationDirectionSign() * step;
+        var targetPage = Math.Max(0, Math.Min(Comic!.PageCount - 1, CurrentPage + delta));
+        if (targetPage == CurrentPage)
+        {
+            return;
+        }
+
+        CurrentPage = targetPage;
         await LoadPageAsync();
         await SaveProgressAsync();
     }
@@ -1043,7 +1291,9 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        if (HasPendingEpubConversion && CurrentPage >= Comic.PageCount - 1)
+        var step = IsTwoPageMode ? 2 : 1;
+        var delta = GetNavigationDirectionSign() * step;
+        if (delta > 0 && HasPendingEpubConversion && CurrentPage >= Comic.PageCount - 1)
         {
             ReaderStatusMessage = "Preparing next page...";
             await EnsureEpubPagesAvailableAsync(CurrentPage + 1);
@@ -1063,9 +1313,17 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        // In two-page mode, advance 2 pages
-        var step = IsTwoPageMode ? 2 : 1;
-        CurrentPage = Math.Min(Comic.PageCount - 1, CurrentPage + step);
+        var targetPage = Math.Max(0, Math.Min(Comic.PageCount - 1, CurrentPage + delta));
+        if (targetPage == CurrentPage)
+        {
+            if (IsLastPage)
+            {
+                await ShowEndOfComicOptionsAsync();
+            }
+            return;
+        }
+
+        CurrentPage = targetPage;
         await LoadPageAsync();
         await SaveProgressAsync();
     }
@@ -1184,6 +1442,10 @@ public partial class ReaderViewModel : ViewModelBase
             try
             {
                 ComicInfo = await _libraryService.GetComicInfoAsync(Comic.FilePath);
+                if (SelectedReadingDirectionModeOption?.Value == ReadingDirectionMode.Automatic)
+                {
+                    await ResolveAutomaticReadingDirectionAsync();
+                }
             }
             catch
             {
@@ -1481,7 +1743,7 @@ public partial class ReaderViewModel : ViewModelBase
         IsDetectingPanels = true;
         try
         {
-            var isManga = ComicInfo?.Manga == YesNo.Yes;
+            var isManga = IsMangaReadingDirection();
             var result = await _panelDetectionService.DetectPanelsAsync(
                 GetActiveReadPath(),
                 pageIndex,
@@ -1547,7 +1809,7 @@ public partial class ReaderViewModel : ViewModelBase
 
         try
         {
-            var isManga = ComicInfo?.Manga == YesNo.Yes;
+            var isManga = IsMangaReadingDirection();
             var nextPageData = await _comicReaderService.GetPageAsync(readPath, nextPageIndex);
             await _panelDetectionService.DetectPanelsAsync(readPath, nextPageIndex, nextPageData, isManga);
         }

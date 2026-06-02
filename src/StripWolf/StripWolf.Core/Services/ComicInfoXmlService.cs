@@ -82,6 +82,7 @@ public static class ComicInfoXmlService
                     case "Format": info.Format = subReader.ReadElementContentAsString(); break;
                     case "BlackAndWhite": if (Enum.TryParse<YesNo>(subReader.ReadElementContentAsString(), out var bw)) info.BlackAndWhite = bw; break;
                     case "Manga": if (Enum.TryParse<YesNo>(subReader.ReadElementContentAsString(), out var m)) info.Manga = m; break;
+                    case "PageProgressionDirection": info.PageProgressionDirection = subReader.ReadElementContentAsString(); break;
                     case "Characters": info.Characters = subReader.ReadElementContentAsString(); break;
                     case "Teams": info.Teams = subReader.ReadElementContentAsString(); break;
                     case "Locations": info.Locations = subReader.ReadElementContentAsString(); break;
@@ -178,6 +179,7 @@ public static class ComicInfoXmlService
         if (!string.IsNullOrEmpty(info.Format)) writer.WriteElementString("Format", info.Format);
         if (info.BlackAndWhite.HasValue) writer.WriteElementString("BlackAndWhite", info.BlackAndWhite.Value.ToString());
         if (info.Manga.HasValue) writer.WriteElementString("Manga", info.Manga.Value.ToString());
+        if (!string.IsNullOrEmpty(info.PageProgressionDirection)) writer.WriteElementString("PageProgressionDirection", info.PageProgressionDirection);
         if (!string.IsNullOrEmpty(info.Characters)) writer.WriteElementString("Characters", info.Characters);
         if (!string.IsNullOrEmpty(info.Teams)) writer.WriteElementString("Teams", info.Teams);
         if (!string.IsNullOrEmpty(info.Locations)) writer.WriteElementString("Locations", info.Locations);
@@ -220,4 +222,3 @@ public static class ComicInfoXmlService
         _ => rating.ToString()
     };
 }
-
