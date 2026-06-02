@@ -20,12 +20,15 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using System.ComponentModel;
 using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
 
 public partial class ReaderView : UserControl
 {
+    private ReaderViewModel? _subscribedViewModel;
+
     public ReaderView()
     {
         InitializeComponent();
@@ -38,6 +41,40 @@ public partial class ReaderView : UserControl
 
         // Update decode dimensions when size changes
         this.SizeChanged += (s, e) => UpdateDecodeDimensions();
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+
+        // Unsubscribe from previous view model
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _subscribedViewModel = null;
+        }
+
+        if (DataContext is ReaderViewModel vm)
+        {
+            _subscribedViewModel = vm;
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ReaderViewModel.IsFullScreen) && sender is ReaderViewModel vm)
+        {
+            SetWindowFullScreen(vm.IsFullScreen);
+        }
+    }
+
+    private void SetWindowFullScreen(bool fullScreen)
+    {
+        if (TopLevel.GetTopLevel(this) is Window window)
+        {
+            window.WindowState = fullScreen ? WindowState.FullScreen : WindowState.Normal;
+        }
     }
 
     private void UpdateDecodeDimensions()

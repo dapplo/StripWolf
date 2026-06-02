@@ -709,6 +709,18 @@
   <data name="CompactOverviewDisabled" xml:space="preserve">
     <value>Compact Overview Disabled</value>
   </data>
+  <data name="UseFullScreenWhenReading" xml:space="preserve">
+    <value>Fullscreen When Reading</value>
+  </data>
+  <data name="UseFullScreenWhenReadingEnabled" xml:space="preserve">
+    <value>Fullscreen Enabled</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDisabled" xml:space="preserve">
+    <value>Fullscreen Disabled</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDescription" xml:space="preserve">
+    <value>When enabled, the app will automatically enter fullscreen mode when opening a comic.</value>
+  </data>
   <data name="SectionLibraries" xml:space="preserve">
     <value>Libraries</value>
   </data>

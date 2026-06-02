@@ -217,6 +217,17 @@
 
             <Separator/>
 
+            <!-- Fullscreen When Reading Toggle -->
+            <StackPanel Spacing="8">
+              <ToggleSwitch IsChecked="{Binding UseFullScreenWhenReading}" 
+                            OnContent="{Binding UseFullScreenWhenReadingEnabled, Source={x:Static res:Loc.Instance}}" 
+                            OffContent="{Binding UseFullScreenWhenReadingDisabled, Source={x:Static res:Loc.Instance}}"/>
+              <TextBlock Text="{Binding UseFullScreenWhenReadingDescription, Source={x:Static res:Loc.Instance}}"
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Separator/>
+
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding AppTheme, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
               <ComboBox ItemsSource="{Binding AvailableAppThemes}"

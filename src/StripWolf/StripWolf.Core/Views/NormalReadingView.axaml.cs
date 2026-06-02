@@ -307,7 +307,8 @@ public partial class NormalReadingView : UserControl
                         var center = new Point((points[0].X + points[1].X) / 2, (points[0].Y + points[1].Y) / 2);
                         
                         double oldZoom = vm.ZoomLevel;
-                        vm.ZoomLevel = Math.Max(0.5, Math.Min(5.0, targetZoom));
+                        // Minimum zoom is 1.0 to prevent the page from becoming smaller than the screen space
+                        vm.ZoomLevel = Math.Max(1.0, Math.Min(5.0, targetZoom));
                         
                         if (Math.Abs(oldZoom - vm.ZoomLevel) > 0.0001)
                         {
