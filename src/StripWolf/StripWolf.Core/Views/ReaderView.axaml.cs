@@ -87,26 +87,26 @@ public partial class ReaderView : UserControl
         {
             case Key.Left:
             case Key.PageUp:
-                if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
-                else vm.GoToPreviousPageCommand.Execute(null);
+                if (vm.IsRightToLeftNavigation) ExecuteForward(vm);
+                else ExecuteBackward(vm);
                 e.Handled = true;
                 break;
                 
             case Key.Right:
             case Key.PageDown:
             case Key.Space:
-                if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
-                else vm.GoToNextPageCommand.Execute(null);
+                if (vm.IsRightToLeftNavigation) ExecuteBackward(vm);
+                else ExecuteForward(vm);
                 e.Handled = true;
                 break;
                 
             case Key.Home:
-                vm.GoToPageCommand.Execute(0);
+                vm.GoToPageCommand.Execute(vm.ReadingStartPageIndex);
                 e.Handled = true;
                 break;
                 
             case Key.End:
-                if (vm.Comic is not null) vm.GoToPageCommand.Execute(vm.Comic.PageCount - 1);
+                vm.GoToPageCommand.Execute(vm.ReadingEndPageIndex);
                 e.Handled = true;
                 break;
                 
@@ -132,5 +132,16 @@ public partial class ReaderView : UserControl
                 break;
         }
     }
-}
 
+    private static void ExecuteForward(ReaderViewModel vm)
+    {
+        if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
+        else vm.GoToNextPageCommand.Execute(null);
+    }
+
+    private static void ExecuteBackward(ReaderViewModel vm)
+    {
+        if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
+        else vm.GoToPreviousPageCommand.Execute(null);
+    }
+}

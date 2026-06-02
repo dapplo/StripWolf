@@ -69,6 +69,12 @@ public class AppSettings
     public Handedness Handedness { get; set; } = Handedness.RightHanded;
 
     /// <summary>
+    /// Preferred reading direction mode for page order and next/previous controls.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<ReadingDirectionMode>))]
+    public ReadingDirectionMode PreferredReadingDirectionMode { get; set; } = ReadingDirectionMode.Automatic;
+
+    /// <summary>
     /// Default zoom region size for zoomed reading mode (0.1 to 0.8)
     /// </summary>
     public double DefaultZoomRegionSize { get; set; } = 0.3;
@@ -165,6 +171,7 @@ public class AppSettings
             AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,
+            PreferredReadingDirectionMode = PreferredReadingDirectionMode,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
             CompactOverview = CompactOverview,
             EpubConversionTheme = EpubConversionTheme,

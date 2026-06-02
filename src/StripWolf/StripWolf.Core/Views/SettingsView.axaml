@@ -170,7 +170,23 @@
                 <Run Text="{Binding ReadingModeGuidedDescription, Source={x:Static res:Loc.Instance}}"/>
               </TextBlock>
             </StackPanel>
-            
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding DefaultReadingDirection, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+              <ComboBox ItemsSource="{Binding AvailableReadingDirectionModes}"
+                        SelectedItem="{Binding SelectedReadingDirectionModeOption}"
+                        HorizontalAlignment="Stretch"
+                        Width="300">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ReadingDirectionModeOption">
+                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Text="{Binding ReadingDirectionDescription, Source={x:Static res:Loc.Instance}}"
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+             
             <!-- Handedness Selection -->
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding Handedness, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>

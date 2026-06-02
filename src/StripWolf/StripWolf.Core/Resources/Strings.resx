@@ -739,6 +739,9 @@
   <data name="DefaultReadingMode" xml:space="preserve">
     <value>Default Reading Mode</value>
   </data>
+  <data name="DefaultReadingDirection" xml:space="preserve">
+    <value>Default Reading Direction</value>
+  </data>
   <data name="ApiKeyPlaceholder" xml:space="preserve">
     <value>Enter your Komga API key</value>
   </data>
@@ -828,6 +831,27 @@
   </data>
   <data name="ReadingModeNormalDescription" xml:space="preserve">
     <value>• Normal: Standard full-page reading</value>
+  </data>
+  <data name="ReadingDirectionDescription" xml:space="preserve">
+    <value>Automatic uses metadata (Komga or ComicInfo). You can also force western or manga-style navigation, with or without reversed page order.</value>
+  </data>
+  <data name="ReadingDirectionAutomatic" xml:space="preserve">
+    <value>Automatic (metadata)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRight" xml:space="preserve">
+    <value>Left to right</value>
+  </data>
+  <data name="ReadingDirectionRightToLeft" xml:space="preserve">
+    <value>Right to left (manga)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRightReversedPages" xml:space="preserve">
+    <value>Start at back, western navigation</value>
+  </data>
+  <data name="ReadingDirectionRightToLeftReversedPages" xml:space="preserve">
+    <value>Start at front, manga navigation</value>
+  </data>
+  <data name="ReadingDirectionAction" xml:space="preserve">
+    <value>Reading Direction</value>
   </data>
   <data name="SectionOnDeck" xml:space="preserve">
     <value>On Deck</value>

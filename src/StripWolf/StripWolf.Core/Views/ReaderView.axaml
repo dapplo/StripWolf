@@ -123,7 +123,7 @@
       <Grid ColumnDefinitions="Auto,*,Auto">
         <Button Grid.Column="0" Command="{Binding GoToPreviousPageCommand}"
                 Background="Transparent" Foreground="White" IsEnabled="{Binding HasPreviousPage}">
-          <TextBlock Text="◀" FontSize="28"/>
+          <TextBlock Text="{Binding PreviousPageButtonGlyph}" FontSize="28"/>
         </Button>
 
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="16,0">
@@ -137,7 +137,7 @@
 
         <Button Grid.Column="2" Command="{Binding GoToNextPageCommand}"
                 Background="Transparent" Foreground="White" IsEnabled="{Binding CanAdvanceOrShowEndChoices}">
-          <TextBlock Text="▶" FontSize="28"/>
+          <TextBlock Text="{Binding NextPageButtonGlyph}" FontSize="28"/>
         </Button>
       </Grid>
     </Border>
@@ -324,6 +324,21 @@
                     <TextBlock Text="{Binding ComicInfoTags}" Foreground="White" TextWrapping="Wrap"/>
                   </StackPanel>
                </StackPanel>
+
+              <Separator Background="#333"/>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ReadingDirectionAction, Source={x:Static res:Loc.Instance}}" Foreground="#888" FontSize="12"/>
+                <ComboBox ItemsSource="{Binding AvailableReadingDirectionModes}"
+                          SelectedItem="{Binding SelectedReadingDirectionModeOption}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReadingDirectionModeOption">
+                      <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
 
               <Separator Background="#333" IsVisible="{Binding ComicInfoSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 

@@ -209,6 +209,12 @@ public class ComicInfo
     public YesNo? Manga { get; set; }
 
     /// <summary>
+    /// Reading direction for pages (e.g. "LeftToRight", "RightToLeft")
+    /// </summary>
+    [XmlElement("PageProgressionDirection")]
+    public string? PageProgressionDirection { get; set; }
+
+    /// <summary>
     /// Main character(s) in the comic
     /// </summary>
     [XmlElement("Characters")]
@@ -345,6 +351,9 @@ public class ComicInfo
     /// <summary>Determines if Manga should be serialized</summary>
     public bool ShouldSerializeManga() => Manga.HasValue;
 
+    /// <summary>Determines if PageProgressionDirection should be serialized</summary>
+    public bool ShouldSerializePageProgressionDirection() => !string.IsNullOrEmpty(PageProgressionDirection);
+
     /// <summary>Determines if AgeRating should be serialized</summary>
     public bool ShouldSerializeAgeRating() => AgeRating.HasValue;
 
@@ -356,4 +365,3 @@ public class ComicInfo
 
     #endregion
 }
-

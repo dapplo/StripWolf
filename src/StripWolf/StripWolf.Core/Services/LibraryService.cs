@@ -1338,6 +1338,7 @@ public class LibraryService
         if (!string.IsNullOrEmpty(info.Format)) writer.WriteElementString("Format", info.Format);
         if (info.BlackAndWhite.HasValue) writer.WriteElementString("BlackAndWhite", info.BlackAndWhite.Value.ToString());
         if (info.Manga.HasValue) writer.WriteElementString("Manga", info.Manga.Value.ToString());
+        if (!string.IsNullOrEmpty(info.PageProgressionDirection)) writer.WriteElementString("PageProgressionDirection", info.PageProgressionDirection);
         if (!string.IsNullOrEmpty(info.Characters)) writer.WriteElementString("Characters", info.Characters);
         if (!string.IsNullOrEmpty(info.Teams)) writer.WriteElementString("Teams", info.Teams);
         if (!string.IsNullOrEmpty(info.Locations)) writer.WriteElementString("Locations", info.Locations);

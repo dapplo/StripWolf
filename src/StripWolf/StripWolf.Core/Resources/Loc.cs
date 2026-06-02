@@ -67,6 +67,7 @@ public class Loc : INotifyPropertyChanged
     public string Language => GetString();
     public string StartupBehavior => GetString();
     public string DefaultReadingMode => GetString();
+    public string DefaultReadingDirection => GetString();
     public string Handedness => GetString();
     public string CompactOverview => GetString();
     public string AppTheme => GetString();
@@ -91,6 +92,11 @@ public class Loc : INotifyPropertyChanged
     public string ReadingModeNormal => GetString();
     public string ReadingModeZoomed => GetString();
     public string ReadingModeGuided => GetString();
+    public string ReadingDirectionAutomatic => GetString();
+    public string ReadingDirectionLeftToRight => GetString();
+    public string ReadingDirectionRightToLeft => GetString();
+    public string ReadingDirectionLeftToRightReversedPages => GetString();
+    public string ReadingDirectionRightToLeftReversedPages => GetString();
     public string HandednessRight => GetString();
     public string HandednessLeft => GetString();
     public string ThemeSystem => GetString();
@@ -121,6 +127,7 @@ public class Loc : INotifyPropertyChanged
     public string ReadingModeNormalDescription => GetString();
     public string ReadingModeZoomedDescription => GetString();
     public string ReadingModeGuidedDescription => GetString();
+    public string ReadingDirectionDescription => GetString();
     public string HandednessDescription => GetString();
     public string CompactOverviewDescription => GetString();
     public string AppThemeDescription => GetString();
@@ -228,6 +235,7 @@ public class Loc : INotifyPropertyChanged
     public string DeleteComicAction => GetString();
     public string ContinueReadingAction => GetString();
     public string HandednessAction => GetString();
+    public string ReadingDirectionAction => GetString();
     public string ShowComicInfo => GetString();
     public string AddServer => GetString();
     public string ShowHidePassword => GetString();
