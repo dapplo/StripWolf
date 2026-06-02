@@ -44,6 +44,7 @@ public partial class NormalReadingView : UserControl
     private readonly Dictionary<long, Point> _touchPoints = new();
     private double _initialDistance = 0;
     private double _initialZoom = 1.0;
+    private bool _isPinching;
 
     public NormalReadingView()
     {
@@ -82,6 +83,8 @@ public partial class NormalReadingView : UserControl
     {
         _touchPoints.Clear();
         _initialDistance = 0;
+        _isPinching = false;
+        _swipeStartPoint = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -263,6 +266,8 @@ public partial class NormalReadingView : UserControl
             {
                 // Multi-touch detected: stop the ScrollViewer from taking over
                 e.Handled = true;
+                _isPinching = true;
+                _swipeStartPoint = null;
                 
                 if (_touchPoints.Count == 2)
                 {
@@ -335,9 +340,21 @@ public partial class NormalReadingView : UserControl
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         _touchPoints.Remove(e.Pointer.Id);
+        bool wasPinching = _isPinching;
         if (_touchPoints.Count < 2)
         {
             _initialDistance = 0;
+            e.Pointer.Capture(null);
+        }
+        if (_touchPoints.Count == 0)
+        {
+            _isPinching = false;
+        }
+
+        if (wasPinching)
+        {
+            _swipeStartPoint = null;
+            return;
         }
 
         if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
