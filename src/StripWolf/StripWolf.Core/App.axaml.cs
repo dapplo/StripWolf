@@ -58,6 +58,12 @@ public partial class App : Application
     /// </summary>
     public static Action<IServiceCollection>? RegisterNetworkConnectionService { get; set; }
 
+    /// <summary>
+    /// Action to register the platform-specific fullscreen service.
+    /// Set this before Initialize() is called if you need a custom implementation (e.g., on Android).
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterFullScreenService { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -209,6 +215,14 @@ public partial class App : Application
         else
         {
             services.AddSingleton<INetworkConnectionService, DefaultNetworkConnectionService>();
+        }
+        if (RegisterFullScreenService is not null)
+        {
+            RegisterFullScreenService(services);
+        }
+        else
+        {
+            services.AddSingleton<IFullScreenService, DefaultFullScreenService>();
         }
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<EpubToCbzConverterService>();

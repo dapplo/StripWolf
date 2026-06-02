@@ -21,6 +21,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using System.ComponentModel;
+using Microsoft.Extensions.DependencyInjection;
+using StripWolf.Core.Services;
 using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
@@ -71,10 +73,8 @@ public partial class ReaderView : UserControl
 
     private void SetWindowFullScreen(bool fullScreen)
     {
-        if (TopLevel.GetTopLevel(this) is Window window)
-        {
-            window.WindowState = fullScreen ? WindowState.FullScreen : WindowState.Normal;
-        }
+        var fullScreenService = global::StripWolf.App.Services?.GetService<IFullScreenService>();
+        fullScreenService?.SetFullScreen(fullScreen);
     }
 
     private void UpdateDecodeDimensions()
