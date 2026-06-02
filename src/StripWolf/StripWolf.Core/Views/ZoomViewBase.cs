@@ -59,6 +59,7 @@ public abstract class ZoomViewBase : UserControl
     private readonly Dictionary<long, Point> _touchPoints = new();
     private double _initialDistance = 0;
     private double _initialZoomRegionSize = 1.0;
+    private bool _isPinching;
 
     // Inertia/Flick fields
     private Vector _panVelocity;
@@ -108,6 +109,8 @@ public abstract class ZoomViewBase : UserControl
         _isDraggingOverview = false;
         _isDrawingManualRegion = false;
         _isPanningZoomArea = false;
+        _isPinching = false;
+        _swipeStartPoint = null;
         _touchPoints.Clear();
         _initialDistance = 0;
     }
@@ -337,6 +340,13 @@ public abstract class ZoomViewBase : UserControl
                 var points = _touchPoints.Values.ToArray();
                 _initialDistance = GetDistance(points[0], points[1]);
                 _initialZoomRegionSize = vm.ZoomRegion.Size;
+                _isPinching = true;
+                _isPanningZoomArea = false;
+                _swipeStartPoint = null;
+                if (sender is Control)
+                {
+                    e.Pointer.Capture(null);
+                }
                 e.Handled = true;
                 return;
             }
@@ -414,7 +424,9 @@ public abstract class ZoomViewBase : UserControl
     private void OnZoomedAreaPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         _touchPoints.Remove(e.Pointer.Id);
+        bool wasPinching = _isPinching;
         if (_touchPoints.Count < 2) _initialDistance = 0;
+        if (_touchPoints.Count == 0) _isPinching = false;
         
         bool wasPanning = _isPanningZoomArea;
         _isPanningZoomArea = false;
@@ -423,6 +435,12 @@ public abstract class ZoomViewBase : UserControl
         if (wasPanning && _panVelocity.Length > 100)
         {
             StartInertia(_panVelocity);
+        }
+
+        if (wasPinching)
+        {
+            _swipeStartPoint = null;
+            return;
         }
 
         if (DataContext is not ReaderViewModel vm || !_swipeStartPoint.HasValue || _touchPoints.Count > 0) return;
@@ -500,4 +518,3 @@ public abstract class ZoomViewBase : UserControl
 
     private double GetDistance(Point p1, Point p2) => Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
 }
-
