@@ -45,6 +45,8 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
             services.AddSingleton<IWebViewPaginationService, AndroidWebViewSnapshotService>();
         App.RegisterNetworkConnectionService = services =>
             services.AddSingleton<INetworkConnectionService, AndroidNetworkConnectionService>();
+        App.RegisterFullScreenService = services =>
+            services.AddSingleton<IFullScreenService, AndroidFullScreenService>();
               
         return base.CustomizeAppBuilder(builder)
             .WithInterFont();

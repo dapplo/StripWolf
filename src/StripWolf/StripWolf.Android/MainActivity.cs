@@ -34,12 +34,30 @@ namespace StripWolf.Core.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
 {
+    /// <summary>
+    /// The currently active <see cref="MainActivity"/> instance.
+    /// Used by platform services (e.g. <see cref="Services.AndroidFullScreenService"/>) that need
+    /// access to the Android <see cref="Android.App.Activity.Window"/>.
+    /// </summary>
+    public static MainActivity? Current { get; private set; }
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
+        Current = this;
+
         // Handle splash screen transition
         AndroidX.Core.SplashScreen.SplashScreen.InstallSplashScreen(this);
         
         base.OnCreate(savedInstanceState);
+    }
+
+    protected override void OnDestroy()
+    {
+        if (Current == this)
+        {
+            Current = null;
+        }
+        base.OnDestroy();
     }
 }
 
