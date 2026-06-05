@@ -70,13 +70,28 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string? KomgaSyncStatus => Comic?.KomgaSyncStatus;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
-    [NotifyPropertyChangedFor(nameof(HasNextPage))]
-    [NotifyPropertyChangedFor(nameof(PageDisplay))]
-    [NotifyPropertyChangedFor(nameof(IsFirstPage))]
-    [NotifyPropertyChangedFor(nameof(IsLastPage))]
     private int _currentPage;
+
+    public int CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            if (_isInitializingComic && value != _currentPage)
+            {
+                return;
+            }
+            if (SetProperty(ref _currentPage, value))
+            {
+                OnPropertyChanged(nameof(HasPreviousPage));
+                OnPropertyChanged(nameof(HasNextPage));
+                OnPropertyChanged(nameof(PageDisplay));
+                OnPropertyChanged(nameof(IsFirstPage));
+                OnPropertyChanged(nameof(IsLastPage));
+                OnCurrentPageChanged(value);
+            }
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasNextPage))]
@@ -126,6 +141,7 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isTwoPageMode;
 
     private bool _isLoadingPage;
+    private bool _isInitializingComic;
     private int _lastLoadedPageIndex = -1;
     private bool _shouldSelectLastPanel;
     private long _epubConversionUpdateVersion;
@@ -649,6 +665,9 @@ public partial class ReaderViewModel : ViewModelBase
             _ = _epubShadowConversionService.StopReadingSessionAsync(Comic.Id);
         }
 
+        _isLoadingPage = false;
+        _isInitializingComic = false;
+
         var cts = Interlocked.Exchange(ref _saveProgressCts, null);
         if (cts is not null)
         {
@@ -833,6 +852,7 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             IsBusy = true;
+            _isInitializingComic = true;
             ErrorMessage = null;
             IsInfoPanelVisible = false;
             IsEndOfComicOptionsVisible = false;
@@ -910,13 +930,18 @@ public partial class ReaderViewModel : ViewModelBase
                 var validPage = Math.Max(0, Math.Min(Comic.CurrentPage, Comic.PageCount - 1));
                 if (Comic.PageCount > 0 && validPage == 0 && !Comic.IsCompleted && StartsAtBack())
                 {
-                    CurrentPage = Comic.PageCount - 1;
+                    _currentPage = Comic.PageCount - 1;
                 }
                 else
                 {
-                    CurrentPage = Comic.PageCount > 0 ? validPage : 0;
+                    _currentPage = Comic.PageCount > 0 ? validPage : 0;
                 }
-                _isLoadingPage = false;
+                OnPropertyChanged(nameof(CurrentPage));
+                OnPropertyChanged(nameof(HasPreviousPage));
+                OnPropertyChanged(nameof(HasNextPage));
+                OnPropertyChanged(nameof(PageDisplay));
+                OnPropertyChanged(nameof(IsFirstPage));
+                OnPropertyChanged(nameof(IsLastPage));
                 await LoadPageAsync();
 
                 // Load the first page before syncing with Komga so server issues never block opening the reader.
@@ -926,7 +951,7 @@ public partial class ReaderViewModel : ViewModelBase
                 }
 
                 // Mark as started reading
-                await SaveProgressAsync();
+                await SaveProgressAsync(forceImmediate: true);
 
                 _periodicSyncTimer.Start();
             }
@@ -937,6 +962,7 @@ public partial class ReaderViewModel : ViewModelBase
         }
         finally
         {
+            _isInitializingComic = false;
             IsBusy = false;
         }
     }
@@ -1180,7 +1206,7 @@ public partial class ReaderViewModel : ViewModelBase
         ErrorMessage = state?.Status == EpubConversionStatus.Failed ? state.LastError : null;
     }
 
-    partial void OnCurrentPageChanged(int value)
+    private void OnCurrentPageChanged(int value)
     {
         if (Comic is not null && !_isLoadingPage)
         {
@@ -1264,11 +1290,11 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task GoToPreviousPageAsync()
+    private Task GoToPreviousPageAsync()
     {
         if (!HasPreviousPage)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var step = IsTwoPageMode ? 2 : 1;
@@ -1276,12 +1302,11 @@ public partial class ReaderViewModel : ViewModelBase
         var targetPage = Math.Max(0, Math.Min(Comic!.PageCount - 1, CurrentPage + delta));
         if (targetPage == CurrentPage)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         CurrentPage = targetPage;
-        await LoadPageAsync();
-        await SaveProgressAsync();
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -1325,8 +1350,6 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         CurrentPage = targetPage;
-        await LoadPageAsync();
-        await SaveProgressAsync();
     }
 
     [RelayCommand]
@@ -1349,8 +1372,6 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         CurrentPage = page;
-        await LoadPageAsync();
-        await SaveProgressAsync();
     }
 
     [RelayCommand]
@@ -1562,13 +1583,25 @@ public partial class ReaderViewModel : ViewModelBase
             return;
         }
 
-        await _libraryService.UpdateReadingProgressAsync(Comic, syncedPage, syncedLastModified, syncedCompleted);
+        try
+        {
+            await _libraryService.UpdateReadingProgressAsync(Comic, syncedPage, syncedLastModified, syncedCompleted);
 
-        _isLoadingPage = true;
-        CurrentPage = Math.Max(0, Math.Min(syncedPage, Comic.PageCount - 1));
-        _isLoadingPage = false;
-        await LoadPageAsync();
-        OnPropertyChanged(nameof(KomgaSyncStatus));
+            _isLoadingPage = true;
+            _currentPage = Math.Max(0, Math.Min(syncedPage, Comic.PageCount - 1));
+            OnPropertyChanged(nameof(CurrentPage));
+            OnPropertyChanged(nameof(HasPreviousPage));
+            OnPropertyChanged(nameof(HasNextPage));
+            OnPropertyChanged(nameof(PageDisplay));
+            OnPropertyChanged(nameof(IsFirstPage));
+            OnPropertyChanged(nameof(IsLastPage));
+            await LoadPageAsync();
+        }
+        finally
+        {
+            _isLoadingPage = false;
+            OnPropertyChanged(nameof(KomgaSyncStatus));
+        }
     }
 
     private void ClearKomgaSyncPrompt()
