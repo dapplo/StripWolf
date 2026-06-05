@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -56,7 +56,7 @@ public abstract class ZoomViewBase : UserControl
     private const double SwipeThreshold = 80;
     private const double SwipeMaxTimeMs = 500;
 
-    private readonly Dictionary<long, Point> _touchPoints = new();
+    private readonly Dictionary<long, (Point Position, IPointer Pointer)> _touchPoints = new();
     private double _initialDistance = 0;
     private double _initialZoomRegionSize = 1.0;
     private bool _isPinching;
@@ -111,7 +111,18 @@ public abstract class ZoomViewBase : UserControl
         _isPanningZoomArea = false;
         _isPinching = false;
         _swipeStartPoint = null;
+        
+        var pointersToRelease = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Pointer));
         _touchPoints.Clear();
+        foreach (var pointer in pointersToRelease)
+        {
+            try
+            {
+                pointer.Capture(null);
+            }
+            catch { }
+        }
+        
         _initialDistance = 0;
     }
 
@@ -334,18 +345,21 @@ public abstract class ZoomViewBase : UserControl
 
         if (e.Pointer.Type == PointerType.Touch)
         {
-            _touchPoints[e.Pointer.Id] = _lastPointerPosition;
+            _touchPoints[e.Pointer.Id] = (_lastPointerPosition, e.Pointer);
             if (_touchPoints.Count == 2)
             {
-                var points = _touchPoints.Values.ToArray();
+                var points = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Position));
                 _initialDistance = GetDistance(points[0], points[1]);
                 _initialZoomRegionSize = vm.ZoomRegion.Size;
                 _isPinching = true;
                 _isPanningZoomArea = false;
                 _swipeStartPoint = null;
-                if (sender is Control)
+                if (sender is Control controlPressed)
                 {
-                    e.Pointer.Capture(null);
+                    foreach (var tp in _touchPoints.Values)
+                    {
+                        tp.Pointer.Capture(controlPressed);
+                    }
                 }
                 e.Handled = true;
                 return;
@@ -371,10 +385,10 @@ public abstract class ZoomViewBase : UserControl
 
         if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
         {
-            _touchPoints[e.Pointer.Id] = currentPosition;
+            _touchPoints[e.Pointer.Id] = (currentPosition, e.Pointer);
             if (_touchPoints.Count == 2)
             {
-                var points = _touchPoints.Values.ToArray();
+                var points = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Position));
                 double currentDistance = GetDistance(points[0], points[1]);
                 if (_initialDistance > 0)
                 {

@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -41,7 +41,7 @@ public partial class NormalReadingView : UserControl
     private const double SwipeMaxVerticalDeviation = 100;
 
     // Manual Pinch tracking
-    private readonly Dictionary<long, Point> _touchPoints = new();
+    private readonly Dictionary<long, (Point Position, IPointer Pointer)> _touchPoints = new();
     private double _initialDistance = 0;
     private double _initialZoom = 1.0;
     private bool _isPinching;
@@ -81,7 +81,16 @@ public partial class NormalReadingView : UserControl
 
     private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        var pointersToRelease = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Pointer));
         _touchPoints.Clear();
+        foreach (var pointer in pointersToRelease)
+        {
+            try
+            {
+                pointer.Capture(null);
+            }
+            catch { }
+        }
         _initialDistance = 0;
         _isPinching = false;
         _swipeStartPoint = null;
@@ -261,7 +270,8 @@ public partial class NormalReadingView : UserControl
 
         if (e.Pointer.Type == PointerType.Touch)
         {
-            _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
+            var position = e.GetPosition(_imageScroller);
+            _touchPoints[e.Pointer.Id] = (position, e.Pointer);
             if (_touchPoints.Count >= 2)
             {
                 // Multi-touch detected: stop the ScrollViewer from taking over
@@ -271,18 +281,21 @@ public partial class NormalReadingView : UserControl
                 
                 if (_touchPoints.Count == 2)
                 {
-                    var points = _touchPoints.Values.ToArray();
+                    var points = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Position));
                     _initialDistance = GetDistance(points[0], points[1]);
                     _initialZoom = vm.ZoomLevel;
-                    // Capture the pointer to this control to prevent gesture recognizer from winning
-                    e.Pointer.Capture(_imageScroller);
+                    // Capture both pointers to this control to prevent gesture recognizer from winning
+                    foreach (var tp in _touchPoints.Values)
+                    {
+                        tp.Pointer.Capture(_imageScroller);
+                    }
                 }
                 return;
             }
         }
 
-        var position = e.GetPosition(_imageScroller);
-        _swipeStartPoint = position;
+        var pressedPosition = e.GetPosition(_imageScroller);
+        _swipeStartPoint = pressedPosition;
         _swipeStartTime = DateTime.UtcNow;
     }
 
@@ -292,7 +305,8 @@ public partial class NormalReadingView : UserControl
 
         if (e.Pointer.Type == PointerType.Touch && _touchPoints.ContainsKey(e.Pointer.Id))
         {
-            _touchPoints[e.Pointer.Id] = e.GetPosition(_imageScroller);
+            var position = e.GetPosition(_imageScroller);
+            _touchPoints[e.Pointer.Id] = (position, e.Pointer);
             if (_touchPoints.Count >= 2)
             {
                 // Ensure the event is consumed so ScrollViewer doesn't pan
@@ -301,7 +315,7 @@ public partial class NormalReadingView : UserControl
                 if (_touchPoints.Count == 2)
                 {
                     // Update pinch
-                    var points = _touchPoints.Values.ToArray();
+                    var points = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_touchPoints.Values, v => v.Position));
                     double currentDistance = GetDistance(points[0], points[1]);
                     if (_initialDistance > 10) // Minimum distance threshold
                     {
