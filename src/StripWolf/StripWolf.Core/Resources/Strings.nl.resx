@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -825,5 +825,11 @@
   </data>
   <data name="ConfirmDeleteServerMessage" xml:space="preserve">
     <value>Er zijn {0} comics gekoppeld aan deze server. Als je deze verwijdert, wordt hun leesvoortgang niet meer gesynchroniseerd. Wil je doorgaan?</value>
+  </data>
+  <data name="BypassSslValidation" xml:space="preserve">
+    <value>SSL/TLS-verificatie omzeilen</value>
+  </data>
+  <data name="BypassSslValidationHint" xml:space="preserve">
+    <value>SSL/TLS-certificaatfouten omzeilen (handig voor zelfondertekende certificaten of oude apparaten die moderne certificeringsinstanties niet vertrouwen).</value>
   </data>
 </root>

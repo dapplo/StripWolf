@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-android</TargetFramework>
@@ -11,11 +11,11 @@
     <ApplicationDisplayVersion Condition="'$(GitVersion_SemVer)' != ''">$(GitVersion_SemVer)</ApplicationDisplayVersion>
     <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <RunAOTCompilation>true</RunAOTCompilation>
-    <AndroidEnableProfiledAot>true</AndroidEnableProfiledAot>
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>link</TrimMode>
-    <AndroidLinkMode>SdkOnly</AndroidLinkMode>
+    <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
+    <AndroidEnableProfiledAot Condition="'$(Configuration)' == 'Release'">true</AndroidEnableProfiledAot>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
+    <TrimMode Condition="'$(Configuration)' == 'Release'">link</TrimMode>
+    <AndroidLinkMode Condition="'$(Configuration)' == 'Release'">SdkOnly</AndroidLinkMode>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!-- Exclude PDFium from Android build to reduce APK size -->
     <ExcludePdfium>true</ExcludePdfium>
@@ -36,6 +36,9 @@
     <AndroidSigningKeyAlias Condition="Exists('$(StripWolfSigningKeyStore)')">StripWolf</AndroidSigningKeyAlias>
     <AndroidSigningKeyPass Condition="Exists('$(StripWolfSigningKeyStore)')">$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
     <AndroidSigningStorePass Condition="Exists('$(StripWolfSigningKeyStore)')">$(ANDROID_SIGNING_STORE_PASS)</AndroidSigningStorePass>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <EmbedAssembliesIntoApk>False</EmbedAssembliesIntoApk>
   </PropertyGroup>
 
   <ItemGroup>

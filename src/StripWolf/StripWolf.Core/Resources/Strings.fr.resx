@@ -816,4 +816,10 @@
   <data name="ConfirmDeleteServerMessage" xml:space="preserve">
     <value>Il y a {0} bandes dessinées liées à ce serveur. Si vous le supprimez, leur progression de lecture ne sera plus synchronisée. Voulez-vous continuer ?</value>
   </data>
+  <data name="BypassSslValidation" xml:space="preserve">
+    <value>Contourner la vérification SSL/TLS</value>
+  </data>
+  <data name="BypassSslValidationHint" xml:space="preserve">
+    <value>Contourner les erreurs de certificat SSL/TLS (utile pour les certificats auto-signés ou les anciens appareils qui ne font pas confiance aux autorités de certification modernes).</value>
+  </data>
 </root>

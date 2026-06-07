@@ -92,6 +92,7 @@ public sealed class KomgaApiServiceFactory : IDisposable
             server.Username ?? string.Empty,
             server.Password ?? string.Empty,
             server.ApiKey ?? string.Empty,
+            server.BypassSslValidation.ToString(),
             headerPart);
     }
 

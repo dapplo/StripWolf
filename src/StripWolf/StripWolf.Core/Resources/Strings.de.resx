@@ -816,4 +816,10 @@
   <data name="ConfirmDeleteServerMessage" xml:space="preserve">
     <value>Es sind {0} Comics mit diesem Server verknüpft. Wenn Sie ihn löschen, wird ihr Lesefortschritt nicht mehr synchronisiert. Möchten Sie fortfahren?</value>
   </data>
+  <data name="BypassSslValidation" xml:space="preserve">
+    <value>SSL/TLS-Verifizierung umgehen</value>
+  </data>
+  <data name="BypassSslValidationHint" xml:space="preserve">
+    <value>SSL/TLS-Zertifikatsfehler umgehen (nützlich für selbstsignierte Zertifikate oder ältere Geräte, die modernen Zertifizierungsstellen nicht vertrauen).</value>
+  </data>
 </root>

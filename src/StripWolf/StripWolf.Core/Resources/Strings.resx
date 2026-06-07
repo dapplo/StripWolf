@@ -907,4 +907,10 @@
   <data name="ConfirmDeleteServerMessage" xml:space="preserve">
     <value>There are {0} comics linked to this server. If you delete it, their reading progress will no longer be synchronized. Do you want to proceed?</value>
   </data>
+  <data name="BypassSslValidation" xml:space="preserve">
+    <value>Bypass SSL/TLS Verification</value>
+  </data>
+  <data name="BypassSslValidationHint" xml:space="preserve">
+    <value>Bypass SSL/TLS certificate errors (useful for self-signed certificates or old devices that don't trust modern CAs).</value>
+  </data>
 </root>

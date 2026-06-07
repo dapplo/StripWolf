@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -91,5 +91,10 @@ public class KomgaServer
     /// Last successful connection time
     /// </summary>
     public DateTime? LastConnected { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to bypass SSL/TLS certificate verification.
+    /// </summary>
+    public bool BypassSslValidation { get; set; }
 }
 

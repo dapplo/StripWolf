@@ -297,4 +297,7 @@ public class Loc : INotifyPropertyChanged
     public string ApiKeyPlaceholder => GetString();
     public string UsernamePlaceholder => GetString();
     public string PasswordPlaceholder => GetString();
+
+    public string BypassSslValidation => GetString();
+    public string BypassSslValidationHint => GetString();
 }

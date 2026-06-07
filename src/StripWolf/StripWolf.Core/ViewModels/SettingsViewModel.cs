@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -97,6 +97,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private string? _connectionStatus;
+
+    [ObservableProperty]
+    private bool _bypassSslValidation;
 
     [ObservableProperty]
     private bool _isPasswordVisible;
@@ -775,6 +778,7 @@ public partial class SettingsViewModel : ViewModelBase
         Username = string.Empty;
         Password = string.Empty;
         ApiKey = string.Empty;
+        BypassSslValidation = false;
         CustomHeaders.Clear();
         ConnectionStatus = null;
         IsPasswordVisible = false;
@@ -795,6 +799,7 @@ public partial class SettingsViewModel : ViewModelBase
         Username = server.Username;
         Password = server.Password;
         ApiKey = server.ApiKey;
+        BypassSslValidation = server.BypassSslValidation;
         CustomHeaders.Clear();
         foreach (var header in server.CustomHeaders)
         {
@@ -812,6 +817,7 @@ public partial class SettingsViewModel : ViewModelBase
         IsEditing = false;
         IsPasswordVisible = false;
         _editingServer = null;
+        BypassSslValidation = false;
         CustomHeaders.Clear();
     }
 
@@ -878,6 +884,7 @@ public partial class SettingsViewModel : ViewModelBase
             server.Username = Username;
             server.Password = Password;
             server.ApiKey = ApiKey;
+            server.BypassSslValidation = BypassSslValidation;
             server.CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList();
             
             // Ensure we have a browsing server ID set if this is the only server
@@ -1029,12 +1036,13 @@ public partial class SettingsViewModel : ViewModelBase
                 Username = Username,
                 Password = Password,
                 ApiKey = ApiKey,
+                BypassSslValidation = BypassSslValidation,
                 CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList()
             };
 
             using var testKomgaApiService = new KomgaApiService();
             testKomgaApiService.Configure(testServer);
-            var result = await testKomgaApiService.TestConnectionWithDetailsAsync(testConnectionCts.Token);
+            var result = await Task.Run(() => testKomgaApiService.TestConnectionWithDetailsAsync(testConnectionCts.Token));
 
             if (!ReferenceEquals(_testConnectionCts, testConnectionCts))
             {
@@ -1049,6 +1057,7 @@ public partial class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            Logger.Error("Komga connection test failed", ex);
             ConnectionStatus = $"✗ Error: {ex.Message}";
         }
         finally

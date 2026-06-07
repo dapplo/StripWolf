@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -88,9 +88,16 @@ public class KomgaApiService : IDisposable
             UseCookies = true,
             CookieContainer = new CookieContainer()
         };
+
+        if (server.BypassSslValidation)
+        {
+            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+        }
+        
+        var backgroundHandler = new BackgroundHttpHandler(handler);
         
         _httpClient?.Dispose();
-        _httpClient = new HttpClient(handler)
+        _httpClient = new HttpClient(backgroundHandler)
         {
             BaseAddress = new Uri(NormalizeServerBaseUrl(server.BaseUrl).TrimEnd('/') + "/"),
             Timeout = TimeSpan.FromMinutes(20)
@@ -173,6 +180,7 @@ public class KomgaApiService : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.Error("Komga server connection check failed", ex);
             return (false, ex.Message);
         }
     }
@@ -1023,5 +1031,21 @@ public class KomgaApiService : IDisposable
     {
         _httpClient?.Dispose();
         _httpClient = null;
+    }
+}
+
+/// <summary>
+/// A delegating handler that forces the underlying HTTP send operation to run on a background thread.
+/// This prevents NetworkOnMainThreadException on Android when requests are initiated from the UI thread.
+/// </summary>
+internal sealed class BackgroundHttpHandler : DelegatingHandler
+{
+    public BackgroundHttpHandler(HttpMessageHandler innerHandler) : base(innerHandler)
+    {
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => base.SendAsync(request, cancellationToken), cancellationToken);
     }
 }
