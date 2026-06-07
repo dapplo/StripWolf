@@ -125,7 +125,7 @@
     </DataTemplate>
 
     <DataTemplate x:Key="SeriesGroupTemplate" x:DataType="models:ComicSeriesGroup">
-      <Expander IsExpanded="{Binding IsExpanded}" Margin="0,0,0,16" Padding="0" HorizontalAlignment="Stretch">
+      <Expander IsExpanded="{Binding IsExpanded}" ContentTransition="{x:Null}" Margin="0,0,0,16" Padding="0" HorizontalAlignment="Stretch">
         <Expander.Header>
           <Border CornerRadius="8" Padding="12" HorizontalAlignment="Stretch"
                   Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
