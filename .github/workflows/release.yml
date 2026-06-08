@@ -155,16 +155,86 @@ jobs:
         run: dotnet restore src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj
 
       - name: Build macOS x64 Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-x64 --self-contained -o publish/macos-x64 -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-x64 --self-contained -o publish/macos-x64/StripWolf.app/Contents/MacOS -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+          mkdir -p publish/macos-x64/StripWolf.app/Contents
+          cat << 'EOF' > publish/macos-x64/StripWolf.app/Contents/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>StripWolf</string>
+              <key>CFBundleIdentifier</key>
+              <string>net.dapplo.stripwolf</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>StripWolf</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleVersion</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.12</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          find publish/macos-x64/StripWolf.app -name "*.dylib" -exec codesign --force -s - {} \;
+          codesign --force -s - publish/macos-x64/StripWolf.app/Contents/MacOS/StripWolf
+          codesign --force -s - publish/macos-x64/StripWolf.app
 
       - name: Build macOS ARM64 Release
-        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-arm64 --self-contained -o publish/macos-arm64 -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -c Release -r osx-arm64 --self-contained -o publish/macos-arm64/StripWolf.app/Contents/MacOS -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+          mkdir -p publish/macos-arm64/StripWolf.app/Contents
+          cat << 'EOF' > publish/macos-arm64/StripWolf.app/Contents/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleExecutable</key>
+              <string>StripWolf</string>
+              <key>CFBundleIdentifier</key>
+              <string>net.dapplo.stripwolf</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>StripWolf</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>CFBundleSignature</key>
+              <string>????</string>
+              <key>CFBundleVersion</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.12</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          find publish/macos-arm64/StripWolf.app -name "*.dylib" -exec codesign --force -s - {} \;
+          codesign --force -s - publish/macos-arm64/StripWolf.app/Contents/MacOS/StripWolf
+          codesign --force -s - publish/macos-arm64/StripWolf.app
 
       - name: Create macOS x64 tarball
-        run: tar -czvf StripWolf-macOS-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/macos-x64 .
+        run: tar -czvf StripWolf-macOS-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/macos-x64 StripWolf.app
 
       - name: Create macOS ARM64 tarball
-        run: tar -czvf StripWolf-macOS-arm64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/macos-arm64 .
+        run: tar -czvf StripWolf-macOS-arm64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/macos-arm64 StripWolf.app
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2

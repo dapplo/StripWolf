@@ -1,0 +1,85 @@
+name: Update Homebrew Cask
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download macOS Release Assets
+        run: |
+          gh release download ${{ github.event.release.tag_name }} --pattern "StripWolf-macOS-*.tar.gz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate SHA-256 Checksums
+        id: shas
+        run: |
+          FILE_X64=$(ls StripWolf-macOS-x64-*.tar.gz)
+          FILE_ARM64=$(ls StripWolf-macOS-arm64-*.tar.gz)
+          
+          SHA_X64=$(sha256sum "$FILE_X64" | awk '{print $1}')
+          SHA_ARM64=$(sha256sum "$FILE_ARM64" | awk '{print $1}')
+          
+          echo "file_x64=$FILE_X64" >> $GITHUB_OUTPUT
+          echo "file_arm64=$FILE_ARM64" >> $GITHUB_OUTPUT
+          echo "sha_x64=$SHA_X64" >> $GITHUB_OUTPUT
+          echo "sha_arm64=$SHA_ARM64" >> $GITHUB_OUTPUT
+
+      - name: Update Cask in homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not set, skipping Homebrew Tap update."
+            exit 0
+          fi
+          
+          # Clone the tap repository
+          git clone https://x-access-token:${TAP_TOKEN}@github.com/dapplo/homebrew-tap.git homebrew-tap
+          cd homebrew-tap
+          mkdir -p Casks
+          
+          # Write Cask file (using standard Homebrew #{version} variable interpolation)
+          cat << EOF > Casks/stripwolf.rb
+          cask "stripwolf" do
+            version "${{ github.event.release.tag_name }}"
+
+            on_intel do
+              sha256 "${{ steps.shas.outputs.sha_x64 }}"
+              url "https://github.com/dapplo/StripWolf/releases/download/#{version}/${{ steps.shas.outputs.file_x64 }}"
+            end
+            on_arm do
+              sha256 "${{ steps.shas.outputs.sha_arm64 }}"
+              url "https://github.com/dapplo/StripWolf/releases/download/#{version}/${{ steps.shas.outputs.file_arm64 }}"
+            end
+
+            name "StripWolf"
+            desc "Cross-platform comic book reader with Komga integration"
+            homepage "https://github.com/dapplo/StripWolf"
+
+            app "StripWolf.app"
+
+            zap trash: [
+              "~/Library/Application Support/StripWolf",
+              "~/Library/Preferences/net.dapplo.stripwolf.plist",
+              "~/Library/Saved Application State/net.dapplo.stripwolf.savedState",
+            ]
+          end
+          EOF
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Commit and push
+          git add Casks/stripwolf.rb
+          git diff-index --quiet HEAD || (git commit -m "Update StripWolf to ${{ github.event.release.tag_name }}" && git push)

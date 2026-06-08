@@ -96,7 +96,12 @@ Extract the archive:
 tar -xzvf StripWolf-macOS-*.tar.gz -C ~/Applications
 ```
 
-**Note**: On first run, you may need to allow the app in System Preferences > Security & Privacy if macOS blocks it.
+**Gatekeeper Notice**: Because the application is ad-hoc signed, macOS will block it on first run with a security warning. To easily bypass this:
+- **Using Finder**: Right-click (or Control-click) `StripWolf.app` in your `~/Applications` folder, select **Open**, and then click **Open** in the dialog. You only need to do this once; macOS will approve the app and all its nested library files.
+- **Using Terminal**: Alternatively, clear the download quarantine flag recursively on the extracted bundle:
+  ```bash
+  xattr -d com.apple.quarantine ~/Applications/StripWolf.app
+  ```
 
 ## Requirements
 
