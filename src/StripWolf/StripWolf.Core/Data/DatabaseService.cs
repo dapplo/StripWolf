@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -147,6 +147,7 @@ public class DatabaseService : IAsyncDisposable
         // New comics are those that haven't been started (no reading progress and not completed)
         return await db.Table<Comic>()
             .Where(c => !c.IsCompleted && c.CurrentPage == 0 && c.LastReadDate == null)
+            .OrderByDescending(c => c.AddedDate)
             .ToListAsync();
     }
 

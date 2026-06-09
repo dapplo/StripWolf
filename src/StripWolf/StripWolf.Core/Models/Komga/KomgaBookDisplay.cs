@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -39,6 +39,9 @@ public partial class KomgaBookDisplay : ObservableObject
 
     [ObservableProperty]
     private bool _isQueued;
+
+    [ObservableProperty]
+    private bool _isLoaded;
 
     [ObservableProperty]
     private bool _isDownloading;

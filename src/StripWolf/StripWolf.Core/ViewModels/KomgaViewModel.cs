@@ -51,6 +51,7 @@ public partial class KomgaViewModel : ViewModelBase
     private CancellationTokenSource? _loadingCts;
     private bool _isApplyingSectionLayout;
     private int _savedSeriesPage;
+    private DateTime _lastLoadTime = DateTime.MinValue;
     
     // Cache timestamps for smart lists
     private DateTime _readListsCacheTime;
@@ -60,12 +61,68 @@ public partial class KomgaViewModel : ViewModelBase
     private DateTime _recentSeriesCacheTime;
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
+    private readonly HashSet<string> _downloadedKomgaIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _downloadedKomgaHashes = new(StringComparer.OrdinalIgnoreCase);
+    private bool _downloadedComicsCacheLoaded;
+    private readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
+
+    private void InvalidateDownloadedComicsCache()
+    {
+        _downloadedComicsCacheLoaded = false;
+    }
+
+    private async Task EnsureDownloadedComicsCacheLoadedAsync()
+    {
+        if (_downloadedComicsCacheLoaded)
+        {
+            return;
+        }
+
+        await _cacheSemaphore.WaitAsync();
+        try
+        {
+            if (_downloadedComicsCacheLoaded)
+            {
+                return;
+            }
+
+            _downloadedKomgaIds.Clear();
+            _downloadedKomgaHashes.Clear();
+
+            if (_activeServer is not null)
+            {
+                var allComics = await _databaseService.GetComicsAsync();
+                var serverComics = allComics
+                    .Where(c => c.KomgaServerId == _activeServer.Id || c.KomgaServerId == null)
+                    .ToList();
+                foreach (var comic in serverComics)
+                {
+                    if (!string.IsNullOrEmpty(comic.KomgaId))
+                    {
+                        _downloadedKomgaIds.Add(comic.KomgaId);
+                    }
+                    if (!string.IsNullOrEmpty(comic.KomgaHash))
+                    {
+                        _downloadedKomgaHashes.Add(comic.KomgaHash);
+                    }
+                }
+            }
+
+            _downloadedComicsCacheLoaded = true;
+        }
+        finally
+        {
+            _cacheSemaphore.Release();
+        }
+    }
+
     /// <summary>
     /// Cancels any ongoing loading, schedules deferred disposal of the old CTS,
     /// creates a fresh CTS and returns its token.
     /// </summary>
     private CancellationToken ResetLoadingCancellation()
     {
+        _lastLoadTime = DateTime.UtcNow;
         var oldCts = _loadingCts;
         _loadingCts = new CancellationTokenSource();
         if (oldCts is not null)
@@ -522,6 +579,12 @@ public partial class KomgaViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowReadListsSection));
     }
 
+    private int GetAnimationDelayMs()
+    {
+        var elapsed = DateTime.UtcNow - _lastLoadTime;
+        return elapsed.TotalMilliseconds < 800 ? 300 : 50;
+    }
+
     private KomgaBookDisplay CreateBookDisplay(KomgaBook book, Bitmap? thumbnail, bool isDownloaded)
     {
         _downloadItemsByBookId.TryGetValue(book.Id, out var queueItem);
@@ -531,7 +594,7 @@ public partial class KomgaViewModel : ViewModelBase
                                     !postDownloadWorkItem.PendingImport.IsCompleted &&
                                     !postDownloadWorkItem.PendingImport.IsFailed;
         var importingPostDownload = postDownloadWorkItem?.PendingImport.IsProcessing ?? false;
-        return new KomgaBookDisplay
+        var display = new KomgaBookDisplay
         {
             Book = book,
             Thumbnail = thumbnail,
@@ -541,6 +604,11 @@ public partial class KomgaViewModel : ViewModelBase
             IsCancelling = queueItem?.IsCancelling ?? false,
             DownloadProgress = queueItem?.Progress ?? postDownloadWorkItem?.PendingImport.Progress ?? 0
         };
+
+        // Trigger loaded transition after a brief delay on UI thread
+        _ = Task.Delay(GetAnimationDelayMs()).ContinueWith(_ => Dispatcher.UIThread.Post(() => display.IsLoaded = true));
+
+        return display;
     }
 
     private KomgaSeriesDisplay CreateSeriesDisplay(KomgaSeries series, Bitmap? thumbnail)
@@ -551,6 +619,24 @@ public partial class KomgaViewModel : ViewModelBase
             Thumbnail = thumbnail
         };
         ApplySeriesDownloadState(display);
+
+        // Trigger loaded transition after a brief delay on UI thread
+        _ = Task.Delay(GetAnimationDelayMs()).ContinueWith(_ => Dispatcher.UIThread.Post(() => display.IsLoaded = true));
+
+        return display;
+    }
+
+    private KomgaReadListDisplay CreateReadListDisplay(KomgaReadList readList, Bitmap? thumbnail)
+    {
+        var display = new KomgaReadListDisplay
+        {
+            ReadList = readList,
+            Thumbnail = thumbnail
+        };
+
+        // Trigger loaded transition after a brief delay on UI thread
+        _ = Task.Delay(GetAnimationDelayMs()).ContinueWith(_ => Dispatcher.UIThread.Post(() => display.IsLoaded = true));
+
         return display;
     }
 
@@ -638,6 +724,7 @@ public partial class KomgaViewModel : ViewModelBase
             });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
+        _libraryService.LibraryChanged += (s, e) => InvalidateDownloadedComicsCache();
     }
 
     private void RegisterHomeSectionLayoutState(SectionLayoutItemViewModel section)
@@ -957,16 +1044,26 @@ public partial class KomgaViewModel : ViewModelBase
 
     private async Task<bool> CheckIfDownloadedAsync(KomgaBook book)
     {
-        var comic = await _libraryService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
-        if (comic is null) return false;
-        // If the comic has a server link, only consider it downloaded for the current server.
-        // Comics without a server link (downloaded before this feature) are treated as matching
-        // all servers to preserve backward compatibility.
-        if (comic.KomgaServerId.HasValue && _activeServer is not null)
+        try
         {
-            return comic.KomgaServerId.Value == _activeServer.Id;
+            await EnsureDownloadedComicsCacheLoadedAsync();
+            
+            if (_downloadedKomgaIds.Contains(book.Id))
+            {
+                return true;
+            }
+            
+            if (!string.IsNullOrEmpty(book.FileHash) && _downloadedKomgaHashes.Contains(book.FileHash))
+            {
+                return true;
+            }
         }
-        return true;
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error checking download status for book '{book.Name}': {ex.Message}");
+        }
+        
+        return false;
     }
 
     private async Task LoadSearchBookThumbnailAsync(KomgaBook book, CancellationToken ct)
@@ -1540,6 +1637,7 @@ public partial class KomgaViewModel : ViewModelBase
     private void ResetNavigationState()
     {
         ResetLoadingCancellation();
+        InvalidateDownloadedComicsCache();
 
         ClearSearch();
         SelectedInfoBookDisplay = null;
@@ -3204,11 +3302,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    ReadLists.Add(new KomgaReadListDisplay
-                    {
-                        ReadList = readList,
-                        Thumbnail = thumbnail
-                    });
+                    ReadLists.Add(CreateReadListDisplay(readList, thumbnail));
                     RefreshHomeSectionVisibilityState();
                 }
                 else
@@ -3228,11 +3322,7 @@ public partial class KomgaViewModel : ViewModelBase
                 {
                     if (!ct.IsCancellationRequested)
                     {
-                        ReadLists.Add(new KomgaReadListDisplay
-                        {
-                            ReadList = readList,
-                            Thumbnail = null
-                        });
+                        ReadLists.Add(CreateReadListDisplay(readList, null));
                         RefreshHomeSectionVisibilityState();
                     }
                 });

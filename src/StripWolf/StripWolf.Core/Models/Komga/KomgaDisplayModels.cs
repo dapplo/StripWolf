@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -46,6 +46,9 @@ public partial class KomgaSeriesDisplay : ObservableObject
         ? $"{BooksReadCount}/{BooksCount} read"
         : $"{BooksReadCount} read";
     public string Summary => Series.Metadata?.Summary ?? string.Empty;
+
+    [ObservableProperty]
+    private bool _isLoaded;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDownloading))]

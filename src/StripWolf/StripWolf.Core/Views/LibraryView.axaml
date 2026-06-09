@@ -25,12 +25,37 @@
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.icon-btn:pointerover">
+      <Setter Property="Background" Value="#15000000"/>
+    </Style>
+    
+    <!-- Comic card hover transition styles -->
+    <Style Selector="Border.comic-card">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" Easing="SineEaseOut"/>
+          <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.25" Easing="SineEaseOut"/>
+        </Transitions>
+      </Setter>
+      <Setter Property="RenderTransform" Value="scale(1.0)"/>
+      <Setter Property="BoxShadow" Value="0 2 6 0 #15000000"/>
+    </Style>
+    <Style Selector="Border.comic-card:pointerover">
+      <Setter Property="RenderTransform" Value="scale(1.04)"/>
+      <Setter Property="BoxShadow" Value="0 8 20 0 #30000000"/>
+      <Setter Property="ZIndex" Value="10"/>
     </Style>
   </UserControl.Styles>
   
   <UserControl.Resources>
     <DataTemplate x:Key="ComicTemplate" x:DataType="models:Comic">
-      <Border CornerRadius="8" ClipToBounds="True" Width="150"
+      <Border Classes="comic-card" CornerRadius="8" ClipToBounds="True" Width="150"
                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
         <Grid RowDefinitions="200,Auto,Auto,Auto">
           <!-- Cover with click handler -->
@@ -130,12 +155,44 @@
           <Border CornerRadius="8" Padding="12" HorizontalAlignment="Stretch"
                   Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-              <Border Width="72" Height="96" CornerRadius="8" ClipToBounds="True" Background="Black">
-                <controls:AsyncImage SourceUrl="{Binding RepresentativeComic.CoverPath}" Stretch="Uniform"
-                                     RenderOptions.BitmapInterpolationMode="LowQuality"
-                                     IsHitTestVisible="False"
-                                     VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
-              </Border>
+              <!-- 3D stacked cover visual for series -->
+              <Grid Width="88" Height="104" Margin="0,0,8,0">
+                <!-- Third cover (back, rotated left) -->
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding HasThirdCover}" Opacity="0.7">
+                  <Border.RenderTransform>
+                    <TransformOperations>translate(-8px, -4px) rotate(-6deg)</TransformOperations>
+                  </Border.RenderTransform>
+                  <controls:AsyncImage SourceUrl="{Binding CoverPath3}" Stretch="Uniform"
+                                       RenderOptions.BitmapInterpolationMode="LowQuality"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                </Border>
+
+                <!-- Second cover (middle, rotated right) -->
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding HasSecondCover}" Opacity="0.85">
+                  <Border.RenderTransform>
+                    <TransformOperations>translate(8px, -2px) rotate(6deg)</TransformOperations>
+                  </Border.RenderTransform>
+                  <controls:AsyncImage SourceUrl="{Binding CoverPath2}" Stretch="Uniform"
+                                       RenderOptions.BitmapInterpolationMode="LowQuality"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                </Border>
+
+                <!-- First cover (front, straight) -->
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        BoxShadow="0 4 8 0 #35000000">
+                  <controls:AsyncImage SourceUrl="{Binding CoverPath1}" Stretch="Uniform"
+                                       RenderOptions.BitmapInterpolationMode="LowQuality"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                </Border>
+              </Grid>
 
               <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"/>

@@ -10,8 +10,11 @@
   
   <Grid RowDefinitions="*,Auto">
     <!-- Content Area -->
-    <ContentControl Grid.Row="0" Content="{Binding CurrentView}">
-      <ContentControl.DataTemplates>
+    <TransitioningContentControl Grid.Row="0" Content="{Binding CurrentView}">
+      <TransitioningContentControl.PageTransition>
+        <CrossFade Duration="0:0:0.25"/>
+      </TransitioningContentControl.PageTransition>
+      <TransitioningContentControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
           <views:LibraryView />
         </DataTemplate>
@@ -27,8 +30,8 @@
         <DataTemplate DataType="{x:Type vm:ReaderViewModel}">
           <views:ReaderView />
         </DataTemplate>
-      </ContentControl.DataTemplates>
-    </ContentControl>
+      </TransitioningContentControl.DataTemplates>
+    </TransitioningContentControl>
 
     <!-- Tab Bar - Hidden when in reader -->
     <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 

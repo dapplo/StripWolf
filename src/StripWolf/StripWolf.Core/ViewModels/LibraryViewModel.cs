@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -467,7 +467,39 @@ public partial class LibraryViewModel : ViewModelBase
             .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        SeriesGroups = new ObservableCollection<ComicSeriesGroup>(groups);
+        // Merge series groups in-place to preserve their visual container state (prevent cover/expander twitching)
+        var toRemove = SeriesGroups.Where(existing => groups.All(g => !string.Equals(NormalizeSeriesName(g.Name), NormalizeSeriesName(existing.Name), StringComparison.OrdinalIgnoreCase))).ToList();
+        foreach (var group in toRemove)
+        {
+            SeriesGroups.Remove(group);
+        }
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            var targetGroup = groups[i];
+            var targetNameNormalized = NormalizeSeriesName(targetGroup.Name);
+            var existing = SeriesGroups.FirstOrDefault(g => string.Equals(NormalizeSeriesName(g.Name), targetNameNormalized, StringComparison.OrdinalIgnoreCase));
+
+            if (existing == null)
+            {
+                SeriesGroups.Insert(i, targetGroup);
+            }
+            else
+            {
+                // Update representative comic
+                existing.RepresentativeComic = targetGroup.RepresentativeComic;
+
+                // Merge the comics collection inside the group in-place to avoid recreating items
+                MergeComics(existing.Comics, targetGroup.Comics.ToList());
+
+                // Move existing group to its sorted position if necessary
+                int currentIndex = SeriesGroups.IndexOf(existing);
+                if (currentIndex != i)
+                {
+                    SeriesGroups.Move(currentIndex, i);
+                }
+            }
+        }
 
         RefreshSectionVisibilityState();
     }

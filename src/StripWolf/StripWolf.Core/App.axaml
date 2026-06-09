@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:StripWolf"
+             xmlns:controls="using:StripWolf.Core.Controls"
              x:Class="StripWolf.App"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -11,5 +12,21 @@
 
     <Application.Styles>
         <FluentTheme />
+        
+        <!-- Global AsyncImage Styles -->
+        <Style Selector="controls|AsyncImage">
+            <Setter Property="Opacity" Value="0.0" />
+            <Setter Property="RenderTransform" Value="scale(0.85)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="SineEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="BackEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="controls|AsyncImage[IsImageLoaded=True]">
+            <Setter Property="Opacity" Value="1.0" />
+            <Setter Property="RenderTransform" Value="scale(1.0)" />
+        </Style>
     </Application.Styles>
 </Application>

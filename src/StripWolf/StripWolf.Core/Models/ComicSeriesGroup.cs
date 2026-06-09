@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -74,6 +74,13 @@ public partial class ComicSeriesGroup : ObservableObject
     public string ComicCountDisplay => string.Format(Loc.Instance.ComicCountDisplay, ComicCount);
     public string ReadCountDisplay => string.Format(Loc.Instance.ReadCountDisplay, ReadCount);
 
+    public string? CoverPath1 => RepresentativeComic?.CoverPath ?? (Comics.Count > 0 ? Comics[0].CoverPath : null);
+    public string? CoverPath2 => Comics.Count > 1 ? Comics[1].CoverPath : null;
+    public string? CoverPath3 => Comics.Count > 2 ? Comics[2].CoverPath : null;
+
+    public bool HasSecondCover => Comics.Count > 1;
+    public bool HasThirdCover => Comics.Count > 2;
+
     partial void OnComicsChanged(ObservableCollection<Comic>? oldValue, ObservableCollection<Comic> newValue)
     {
         if (oldValue is not null)
@@ -134,6 +141,11 @@ public partial class ComicSeriesGroup : ObservableObject
         OnPropertyChanged(nameof(DeleteStatusText));
         OnPropertyChanged(nameof(ComicCountDisplay));
         OnPropertyChanged(nameof(ReadCountDisplay));
+        OnPropertyChanged(nameof(CoverPath1));
+        OnPropertyChanged(nameof(CoverPath2));
+        OnPropertyChanged(nameof(CoverPath3));
+        OnPropertyChanged(nameof(HasSecondCover));
+        OnPropertyChanged(nameof(HasThirdCover));
     }
 
     public void RefreshLocalization()

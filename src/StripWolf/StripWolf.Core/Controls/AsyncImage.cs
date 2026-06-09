@@ -81,6 +81,9 @@ public class AsyncImage : Control
     public static readonly StyledProperty<Stretch> StretchProperty =
         AvaloniaProperty.Register<AsyncImage, Stretch>(nameof(Stretch), Stretch.Uniform);
 
+    public static readonly StyledProperty<bool> IsImageLoadedProperty =
+        AvaloniaProperty.Register<AsyncImage, bool>(nameof(IsImageLoaded), false);
+
     /// <summary>
     /// URL of the image to load
     /// </summary>
@@ -124,6 +127,15 @@ public class AsyncImage : Control
     {
         get => GetValue(StretchProperty);
         set => SetValue(StretchProperty, value);
+    }
+
+    /// <summary>
+    /// Gets whether the image has finished loading
+    /// </summary>
+    public bool IsImageLoaded
+    {
+        get => GetValue(IsImageLoadedProperty);
+        private set => SetValue(IsImageLoadedProperty, value);
     }
 
     private void OnSourceUrlChanged()
@@ -253,6 +265,7 @@ public class AsyncImage : Control
                             {
                                 _loadedBitmap = bitmap;
                                 _ownsLoadedBitmap = true;
+                                IsImageLoaded = true;
                                 InvalidateVisual();
                                 bitmap = null;
                             }
@@ -277,6 +290,7 @@ public class AsyncImage : Control
                 {
                     _loadedBitmap = cachedBitmap;
                     _ownsLoadedBitmap = false;
+                    IsImageLoaded = true;
                     InvalidateVisual();
                 }
                 return;
@@ -325,6 +339,7 @@ public class AsyncImage : Control
                 {
                     _loadedBitmap = sharedBitmap;
                     _ownsLoadedBitmap = false;
+                    IsImageLoaded = true;
                     InvalidateVisual();
                 }
             });
@@ -508,6 +523,7 @@ public class AsyncImage : Control
             return;
         }
 
+        IsImageLoaded = false;
         _isLoading = true;
 
         var newCts = new CancellationTokenSource();
@@ -530,6 +546,7 @@ public class AsyncImage : Control
 
     private void ResetImageState()
     {
+        IsImageLoaded = false;
         Interlocked.Increment(ref _loadVersion);
 
         var cts = Interlocked.Exchange(ref _cts, null);

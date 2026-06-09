@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -18,14 +18,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
 /// Display model for a Komga read list with pre-loaded thumbnail
 /// </summary>
-public class KomgaReadListDisplay
+public partial class KomgaReadListDisplay : ObservableObject
 {
+    [ObservableProperty]
+    private bool _isLoaded;
     /// <summary>
     /// The underlying Komga read list data
     /// </summary>
