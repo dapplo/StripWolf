@@ -32,10 +32,8 @@ public partial class KomgaBookDisplay : ObservableObject
     /// </summary>
     public KomgaBook Book { get; set; } = new();
 
-    /// <summary>
-    /// Pre-loaded thumbnail bitmap
-    /// </summary>
-    public Bitmap? Thumbnail { get; set; }
+    [ObservableProperty]
+    private Bitmap? _thumbnail;
 
     [ObservableProperty]
     private bool _isQueued;

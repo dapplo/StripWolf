@@ -34,10 +34,8 @@ public partial class KomgaReadListDisplay : ObservableObject
     /// </summary>
     public KomgaReadList ReadList { get; set; } = new();
 
-    /// <summary>
-    /// Pre-loaded thumbnail bitmap
-    /// </summary>
-    public Bitmap? Thumbnail { get; set; }
+    [ObservableProperty]
+    private Bitmap? _thumbnail;
 
     // Convenience properties for binding
     public string Id => ReadList.Id;

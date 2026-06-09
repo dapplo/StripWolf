@@ -40,6 +40,7 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly KomgaSyncService _komgaSyncService;
+    private readonly IExternalLinkService _externalLinkService;
     private CancellationTokenSource? _deleteCountdownLoopCancellation;
     private Task? _deleteCountdownLoopTask;
     private bool _hasLoadedComics;
@@ -169,7 +170,8 @@ public partial class LibraryViewModel : ViewModelBase
         ImportQueueService importQueueService, 
         SettingsService settingsService,
         KomgaApiServiceFactory komgaApiServiceFactory,
-        KomgaSyncService komgaSyncService)
+        KomgaSyncService komgaSyncService,
+        IExternalLinkService externalLinkService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
@@ -177,6 +179,7 @@ public partial class LibraryViewModel : ViewModelBase
         _settingsService = settingsService;
         _komgaApiServiceFactory = komgaApiServiceFactory;
         _komgaSyncService = komgaSyncService;
+        _externalLinkService = externalLinkService;
         Title = Loc.Instance.Library;
 
         RegisterSectionLayoutState(ContinueReadingSection);
@@ -259,6 +262,36 @@ public partial class LibraryViewModel : ViewModelBase
             });
             SelectedInfoComic = null;
         }
+    }
+
+    [RelayCommand]
+    private void OpenBookOnline(Comic comic)
+    {
+        var baseUrl = GetServerBaseUrl(comic.KomgaServerId);
+        if (!string.IsNullOrEmpty(baseUrl) && !string.IsNullOrEmpty(comic.KomgaId))
+        {
+            var url = $"{baseUrl.TrimEnd('/')}/book/{comic.KomgaId}";
+            _externalLinkService.OpenUrl(url);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenSeriesOnline(Comic comic)
+    {
+        var baseUrl = GetServerBaseUrl(comic.KomgaServerId);
+        if (!string.IsNullOrEmpty(baseUrl) && !string.IsNullOrEmpty(comic.KomgaSeriesId))
+        {
+            var url = $"{baseUrl.TrimEnd('/')}/series/{comic.KomgaSeriesId}";
+            _externalLinkService.OpenUrl(url);
+        }
+    }
+
+    private string? GetServerBaseUrl(int? serverId)
+    {
+        if (!serverId.HasValue) return null;
+        var settings = _settingsService.LoadSettings();
+        var server = settings.Servers.FirstOrDefault(s => s.Id == serverId.Value);
+        return server?.BaseUrl;
     }
 
     partial void OnSearchTextChanged(string value)

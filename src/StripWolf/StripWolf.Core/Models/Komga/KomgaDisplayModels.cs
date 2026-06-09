@@ -32,10 +32,8 @@ public partial class KomgaSeriesDisplay : ObservableObject
     /// </summary>
     public KomgaSeries Series { get; set; } = new();
 
-    /// <summary>
-    /// Pre-loaded thumbnail bitmap
-    /// </summary>
-    public Bitmap? Thumbnail { get; set; }
+    [ObservableProperty]
+    private Bitmap? _thumbnail;
 
     // Convenience properties for binding
     public string Id => Series.Id;

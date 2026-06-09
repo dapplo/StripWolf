@@ -472,6 +472,12 @@
   <data name="ViewSeriesOnKomga" xml:space="preserve">
     <value>View Series on Komga</value>
   </data>
+  <data name="OpenBookOnline" xml:space="preserve">
+    <value>Open boek online</value>
+  </data>
+  <data name="OpenSeriesOnline" xml:space="preserve">
+    <value>Open serie online</value>
+  </data>
   <data name="OpenFolder" xml:space="preserve">
     <value>Open Folder</value>
   </data>

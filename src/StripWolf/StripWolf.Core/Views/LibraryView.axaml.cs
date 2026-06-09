@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -196,6 +196,24 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
         if (DataContext is LibraryViewModel viewModel && SelectedInfoComic is not null)
         {
             viewModel.ViewSeriesOnKomgaCommand.Execute(SelectedInfoComic);
+            e.Handled = true;
+        }
+    }
+
+    private void OnOpenBookOnlineClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel && SelectedInfoComic is not null)
+        {
+            viewModel.OpenBookOnlineCommand.Execute(SelectedInfoComic);
+            e.Handled = true;
+        }
+    }
+
+    private void OnOpenSeriesOnlineClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel && SelectedInfoComic is not null)
+        {
+            viewModel.OpenSeriesOnlineCommand.Execute(SelectedInfoComic);
             e.Handled = true;
         }
     }

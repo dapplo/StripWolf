@@ -511,6 +511,26 @@
                            <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                         </Button.IsVisible>
                       </Button>
+                       <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,8,0,0">
+                         <Grid.IsVisible>
+                           <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                             <Binding Path="KomgaId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                             <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                           </MultiBinding>
+                         </Grid.IsVisible>
+                         <Button Grid.Column="0" Content="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                                 Click="OnOpenBookOnlineClicked" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                           <Button.IsVisible>
+                             <Binding Path="KomgaId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                           </Button.IsVisible>
+                         </Button>
+                         <Button Grid.Column="1" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                                 Click="OnOpenSeriesOnlineClicked" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                           <Button.IsVisible>
+                             <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                           </Button.IsVisible>
+                         </Button>
+                       </Grid>
                     </StackPanel>
                   </Grid>
                 </StackPanel>

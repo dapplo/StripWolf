@@ -54,6 +54,19 @@
       <Setter Property="Opacity" Value="1.0"/>
       <Setter Property="RenderTransform" Value="scale(1.0)"/>
     </Style>
+    
+    <!-- Fade-in transition for cover images when loaded -->
+    <Style Selector="Border.komga-card Image">
+      <Setter Property="Opacity" Value="0.0"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.4" Easing="SineEaseInOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.komga-card Image.loaded">
+      <Setter Property="Opacity" Value="1.0"/>
+    </Style>
   </UserControl.Styles>
 
   <UserControl.Resources>
@@ -68,7 +81,8 @@
             <Grid RowDefinitions="200,Auto,Auto">
               <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
                 <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
               </Border>
               <Border Grid.Row="1" Height="34" Margin="8,4">
                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
@@ -114,7 +128,8 @@
             <Border Height="200" Background="Black" ClipToBounds="True">
               <Panel>
                 <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                 <Border Background="#80000000" IsVisible="{Binding IsRead}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" CornerRadius="4" Padding="4,2">
                   <TextBlock Text="{Binding MarkRead, Source={x:Static res:Loc.Instance}, StringFormat='{}✓ {0}'}" Foreground="#4CAF50" FontSize="10" FontWeight="Bold"/>
                 </Border>
@@ -461,7 +476,8 @@
                             <Grid RowDefinitions="200,Auto,Auto">
                               <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
                                 <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                               </Border>
                               <Border Grid.Row="1" Height="34" Margin="8,4">
                                 <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
@@ -564,12 +580,20 @@
               </MultiBinding>
             </StackPanel.IsVisible>
             
-             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToSeriesCommand}"
                        Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
                <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
 
-               <Button Grid.Column="2" Content="{Binding Download, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}"
+               <Button Grid.Column="2" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                       Command="{Binding OpenSelectedSeriesOnlineCommand}"
+                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+                 <Button.IsVisible>
+                   <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                 </Button.IsVisible>
+               </Button>
+
+               <Button Grid.Column="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}"
                        Command="{Binding DownloadSelectedSeriesCommand}"
                        Background="Transparent" Padding="8,4" VerticalAlignment="Center">
                  <Button.IsVisible>
@@ -580,17 +604,17 @@
                    </MultiBinding>
                  </Button.IsVisible>
                </Button>
-               <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+               <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
                        VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesQueuedForDownload}">
                  <TextBlock Text="{Binding Queued, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
                </Border>
-               <Border Grid.Column="2" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+               <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
                        VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesDownloading}">
                  <TextBlock Text="{Binding Downloading, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
                </Border>
                
                <!-- Sort Order Toggle -->
-               <Button Grid.Column="3" Command="{Binding CycleSortOrderCommand}"
+               <Button Grid.Column="4" Command="{Binding CycleSortOrderCommand}"
                        Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
                  <StackPanel Orientation="Horizontal" Spacing="4">
                    <TextBlock Text="{Binding Sort, Source={x:Static res:Loc.Instance}, StringFormat='{}{0}:'}"/>
@@ -599,7 +623,7 @@
                </Button>
                
                <!-- Sort Direction Toggle -->
-               <Button Grid.Column="4" Command="{Binding ToggleSortDirectionCommand}"
+               <Button Grid.Column="5" Command="{Binding ToggleSortDirectionCommand}"
                        Background="Transparent" Padding="8,4" VerticalAlignment="Center">
                  <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
                </Button>
@@ -890,6 +914,14 @@
                     <Button Grid.Column="1" Content="{Binding SectionSeries, Source={x:Static res:Loc.Instance}, StringFormat='{}📚 {0}'}"
                             Command="{Binding ((vm:KomgaViewModel)DataContext).ViewSelectedBookSeriesCommand, ElementName=Root}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Content="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).OpenBookOnlineCommand, ElementName=Root}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                            Command="{Binding ((vm:KomgaViewModel)DataContext).OpenBookSeriesOnlineCommand, ElementName=Root}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                   </Grid>
                 </StackPanel>
               </Border>

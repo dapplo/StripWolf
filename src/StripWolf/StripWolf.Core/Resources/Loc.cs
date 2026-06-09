@@ -234,6 +234,8 @@ public class Loc : INotifyPropertyChanged
     public string DeleteActionUndo => GetString();
     public string DeleteActionUndoMultiple => GetString();
     public string ViewSeriesOnKomga => GetString();
+    public string OpenBookOnline => GetString();
+    public string OpenSeriesOnline => GetString();
     public string ReadNowAction => GetString();
     public string MarkReadAction => GetString();
     public string DeleteComicAction => GetString();
