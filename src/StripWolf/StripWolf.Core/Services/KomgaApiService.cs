@@ -296,19 +296,19 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Gets series thumbnail
     /// </summary>
-    public async Task<byte[]?> GetSeriesThumbnailAsync(string seriesId)
+    public async Task<byte[]?> GetSeriesThumbnailAsync(string seriesId, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/series/{seriesId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
         }
         
-        return await response.Content.ReadAsByteArrayAsync();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
     #endregion
@@ -397,19 +397,19 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Gets book thumbnail
     /// </summary>
-    public async Task<byte[]?> GetBookThumbnailAsync(string bookId)
+    public async Task<byte[]?> GetBookThumbnailAsync(string bookId, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
         }
         
-        return await response.Content.ReadAsByteArrayAsync();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
     /// <summary>
@@ -871,19 +871,19 @@ public class KomgaApiService : IDisposable
     /// <summary>
     /// Gets read list thumbnail
     /// </summary>
-    public async Task<byte[]?> GetReadListThumbnailAsync(string readListId)
+    public async Task<byte[]?> GetReadListThumbnailAsync(string readListId, CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/readlists/{readListId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
         }
         
-        return await response.Content.ReadAsByteArrayAsync();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
     /// <summary>

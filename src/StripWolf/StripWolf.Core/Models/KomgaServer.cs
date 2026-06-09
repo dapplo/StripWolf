@@ -96,5 +96,33 @@ public class KomgaServer
     /// Gets or sets whether to bypass SSL/TLS certificate verification.
     /// </summary>
     public bool BypassSslValidation { get; set; }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not KomgaServer other)
+        {
+            return false;
+        }
+
+        if (Id != 0 && other.Id != 0)
+        {
+            return Id == other.Id;
+        }
+
+        return string.Equals(BaseUrl, other.BaseUrl, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(Username, other.Username, StringComparison.Ordinal);
+    }
+
+    public override int GetHashCode()
+    {
+        if (Id != 0)
+        {
+            return Id.GetHashCode();
+        }
+
+        return HashCode.Combine(
+            BaseUrl?.ToLowerInvariant() ?? string.Empty,
+            Username ?? string.Empty);
+    }
 }
 

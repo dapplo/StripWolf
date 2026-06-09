@@ -714,6 +714,8 @@ public partial class KomgaViewModel : ViewModelBase
                 ApplyDownloadSettings(settings);
                 RefreshLocalization();
                 
+                RefreshConfiguredServers(settings);
+                
                 if (_activeServer is not null)
                 {
                     var updatedServer = settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id);
@@ -1474,9 +1476,7 @@ public partial class KomgaViewModel : ViewModelBase
         if (persistSelection)
         {
             await PersistActiveServerSelectionAsync(server.Id);
-            var settings = _settingsService.LoadSettings();
-            RefreshConfiguredServers(settings);
-            activeServer = settings.Servers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id) ?? server;
+            activeServer = ConfiguredServers.FirstOrDefault(configuredServer => configuredServer.Id == server.Id) ?? server;
         }
 
         var activeKomgaApiService = _komgaApiServiceFactory.GetForServer(activeServer);
@@ -1485,6 +1485,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             _komgaApiService = previousServer is not null ? previousKomgaApiService : _inactiveKomgaApiService;
             IsConnected = !persistSelection && hasExistingData;
+            UpdateSelectedServer(previousServer);
             return;
         }
 
@@ -1520,10 +1521,49 @@ public partial class KomgaViewModel : ViewModelBase
 
     private void RefreshConfiguredServers(AppSettings settings)
     {
-        ConfiguredServers.Clear();
-        foreach (var server in settings.Servers)
+        var currentServers = ConfiguredServers.ToList();
+        var newServers = settings.Servers.ToList();
+
+        // Remove servers that are no longer in settings
+        foreach (var server in currentServers)
         {
-            ConfiguredServers.Add(server);
+            if (!newServers.Any(s => s.Id == server.Id))
+            {
+                ConfiguredServers.Remove(server);
+            }
+        }
+
+        // Add or update servers
+        for (int i = 0; i < newServers.Count; i++)
+        {
+            var newServer = newServers[i];
+            var existingServer = ConfiguredServers.FirstOrDefault(s => s.Id == newServer.Id);
+
+            if (existingServer is null)
+            {
+                // New server, insert at correct index
+                if (i < ConfiguredServers.Count)
+                {
+                    ConfiguredServers.Insert(i, newServer);
+                }
+                else
+                {
+                    ConfiguredServers.Add(newServer);
+                }
+            }
+            else
+            {
+                // Update existing server properties and replace in list to trigger ComboBox update
+                if (existingServer.Name != newServer.Name ||
+                    existingServer.BaseUrl != newServer.BaseUrl ||
+                    existingServer.Username != newServer.Username ||
+                    existingServer.Password != newServer.Password ||
+                    existingServer.ApiKey != newServer.ApiKey)
+                {
+                    var index = ConfiguredServers.IndexOf(existingServer);
+                    ConfiguredServers[index] = newServer;
+                }
+            }
         }
 
         OnPropertyChanged(nameof(HasMultipleServers));
@@ -1711,28 +1751,28 @@ public partial class KomgaViewModel : ViewModelBase
     /// <summary>
     /// Returns cached series thumbnail bytes, fetching and caching from the server if not found on disk.
     /// </summary>
-    private async Task<byte[]?> GetOrFetchSeriesThumbnailAsync(string seriesId)
+    private async Task<byte[]?> GetOrFetchSeriesThumbnailAsync(string seriesId, CancellationToken ct)
     {
         var cachePath = GetThumbnailCachePath("series", seriesId);
         if (File.Exists(cachePath))
-            return await File.ReadAllBytesAsync(cachePath);
-        var bytes = await _komgaApiService.GetSeriesThumbnailAsync(seriesId);
-        if (bytes is { Length: > 0 })
-            await File.WriteAllBytesAsync(cachePath, bytes);
+            return await File.ReadAllBytesAsync(cachePath, ct);
+        var bytes = await _komgaApiService.GetSeriesThumbnailAsync(seriesId, ct);
+        if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
+            await File.WriteAllBytesAsync(cachePath, bytes, ct);
         return bytes;
     }
 
     /// <summary>
     /// Returns cached book thumbnail bytes, fetching and caching from the server if not found on disk.
     /// </summary>
-    private async Task<byte[]?> GetOrFetchBookThumbnailAsync(string bookId)
+    private async Task<byte[]?> GetOrFetchBookThumbnailAsync(string bookId, CancellationToken ct)
     {
         var cachePath = GetThumbnailCachePath("books", bookId);
         if (File.Exists(cachePath))
-            return await File.ReadAllBytesAsync(cachePath);
-        var bytes = await _komgaApiService.GetBookThumbnailAsync(bookId);
-        if (bytes is { Length: > 0 })
-            await File.WriteAllBytesAsync(cachePath, bytes);
+            return await File.ReadAllBytesAsync(cachePath, ct);
+        var bytes = await _komgaApiService.GetBookThumbnailAsync(bookId, ct);
+        if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
+            await File.WriteAllBytesAsync(cachePath, bytes, ct);
         return bytes;
     }
 
@@ -1746,7 +1786,7 @@ public partial class KomgaViewModel : ViewModelBase
             Bitmap? thumbnail = null;
             
             // Try to load the thumbnail (using disk cache)
-            var thumbnailBytes = await GetOrFetchSeriesThumbnailAsync(display.Series.Id);
+            var thumbnailBytes = await GetOrFetchSeriesThumbnailAsync(display.Series.Id, ct);
             if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
             {
                 using var stream = new MemoryStream(thumbnailBytes);
@@ -1991,7 +2031,7 @@ public partial class KomgaViewModel : ViewModelBase
             Bitmap? thumbnail = null;
             
             // Try to load the thumbnail (using disk cache)
-            var thumbnailBytes = await GetOrFetchBookThumbnailAsync(display.Book.Id);
+            var thumbnailBytes = await GetOrFetchBookThumbnailAsync(display.Book.Id, ct);
             if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
             {
                 using var stream = new MemoryStream(thumbnailBytes);
@@ -3297,7 +3337,7 @@ public partial class KomgaViewModel : ViewModelBase
             Bitmap? thumbnail = null;
             
             // Try to load the thumbnail
-            var thumbnailBytes = await _komgaApiService.GetReadListThumbnailAsync(display.ReadList.Id);
+            var thumbnailBytes = await _komgaApiService.GetReadListThumbnailAsync(display.ReadList.Id, ct);
             if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
             {
                 using var stream = new MemoryStream(thumbnailBytes);

@@ -614,7 +614,7 @@ public class LibraryService
             cancellationToken.ThrowIfCancellationRequested();
 
             var komgaApiService = ResolveKomgaApiService(downloadedFile.ServerId);
-            var thumbnailData = await komgaApiService.GetBookThumbnailAsync(downloadedFile.Book.Id);
+            var thumbnailData = await komgaApiService.GetBookThumbnailAsync(downloadedFile.Book.Id, cancellationToken);
             if (thumbnailData is not null)
             {
                 coverPath = Path.Combine(_coversDirectory, $"{downloadedFile.Book.Id}.jpg");
