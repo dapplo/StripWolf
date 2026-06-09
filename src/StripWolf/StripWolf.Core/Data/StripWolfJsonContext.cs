@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -43,6 +43,7 @@ namespace StripWolf.Core.Data;
 [JsonSerializable(typeof(Dictionary<int, string>), TypeInfoPropertyName = "DictionaryIntString")]
 [JsonSerializable(typeof(Dictionary<int, SettingsService.SensitiveServerData>), TypeInfoPropertyName = "DictionaryIntSensitiveServerData")]
 [JsonSerializable(typeof(int?), TypeInfoPropertyName = "NullableInt32")]
+[JsonSerializable(typeof(GitHubRelease))]
 public partial class StripWolfJsonContext : JsonSerializerContext
 {
 }

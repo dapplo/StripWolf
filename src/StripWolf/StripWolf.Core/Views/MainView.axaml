@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StripWolf.Core.ViewModels"
              xmlns:views="using:StripWolf.Core.Views"
+             xmlns:res="using:StripWolf.Core.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="StripWolf.Core.Views.MainView"
              x:DataType="vm:MainViewModel">
@@ -78,5 +79,29 @@
         </Button>
       </Grid>
     </Border>
+
+    <!-- Update Notification Overlay -->
+    <Panel Grid.RowSpan="2" Background="#80000000" IsVisible="{Binding ShowUpdateNotification}">
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+              CornerRadius="8" Padding="24" MaxWidth="400"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="16">
+          <TextBlock Text="{Binding UpdateAvailable, Source={x:Static res:Loc.Instance}}" 
+                     FontSize="18" FontWeight="Bold"/>
+          
+          <TextBlock Text="{Binding UpdateNotificationMessage}" TextWrapping="Wrap"/>
+
+          <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+            <Button Content="{Binding Ok, Source={x:Static res:Loc.Instance}}" 
+                    Command="{Binding CloseUpdateNotificationCommand}"/>
+            <Button Content="{Binding BringMeThere, Source={x:Static res:Loc.Instance}}" 
+                    Command="{Binding GoToUpdateCommand}" 
+                    Classes="accent"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
   </Grid>
 </UserControl>

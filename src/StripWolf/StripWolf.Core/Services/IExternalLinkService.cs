@@ -1,0 +1,51 @@
+// StripWolf - an open source comic book reader
+// Copyright (C) 2026 Dapplo - Robin Krom
+//
+// For more information see: https://github.com/dapplo/StripWolf
+// The StripWolf project is hosted on GitHub https://github.com/dapplo/StripWolf
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+namespace StripWolf.Core.Services;
+
+/// <summary>
+/// Service for launching external links and URLs
+/// </summary>
+public interface IExternalLinkService
+{
+    /// <summary>
+    /// Opens the specified URL in the system browser
+    /// </summary>
+    void OpenUrl(string url);
+
+    /// <summary>
+    /// Opens the Ko-fi donation page
+    /// </summary>
+    void OpenKoFi();
+
+    /// <summary>
+    /// Opens the PayPal.me donation page
+    /// </summary>
+    void OpenPayPal();
+
+    /// <summary>
+    /// Opens the GitHub project page
+    /// </summary>
+    void OpenGitHub();
+
+    /// <summary>
+    /// Opens the GitHub project releases page
+    /// </summary>
+    void OpenGitHubReleases();
+}

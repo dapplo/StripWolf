@@ -36,6 +36,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly ReaderViewModel _readerViewModel;
     private readonly SettingsService _settingsService;
     private readonly KomgaSyncService _komgaSyncService;
+    private readonly UpdateService _updateService;
     private bool _isInitializing = true;
 
     [ObservableProperty]
@@ -50,6 +51,12 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _title;
 
+    [ObservableProperty]
+    private bool _showUpdateNotification;
+
+    [ObservableProperty]
+    private string _updateNotificationMessage = string.Empty;
+
     public MainViewModel(
         LibraryViewModel libraryViewModel,
         KomgaViewModel komgaViewModel,
@@ -57,7 +64,8 @@ public partial class MainViewModel : ViewModelBase
         SettingsViewModel settingsViewModel,
         ReaderViewModel readerViewModel,
         SettingsService settingsService,
-        KomgaSyncService komgaSyncService)
+        KomgaSyncService komgaSyncService,
+        UpdateService updateService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
@@ -66,6 +74,7 @@ public partial class MainViewModel : ViewModelBase
         _readerViewModel = readerViewModel;
         _settingsService = settingsService;
         _komgaSyncService = komgaSyncService;
+        _updateService = updateService;
         
         Title = "StripWolf";
         _currentView = _libraryViewModel;
@@ -76,6 +85,13 @@ public partial class MainViewModel : ViewModelBase
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
         _readerViewModel.ComicOpenRequested += OnComicOpenRequested;
         _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
+        
+        _updateService.NewVersionDetected += (sender, version) =>
+        {
+            UpdateNotificationMessage = string.Format(Resources.Loc.Instance.UpdatePopupMessage, version);
+            ShowUpdateNotification = true;
+        };
+
         _activityViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ActivityViewModel.ActiveItemsCount))
@@ -121,6 +137,9 @@ public partial class MainViewModel : ViewModelBase
             }
         }
         _isInitializing = false;
+
+        // Run check for updates in background
+        _ = Task.Run(() => _updateService.CheckForUpdatesIfNeededAsync());
     }
 
     partial void OnIsInReaderChanged(bool value)
@@ -247,5 +266,18 @@ public partial class MainViewModel : ViewModelBase
     public async Task OnShutdownAsync()
     {
         await _libraryViewModel.DeleteAllPendingComicsAsync();
+    }
+
+    [RelayCommand]
+    private void CloseUpdateNotification()
+    {
+        ShowUpdateNotification = false;
+    }
+
+    [RelayCommand]
+    private void GoToUpdate()
+    {
+        ShowUpdateNotification = false;
+        _updateService.GoToReleases();
     }
 }

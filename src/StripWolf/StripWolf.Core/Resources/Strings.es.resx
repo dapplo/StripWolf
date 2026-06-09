@@ -822,4 +822,22 @@
   <data name="BypassSslValidationHint" xml:space="preserve">
     <value>Omitir los errores de certificado SSL/TLS (útil para certificados autofirmados o dispositivos antiguos que no confían en las autoridades de certificación modernas).</value>
   </data>
+  <data name="NewerVersionAvailable" xml:space="preserve">
+    <value>¡Nueva versión disponible!</value>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Buscar actualizaciones</value>
+  </data>
+  <data name="UpdateAvailable" xml:space="preserve">
+    <value>Actualización disponible</value>
+  </data>
+  <data name="UpdatePopupMessage" xml:space="preserve">
+    <value>Una nueva versión ({0}) está disponible. ¿Le gustaría ver las notas de la versión y descargarla?</value>
+  </data>
+  <data name="BringMeThere" xml:space="preserve">
+    <value>Llevarme allí</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>Aceptar</value>
+  </data>
 </root>

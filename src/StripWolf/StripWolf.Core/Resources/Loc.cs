@@ -300,4 +300,12 @@ public class Loc : INotifyPropertyChanged
 
     public string BypassSslValidation => GetString();
     public string BypassSslValidationHint => GetString();
+
+    // Update Checker
+    public string NewerVersionAvailable => GetString();
+    public string CheckForUpdates => GetString();
+    public string UpdateAvailable => GetString();
+    public string UpdatePopupMessage => GetString();
+    public string BringMeThere => GetString();
+    public string Ok => GetString();
 }

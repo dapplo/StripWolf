@@ -913,4 +913,22 @@
   <data name="BypassSslValidationHint" xml:space="preserve">
     <value>Bypass SSL/TLS certificate errors (useful for self-signed certificates or old devices that don't trust modern CAs).</value>
   </data>
+  <data name="NewerVersionAvailable" xml:space="preserve">
+    <value>Newer version available!</value>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Check for updates</value>
+  </data>
+  <data name="UpdateAvailable" xml:space="preserve">
+    <value>Update Available</value>
+  </data>
+  <data name="UpdatePopupMessage" xml:space="preserve">
+    <value>A newer version ({0}) is available. Would you like to view the release notes and download it?</value>
+  </data>
+  <data name="BringMeThere" xml:space="preserve">
+    <value>Bring me there</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>OK</value>
+  </data>
 </root>

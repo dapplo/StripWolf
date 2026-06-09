@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -188,7 +188,8 @@ public partial class App : Application
         services.AddSingleton<PanelDetectionService>();
         services.AddSingleton<KomgaApiServiceFactory>();
         services.AddSingleton<ComicConverterService>();
-        services.AddSingleton<IDonationService, DonationService>();
+        services.AddSingleton<IExternalLinkService, ExternalLinkService>();
+        services.AddSingleton<UpdateService>();
 
         // Register platform-specific PDF renderer
         // Use the custom registration action if set (e.g., for Android), otherwise default to nothing

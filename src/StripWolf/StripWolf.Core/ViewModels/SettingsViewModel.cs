@@ -47,7 +47,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     private readonly LibraryService _libraryService;
     private readonly LocalizationService _localizationService;
-    private readonly IDonationService _donationService;
+    private readonly IExternalLinkService _externalLinkService;
+    private readonly UpdateService _updateService;
     
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
@@ -310,12 +311,15 @@ public partial class SettingsViewModel : ViewModelBase
 
     private KomgaServer? _editingServer;
 
-    public SettingsViewModel(SettingsService settingsService, LibraryService libraryService, LocalizationService localizationService, IDonationService donationService)
+    public UpdateService UpdateService => _updateService;
+
+    public SettingsViewModel(SettingsService settingsService, LibraryService libraryService, LocalizationService localizationService, IExternalLinkService externalLinkService, UpdateService updateService)
     {
         _settingsService = settingsService;
         _libraryService = libraryService;
         _localizationService = localizationService;
-        _donationService = donationService;
+        _externalLinkService = externalLinkService;
+        _updateService = updateService;
         Title = "Settings";
         _settingsService.SettingsChanged += (_, settings) =>
         {
@@ -455,19 +459,31 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void OpenGitHub()
     {
-        _donationService.OpenGitHub();
+        _externalLinkService.OpenGitHub();
     }
 
     [RelayCommand]
     private void OpenPayPal()
     {
-        _donationService.OpenPayPal();
+        _externalLinkService.OpenPayPal();
     }
 
     [RelayCommand]
     private void OpenKoFi()
     {
-        _donationService.OpenKoFi();
+        _externalLinkService.OpenKoFi();
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        await _updateService.CheckForUpdatesManualAsync();
+    }
+
+    [RelayCommand]
+    private void OpenGitHubReleases()
+    {
+        _updateService.GoToReleases();
     }
 
     [RelayCommand]

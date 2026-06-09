@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -147,6 +147,16 @@ public class AppSettings
     public bool SyncReadProgress { get; set; } = true;
 
     /// <summary>
+    /// Time of the last update check
+    /// </summary>
+    public DateTime? LastUpdateCheckTime { get; set; }
+
+    /// <summary>
+    /// Latest version available from the last update check
+    /// </summary>
+    public string? LatestAvailableVersion { get; set; }
+
+    /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
     public AppSettings Clone()
@@ -191,7 +201,9 @@ public class AppSettings
             KomgaSeriesPageSize = KomgaSeriesPageSize,
             KomgaSearchLimit = KomgaSearchLimit,
             KomgaSmartListSize = KomgaSmartListSize,
-            SyncReadProgress = SyncReadProgress
+            SyncReadProgress = SyncReadProgress,
+            LastUpdateCheckTime = LastUpdateCheckTime,
+            LatestAvailableVersion = LatestAvailableVersion
         };
     }
 }

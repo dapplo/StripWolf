@@ -832,4 +832,22 @@
   <data name="BypassSslValidationHint" xml:space="preserve">
     <value>SSL/TLS-certificaatfouten omzeilen (handig voor zelfondertekende certificaten of oude apparaten die moderne certificeringsinstanties niet vertrouwen).</value>
   </data>
+  <data name="NewerVersionAvailable" xml:space="preserve">
+    <value>Nieuwere versie beschikbaar!</value>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Controleren op updates</value>
+  </data>
+  <data name="UpdateAvailable" xml:space="preserve">
+    <value>Update beschikbaar</value>
+  </data>
+  <data name="UpdatePopupMessage" xml:space="preserve">
+    <value>Er is een nieuwere versie ({0}) beschikbaar. Wilt u de release-notes bekijken en deze downloaden?</value>
+  </data>
+  <data name="BringMeThere" xml:space="preserve">
+    <value>Breng me erheen</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>OK</value>
+  </data>
 </root>
