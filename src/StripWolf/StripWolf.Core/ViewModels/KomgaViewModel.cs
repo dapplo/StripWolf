@@ -2715,28 +2715,32 @@ public partial class KomgaViewModel : ViewModelBase
 
                 if (!IsDownloadQueuePaused && queuedItems.Count > 0)
                 {
-                    var availableSlots = Math.Max(1, _maxParallelDownloads) - activeCount;
-                    if (availableSlots > 0)
+                    // Group active/cancelling downloads by ServerId to track running downloads per server
+                    var activeByServer = DownloadQueueItems
+                        .Where(item => item.IsDownloading || item.IsCancelling)
+                        .GroupBy(item => item.ServerId)
+                        .ToDictionary(g => g.Key ?? 0, g => g.Count());
+
+                    var candidates = OrderQueuedItemsForScheduling(queuedItems).ToList();
+                    var maxParallel = Math.Max(1, _maxParallelDownloads);
+
+                    foreach (var queueItem in candidates)
                     {
-                        var candidates = OrderQueuedItemsForScheduling(queuedItems).ToList();
-                        foreach (var queueItem in candidates)
+                        if (queueItem.IsDownloading || queueItem.IsCancelling)
                         {
-                            if (availableSlots <= 0)
-                            {
-                                break;
-                            }
+                            continue;
+                        }
 
-                            if (queueItem.IsDownloading || queueItem.IsCancelling)
-                            {
-                                continue;
-                            }
-
+                        activeByServer.TryGetValue(queueItem.ServerId ?? 0, out var activeForServerCount);
+                        if (activeForServerCount < maxParallel)
+                        {
                             var hasConnection = await IsDownloadConnectionAvailableAsync(queueItem.ServerId);
                             if (hasConnection)
                             {
                                 ResumeQueueAfterConnectionRestore(queueItem.ServerId);
                                 
-                                availableSlots--;
+                                activeByServer[queueItem.ServerId ?? 0] = activeForServerCount + 1;
+                                
                                 var cts = new CancellationTokenSource();
                                 _downloadCancellationTokens[queueItem.Id] = cts;
                                 _ = RunDownloadAsync(queueItem, cts.Token);
@@ -2884,24 +2888,20 @@ public partial class KomgaViewModel : ViewModelBase
                         return;
                     }
 
-                    if (_cancelRequestedBookIds.Remove(queueItem.Id))
-                    {
-                        _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
-                        _downloadPendingBookIds.Remove(queueItem.Id);
-                        _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
-                        _downloadItemsByBookId.Remove(queueItem.Id);
-                        ResetDownloadState(queueItem.Id);
-                        queueItem.IsDownloading = false;
-                        queueItem.IsCancelling = false;
-                        queueItem.SpeedText = string.Empty;
-                        queueItem.EtaText = string.Empty;
-                        DownloadQueueItems.Remove(queueItem);
-                        RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-                        ScheduleRefreshDownloadQueueState();
-                        return;
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"Download cancelled for '{queueItem.Name}'.");
+                    // Otherwise, treat it as a cancellation (remove from cancel requests if present, and clean up)
+                    _cancelRequestedBookIds.Remove(queueItem.Id);
+                    _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
+                    _downloadPendingBookIds.Remove(queueItem.Id);
+                    _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
+                    _downloadItemsByBookId.Remove(queueItem.Id);
+                    ResetDownloadState(queueItem.Id);
+                    queueItem.IsDownloading = false;
+                    queueItem.IsCancelling = false;
+                    queueItem.SpeedText = string.Empty;
+                    queueItem.EtaText = string.Empty;
+                    DownloadQueueItems.Remove(queueItem);
+                    RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                    ScheduleRefreshDownloadQueueState();
                     return;
                 }
                 catch (Exception ex)
@@ -2972,7 +2972,8 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
-        if (queueItem.IsDownloading)
+        var hasToken = _downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts);
+        if (queueItem.IsDownloading || hasToken)
         {
             queueItem.IsCancelling = true;
             queueItem.IsDownloading = false;
@@ -2983,7 +2984,7 @@ public partial class KomgaViewModel : ViewModelBase
             });
             RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
             _cancelRequestedBookIds.Add(queueItem.Id);
-            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts))
+            if (hasToken && activeCts is not null)
             {
                 activeCts.Cancel();
             }
@@ -3004,35 +3005,38 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private void CancelAllDownloads()
     {
-        foreach (var queueItem in DownloadQueueItems.Where(item => !item.IsDownloading).ToList())
+        var itemsToCancel = DownloadQueueItems.ToList();
+        foreach (var queueItem in itemsToCancel)
         {
-            _downloadPendingBookIds.Remove(queueItem.Id);
-            _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
-            _downloadItemsByBookId.Remove(queueItem.Id);
-            _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
-            ResetDownloadState(queueItem.Id);
-            DownloadQueueItems.Remove(queueItem);
-            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-            ScheduleRefreshDownloadQueueState();
-        }
-
-        foreach (var queueItem in DownloadQueueItems.Where(item => item.IsDownloading).ToList())
-        {
-            queueItem.IsCancelling = true;
-            queueItem.IsDownloading = false;
-            SetDownloadState(queueItem.Id, trackedBook =>
+            var hasToken = _downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts);
+            if (queueItem.IsDownloading || hasToken)
             {
-                trackedBook.IsCancelling = true;
-                trackedBook.IsDownloading = false;
-            });
-            RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
-            _cancelRequestedBookIds.Add(queueItem.Id);
-            if (_downloadCancellationTokens.TryGetValue(queueItem.Id, out var activeCts))
-            {
-                activeCts.Cancel();
+                queueItem.IsCancelling = true;
+                queueItem.IsDownloading = false;
+                SetDownloadState(queueItem.Id, trackedBook =>
+                {
+                    trackedBook.IsCancelling = true;
+                    trackedBook.IsDownloading = false;
+                });
+                RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+                _cancelRequestedBookIds.Add(queueItem.Id);
+                if (hasToken && activeCts is not null)
+                {
+                    activeCts.Cancel();
+                }
             }
-            ScheduleRefreshDownloadQueueState();
+            else
+            {
+                _downloadPendingBookIds.Remove(queueItem.Id);
+                _ = PersistPendingKomgaDownloadRemovedAsync(queueItem.Id);
+                _downloadItemsByBookId.Remove(queueItem.Id);
+                _libraryService.CleanupPendingKomgaDownload(queueItem.BookDisplay.Book);
+                ResetDownloadState(queueItem.Id);
+                DownloadQueueItems.Remove(queueItem);
+                RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+            }
         }
+        ScheduleRefreshDownloadQueueState();
     }
 
     [RelayCommand]
