@@ -87,6 +87,12 @@ chmod +x ~/StripWolf/StripWolf.Desktop
 
 ### macOS
 
+*Brew*:
+- brew tap dapplo/tap
+- brew install --cask stripwolf
+
+*Manuall installation:*
+
 Download the appropriate archive from the [Releases](https://github.com/dapplo/StripWolf/releases) page:
 - **Intel Macs**: `StripWolf-macOS-x64.tar.gz`
 - **Apple Silicon (M1/M2/M3)**: `StripWolf-macOS-arm64.tar.gz`
