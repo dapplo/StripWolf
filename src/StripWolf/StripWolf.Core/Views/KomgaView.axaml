@@ -239,8 +239,9 @@
       </StackPanel>
 
       <!-- Connected Content -->
-      <ScrollViewer x:Name="ConnectedScrollViewer" IsVisible="{Binding IsConnected}" Padding="16">
-        <StackPanel Spacing="16" Margin="0,0,0,76">
+      <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsConnected}">
+        <!-- Sticky Top Panel -->
+        <StackPanel Grid.Row="0" Spacing="8" Margin="16,16,16,8">
           <!-- Search Box -->
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="{Binding SearchPlaceholder, Source={x:Static res:Loc.Instance}}"
@@ -250,54 +251,23 @@
                     IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
           </Grid>
 
-          <!-- Search Results Section -->
-          <StackPanel Spacing="16" IsVisible="{Binding IsSearching}">
-            <!-- Series Search Results -->
-            <StackPanel Spacing="8" IsVisible="{Binding SearchSeriesResults.Count}">
-              <TextBlock Text="{Binding SeriesResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ListBox ItemsSource="{Binding SearchSeriesResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="SeriesCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </StackPanel>
-
-            <!-- Book Search Results -->
-            <StackPanel Spacing="8" IsVisible="{Binding SearchBookResults.Count}">
-              <TextBlock Text="{Binding BookResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              <ListBox ItemsSource="{Binding SearchBookResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="BookCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </StackPanel>
-
-            <!-- No Results -->
-            <TextBlock Text="{Binding NoResults, Source={x:Static res:Loc.Instance}}" Foreground="Gray" 
-                       IsVisible="{Binding !SearchSeriesResults.Count}" Margin="0,8"/>
-          </StackPanel>
-          
           <!-- Error Message -->
           <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"/>
           </Border>
 
-          <!-- Main Content (hidden when searching) -->
-          <StackPanel Spacing="16" IsVisible="{Binding !IsSearching}">
-            
           <!-- Breadcrumb Navigation -->
           <StackPanel Orientation="Horizontal" Spacing="8">
+            <StackPanel.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsSearching"/>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                  <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                </MultiBinding>
+              </MultiBinding>
+            </StackPanel.IsVisible>
             <Button Content="Home" Command="{Binding GoBackToLibrariesCommand}"
                     Background="Transparent" Padding="0">
               <Button.IsVisible>
@@ -340,310 +310,377 @@
                        IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
           </StackPanel>
 
-          <!-- Libraries and Read Lists (shown when nothing is selected) -->
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="16">
-            <Grid.IsVisible>
+          <!-- Prefix Selector (A-Z) -->
+          <ListBox ItemsSource="{Binding AvailablePrefixes}" 
+                   SelectedItem="{Binding SelectedSeriesPrefix}"
+                   Background="Transparent" 
+                   Margin="0"
+                   Padding="0">
+            <ListBox.IsVisible>
               <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNull}"/>
+                <Binding Path="!IsSearching"/>
+                <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
                 <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
                 <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
               </MultiBinding>
+            </ListBox.IsVisible>
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal"/>
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border CornerRadius="4" Padding="8,4">
+                  <TextBlock Text="{Binding}" FontSize="14" HorizontalAlignment="Center"/>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="2"/>
+                <Setter Property="Margin" Value="0,0,4,4"/>
+                <Setter Property="MinWidth" Value="36"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+              </Style>
+            </ListBox.Styles>
+          </ListBox>
+
+          <!-- Read List Books Header -->
+          <Grid ColumnDefinitions="Auto,*">
+            <Grid.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsSearching"/>
+                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+              </MultiBinding>
             </Grid.IsVisible>
+            <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToLibrariesCommand}"
+                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+          </Grid>
+
+          <!-- Series Books Header -->
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+            <Grid.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsSearching"/>
+                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+              </MultiBinding>
+            </Grid.IsVisible>
+            <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToSeriesCommand}"
+                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+
+            <Button Grid.Column="2" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                    Command="{Binding OpenSelectedSeriesOnlineCommand}"
+                    Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+              <Button.IsVisible>
+                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+              </Button.IsVisible>
+            </Button>
+
+            <Button Grid.Column="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}"
+                    Command="{Binding DownloadSelectedSeriesCommand}"
+                    Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+              <Button.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                  <Binding Path="!IsSelectedSeriesQueuedForDownload"/>
+                  <Binding Path="!IsSelectedSeriesDownloading"/>
+                </MultiBinding>
+              </Button.IsVisible>
+            </Button>
+            <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+                    VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesQueuedForDownload}">
+              <TextBlock Text="{Binding Queued, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
+            </Border>
+            <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
+                    VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesDownloading}">
+              <TextBlock Text="{Binding Downloading, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
+            </Border>
             
-            <!-- Keep Reading Section -->
-            <Expander Grid.Row="{Binding KeepReadingSection.Order}" IsVisible="{Binding ShowKeepReadingSection}"
-                      IsExpanded="{Binding KeepReadingSection.IsExpanded}">
-              <Expander.Header>
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="{Binding SectionKeepReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                  <Button Grid.Column="1" Content="↻" Command="{Binding RefreshSmartListsCommand}" 
-                          Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
-                </Grid>
-              </Expander.Header>
-              <ListBox ItemsSource="{Binding KeepReadingBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="BookCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </Expander>
+            <!-- Sort Order Toggle -->
+            <Button Grid.Column="4" Command="{Binding CycleSortOrderCommand}"
+                    Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="{Binding Sort, Source={x:Static res:Loc.Instance}, StringFormat='{}{0}:'}"/>
+                <TextBlock Text="{Binding SelectedBookSortOrder}"/>
+              </StackPanel>
+            </Button>
             
-            <!-- On Deck Section -->
-            <Expander Grid.Row="{Binding OnDeckSection.Order}" IsVisible="{Binding ShowOnDeckSection}"
-                      IsExpanded="{Binding OnDeckSection.IsExpanded}">
-              <Expander.Header>
-                <TextBlock Text="{Binding SectionOnDeck, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              </Expander.Header>
-              <ListBox ItemsSource="{Binding OnDeckBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="BookCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </Expander>
-            
-            <!-- Recently Added Books Section -->
-            <Expander Grid.Row="{Binding RecentBooksSection.Order}" IsVisible="{Binding ShowRecentBooksSection}"
-                      IsExpanded="{Binding RecentBooksSection.IsExpanded}">
-              <Expander.Header>
-                <TextBlock Text="{Binding SectionRecentlyAddedBooks, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              </Expander.Header>
-              <ListBox ItemsSource="{Binding RecentlyAddedBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="BookCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </Expander>
-            
-            <!-- Recently Added Series Section -->
-            <Expander Grid.Row="{Binding RecentSeriesSection.Order}" IsVisible="{Binding ShowRecentSeriesSection}"
-                      IsExpanded="{Binding RecentSeriesSection.IsExpanded}">
-              <Expander.Header>
-                <TextBlock Text="{Binding SectionRecentlyAddedSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              </Expander.Header>
-              <ListBox ItemsSource="{Binding RecentlyAddedSeries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="SeriesCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </Expander>
-            
-            <!-- Libraries List -->
-            <Expander Grid.Row="{Binding LibrariesSection.Order}" IsVisible="{Binding ShowLibrariesSection}"
-                      IsExpanded="{Binding LibrariesSection.IsExpanded}">
-              <Expander.Header>
-                <TextBlock Text="{Binding SectionLibraries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-              </Expander.Header>
-              <ListBox ItemsSource="{Binding Libraries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="komga:KomgaLibrary">
-                    <Button Padding="16" HorizontalAlignment="Stretch"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, ElementName=Root}"
-                            CommandParameter="{Binding}">
-                      <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Name}" FontSize="16" VerticalAlignment="Center"/>
-                      </StackPanel>
-                    </Button>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </Expander>
-            
-            <!-- Read Lists -->
-            <Expander Grid.Row="{Binding ReadListsSection.Order}" IsVisible="{Binding ShowReadListsSection}"
-                      IsExpanded="{Binding ReadListsSection.IsExpanded}">
-              <Expander.Header>
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="{Binding SectionReadLists, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                  <Button Grid.Column="1" Content="↻" Command="{Binding RefreshReadListsCommand}" 
-                          Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
-                </Grid>
-              </Expander.Header>
-              <StackPanel Spacing="8" Margin="0,8,0,0">
-                <ListBox ItemsSource="{Binding ReadLists}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+            <!-- Sort Direction Toggle -->
+            <Button Grid.Column="5" Command="{Binding ToggleSortDirectionCommand}"
+                    Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+              <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
+            </Button>
+          </Grid>
+        </StackPanel>
+
+        <!-- Scrollable content -->
+        <ScrollViewer Grid.Row="1" x:Name="ConnectedScrollViewer" Padding="16,0,16,16">
+          <StackPanel Spacing="16" Margin="0,8,0,76">
+            <!-- Search Results Section -->
+            <StackPanel Spacing="16" IsVisible="{Binding IsSearching}">
+              <!-- Series Search Results -->
+              <StackPanel Spacing="8" IsVisible="{Binding SearchSeriesResults.Count}">
+                <TextBlock Text="{Binding SeriesResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                <ListBox ItemsSource="{Binding SearchSeriesResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                   <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                       <WrapPanel Orientation="Horizontal"/>
                     </ItemsPanelTemplate>
                   </ListBox.ItemsPanel>
                   <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="komga:KomgaReadListDisplay">
-                      <Button Padding="0" Background="Transparent"
-                              Command="{Binding ((vm:KomgaViewModel)DataContext).SelectReadListCommand, ElementName=Root}"
-                              CommandParameter="{Binding}">
-                        <Border Classes="komga-card-entry" Classes.loaded="{Binding IsLoaded}">
-                          <Border Classes="komga-card" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-                                  Width="150" ClipToBounds="True">
-                            <Grid RowDefinitions="200,Auto,Auto">
-                              <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
-                                <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                              </Border>
-                              <Border Grid.Row="1" Height="34" Margin="8,4">
-                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                           TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                           VerticalAlignment="Center"/>
-                              </Border>
-                              <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
-                                         FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                            </Grid>
-                          </Border>
-                        </Border>
-                      </Button>
-                    </DataTemplate>
+                    <StaticResource ResourceKey="SeriesCardTemplate"/>
                   </ListBox.ItemTemplate>
                 </ListBox>
-                <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
-                        HorizontalAlignment="Center" Margin="0,8,0,0"
-                        IsVisible="{Binding HasMoreReadLists}"/>
               </StackPanel>
-            </Expander>
-          </Grid>
 
-          <!-- Read List Books Grid -->
-          <StackPanel Spacing="8" IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <Grid ColumnDefinitions="Auto,*">
-              <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToLibrariesCommand}"
-                      Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
-              <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-            </Grid>
-            <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-              <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <WrapPanel Orientation="Horizontal"/>
-                </ItemsPanelTemplate>
-              </ListBox.ItemsPanel>
-              <ListBox.ItemTemplate>
-                <StaticResource ResourceKey="BookCardTemplate"/>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </StackPanel>
+              <!-- Book Search Results -->
+              <StackPanel Spacing="8" IsVisible="{Binding SearchBookResults.Count}">
+                <TextBlock Text="{Binding BookResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                <ListBox ItemsSource="{Binding SearchBookResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <StaticResource ResourceKey="BookCardTemplate"/>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
 
-          <!-- Series Grid (only show when library is selected but no read list) -->
-          <StackPanel Spacing="8">
-            <StackPanel.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
-              </MultiBinding>
-            </StackPanel.IsVisible>
-            <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
-              <!-- Prefix Selector (A-Z) -->
-              <ListBox ItemsSource="{Binding AvailablePrefixes}" 
-                       SelectedItem="{Binding SelectedSeriesPrefix}"
-                       Background="Transparent" 
-                       Margin="0,0,0,16"
-                       Padding="0">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <DataTemplate>
-                    <Border CornerRadius="4" Padding="8,4">
-                      <TextBlock Text="{Binding}" FontSize="14" HorizontalAlignment="Center"/>
-                    </Border>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-                <ListBox.Styles>
-                  <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="2"/>
-                    <Setter Property="Margin" Value="0,0,4,4"/>
-                    <Setter Property="MinWidth" Value="36"/>
-                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                  </Style>
-                </ListBox.Styles>
-              </ListBox>
-
-              <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
-              
-              <ListBox ItemsSource="{Binding Series}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                <ListBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal"/>
-                  </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                  <StaticResource ResourceKey="SeriesCardTemplate"/>
-                </ListBox.ItemTemplate>
-              </ListBox>
+              <!-- No Results -->
+              <TextBlock Text="{Binding NoResults, Source={x:Static res:Loc.Instance}}" Foreground="Gray" 
+                         IsVisible="{Binding !SearchSeriesResults.Count}" Margin="0,8"/>
             </StackPanel>
+
+            <!-- Main Content (hidden when searching) -->
+            <StackPanel Spacing="16" IsVisible="{Binding !IsSearching}">
+              <!-- Libraries and Read Lists (shown when nothing is selected) -->
+              <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="16">
+                <Grid.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNull}"/>
+                    <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+                    <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
+                  </MultiBinding>
+                </Grid.IsVisible>
+                
+                <!-- Keep Reading Section -->
+                <Expander Grid.Row="{Binding KeepReadingSection.Order}" IsVisible="{Binding ShowKeepReadingSection}"
+                          IsExpanded="{Binding KeepReadingSection.IsExpanded}">
+                  <Expander.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding SectionKeepReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                      <Button Grid.Column="1" Content="↻" Command="{Binding RefreshSmartListsCommand}" 
+                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
+                    </Grid>
+                  </Expander.Header>
+                  <ListBox ItemsSource="{Binding KeepReadingBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <StaticResource ResourceKey="BookCardTemplate"/>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Expander>
+                
+                <!-- On Deck Section -->
+                <Expander Grid.Row="{Binding OnDeckSection.Order}" IsVisible="{Binding ShowOnDeckSection}"
+                          IsExpanded="{Binding OnDeckSection.IsExpanded}">
+                  <Expander.Header>
+                    <TextBlock Text="{Binding SectionOnDeck, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                  </Expander.Header>
+                  <ListBox ItemsSource="{Binding OnDeckBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <StaticResource ResourceKey="BookCardTemplate"/>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Expander>
+                
+                <!-- Recently Added Books Section -->
+                <Expander Grid.Row="{Binding RecentBooksSection.Order}" IsVisible="{Binding ShowRecentBooksSection}"
+                          IsExpanded="{Binding RecentBooksSection.IsExpanded}">
+                  <Expander.Header>
+                    <TextBlock Text="{Binding SectionRecentlyAddedBooks, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                  </Expander.Header>
+                  <ListBox ItemsSource="{Binding RecentlyAddedBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <StaticResource ResourceKey="BookCardTemplate"/>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Expander>
+                
+                <!-- Recently Added Series Section -->
+                <Expander Grid.Row="{Binding RecentSeriesSection.Order}" IsVisible="{Binding ShowRecentSeriesSection}"
+                          IsExpanded="{Binding RecentSeriesSection.IsExpanded}">
+                  <Expander.Header>
+                    <TextBlock Text="{Binding SectionRecentlyAddedSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                  </Expander.Header>
+                  <ListBox ItemsSource="{Binding RecentlyAddedSeries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <StaticResource ResourceKey="SeriesCardTemplate"/>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Expander>
+                
+                <!-- Libraries List -->
+                <Expander Grid.Row="{Binding LibrariesSection.Order}" IsVisible="{Binding ShowLibrariesSection}"
+                          IsExpanded="{Binding LibrariesSection.IsExpanded}">
+                  <Expander.Header>
+                    <TextBlock Text="{Binding SectionLibraries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+                  </Expander.Header>
+                  <ListBox ItemsSource="{Binding Libraries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="komga:KomgaLibrary">
+                        <Button Padding="16" HorizontalAlignment="Stretch"
+                                Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, ElementName=Root}"
+                                CommandParameter="{Binding}">
+                          <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" FontSize="16" VerticalAlignment="Center"/>
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Expander>
+                
+                <!-- Read Lists -->
+                <Expander Grid.Row="{Binding ReadListsSection.Order}" IsVisible="{Binding ShowReadListsSection}"
+                          IsExpanded="{Binding ReadListsSection.IsExpanded}">
+                  <Expander.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding SectionReadLists, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                      <Button Grid.Column="1" Content="↻" Command="{Binding RefreshReadListsCommand}" 
+                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
+                    </Grid>
+                  </Expander.Header>
+                  <StackPanel Spacing="8" Margin="0,8,0,0">
+                    <ListBox ItemsSource="{Binding ReadLists}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                      <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                      </ListBox.ItemsPanel>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="komga:KomgaReadListDisplay">
+                          <Button Padding="0" Background="Transparent"
+                                  Command="{Binding ((vm:KomgaViewModel)DataContext).SelectReadListCommand, ElementName=Root}"
+                                  CommandParameter="{Binding}">
+                            <Border Classes="komga-card-entry" Classes.loaded="{Binding IsLoaded}">
+                              <Border Classes="komga-card" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+                                      Width="150" ClipToBounds="True">
+                                <Grid RowDefinitions="200,Auto,Auto">
+                                  <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                  </Border>
+                                  <Border Grid.Row="1" Height="34" Margin="8,4">
+                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                                               VerticalAlignment="Center"/>
+                                  </Border>
+                                  <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
+                                             FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+                                </Grid>
+                              </Border>
+                            </Border>
+                          </Button>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
+                            HorizontalAlignment="Center" Margin="0,8,0,0"
+                            IsVisible="{Binding HasMoreReadLists}"/>
+                  </StackPanel>
+                </Expander>
+              </Grid>
+
+              <!-- Read List Books Grid -->
+              <StackPanel Spacing="8" IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <StaticResource ResourceKey="BookCardTemplate"/>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+
+              <!-- Series Grid (only show when library is selected but no read list) -->
+              <StackPanel Spacing="8">
+                <StackPanel.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                    <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+                  </MultiBinding>
+                </StackPanel.IsVisible>
+                <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
+                  <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+                  
+                  <ListBox ItemsSource="{Binding Series}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <StaticResource ResourceKey="SeriesCardTemplate"/>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Books Grid (for series) -->
+              <StackPanel Spacing="8">
+                <StackPanel.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                    <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+                  </MultiBinding>
+                </StackPanel.IsVisible>
+                
+                <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <StaticResource ResourceKey="BookCardTemplate"/>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </StackPanel> <!-- End of Main Content (hidden when searching) -->
           </StackPanel>
-
-          <!-- Books Grid (for series) -->
-          <StackPanel Spacing="8">
-            <StackPanel.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-                <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
-              </MultiBinding>
-            </StackPanel.IsVisible>
-            
-             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
-               <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToSeriesCommand}"
-                       Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
-               <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-
-               <Button Grid.Column="2" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
-                       Command="{Binding OpenSelectedSeriesOnlineCommand}"
-                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
-                 <Button.IsVisible>
-                   <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-                 </Button.IsVisible>
-               </Button>
-
-               <Button Grid.Column="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}"
-                       Command="{Binding DownloadSelectedSeriesCommand}"
-                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
-                 <Button.IsVisible>
-                   <MultiBinding Converter="{x:Static BoolConverters.And}">
-                     <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-                     <Binding Path="!IsSelectedSeriesQueuedForDownload"/>
-                     <Binding Path="!IsSelectedSeriesDownloading"/>
-                   </MultiBinding>
-                 </Button.IsVisible>
-               </Button>
-               <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
-                       VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesQueuedForDownload}">
-                 <TextBlock Text="{Binding Queued, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
-               </Border>
-               <Border Grid.Column="3" Background="{DynamicResource SystemAccentColor}" CornerRadius="4" Padding="8,4"
-                       VerticalAlignment="Center" IsVisible="{Binding IsSelectedSeriesDownloading}">
-                 <TextBlock Text="{Binding Downloading, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
-               </Border>
-               
-               <!-- Sort Order Toggle -->
-               <Button Grid.Column="4" Command="{Binding CycleSortOrderCommand}"
-                       Background="Transparent" Padding="8,4" Margin="4,0" VerticalAlignment="Center">
-                 <StackPanel Orientation="Horizontal" Spacing="4">
-                   <TextBlock Text="{Binding Sort, Source={x:Static res:Loc.Instance}, StringFormat='{}{0}:'}"/>
-                   <TextBlock Text="{Binding SelectedBookSortOrder}"/>
-                 </StackPanel>
-               </Button>
-               
-               <!-- Sort Direction Toggle -->
-               <Button Grid.Column="5" Command="{Binding ToggleSortDirectionCommand}"
-                       Background="Transparent" Padding="8,4" VerticalAlignment="Center">
-                 <TextBlock Text="{Binding IsSortDescending, Converter={x:Static converters:FilePathToBitmapConverter.SortDirectionIconConverter}}"/>
-               </Button>
-             </Grid>
-
-            <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-              <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <WrapPanel Orientation="Horizontal"/>
-                </ItemsPanelTemplate>
-              </ListBox.ItemsPanel>
-              <ListBox.ItemTemplate>
-                <StaticResource ResourceKey="BookCardTemplate"/>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </StackPanel>
-          
-          </StackPanel> <!-- End of Main Content (hidden when searching) -->
-        </StackPanel>
-      </ScrollViewer>
+        </ScrollViewer>
+      </Grid>
 
       <!-- Floating Load More Button for Series - Always visible at the bottom when browsing series -->
       <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
