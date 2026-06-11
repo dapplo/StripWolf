@@ -49,6 +49,10 @@ public class Loc : INotifyPropertyChanged
     // Navigation
     public string Back => GetString();
     public string Home => GetString();
+    public string WelcomeExperienceBack => GetString();
+    public string WelcomeExperienceNext => GetString();
+    public string WelcomeExperienceSkip => GetString();
+    public string WelcomeExperienceFinish => GetString();
 
     // Settings Sections
     public string LanguageSettings => GetString();
@@ -310,4 +314,41 @@ public class Loc : INotifyPropertyChanged
     public string UpdatePopupMessage => GetString();
     public string BringMeThere => GetString();
     public string Ok => GetString();
+
+    // Welcome Experience
+    public string WelcomeExperience => GetString();
+    public string WelcomeExperienceProgress => GetString();
+    public string WelcomeExperienceIntroTitle => GetString();
+    public string WelcomeExperienceIntroDescription => GetString();
+    public string WelcomeExperienceQuickSetup => GetString();
+    public string WelcomeExperienceQuickSetupHint => GetString();
+    public string WelcomeExperienceLicenseRequired => GetString();
+    public string WelcomeExperienceReviewLicense => GetString();
+    public string WelcomeExperienceLicenseAccepted => GetString();
+    public string WelcomeExperienceLicenseTitle => GetString();
+    public string WelcomeExperienceLicenseSummary => GetString();
+    public string WelcomeExperienceLicenseAsIs => GetString();
+    public string WelcomeExperienceOpenGplLink => GetString();
+    public string WelcomeExperienceDecline => GetString();
+    public string WelcomeExperienceAcceptLicense => GetString();
+    public string WelcomeExperienceLibraryTitle => GetString();
+    public string WelcomeExperienceLibraryDescription => GetString();
+    public string WelcomeExperienceImportTitle => GetString();
+    public string WelcomeExperienceImportDescription => GetString();
+    public string WelcomeExperienceKomgaTitle => GetString();
+    public string WelcomeExperienceKomgaDescription => GetString();
+    public string WelcomeExperienceActivityTitle => GetString();
+    public string WelcomeExperienceActivityDescription => GetString();
+    public string WelcomeExperienceSettingsTitle => GetString();
+    public string WelcomeExperienceSettingsDescription => GetString();
+    public string WelcomeExperienceSupportTitle => GetString();
+    public string WelcomeExperienceSupportDescription => GetString();
+    public string WelcomeExperienceSupportCta => GetString();
+    public string WelcomeExperienceLibraryHint => GetString();
+    public string WelcomeExperienceImportHint => GetString();
+    public string WelcomeExperienceImportPointer => GetString();
+    public string WelcomeExperienceKomgaHint => GetString();
+    public string WelcomeExperienceActivityHint => GetString();
+    public string WelcomeExperienceSettingsHint => GetString();
+    public string WelcomeExperienceSupportHint => GetString();
 }

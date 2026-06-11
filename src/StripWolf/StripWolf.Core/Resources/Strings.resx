@@ -937,4 +937,121 @@
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="WelcomeExperience" xml:space="preserve">
+    <value>Welcome to StripWolf</value>
+  </data>
+  <data name="WelcomeExperienceProgress" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="WelcomeExperienceIntroTitle" xml:space="preserve">
+    <value>Your comic reading hub</value>
+  </data>
+  <data name="WelcomeExperienceIntroDescription" xml:space="preserve">
+    <value>Before we begin, choose your language and app theme, then review and accept the license terms. You can change these settings later in Settings.</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetup" xml:space="preserve">
+    <value>Quick setup</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetupHint" xml:space="preserve">
+    <value>Language controls translated UI text. Theme controls app appearance (System follows your device settings).</value>
+  </data>
+  <data name="WelcomeExperienceLicenseRequired" xml:space="preserve">
+    <value>License acceptance is required to continue.</value>
+  </data>
+  <data name="WelcomeExperienceReviewLicense" xml:space="preserve">
+    <value>Review GPLv3 license</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAccepted" xml:space="preserve">
+    <value>Accepted</value>
+  </data>
+  <data name="WelcomeExperienceLicenseTitle" xml:space="preserve">
+    <value>License and warranty notice</value>
+  </data>
+  <data name="WelcomeExperienceLicenseSummary" xml:space="preserve">
+    <value>StripWolf is licensed under GNU GPLv3. You can use, study, modify, and redistribute it under GPLv3 terms.</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAsIs" xml:space="preserve">
+    <value>This software is provided "as is", without warranty of any kind, including merchantability or fitness for a particular purpose. You are responsible for your data and backups; the authors are not liable for data loss or other damages.</value>
+  </data>
+  <data name="WelcomeExperienceOpenGplLink" xml:space="preserve">
+    <value>Open GPLv3</value>
+  </data>
+  <data name="WelcomeExperienceDecline" xml:space="preserve">
+    <value>Not now</value>
+  </data>
+  <data name="WelcomeExperienceAcceptLicense" xml:space="preserve">
+    <value>I accept</value>
+  </data>
+  <data name="WelcomeExperienceLibraryTitle" xml:space="preserve">
+    <value>Library: import and read offline</value>
+  </data>
+  <data name="WelcomeExperienceLibraryDescription" xml:space="preserve">
+    <value>Import single files or full folders, organize by series, mark favorites, and continue where you left off. Supported formats include CBZ, CBR, CB7, CBT, PDF, and EPUB.</value>
+  </data>
+  <data name="WelcomeExperienceImportTitle" xml:space="preserve">
+    <value>Import: where to add comics</value>
+  </data>
+  <data name="WelcomeExperienceImportDescription" xml:space="preserve">
+    <value>Use the top action row in Library: Open Folder, Import Folder, and Import Comic. This is the fastest way to seed your local library.</value>
+  </data>
+  <data name="WelcomeExperienceKomgaTitle" xml:space="preserve">
+    <value>Komga: browse and sync your server</value>
+  </data>
+  <data name="WelcomeExperienceKomgaDescription" xml:space="preserve">
+    <value>Connect one or more Komga servers, browse libraries and read lists, download books for offline reading, and sync your reading progress across devices.</value>
+  </data>
+  <data name="WelcomeExperienceActivityTitle" xml:space="preserve">
+    <value>Activity: track ongoing work</value>
+  </data>
+  <data name="WelcomeExperienceActivityDescription" xml:space="preserve">
+    <value>Monitor imports, Komga downloads, and EPUB conversions in one place. Pause, resume, retry, or cancel queued work when needed.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsTitle" xml:space="preserve">
+    <value>Settings: tailor your experience</value>
+  </data>
+  <data name="WelcomeExperienceSettingsDescription" xml:space="preserve">
+    <value>Configure Komga servers, language, theme, startup behavior, section layout, and default reading preferences to match how you read.</value>
+  </data>
+  <data name="WelcomeExperienceSupportTitle" xml:space="preserve">
+    <value>Support the project</value>
+  </data>
+  <data name="WelcomeExperienceSupportDescription" xml:space="preserve">
+    <value>If StripWolf is useful to you, please consider a donation. You can always find these options later in Settings → About → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceSupportCta" xml:space="preserve">
+    <value>Want to support development?</value>
+  </data>
+  <data name="WelcomeExperienceLibraryHint" xml:space="preserve">
+    <value>Look at the highlighted Library tab below.</value>
+  </data>
+  <data name="WelcomeExperienceImportHint" xml:space="preserve">
+    <value>The import buttons are on the top action row of the Library screen.</value>
+  </data>
+  <data name="WelcomeExperienceImportPointer" xml:space="preserve">
+    <value>Import actions are here ↑</value>
+  </data>
+  <data name="WelcomeExperienceKomgaHint" xml:space="preserve">
+    <value>Look at the highlighted Komga tab below.</value>
+  </data>
+  <data name="WelcomeExperienceActivityHint" xml:space="preserve">
+    <value>Look at the highlighted Activity tab below.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsHint" xml:space="preserve">
+    <value>Look at the highlighted Settings tab below.</value>
+  </data>
+  <data name="WelcomeExperienceSupportHint" xml:space="preserve">
+    <value>You can revisit donation options later in Settings → About → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="WelcomeExperienceNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="WelcomeExperienceSkip" xml:space="preserve">
+    <value>Skip tour</value>
+  </data>
+  <data name="WelcomeExperienceFinish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
 </root>

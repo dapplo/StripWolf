@@ -47,6 +47,8 @@ public partial class KomgaViewModel : ViewModelBase
     private readonly SettingsService _settingsService;
     private readonly DatabaseService _databaseService;
     private readonly IExternalLinkService _externalLinkService;
+
+    public event EventHandler? ConfigureServerRequested;
     
     private KomgaServer? _activeServer;
     private CancellationTokenSource? _loadingCts;
@@ -1094,6 +1096,12 @@ public partial class KomgaViewModel : ViewModelBase
         
         await InitializeAsync();
         IsRefreshing = false;
+    }
+
+    [RelayCommand]
+    private void ConfigureServer()
+    {
+        ConfigureServerRequested?.Invoke(this, EventArgs.Empty);
     }
     
     [RelayCommand]

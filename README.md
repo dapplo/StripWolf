@@ -13,6 +13,7 @@ A cross-platform comic book reader built with Avalonia UI that supports offline 
 - **Extended Format Support**: Read CB7 (7-Zip) and CBT (TAR) archives natively, while solid RAR archives are automatically converted to CBZ for reliable reading
 - **ComicInfo.xml Support**: Automatically extracts and displays metadata from ComicInfo.xml files embedded in comic archives
 - **Komga Integration**: Connect to your Komga server to browse and download comics
+- **Welcome Experience**: First-run guided tour that introduces library, Komga, activity, and settings capabilities
 - **Multiple Reading Modes**:
   - **Normal**: Standard full-page reading
   - **Zoomed**: Split view with page overview and magnified area
