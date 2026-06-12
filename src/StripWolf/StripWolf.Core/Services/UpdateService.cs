@@ -100,8 +100,13 @@ public partial class UpdateService : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(latestVersionStr)) return false;
 
-        static string NormalizeVersion(string value)
+        static string NormalizeVersion(string? value)
         {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
             var normalized = value.Trim();
             if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
             {
