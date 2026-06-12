@@ -846,4 +846,121 @@
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="WelcomeExperience" xml:space="preserve">
+    <value>Willkommen bei StripWolf</value>
+  </data>
+  <data name="WelcomeExperienceProgress" xml:space="preserve">
+    <value>Schritt {0} von {1}</value>
+  </data>
+  <data name="WelcomeExperienceIntroTitle" xml:space="preserve">
+    <value>Ihr Comic-Lesezentrum</value>
+  </data>
+  <data name="WelcomeExperienceIntroDescription" xml:space="preserve">
+    <value>Bevor wir beginnen, wählen Sie Sprache und App-Design und akzeptieren Sie die Lizenzbedingungen. Diese Einstellungen können Sie später in den Einstellungen ändern.</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetup" xml:space="preserve">
+    <value>Schnelleinrichtung</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetupHint" xml:space="preserve">
+    <value>Die Sprache steuert die übersetzten UI-Texte. Das Design steuert das Erscheinungsbild der App (System folgt den Geräteeinstellungen).</value>
+  </data>
+  <data name="WelcomeExperienceLicenseRequired" xml:space="preserve">
+    <value>Die Annahme der Lizenz ist erforderlich, um fortzufahren.</value>
+  </data>
+  <data name="WelcomeExperienceReviewLicense" xml:space="preserve">
+    <value>GPLv3-Lizenz prüfen</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAccepted" xml:space="preserve">
+    <value>Akzeptiert</value>
+  </data>
+  <data name="WelcomeExperienceLicenseTitle" xml:space="preserve">
+    <value>Lizenz- und Gewährleistungshinweis</value>
+  </data>
+  <data name="WelcomeExperienceLicenseSummary" xml:space="preserve">
+    <value>StripWolf ist unter der GNU GPLv3 lizenziert. Sie dürfen es gemäß den GPLv3-Bedingungen nutzen, untersuchen, ändern und weitergeben.</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAsIs" xml:space="preserve">
+    <value>Diese Software wird „wie besehen“ ohne jegliche Gewährleistung bereitgestellt, einschließlich Marktgängigkeit oder Eignung für einen bestimmten Zweck. Sie sind für Ihre Daten und Backups verantwortlich; die Autoren haften nicht für Datenverlust oder andere Schäden.</value>
+  </data>
+  <data name="WelcomeExperienceOpenGplLink" xml:space="preserve">
+    <value>GPLv3 öffnen</value>
+  </data>
+  <data name="WelcomeExperienceDecline" xml:space="preserve">
+    <value>Jetzt nicht</value>
+  </data>
+  <data name="WelcomeExperienceAcceptLicense" xml:space="preserve">
+    <value>Ich akzeptiere</value>
+  </data>
+  <data name="WelcomeExperienceLibraryTitle" xml:space="preserve">
+    <value>Bibliothek: importieren und offline lesen</value>
+  </data>
+  <data name="WelcomeExperienceLibraryDescription" xml:space="preserve">
+    <value>Importieren Sie einzelne Dateien oder ganze Ordner, organisieren Sie nach Serien, markieren Sie Favoriten und lesen Sie dort weiter, wo Sie aufgehört haben. Unterstützte Formate: CBZ, CBR, CB7, CBT, PDF und EPUB.</value>
+  </data>
+  <data name="WelcomeExperienceImportTitle" xml:space="preserve">
+    <value>Import: wo Comics hinzugefügt werden</value>
+  </data>
+  <data name="WelcomeExperienceImportDescription" xml:space="preserve">
+    <value>Verwenden Sie in der Bibliothek die obere Aktionsleiste: Ordner öffnen, Ordner importieren und Comic importieren. So füllen Sie Ihre lokale Bibliothek am schnellsten.</value>
+  </data>
+  <data name="WelcomeExperienceKomgaTitle" xml:space="preserve">
+    <value>Komga: Server durchsuchen und synchronisieren</value>
+  </data>
+  <data name="WelcomeExperienceKomgaDescription" xml:space="preserve">
+    <value>Verbinden Sie einen oder mehrere Komga-Server, durchsuchen Sie Bibliotheken und Leselisten, laden Sie Bücher für Offline-Lesen herunter und synchronisieren Sie den Lesefortschritt geräteübergreifend.</value>
+  </data>
+  <data name="WelcomeExperienceActivityTitle" xml:space="preserve">
+    <value>Aktivität: laufende Aufgaben verfolgen</value>
+  </data>
+  <data name="WelcomeExperienceActivityDescription" xml:space="preserve">
+    <value>Überwachen Sie Importe, Komga-Downloads und EPUB-Konvertierungen an einem Ort. Pausieren, fortsetzen, erneut versuchen oder Warteschlangen abbrechen bei Bedarf.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsTitle" xml:space="preserve">
+    <value>Einstellungen: Erfahrung anpassen</value>
+  </data>
+  <data name="WelcomeExperienceSettingsDescription" xml:space="preserve">
+    <value>Konfigurieren Sie Komga-Server, Sprache, Design, Startverhalten, Abschnittslayout und Standard-Leseeinstellungen passend zu Ihrer Nutzung.</value>
+  </data>
+  <data name="WelcomeExperienceSupportTitle" xml:space="preserve">
+    <value>Projekt unterstützen</value>
+  </data>
+  <data name="WelcomeExperienceSupportDescription" xml:space="preserve">
+    <value>Wenn StripWolf für Sie nützlich ist, erwägen Sie bitte eine Spende. Diese Optionen finden Sie später immer unter Einstellungen → Über → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceSupportCta" xml:space="preserve">
+    <value>Möchten Sie die Entwicklung unterstützen?</value>
+  </data>
+  <data name="WelcomeExperienceLibraryHint" xml:space="preserve">
+    <value>Schauen Sie auf den unten hervorgehobenen Bibliothek-Tab.</value>
+  </data>
+  <data name="WelcomeExperienceImportHint" xml:space="preserve">
+    <value>Die Import-Schaltflächen befinden sich in der oberen Aktionsleiste der Bibliotheksansicht.</value>
+  </data>
+  <data name="WelcomeExperienceImportPointer" xml:space="preserve">
+    <value>Import-Aktionen sind hier ↑</value>
+  </data>
+  <data name="WelcomeExperienceKomgaHint" xml:space="preserve">
+    <value>Schauen Sie auf den unten hervorgehobenen Komga-Tab.</value>
+  </data>
+  <data name="WelcomeExperienceActivityHint" xml:space="preserve">
+    <value>Schauen Sie auf den unten hervorgehobenen Aktivität-Tab.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsHint" xml:space="preserve">
+    <value>Schauen Sie auf den unten hervorgehobenen Einstellungen-Tab.</value>
+  </data>
+  <data name="WelcomeExperienceSupportHint" xml:space="preserve">
+    <value>Spendenoptionen finden Sie später in Einstellungen → Über → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceBack" xml:space="preserve">
+    <value>Zurück</value>
+  </data>
+  <data name="WelcomeExperienceNext" xml:space="preserve">
+    <value>Weiter</value>
+  </data>
+  <data name="WelcomeExperienceSkip" xml:space="preserve">
+    <value>Tour überspringen</value>
+  </data>
+  <data name="WelcomeExperienceFinish" xml:space="preserve">
+    <value>Fertig</value>
+  </data>
 </root>

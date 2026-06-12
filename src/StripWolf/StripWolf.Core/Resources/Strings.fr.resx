@@ -846,4 +846,121 @@
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="WelcomeExperience" xml:space="preserve">
+    <value>Bienvenue dans StripWolf</value>
+  </data>
+  <data name="WelcomeExperienceProgress" xml:space="preserve">
+    <value>Étape {0} sur {1}</value>
+  </data>
+  <data name="WelcomeExperienceIntroTitle" xml:space="preserve">
+    <value>Votre centre de lecture de comics</value>
+  </data>
+  <data name="WelcomeExperienceIntroDescription" xml:space="preserve">
+    <value>Avant de commencer, choisissez la langue et le thème de l'application, puis acceptez les conditions de licence. Vous pourrez modifier ces paramètres plus tard dans les Réglages.</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetup" xml:space="preserve">
+    <value>Configuration rapide</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetupHint" xml:space="preserve">
+    <value>La langue contrôle les textes traduits de l'interface. Le thème contrôle l'apparence de l'application (Système suit les paramètres de votre appareil).</value>
+  </data>
+  <data name="WelcomeExperienceLicenseRequired" xml:space="preserve">
+    <value>L'acceptation de la licence est requise pour continuer.</value>
+  </data>
+  <data name="WelcomeExperienceReviewLicense" xml:space="preserve">
+    <value>Consulter la licence GPLv3</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAccepted" xml:space="preserve">
+    <value>Acceptée</value>
+  </data>
+  <data name="WelcomeExperienceLicenseTitle" xml:space="preserve">
+    <value>Avis de licence et de garantie</value>
+  </data>
+  <data name="WelcomeExperienceLicenseSummary" xml:space="preserve">
+    <value>StripWolf est sous licence GNU GPLv3. Vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer selon les termes de la GPLv3.</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAsIs" xml:space="preserve">
+    <value>Ce logiciel est fourni « tel quel », sans aucune garantie, y compris de qualité marchande ou d'adéquation à un usage particulier. Vous êtes responsable de vos données et sauvegardes ; les auteurs ne sont pas responsables des pertes de données ni d'autres dommages.</value>
+  </data>
+  <data name="WelcomeExperienceOpenGplLink" xml:space="preserve">
+    <value>Ouvrir la GPLv3</value>
+  </data>
+  <data name="WelcomeExperienceDecline" xml:space="preserve">
+    <value>Pas maintenant</value>
+  </data>
+  <data name="WelcomeExperienceAcceptLicense" xml:space="preserve">
+    <value>J'accepte</value>
+  </data>
+  <data name="WelcomeExperienceLibraryTitle" xml:space="preserve">
+    <value>Bibliothèque : importer et lire hors ligne</value>
+  </data>
+  <data name="WelcomeExperienceLibraryDescription" xml:space="preserve">
+    <value>Importez des fichiers uniques ou des dossiers complets, organisez par séries, marquez vos favoris et reprenez là où vous vous êtes arrêté. Formats pris en charge : CBZ, CBR, CB7, CBT, PDF et EPUB.</value>
+  </data>
+  <data name="WelcomeExperienceImportTitle" xml:space="preserve">
+    <value>Import : où ajouter des comics</value>
+  </data>
+  <data name="WelcomeExperienceImportDescription" xml:space="preserve">
+    <value>Utilisez la barre d'actions en haut de la Bibliothèque : Ouvrir le dossier, Importer un dossier et Importer un comic. C'est le moyen le plus rapide de remplir votre bibliothèque locale.</value>
+  </data>
+  <data name="WelcomeExperienceKomgaTitle" xml:space="preserve">
+    <value>Komga : parcourir et synchroniser votre serveur</value>
+  </data>
+  <data name="WelcomeExperienceKomgaDescription" xml:space="preserve">
+    <value>Connectez un ou plusieurs serveurs Komga, parcourez bibliothèques et listes de lecture, téléchargez des livres pour la lecture hors ligne et synchronisez votre progression entre appareils.</value>
+  </data>
+  <data name="WelcomeExperienceActivityTitle" xml:space="preserve">
+    <value>Activité : suivre les tâches en cours</value>
+  </data>
+  <data name="WelcomeExperienceActivityDescription" xml:space="preserve">
+    <value>Suivez les imports, téléchargements Komga et conversions EPUB au même endroit. Mettez en pause, reprenez, relancez ou annulez les files d'attente selon vos besoins.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsTitle" xml:space="preserve">
+    <value>Réglages : personnaliser votre expérience</value>
+  </data>
+  <data name="WelcomeExperienceSettingsDescription" xml:space="preserve">
+    <value>Configurez les serveurs Komga, la langue, le thème, le comportement au démarrage, la disposition des sections et les préférences de lecture par défaut.</value>
+  </data>
+  <data name="WelcomeExperienceSupportTitle" xml:space="preserve">
+    <value>Soutenir le projet</value>
+  </data>
+  <data name="WelcomeExperienceSupportDescription" xml:space="preserve">
+    <value>Si StripWolf vous est utile, pensez à faire un don. Vous retrouverez toujours ces options plus tard dans Réglages → À propos → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceSupportCta" xml:space="preserve">
+    <value>Envie de soutenir le développement ?</value>
+  </data>
+  <data name="WelcomeExperienceLibraryHint" xml:space="preserve">
+    <value>Regardez l'onglet Bibliothèque surligné en bas.</value>
+  </data>
+  <data name="WelcomeExperienceImportHint" xml:space="preserve">
+    <value>Les boutons d'import se trouvent sur la barre d'actions en haut de l'écran Bibliothèque.</value>
+  </data>
+  <data name="WelcomeExperienceImportPointer" xml:space="preserve">
+    <value>Les actions d'import sont ici ↑</value>
+  </data>
+  <data name="WelcomeExperienceKomgaHint" xml:space="preserve">
+    <value>Regardez l'onglet Komga surligné en bas.</value>
+  </data>
+  <data name="WelcomeExperienceActivityHint" xml:space="preserve">
+    <value>Regardez l'onglet Activité surligné en bas.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsHint" xml:space="preserve">
+    <value>Regardez l'onglet Réglages surligné en bas.</value>
+  </data>
+  <data name="WelcomeExperienceSupportHint" xml:space="preserve">
+    <value>Vous pourrez retrouver les options de don dans Réglages → À propos → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceBack" xml:space="preserve">
+    <value>Retour</value>
+  </data>
+  <data name="WelcomeExperienceNext" xml:space="preserve">
+    <value>Suivant</value>
+  </data>
+  <data name="WelcomeExperienceSkip" xml:space="preserve">
+    <value>Passer la visite</value>
+  </data>
+  <data name="WelcomeExperienceFinish" xml:space="preserve">
+    <value>Terminer</value>
+  </data>
 </root>

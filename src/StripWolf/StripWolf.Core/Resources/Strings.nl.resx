@@ -856,4 +856,121 @@
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="WelcomeExperience" xml:space="preserve">
+    <value>Welkom bij StripWolf</value>
+  </data>
+  <data name="WelcomeExperienceProgress" xml:space="preserve">
+    <value>Stap {0} van {1}</value>
+  </data>
+  <data name="WelcomeExperienceIntroTitle" xml:space="preserve">
+    <value>Jouw strip-leeshub</value>
+  </data>
+  <data name="WelcomeExperienceIntroDescription" xml:space="preserve">
+    <value>Kies voordat je begint je taal en app-thema, en accepteer daarna de licentievoorwaarden. Je kunt deze instellingen later in Instellingen wijzigen.</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetup" xml:space="preserve">
+    <value>Snelle configuratie</value>
+  </data>
+  <data name="WelcomeExperienceQuickSetupHint" xml:space="preserve">
+    <value>Taal bepaalt de vertaalde UI-teksten. Thema bepaalt het uiterlijk van de app (Systeem volgt de instellingen van je apparaat).</value>
+  </data>
+  <data name="WelcomeExperienceLicenseRequired" xml:space="preserve">
+    <value>Het accepteren van de licentie is vereist om door te gaan.</value>
+  </data>
+  <data name="WelcomeExperienceReviewLicense" xml:space="preserve">
+    <value>GPLv3-licentie bekijken</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAccepted" xml:space="preserve">
+    <value>Geaccepteerd</value>
+  </data>
+  <data name="WelcomeExperienceLicenseTitle" xml:space="preserve">
+    <value>Licentie- en garantiemelding</value>
+  </data>
+  <data name="WelcomeExperienceLicenseSummary" xml:space="preserve">
+    <value>StripWolf is gelicentieerd onder GNU GPLv3. Je mag het gebruiken, bestuderen, wijzigen en herdistribueren onder de GPLv3-voorwaarden.</value>
+  </data>
+  <data name="WelcomeExperienceLicenseAsIs" xml:space="preserve">
+    <value>Deze software wordt geleverd "zoals deze is", zonder enige garantie, inclusief verhandelbaarheid of geschiktheid voor een bepaald doel. Je bent zelf verantwoordelijk voor je gegevens en back-ups; de auteurs zijn niet aansprakelijk voor gegevensverlies of andere schade.</value>
+  </data>
+  <data name="WelcomeExperienceOpenGplLink" xml:space="preserve">
+    <value>GPLv3 openen</value>
+  </data>
+  <data name="WelcomeExperienceDecline" xml:space="preserve">
+    <value>Nu niet</value>
+  </data>
+  <data name="WelcomeExperienceAcceptLicense" xml:space="preserve">
+    <value>Ik accepteer</value>
+  </data>
+  <data name="WelcomeExperienceLibraryTitle" xml:space="preserve">
+    <value>Bibliotheek: importeren en offline lezen</value>
+  </data>
+  <data name="WelcomeExperienceLibraryDescription" xml:space="preserve">
+    <value>Importeer losse bestanden of complete mappen, organiseer op series, markeer favorieten en ga verder waar je was gebleven. Ondersteunde formaten: CBZ, CBR, CB7, CBT, PDF en EPUB.</value>
+  </data>
+  <data name="WelcomeExperienceImportTitle" xml:space="preserve">
+    <value>Importeren: waar je strips toevoegt</value>
+  </data>
+  <data name="WelcomeExperienceImportDescription" xml:space="preserve">
+    <value>Gebruik in Bibliotheek de bovenste actiebalk: Map openen, Map importeren en Strip importeren. Dit is de snelste manier om je lokale bibliotheek te vullen.</value>
+  </data>
+  <data name="WelcomeExperienceKomgaTitle" xml:space="preserve">
+    <value>Komga: je server verkennen en synchroniseren</value>
+  </data>
+  <data name="WelcomeExperienceKomgaDescription" xml:space="preserve">
+    <value>Verbind één of meerdere Komga-servers, blader door bibliotheken en leeslijsten, download boeken voor offline lezen en synchroniseer je voortgang tussen apparaten.</value>
+  </data>
+  <data name="WelcomeExperienceActivityTitle" xml:space="preserve">
+    <value>Activiteit: lopende taken volgen</value>
+  </data>
+  <data name="WelcomeExperienceActivityDescription" xml:space="preserve">
+    <value>Volg imports, Komga-downloads en EPUB-conversies op één plek. Pauzeer, hervat, probeer opnieuw of annuleer wachtrijen wanneer nodig.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsTitle" xml:space="preserve">
+    <value>Instellingen: maak het persoonlijk</value>
+  </data>
+  <data name="WelcomeExperienceSettingsDescription" xml:space="preserve">
+    <value>Stel Komga-servers, taal, thema, opstartgedrag, sectie-indeling en standaard leesvoorkeuren in zoals jij wilt lezen.</value>
+  </data>
+  <data name="WelcomeExperienceSupportTitle" xml:space="preserve">
+    <value>Ondersteun het project</value>
+  </data>
+  <data name="WelcomeExperienceSupportDescription" xml:space="preserve">
+    <value>Als StripWolf nuttig voor je is, overweeg dan een donatie. Je vindt deze opties later altijd in Instellingen → Over → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceSupportCta" xml:space="preserve">
+    <value>Wil je de ontwikkeling steunen?</value>
+  </data>
+  <data name="WelcomeExperienceLibraryHint" xml:space="preserve">
+    <value>Kijk naar het gemarkeerde Bibliotheek-tabblad onderaan.</value>
+  </data>
+  <data name="WelcomeExperienceImportHint" xml:space="preserve">
+    <value>De importknoppen staan in de bovenste actiebalk van het Bibliotheek-scherm.</value>
+  </data>
+  <data name="WelcomeExperienceImportPointer" xml:space="preserve">
+    <value>Importacties staan hier ↑</value>
+  </data>
+  <data name="WelcomeExperienceKomgaHint" xml:space="preserve">
+    <value>Kijk naar het gemarkeerde Komga-tabblad onderaan.</value>
+  </data>
+  <data name="WelcomeExperienceActivityHint" xml:space="preserve">
+    <value>Kijk naar het gemarkeerde Activiteit-tabblad onderaan.</value>
+  </data>
+  <data name="WelcomeExperienceSettingsHint" xml:space="preserve">
+    <value>Kijk naar het gemarkeerde Instellingen-tabblad onderaan.</value>
+  </data>
+  <data name="WelcomeExperienceSupportHint" xml:space="preserve">
+    <value>Je kunt donatieopties later terugvinden in Instellingen → Over → Support Me.</value>
+  </data>
+  <data name="WelcomeExperienceBack" xml:space="preserve">
+    <value>Terug</value>
+  </data>
+  <data name="WelcomeExperienceNext" xml:space="preserve">
+    <value>Volgende</value>
+  </data>
+  <data name="WelcomeExperienceSkip" xml:space="preserve">
+    <value>Rondleiding overslaan</value>
+  </data>
+  <data name="WelcomeExperienceFinish" xml:space="preserve">
+    <value>Voltooien</value>
+  </data>
 </root>

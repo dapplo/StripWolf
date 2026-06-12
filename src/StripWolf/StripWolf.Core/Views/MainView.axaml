@@ -11,7 +11,7 @@
   
   <Grid RowDefinitions="*,Auto">
     <!-- Content Area -->
-    <TransitioningContentControl Grid.Row="0" Content="{Binding CurrentView}">
+    <TransitioningContentControl Grid.Row="0" Content="{Binding CurrentView}" Opacity="{Binding WelcomeBackgroundContentOpacity}">
       <TransitioningContentControl.PageTransition>
         <CrossFade Duration="0:0:0.25"/>
       </TransitioningContentControl.PageTransition>
@@ -37,31 +37,44 @@
     <!-- Tab Bar - Hidden when in reader -->
     <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
             BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-            IsVisible="{Binding !IsInReader}">
+            IsVisible="{Binding !IsInReader}"
+            Opacity="{Binding WelcomeBackgroundContentOpacity}">
       <Grid ColumnDefinitions="*,*,*,*" Height="60">
+        <Border Grid.Column="0" Margin="6" CornerRadius="10"
+                BorderThickness="3" BorderBrush="White"
+                Background="#AA1A73E8" IsHitTestVisible="False"
+                IsVisible="{Binding IsWelcomeLibraryStep}"/>
         <Button Grid.Column="0" Command="{Binding NavigateToLibraryCommand}" 
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
             <TextBlock Text="▤" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Library" FontSize="12" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
+        <Border Grid.Column="1" Margin="6" CornerRadius="10"
+                BorderThickness="3" BorderBrush="White"
+                Background="#AA1A73E8" IsHitTestVisible="False"
+                IsVisible="{Binding IsWelcomeKomgaStep}"/>
         <Button Grid.Column="1" Command="{Binding NavigateToKomgaCommand}"
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
             <TextBlock Text="K" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-            <TextBlock Text="Komga" FontSize="12" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding Komga, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
+        <Border Grid.Column="2" Margin="6" CornerRadius="10"
+                BorderThickness="3" BorderBrush="White"
+                Background="#AA1A73E8" IsHitTestVisible="False"
+                IsVisible="{Binding IsWelcomeActivityStep}"/>
         <Button Grid.Column="2" Command="{Binding NavigateToActivityCommand}"
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
             <TextBlock Text="↻" FontSize="20" HorizontalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-              <TextBlock Text="Activity" FontSize="12" VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding Activity, Source={x:Static res:Loc.Instance}}" FontSize="12" VerticalAlignment="Center"/>
               <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="4,1"
                       VerticalAlignment="Center" IsVisible="{Binding HasActivityItems}">
                 <TextBlock Text="{Binding ActivityItemsCount}" FontSize="10" Foreground="White"/>
@@ -69,12 +82,16 @@
             </StackPanel>
           </StackPanel>
         </Button>
+        <Border Grid.Column="3" Margin="6" CornerRadius="10"
+                BorderThickness="3" BorderBrush="White"
+                Background="#AA1A73E8" IsHitTestVisible="False"
+                IsVisible="{Binding IsWelcomeSettingsStep}"/>
         <Button Grid.Column="3" Command="{Binding NavigateToSettingsCommand}"
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
             <TextBlock Text="⚙" FontSize="20" HorizontalAlignment="Center"/>
-            <TextBlock Text="Settings" FontSize="12" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
       </Grid>
@@ -102,6 +119,138 @@
           </StackPanel>
         </StackPanel>
       </Border>
+    </Panel>
+
+    <!-- Welcome Experience Overlay -->
+    <Panel Grid.RowSpan="2" Background="#B3000000" IsVisible="{Binding ShowWelcomeExperience}">
+      <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="10" Padding="12,8"
+              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,140,16,0"
+              IsVisible="{Binding IsWelcomeLibraryImportStep}">
+        <TextBlock Text="{Binding WelcomeExperienceImportPointer, Source={x:Static res:Loc.Instance}}"
+                   Foreground="White" FontWeight="Bold"/>
+      </Border>
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              CornerRadius="12"
+              Padding="24"
+              Width="560"
+              MinHeight="560"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <Grid RowDefinitions="*,Auto" RowSpacing="16">
+          <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="16">
+          <TextBlock Text="{Binding WelcomeExperience, Source={x:Static res:Loc.Instance}}" FontSize="22" FontWeight="Bold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding WelcomeExperienceProgress}" Foreground="Gray" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding WelcomeExperienceStepTitle}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding WelcomeExperienceStepDescription}" TextWrapping="Wrap"/>
+
+          <StackPanel Spacing="10" IsVisible="{Binding IsWelcomeFirstStep}">
+            <TextBlock Text="{Binding WelcomeExperienceQuickSetup, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Language, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              <ComboBox Grid.Row="0" Grid.Column="1"
+                        ItemsSource="{Binding WelcomeAvailableLanguages}"
+                        SelectedItem="{Binding WelcomeSelectedLanguage}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding DisplayName}"/>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding AppTheme, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              <ComboBox Grid.Row="1" Grid.Column="1"
+                        ItemsSource="{Binding WelcomeThemeOptions}"
+                        SelectedItem="{Binding WelcomeSelectedThemeOption}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:WelcomeThemeOption">
+                    <TextBlock Text="{Binding DisplayName}"/>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
+            <TextBlock Text="{Binding WelcomeExperienceQuickSetupHint, Source={x:Static res:Loc.Instance}}"
+                       Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+
+            <Border Background="#26222222" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding WelcomeExperienceLicenseRequired, Source={x:Static res:Loc.Instance}}" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="{Binding WelcomeExperienceReviewLicense, Source={x:Static res:Loc.Instance}}"
+                          Command="{Binding OpenWelcomeLicenseDialogCommand}"/>
+                  <TextBlock Text="{Binding WelcomeExperienceLicenseAccepted, Source={x:Static res:Loc.Instance}}"
+                             IsVisible="{Binding HasAcceptedWelcomeLicense}"
+                             Foreground="Green" VerticalAlignment="Center"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <StackPanel Spacing="8" IsVisible="{Binding IsWelcomeSupportStep}">
+            <TextBlock Text="{Binding WelcomeExperienceSupportCta, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Content="{Binding DonateWithPayPal, Source={x:Static res:Loc.Instance}}"
+                      Command="{Binding OpenWelcomePayPalCommand}"/>
+              <Button Content="{Binding DonateWithKoFi, Source={x:Static res:Loc.Instance}}"
+                      Command="{Binding OpenWelcomeKoFiCommand}"/>
+            </StackPanel>
+          </StackPanel>
+
+          <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="10,6"
+                  IsVisible="{Binding HasWelcomeExperienceTargetHint}">
+            <TextBlock Text="{Binding WelcomeExperienceTargetHint}" Foreground="White" FontWeight="SemiBold" TextWrapping="Wrap"/>
+          </Border>
+          </StackPanel>
+          </ScrollViewer>
+
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+            <Button Grid.Column="0"
+                    MinWidth="120"
+                    Content="{Binding WelcomeExperienceSkip, Source={x:Static res:Loc.Instance}}"
+                    Command="{Binding SkipWelcomeExperienceCommand}"
+                    IsEnabled="{Binding CanSkipWelcome}"/>
+            <Button Grid.Column="2"
+                    MinWidth="120"
+                    Content="{Binding WelcomeExperienceBack, Source={x:Static res:Loc.Instance}}"
+                    Command="{Binding PreviousWelcomeExperienceStepCommand}"
+                    IsEnabled="{Binding !IsWelcomeFirstStep}"/>
+            <Button Grid.Column="3"
+                    MinWidth="120"
+                    Classes="accent"
+                    Content="{Binding WelcomeExperienceNextButtonLabel}"
+                    Command="{Binding NextWelcomeExperienceStepCommand}"
+                    IsEnabled="{Binding CanContinueWelcomeStep}"/>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Panel Background="#A0000000" IsVisible="{Binding ShowWelcomeLicenseDialog}">
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                CornerRadius="12" Padding="18" MaxWidth="620"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="1">
+          <StackPanel Spacing="10">
+            <TextBlock Text="{Binding WelcomeExperienceLicenseTitle, Source={x:Static res:Loc.Instance}}"
+                       FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="{Binding WelcomeExperienceLicenseSummary, Source={x:Static res:Loc.Instance}}"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding WelcomeExperienceLicenseAsIs, Source={x:Static res:Loc.Instance}}"
+                       TextWrapping="Wrap" Foreground="Gray"/>
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button Content="{Binding WelcomeExperienceOpenGplLink, Source={x:Static res:Loc.Instance}}"
+                      Command="{Binding OpenGplLicenseCommand}"/>
+              <Button Content="{Binding WelcomeExperienceDecline, Source={x:Static res:Loc.Instance}}"
+                      Command="{Binding CloseWelcomeLicenseDialogCommand}"/>
+              <Button Content="{Binding WelcomeExperienceAcceptLicense, Source={x:Static res:Loc.Instance}}"
+                      Classes="accent"
+                      Command="{Binding AcceptWelcomeLicenseCommand}"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Panel>
     </Panel>
   </Grid>
 </UserControl>

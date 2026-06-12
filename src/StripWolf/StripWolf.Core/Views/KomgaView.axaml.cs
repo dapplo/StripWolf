@@ -53,6 +53,18 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
     }
 
     public ICommand? GoBackToSeriesCommand => (DataContext as KomgaViewModel)?.GoBackToSeriesCommand;
+    public ICommand? SelectSeriesCommand => (DataContext as KomgaViewModel)?.SelectSeriesCommand;
+    public ICommand? DownloadSeriesCommand => (DataContext as KomgaViewModel)?.DownloadSeriesCommand;
+    public ICommand? ShowBookInfoCommand => (DataContext as KomgaViewModel)?.ShowBookInfoCommand;
+    public ICommand? DownloadBookCommand => (DataContext as KomgaViewModel)?.DownloadBookCommand;
+    public ICommand? ShowReadListPickerCommand => (DataContext as KomgaViewModel)?.ShowReadListPickerCommand;
+    public ICommand? MarkBookAsReadCommand => (DataContext as KomgaViewModel)?.MarkBookAsReadCommand;
+    public ICommand? SelectLibraryCommand => (DataContext as KomgaViewModel)?.SelectLibraryCommand;
+    public ICommand? SelectReadListCommand => (DataContext as KomgaViewModel)?.SelectReadListCommand;
+    public ICommand? AddBookToReadListCommand => (DataContext as KomgaViewModel)?.AddBookToReadListCommand;
+    public ICommand? ViewSelectedBookSeriesCommand => (DataContext as KomgaViewModel)?.ViewSelectedBookSeriesCommand;
+    public ICommand? OpenBookOnlineCommand => (DataContext as KomgaViewModel)?.OpenBookOnlineCommand;
+    public ICommand? OpenBookSeriesOnlineCommand => (DataContext as KomgaViewModel)?.OpenBookSeriesOnlineCommand;
     
     public KomgaSeries? SelectedSeries => (DataContext as KomgaViewModel)?.SelectedSeries;
     
@@ -178,6 +190,18 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
     private void RaiseProxyPropertyChanges()
     {
         OnPropertyChanged(nameof(GoBackToSeriesCommand));
+        OnPropertyChanged(nameof(SelectSeriesCommand));
+        OnPropertyChanged(nameof(DownloadSeriesCommand));
+        OnPropertyChanged(nameof(ShowBookInfoCommand));
+        OnPropertyChanged(nameof(DownloadBookCommand));
+        OnPropertyChanged(nameof(ShowReadListPickerCommand));
+        OnPropertyChanged(nameof(MarkBookAsReadCommand));
+        OnPropertyChanged(nameof(SelectLibraryCommand));
+        OnPropertyChanged(nameof(SelectReadListCommand));
+        OnPropertyChanged(nameof(AddBookToReadListCommand));
+        OnPropertyChanged(nameof(ViewSelectedBookSeriesCommand));
+        OnPropertyChanged(nameof(OpenBookOnlineCommand));
+        OnPropertyChanged(nameof(OpenBookSeriesOnlineCommand));
         OnPropertyChanged(nameof(SelectedSeries));
         OnPropertyChanged(nameof(SelectedLibrary));
         OnPropertyChanged(nameof(SelectedReadList));

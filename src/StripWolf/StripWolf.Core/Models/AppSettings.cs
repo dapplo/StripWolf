@@ -57,6 +57,11 @@ public class AppSettings
     public int LastTabIndex { get; set; }
 
     /// <summary>
+    /// Whether the first-run welcome tour has already been completed or skipped.
+    /// </summary>
+    public bool? HasCompletedWelcomeExperience { get; set; }
+
+    /// <summary>
     /// Preferred reading mode for the comic reader
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<ReadingMode>))]
@@ -183,6 +188,7 @@ public class AppSettings
             StartupBehavior = StartupBehavior,
             WasInReader = WasInReader,
             LastTabIndex = LastTabIndex,
+            HasCompletedWelcomeExperience = HasCompletedWelcomeExperience,
             AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,

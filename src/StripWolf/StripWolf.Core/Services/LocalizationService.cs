@@ -32,6 +32,7 @@ public class LocalizationService
     private static readonly ResourceManager ResourceManager = new("StripWolf.Core.Resources.Strings", typeof(LocalizationService).Assembly);
     
     private CultureInfo _currentCulture;
+    private readonly CultureInfo _systemCulture;
     private bool _useSystemLanguage = true;
     
     /// <summary>
@@ -54,7 +55,8 @@ public class LocalizationService
     
     public LocalizationService()
     {
-        _currentCulture = CultureInfo.CurrentUICulture;
+        _systemCulture = CultureInfo.CurrentUICulture;
+        _currentCulture = _systemCulture;
     }
     
     /// <summary>
@@ -68,7 +70,7 @@ public class LocalizationService
             _useSystemLanguage = value;
             if (value)
             {
-                SetCulture(CultureInfo.CurrentUICulture);
+                SetCulture(_systemCulture);
             }
         }
     }
@@ -92,7 +94,7 @@ public class LocalizationService
         if (string.IsNullOrEmpty(cultureCode))
         {
             _useSystemLanguage = true;
-            SetCulture(CultureInfo.CurrentUICulture);
+            SetCulture(_systemCulture);
         }
         else
         {
@@ -105,7 +107,7 @@ public class LocalizationService
             {
                 // If the culture is not found, fall back to system default
                 _useSystemLanguage = true;
-                SetCulture(CultureInfo.CurrentUICulture);
+                SetCulture(_systemCulture);
             }
         }
     }
@@ -186,4 +188,3 @@ public record LanguageOption(string DisplayName, string? CultureCode)
 {
     public override string ToString() => DisplayName;
 }
-

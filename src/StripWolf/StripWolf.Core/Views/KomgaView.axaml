@@ -76,7 +76,7 @@
                 Width="150" ClipToBounds="True">
           <Grid RowDefinitions="200,Auto,Auto,Auto">
           <Button Grid.Row="0" Grid.RowSpan="3" Padding="0" Background="Transparent"
-                  Command="{Binding ((vm:KomgaViewModel)DataContext).SelectSeriesCommand, ElementName=Root}"
+                  Command="{Binding SelectSeriesCommand, ElementName=Root}"
                   CommandParameter="{Binding}">
             <Grid RowDefinitions="200,Auto,Auto">
               <Border Grid.Row="0" Height="200" Background="Black" ClipToBounds="True">
@@ -95,7 +95,7 @@
           </Button>
           <Panel Grid.Row="3" Margin="8,0,8,8">
             <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                    Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadSeriesCommand, ElementName=Root}"
+                    Command="{Binding DownloadSeriesCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -123,7 +123,7 @@
                 ClipToBounds="True">
           <Grid RowDefinitions="200,Auto,Auto,Auto,Auto">
           <Button Grid.Row="0" Padding="0" Background="Transparent"
-                  Command="{Binding ((vm:KomgaViewModel)DataContext).ShowBookInfoCommand, ElementName=Root}"
+                  Command="{Binding ShowBookInfoCommand, ElementName=Root}"
                   CommandParameter="{Binding}">
             <Border Height="200" Background="Black" ClipToBounds="True">
               <Panel>
@@ -159,7 +159,7 @@
           </Panel>
           <Panel Grid.Row="3" Margin="8,0,8,4">
             <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
-                    Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, ElementName=Root}"
+                    Command="{Binding DownloadBookCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -186,13 +186,13 @@
           </Panel>
           <Grid Grid.Row="4" ColumnDefinitions="*,*,*" Margin="4,0,4,4" Height="32">
             <Button Grid.Column="0" Classes="icon-btn" Content="ⓘ"
-                    Command="{Binding ((vm:KomgaViewModel)DataContext).ShowBookInfoCommand, ElementName=Root}"
+                    Command="{Binding ShowBookInfoCommand, ElementName=Root}"
                     CommandParameter="{Binding}" ToolTip.Tip="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}"/>
             <Button Grid.Column="1" Classes="icon-btn" Content="≣"
-                    Command="{Binding ((vm:KomgaViewModel)DataContext).ShowReadListPickerCommand, ElementName=Root}"
+                    Command="{Binding ShowReadListPickerCommand, ElementName=Root}"
                     CommandParameter="{Binding}" ToolTip.Tip="{Binding AddToReadList, Source={x:Static res:Loc.Instance}}"/>
             <Button Grid.Column="2" Classes="icon-btn" Content="✓"
-                    Command="{Binding ((vm:KomgaViewModel)DataContext).MarkBookAsReadCommand, ElementName=Root}"
+                    Command="{Binding MarkBookAsReadCommand, ElementName=Root}"
                     CommandParameter="{Binding}" ToolTip.Tip="{Binding MarkRead, Source={x:Static res:Loc.Instance}}"
                     IsEnabled="{Binding !IsRead}"/>
           </Grid>
@@ -236,6 +236,11 @@
         <TextBlock Text="{Binding NotConnected, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
         <TextBlock Text="{Binding ConfigureServer, Source={x:Static res:Loc.Instance}}"
                    Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
+        <Button Content="{Binding AddServer, Source={x:Static res:Loc.Instance}}"
+                Command="{Binding ConfigureServerCommand}"
+                Classes="accent"
+                HorizontalAlignment="Center"
+                Padding="16,8"/>
       </StackPanel>
 
       <!-- Connected Content -->
@@ -555,7 +560,7 @@
                     <ListBox.ItemTemplate>
                       <DataTemplate x:DataType="komga:KomgaLibrary">
                         <Button Padding="16" HorizontalAlignment="Stretch"
-                                Command="{Binding ((vm:KomgaViewModel)DataContext).SelectLibraryCommand, ElementName=Root}"
+                                Command="{Binding SelectLibraryCommand, ElementName=Root}"
                                 CommandParameter="{Binding}">
                           <StackPanel Orientation="Horizontal" Spacing="12">
                             <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
@@ -587,7 +592,7 @@
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="komga:KomgaReadListDisplay">
                           <Button Padding="0" Background="Transparent"
-                                  Command="{Binding ((vm:KomgaViewModel)DataContext).SelectReadListCommand, ElementName=Root}"
+                                  Command="{Binding SelectReadListCommand, ElementName=Root}"
                                   CommandParameter="{Binding}">
                             <Border Classes="komga-card-entry" Classes.loaded="{Binding IsLoaded}">
                               <Border Classes="komga-card" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
@@ -853,7 +858,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="komga:KomgaReadList">
                     <Button Padding="12" Margin="0,0,0,8" HorizontalAlignment="Stretch"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).AddBookToReadListCommand, ElementName=Root}"
+                            Command="{Binding AddBookToReadListCommand, ElementName=Root}"
                             CommandParameter="{Binding}">
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel>
@@ -937,27 +942,27 @@
                   </StackPanel>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Content="{Binding Download, Source={x:Static res:Loc.Instance}}"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).DownloadBookCommand, ElementName=Root}"
+                            Command="{Binding DownloadBookCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     <Button Grid.Column="1" Content="{Binding MarkRead, Source={x:Static res:Loc.Instance}, StringFormat='{}✓ {0}'}"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).MarkBookAsReadCommand, ElementName=Root}"
+                            Command="{Binding MarkBookAsReadCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                             IsEnabled="{Binding !IsRead}"/>
                   </Grid>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Content="📝 Add to Read List"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).ShowReadListPickerCommand, ElementName=Root}"
+                            Command="{Binding ShowReadListPickerCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     <Button Grid.Column="1" Content="{Binding SectionSeries, Source={x:Static res:Loc.Instance}, StringFormat='{}📚 {0}'}"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).ViewSelectedBookSeriesCommand, ElementName=Root}"
+                            Command="{Binding ViewSelectedBookSeriesCommand, ElementName=Root}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                   </Grid>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Content="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).OpenBookOnlineCommand, ElementName=Root}"
+                            Command="{Binding OpenBookOnlineCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     <Button Grid.Column="1" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
-                            Command="{Binding ((vm:KomgaViewModel)DataContext).OpenBookSeriesOnlineCommand, ElementName=Root}"
+                            Command="{Binding OpenBookSeriesOnlineCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                   </Grid>
                 </StackPanel>
