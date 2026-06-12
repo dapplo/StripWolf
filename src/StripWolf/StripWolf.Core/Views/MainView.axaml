@@ -139,10 +139,11 @@
               BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
               BorderThickness="1">
         <Grid RowDefinitions="*,Auto" RowSpacing="16">
-          <StackPanel Grid.Row="0" Spacing="16">
-          <TextBlock Text="{Binding WelcomeExperience, Source={x:Static res:Loc.Instance}}" FontSize="22" FontWeight="Bold"/>
-          <TextBlock Text="{Binding WelcomeExperienceProgress}" Foreground="Gray"/>
-          <TextBlock Text="{Binding WelcomeExperienceStepTitle}" FontSize="18" FontWeight="SemiBold"/>
+          <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="16">
+          <TextBlock Text="{Binding WelcomeExperience, Source={x:Static res:Loc.Instance}}" FontSize="22" FontWeight="Bold" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding WelcomeExperienceProgress}" Foreground="Gray" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding WelcomeExperienceStepTitle}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding WelcomeExperienceStepDescription}" TextWrapping="Wrap"/>
 
           <StackPanel Spacing="10" IsVisible="{Binding IsWelcomeFirstStep}">
@@ -188,7 +189,7 @@
           </StackPanel>
 
           <StackPanel Spacing="8" IsVisible="{Binding IsWelcomeSupportStep}">
-            <TextBlock Text="{Binding WelcomeExperienceSupportCta, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding WelcomeExperienceSupportCta, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" Spacing="10">
               <Button Content="{Binding DonateWithPayPal, Source={x:Static res:Loc.Instance}}"
                       Command="{Binding OpenWelcomePayPalCommand}"/>
@@ -199,9 +200,10 @@
 
           <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="10,6"
                   IsVisible="{Binding HasWelcomeExperienceTargetHint}">
-            <TextBlock Text="{Binding WelcomeExperienceTargetHint}" Foreground="White" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding WelcomeExperienceTargetHint}" Foreground="White" FontWeight="SemiBold" TextWrapping="Wrap"/>
           </Border>
           </StackPanel>
+          </ScrollViewer>
 
           <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
             <Button Grid.Column="0"

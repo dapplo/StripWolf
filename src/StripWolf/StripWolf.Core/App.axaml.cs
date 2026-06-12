@@ -20,7 +20,6 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Styling;
-using System.Globalization;
 using Avalonia.Markup.Xaml;
 using StripWolf.Core.Data;
 using StripWolf.Core.Models;
@@ -139,14 +138,8 @@ public partial class App : Application
             var settingsService = Services!.GetRequiredService<SettingsService>();
             var settings = settingsService.LoadSettings();
             
-            if (!settings.UseSystemLanguage && !string.IsNullOrEmpty(settings.LanguageCode))
-            {
-                var culture = new CultureInfo(settings.LanguageCode);
-                CultureInfo.DefaultThreadCurrentUICulture = culture;
-                CultureInfo.DefaultThreadCurrentCulture = culture;
-                Thread.CurrentThread.CurrentUICulture = culture;
-                Thread.CurrentThread.CurrentCulture = culture;
-            }
+            var localizationService = Services!.GetRequiredService<LocalizationService>();
+            localizationService.SetLanguage(settings.UseSystemLanguage ? null : settings.LanguageCode);
         }
         catch
         {

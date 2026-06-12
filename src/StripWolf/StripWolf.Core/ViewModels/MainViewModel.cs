@@ -24,6 +24,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
 using StripWolf.Core.Services;
+using System.Diagnostics;
 
 namespace StripWolf.Core.ViewModels;
 
@@ -49,8 +50,10 @@ public partial class MainViewModel : ViewModelBase
     private bool _isApplyingWelcomePreferences;
     private bool _shouldStartWelcomeAfterInitialization;
     private bool _hasWelcomeStartState;
+    private bool _isRestoringWelcomeState;
     private bool _welcomeStartedInReader;
     private int _welcomeStartTabIndex;
+    private IReadOnlyList<WelcomeThemeOption>? _welcomeThemeOptions;
 
     [ObservableProperty]
     private ViewModelBase _currentView;
@@ -284,7 +287,7 @@ public partial class MainViewModel : ViewModelBase
         settings.LastTabIndex = value;
         _ = _settingsService.SaveSettingsAsync(settings);
 
-        if (!IsInReader)
+        if (!IsInReader && !_isRestoringWelcomeState)
         {
             CurrentView = GetViewForTab(value);
         }
@@ -329,7 +332,7 @@ public partial class MainViewModel : ViewModelBase
     public bool CanContinueWelcomeStep => !IsWelcomeFirstStep || HasAcceptedWelcomeLicense;
     public bool CanSkipWelcome => !IsWelcomeFirstStep || HasAcceptedWelcomeLicense;
     public IReadOnlyList<LanguageOption> WelcomeAvailableLanguages => LocalizationService.AvailableLanguages;
-    public IReadOnlyList<WelcomeThemeOption> WelcomeThemeOptions =>
+    public IReadOnlyList<WelcomeThemeOption> WelcomeThemeOptions => _welcomeThemeOptions ??=
     [
         new WelcomeThemeOption(AppThemePreference.System, Resources.Loc.Instance.ThemeSystem),
         new WelcomeThemeOption(AppThemePreference.Light, Resources.Loc.Instance.ThemeLight),
@@ -566,20 +569,21 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        _hasWelcomeStartState = false;
-        var restoreTabIndex = _welcomeStartTabIndex;
-        var restoreReader = _welcomeStartedInReader;
-
-        SelectedTabIndex = restoreTabIndex;
-        if (restoreReader)
+        _isRestoringWelcomeState = true;
+        try
         {
-            IsInReader = true;
-            CurrentView = _readerViewModel;
-            return;
-        }
+            _hasWelcomeStartState = false;
+            var restoreTabIndex = _welcomeStartTabIndex;
+            var restoreReader = _welcomeStartedInReader;
 
-        IsInReader = false;
-        CurrentView = GetViewForTab(restoreTabIndex);
+            IsInReader = restoreReader;
+            SelectedTabIndex = restoreTabIndex;
+            CurrentView = restoreReader ? _readerViewModel : GetViewForTab(restoreTabIndex);
+        }
+        finally
+        {
+            _isRestoringWelcomeState = false;
+        }
     }
 
     [RelayCommand]
@@ -621,12 +625,19 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task ApplyWelcomeLanguageAsync(LanguageOption language)
     {
-        _localizationService.SetLanguage(language.CultureCode);
-        await _settingsService.UpdateSettingsAsync(settings =>
+        try
         {
-            settings.UseSystemLanguage = language.CultureCode is null;
-            settings.LanguageCode = language.CultureCode;
-        });
+            _localizationService.SetLanguage(language.CultureCode);
+            await _settingsService.UpdateSettingsAsync(settings =>
+            {
+                settings.UseSystemLanguage = language.CultureCode is null;
+                settings.LanguageCode = language.CultureCode;
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to apply welcome language selection: {ex.Message}");
+        }
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
@@ -636,6 +647,7 @@ public partial class MainViewModel : ViewModelBase
             var selectedThemeValue = WelcomeSelectedThemeOption?.Value ?? AppThemePreference.System;
 
             _isApplyingWelcomePreferences = true;
+            _welcomeThemeOptions = null;
             OnPropertyChanged(nameof(WelcomeThemeOptions));
             WelcomeSelectedThemeOption = WelcomeThemeOptions.FirstOrDefault(option => option.Value == selectedThemeValue) ?? WelcomeThemeOptions[0];
             _isApplyingWelcomePreferences = false;
