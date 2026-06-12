@@ -197,6 +197,9 @@
   <data name="Save" xml:space="preserve">
     <value>Save</value>
   </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
   <data name="Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
@@ -233,6 +236,15 @@
   <!-- Language Settings -->
   <data name="LanguageSettings" xml:space="preserve">
     <value>Language Settings</value>
+  </data>
+  <data name="UiSettings" xml:space="preserve">
+    <value>UI Settings</value>
+  </data>
+  <data name="LibrarySettings" xml:space="preserve">
+    <value>Library Settings</value>
+  </data>
+  <data name="KomgaSettings" xml:space="preserve">
+    <value>Komga Settings</value>
   </data>
   <data name="Language" xml:space="preserve">
     <value>Language</value>
@@ -772,6 +784,12 @@
   <data name="ResolutionLow" xml:space="preserve">
     <value>Low</value>
   </data>
+  <data name="Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Hide</value>
+  </data>
   <data name="Shown" xml:space="preserve">
     <value>Shown</value>
   </data>
@@ -798,6 +816,9 @@
   </data>
   <data name="UnsupportedFormatHandling" xml:space="preserve">
     <value>Unsupported Format Handling</value>
+  </data>
+  <data name="UnsupportedFormatHandlingDescription" xml:space="preserve">
+    <value>Choose when unsupported formats should be converted: right away during import, or only when opening the comic for reading.</value>
   </data>
   <data name="EpubOutputResolution" xml:space="preserve">
     <value>EPUB Output Resolution</value>

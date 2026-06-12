@@ -56,6 +56,9 @@ public class Loc : INotifyPropertyChanged
 
     // Settings Sections
     public string LanguageSettings => GetString();
+    public string UiSettings => GetString();
+    public string LibrarySettings => GetString();
+    public string KomgaSettings => GetString();
     public string ReadingSettings => GetString();
     public string SectionLayout => GetString();
     public string ServerConfiguration => GetString();
@@ -125,6 +128,7 @@ public class Loc : INotifyPropertyChanged
     public string Expanded => GetString();
     public string Collapsed => GetString();
     public string Browsing => GetString();
+    public string Edit => GetString();
     public string Delete => GetString();
     public string Cancel => GetString();
 
@@ -243,6 +247,8 @@ public class Loc : INotifyPropertyChanged
     public string ReadNowAction => GetString();
     public string MarkReadAction => GetString();
     public string DeleteComicAction => GetString();
+    public string Show => GetString();
+    public string Hide => GetString();
     public string ContinueReadingAction => GetString();
     public string HandednessAction => GetString();
     public string ReadingDirectionAction => GetString();

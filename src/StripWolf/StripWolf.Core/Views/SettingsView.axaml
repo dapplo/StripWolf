@@ -12,475 +12,467 @@
   <Grid>
     <!-- Server List View -->
     <ScrollViewer IsVisible="{Binding !IsEditing}" Padding="16">
-      <StackPanel Spacing="16" Margin="0,0,0,76">
-        <!-- Header -->
-        <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
-        
-        <!-- About Section -->
-        <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="StripWolf" FontSize="16" FontWeight="Bold"/>
-            <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <TextBlock Text="{Binding AppVersion}" Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
-              
-              <!-- Newer version available -->
-              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding UpdateService.IsNewerVersionAvailable}" VerticalAlignment="Center">
-                <TextBlock Text="•" Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
-                <Button Content="{Binding NewerVersionAvailable, Source={x:Static res:Loc.Instance}}" 
-                        Command="{Binding OpenGitHubReleasesCommand}" 
-                        Foreground="#E5A93C" 
-                        Background="Transparent" 
-                        BorderThickness="0" 
-                        Padding="0" 
-                        FontSize="12" 
-                        Cursor="Hand"
-                        VerticalAlignment="Center"/>
+      <Grid HorizontalAlignment="Center" MaxWidth="980">
+        <StackPanel Spacing="20" Margin="0,0,0,76">
+          <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
+
+          <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
+                  IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828" TextWrapping="Wrap"/>
+          </Border>
+
+          <TextBlock Text="{Binding About, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+          <Border Padding="16" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="StripWolf" FontSize="16" FontWeight="Bold"/>
+              <TextBlock Text="{Binding AppDescription, Source={x:Static res:Loc.Instance}}" Foreground="Gray"/>
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding AppVersion}" Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding UpdateService.IsNewerVersionAvailable}" VerticalAlignment="Center">
+                  <TextBlock Text="•" Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
+                  <Button Content="{Binding NewerVersionAvailable, Source={x:Static res:Loc.Instance}}"
+                          Command="{Binding OpenGitHubReleasesCommand}"
+                          Foreground="#E5A93C"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Padding="0"
+                          FontSize="12"
+                          Cursor="Hand"
+                          VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !UpdateService.IsNewerVersionAvailable}" VerticalAlignment="Center">
+                  <Button Command="{Binding CheckForUpdatesCommand}"
+                          IsEnabled="{Binding !UpdateService.IsChecking}"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Padding="4,0"
+                          ToolTip.Tip="{Binding CheckForUpdates, Source={x:Static res:Loc.Instance}}"
+                          VerticalAlignment="Center">
+                    <TextBlock Text="↻" FontSize="12"/>
+                  </Button>
+                  <TextBlock Text="{Binding UpdateService.UpdateStatus}" Foreground="Gray" FontSize="12" VerticalAlignment="Center"
+                             IsVisible="{Binding UpdateService.UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
               </StackPanel>
-              
-              <!-- Refresh/Manual Check button when no newer version is shown -->
-              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !UpdateService.IsNewerVersionAvailable}" VerticalAlignment="Center">
-                <Button Command="{Binding CheckForUpdatesCommand}" 
-                        IsEnabled="{Binding !UpdateService.IsChecking}"
-                        Background="Transparent" 
-                        BorderThickness="0" 
-                        Padding="4,0" 
-                        ToolTip.Tip="{Binding CheckForUpdates, Source={x:Static res:Loc.Instance}}"
-                        VerticalAlignment="Center">
-                  <TextBlock Text="🔄" FontSize="12"/>
-                </Button>
-                <TextBlock Text="{Binding UpdateService.UpdateStatus}" Foreground="Gray" FontSize="12" VerticalAlignment="Center"
-                           IsVisible="{Binding UpdateService.UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-              </StackPanel>
-            </StackPanel>
-            
-            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+
+              <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
                 <Button Content="{Binding ProjectOnGitHub, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenGitHubCommand}"
                         Background="Transparent" Padding="0"/>
-            </StackPanel>
+              </StackPanel>
 
-            <Separator Margin="0,8"/>
-            
-            <Expander IsExpanded="{Binding IsSupportMeVisible}" HorizontalAlignment="Stretch">
+              <Separator Margin="0,8"/>
+
+              <Expander IsExpanded="{Binding IsSupportMeVisible}" HorizontalAlignment="Stretch">
                 <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{Binding SupportMe, Source={x:Static res:Loc.Instance}}"/>
-                        <TextBlock Text="❤" Foreground="Red"/>
-                    </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding SupportMe, Source={x:Static res:Loc.Instance}}"/>
+                    <TextBlock Text="❤" Foreground="Red"/>
+                  </StackPanel>
                 </Expander.Header>
                 <StackPanel Spacing="8" Margin="0,8,0,0">
-                    <Button Content="{Binding DonateWithPayPal, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenPayPalCommand}" HorizontalAlignment="Stretch"/>
-                    <Button Content="{Binding DonateWithKoFi, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenKoFiCommand}" HorizontalAlignment="Stretch"/>
+                  <Button Content="{Binding DonateWithPayPal, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenPayPalCommand}" HorizontalAlignment="Stretch"/>
+                  <Button Content="{Binding DonateWithKoFi, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenKoFiCommand}" HorizontalAlignment="Stretch"/>
                 </StackPanel>
-            </Expander>
-          </StackPanel>
-        </Border>
+              </Expander>
+            </StackPanel>
+          </Border>
 
-        <!-- Error Message -->
-        <Border Background="#FFEBEE" CornerRadius="8" Padding="12"
-                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-          <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828" TextWrapping="Wrap"/>
-        </Border>
+          <TextBlock Text="{Binding UiSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+          <Border Padding="16" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+            <StackPanel Spacing="16">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Language, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableLanguages}"
+                          SelectedItem="{Binding SelectedLanguage}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding DisplayName}"/>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding LanguageDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
 
-        <!-- Komga Servers Section -->
-        <TextBlock Text="{Binding KomgaServers, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-        
-        <!-- Add Server Button -->
-        <Button Content="{Binding AddServer, Source={x:Static res:Loc.Instance}}" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
+              <Separator/>
 
-        <!-- Servers List -->
-        <ItemsControl ItemsSource="{Binding Servers}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="models:KomgaServer">
-              <Border Padding="16" Margin="0,0,0,8" CornerRadius="8" 
-                      Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                  <StackPanel Spacing="4" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
-                      <Border Background="{DynamicResource AccentFillColorDefaultBrush}"
-                              Padding="6,2" CornerRadius="4" 
-                              IsVisible="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ActiveServerId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={Binding Id}}">
-                        <TextBlock Text="{Binding Browsing, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
-                      </Border>
-                    </StackPanel>
-                    <TextBlock Text="{Binding BaseUrl}" Foreground="Gray" FontSize="12"/>
-                    <TextBlock Text="{Binding Username}" Foreground="Gray" FontSize="12"/>
-                  </StackPanel>
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AppTheme, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableAppThemes}"
+                          SelectedItem="{Binding SelectedAppThemeOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AppThemeOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding AppThemeDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
 
-                  <Button Grid.Column="1" Content="✓"
-                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).SetBrowsingServerCommand}"
-                          CommandParameter="{Binding}"
-                          IsVisible="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ActiveServerId, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={Binding Id}}"
-                          Background="Transparent" FontSize="20" Width="44"
-                          ToolTip.Tip="{Binding SetAsBrowsingServer, Source={x:Static res:Loc.Instance}}"/>                  
-                  <Button Grid.Column="2" Content="✏️"
-                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditServerCommand}"
-                          CommandParameter="{Binding}"
-                          Background="Transparent" FontSize="16" Width="44"/>
-                  
-                  <Button Grid.Column="3" Content="🗑️"
-                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteServerCommand}"
-                          CommandParameter="{Binding}"
-                          Background="Transparent" FontSize="16" Width="44"/>
+              <Separator/>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding StartupBehavior, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableStartupBehaviors}"
+                          SelectedItem="{Binding SelectedStartupBehaviorOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:StartupBehaviorOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding StartupBehaviorHint, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <ToggleSwitch IsChecked="{Binding UseFullScreenWhenReading}"
+                              OnContent="{Binding UseFullScreenWhenReadingEnabled, Source={x:Static res:Loc.Instance}}"
+                              OffContent="{Binding UseFullScreenWhenReadingDisabled, Source={x:Static res:Loc.Instance}}"/>
+                <TextBlock Text="{Binding UseFullScreenWhenReadingDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="{Binding ReadingSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+          <Border Padding="16" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+            <StackPanel Spacing="16">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding DefaultReadingMode, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableReadingModes}"
+                          SelectedItem="{Binding SelectedReadingModeOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReadingModeOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Foreground="Gray" FontSize="12" TextWrapping="Wrap">
+                  <Run Text="{Binding ReadingModeNormalDescription, Source={x:Static res:Loc.Instance}}"/>
+                  <LineBreak/>
+                  <Run Text="{Binding ReadingModeZoomedDescription, Source={x:Static res:Loc.Instance}}"/>
+                  <LineBreak/>
+                  <Run Text="{Binding ReadingModeGuidedDescription, Source={x:Static res:Loc.Instance}}"/>
+                </TextBlock>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding DefaultReadingDirection, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableReadingDirectionModes}"
+                          SelectedItem="{Binding SelectedReadingDirectionModeOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ReadingDirectionModeOption">
+                      <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding ReadingDirectionDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Handedness, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableHandednessOptions}"
+                          SelectedItem="{Binding SelectedHandednessOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HandednessOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding HandednessDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <Separator/>
+
+              <StackPanel Spacing="8">
+                <ToggleSwitch IsChecked="{Binding CompactOverview}"
+                              OnContent="{Binding CompactOverviewEnabled, Source={x:Static res:Loc.Instance}}"
+                              OffContent="{Binding CompactOverviewDisabled, Source={x:Static res:Loc.Instance}}"/>
+                <TextBlock Text="{Binding CompactOverviewDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="{Binding LibrarySettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+          <Border Padding="16" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+            <StackPanel Spacing="16">
+              <StackPanel Spacing="8">
+                <ToggleSwitch IsChecked="{Binding SkipExternalDeleteConfirmation}"
+                              OnContent="{Binding SkipExternalDeleteConfirmationEnabled, Source={x:Static res:Loc.Instance}}"
+                              OffContent="{Binding SkipExternalDeleteConfirmationDisabled, Source={x:Static res:Loc.Instance}}"/>
+                <TextBlock Text="{Binding SkipExternalDeleteConfirmationDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding UnsupportedFormatHandling, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableUnsupportedFormatHandlingModes}"
+                          SelectedItem="{Binding SelectedUnsupportedFormatHandlingModeOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:UnsupportedFormatHandlingModeOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding UnsupportedFormatHandlingDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
+                <TextBlock Text="{Binding EpubConversionTheme, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableEpubConversionThemes}"
+                          SelectedItem="{Binding SelectedEpubConversionThemeOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EpubConversionThemeOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding EpubConversionThemeDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
+                <TextBlock Text="{Binding EpubOutputResolution, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <ComboBox ItemsSource="{Binding AvailableEpubOutputResolutions}"
+                          SelectedItem="{Binding SelectedEpubOutputResolutionOption}"
+                          HorizontalAlignment="Stretch"
+                          Width="320">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EpubOutputResolutionOption">
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding EpubOutputResolutionDescription, Source={x:Static res:Loc.Instance}}"
+                           Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+
+              <Separator/>
+
+              <TextBlock Text="{Binding SectionLayoutDescription, Source={x:Static res:Loc.Instance}}"
+                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
+                  <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                  <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                  <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
                 </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                <ItemsControl ItemsSource="{Binding LibrarySections}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
+                      <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
+                              Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
+                              DragDrop.AllowDrop="True"
+                              DragDrop.DragOver="OnSectionDragOver"
+                              DragDrop.Drop="OnSectionDrop">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                            <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                       PointerPressed="OnSectionDragHandlePointerPressed"/>
+                            <StackPanel Orientation="Vertical" Spacing="1">
+                              <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                      Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
+                                      CommandParameter="{Binding}"/>
+                              <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                      Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
+                                      CommandParameter="{Binding}"/>
+                            </StackPanel>
+                          </StackPanel>
+                          <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                          <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
+                          <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </StackPanel>
+          </Border>
 
-        <!-- Empty State -->
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="32"
-                    IsVisible="{Binding !Servers.Count}">
-          <TextBlock Text="{Binding NoServersConfigured, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center"/>
-          <TextBlock Text="{Binding AddServerHint, Source={x:Static res:Loc.Instance}}"
-                     Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
+          <Expander>
+            <Expander.Header>
+              <TextBlock Text="{Binding KomgaSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
+            </Expander.Header>
+            <Border Padding="16" CornerRadius="10" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Margin="0,8,0,0">
+              <StackPanel Spacing="16">
+                <StackPanel Spacing="12">
+                  <Button Content="{Binding AddServer, Source={x:Static res:Loc.Instance}}" Command="{Binding AddServerCommand}" HorizontalAlignment="Left"/>
+
+                  <ItemsControl ItemsSource="{Binding Servers}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="models:KomgaServer">
+                        <Border Padding="16" Margin="0,0,0,8" CornerRadius="8"
+                                Background="{DynamicResource SystemControlBackgroundChromeLowBrush}">
+                          <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
+                                <Border Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                        Padding="6,2" CornerRadius="4"
+                                        IsVisible="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ActiveServerId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={Binding Id}}">
+                                  <TextBlock Text="{Binding Browsing, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="10"/>
+                                </Border>
+                              </StackPanel>
+                              <TextBlock Text="{Binding BaseUrl}" Foreground="Gray" FontSize="12"/>
+                              <TextBlock Text="{Binding Username}" Foreground="Gray" FontSize="12"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Content="{Binding SetAsBrowsingServer, Source={x:Static res:Loc.Instance}}"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).SetBrowsingServerCommand}"
+                                    CommandParameter="{Binding}"
+                                    IsVisible="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ActiveServerId, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={Binding Id}}"
+                                    Background="Transparent" Padding="8,4"/>
+                            <Button Grid.Column="2" Content="{Binding Edit, Source={x:Static res:Loc.Instance}}"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditServerCommand}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent" Padding="8,4"/>
+                            <Button Grid.Column="3" Content="{Binding Delete, Source={x:Static res:Loc.Instance}}"
+                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteServerCommand}"
+                                    CommandParameter="{Binding}"
+                                    Background="Transparent" Padding="8,4"/>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="32"
+                              IsVisible="{Binding !Servers.Count}">
+                    <TextBlock Text="{Binding NoServersConfigured, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding AddServerHint, Source={x:Static res:Loc.Instance}}"
+                               Foreground="Gray" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center"/>
+                  </StackPanel>
+                </StackPanel>
+
+                <Separator IsVisible="{Binding Servers.Count}"/>
+
+                <StackPanel IsVisible="{Binding Servers.Count}" Spacing="16">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding KomgaParallelDownloads, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                  <ComboBox ItemsSource="{Binding AvailableKomgaParallelDownloadOptions}"
+                            SelectedItem="{Binding SelectedKomgaParallelDownloads}"
+                            HorizontalAlignment="Stretch"
+                            Width="320"/>
+                  <TextBlock Text="{Binding KomgaParallelDownloadsDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding KomgaSeriesPageSize, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                  <ComboBox ItemsSource="{Binding AvailableKomgaSeriesPageSizeOptions}"
+                            SelectedItem="{Binding SelectedKomgaSeriesPageSize}"
+                            HorizontalAlignment="Stretch"
+                            Width="320"/>
+                  <TextBlock Text="{Binding KomgaSeriesPageSizeDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding KomgaSearchLimit, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                  <ComboBox ItemsSource="{Binding AvailableKomgaSearchLimitOptions}"
+                            SelectedItem="{Binding SelectedKomgaSearchLimit}"
+                            HorizontalAlignment="Stretch"
+                            Width="320"/>
+                  <TextBlock Text="{Binding KomgaSearchLimitDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding KomgaSmartListSize, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                  <ComboBox ItemsSource="{Binding AvailableKomgaSmartListSizeOptions}"
+                            SelectedItem="{Binding SelectedKomgaSmartListSize}"
+                            HorizontalAlignment="Stretch"
+                            Width="320"/>
+                  <TextBlock Text="{Binding KomgaSmartListSizeDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <ToggleSwitch IsChecked="{Binding AllowMeteredKomgaDownloads}"
+                                OnContent="{Binding AllowMeteredKomgaDownloadsEnabled, Source={x:Static res:Loc.Instance}}"
+                                OffContent="{Binding AllowMeteredKomgaDownloadsDisabled, Source={x:Static res:Loc.Instance}}"/>
+                  <TextBlock Text="{Binding AllowMeteredKomgaDownloadsDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <ToggleSwitch IsChecked="{Binding SyncReadProgress}"
+                                OnContent="{Binding SyncReadProgressEnabled, Source={x:Static res:Loc.Instance}}"
+                                OffContent="{Binding SyncReadProgressDisabled, Source={x:Static res:Loc.Instance}}"/>
+                  <TextBlock Text="{Binding SyncReadProgressDescription, Source={x:Static res:Loc.Instance}}"
+                             Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding KomgaHome, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
+                    <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                    <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding KomgaSections}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
+                        <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
+                                Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
+                                DragDrop.AllowDrop="True"
+                                DragDrop.DragOver="OnSectionDragOver"
+                                DragDrop.Drop="OnSectionDrop">
+                          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                              <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
+                                         PointerPressed="OnSectionDragHandlePointerPressed"/>
+                              <StackPanel Orientation="Vertical" Spacing="1">
+                                <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                        Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
+                                        CommandParameter="{Binding}"/>
+                                <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
+                                        Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
+                                        CommandParameter="{Binding}"/>
+                              </StackPanel>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
+                            <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+              </StackPanel>
+              </StackPanel>
+            </Border>
+          </Expander>
         </StackPanel>
-
-        <!-- Language Settings Section -->
-        <TextBlock Text="{Binding LanguageSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Language, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-            <ComboBox ItemsSource="{Binding AvailableLanguages}" 
-                      SelectedItem="{Binding SelectedLanguage}"
-                      HorizontalAlignment="Stretch"
-                      Width="300">
-              <ComboBox.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding DisplayName}"/>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock Text="{Binding LanguageDescription, Source={x:Static res:Loc.Instance}}"
-                       Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-          </StackPanel>
-        </Border>
-
-        <TextBlock Text="{Binding ReadingSettings, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-          <StackPanel Spacing="16">
-            <!-- Startup Behavior Selection -->
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding StartupBehavior, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableStartupBehaviors}" 
-                        SelectedItem="{Binding SelectedStartupBehaviorOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:StartupBehaviorOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding StartupBehaviorHint, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <!-- Reading Mode Selection -->
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding DefaultReadingMode, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableReadingModes}" 
-                        SelectedItem="{Binding SelectedReadingModeOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ReadingModeOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Foreground="Gray" FontSize="12" TextWrapping="Wrap">
-                <Run Text="{Binding ReadingModeNormalDescription, Source={x:Static res:Loc.Instance}}"/>
-                <LineBreak/>
-                <Run Text="{Binding ReadingModeZoomedDescription, Source={x:Static res:Loc.Instance}}"/>
-                <LineBreak/>
-                <Run Text="{Binding ReadingModeGuidedDescription, Source={x:Static res:Loc.Instance}}"/>
-              </TextBlock>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding DefaultReadingDirection, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableReadingDirectionModes}"
-                        SelectedItem="{Binding SelectedReadingDirectionModeOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ReadingDirectionModeOption">
-                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/>
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding ReadingDirectionDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-             
-            <!-- Handedness Selection -->
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding Handedness, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableHandednessOptions}" 
-                        SelectedItem="{Binding SelectedHandednessOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:HandednessOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding HandednessDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <!-- Compact Overview Toggle -->
-            <StackPanel Spacing="8">
-              <ToggleSwitch IsChecked="{Binding CompactOverview}" 
-                            OnContent="{Binding CompactOverviewEnabled, Source={x:Static res:Loc.Instance}}" 
-                            OffContent="{Binding CompactOverviewDisabled, Source={x:Static res:Loc.Instance}}"/>
-              <TextBlock Text="{Binding CompactOverviewDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <!-- Fullscreen When Reading Toggle -->
-            <StackPanel Spacing="8">
-              <ToggleSwitch IsChecked="{Binding UseFullScreenWhenReading}" 
-                            OnContent="{Binding UseFullScreenWhenReadingEnabled, Source={x:Static res:Loc.Instance}}" 
-                            OffContent="{Binding UseFullScreenWhenReadingDisabled, Source={x:Static res:Loc.Instance}}"/>
-              <TextBlock Text="{Binding UseFullScreenWhenReadingDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding AppTheme, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableAppThemes}"
-                        SelectedItem="{Binding SelectedAppThemeOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:AppThemeOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding AppThemeDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
-              <TextBlock Text="{Binding EpubConversionTheme, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableEpubConversionThemes}"
-                        SelectedItem="{Binding SelectedEpubConversionThemeOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EpubConversionThemeOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding EpubConversionThemeDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8" IsVisible="{Binding SupportsEpubFeatures}">
-              <TextBlock Text="{Binding EpubOutputResolution, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableEpubOutputResolutions}"
-                        SelectedItem="{Binding SelectedEpubOutputResolutionOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EpubOutputResolutionOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding EpubOutputResolutionDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding UnsupportedFormatHandling, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableUnsupportedFormatHandlingModes}"
-                        SelectedItem="{Binding SelectedUnsupportedFormatHandlingModeOption}"
-                        HorizontalAlignment="Stretch"
-                        Width="300">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:UnsupportedFormatHandlingModeOption">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBlock Text="{Binding UnsupportedFormatHandlingDescription}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding KomgaParallelDownloads, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableKomgaParallelDownloadOptions}"
-                        SelectedItem="{Binding SelectedKomgaParallelDownloads}"
-                        HorizontalAlignment="Stretch"
-                        Width="300"/>
-              <TextBlock Text="{Binding KomgaParallelDownloadsDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding KomgaSeriesPageSize, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableKomgaSeriesPageSizeOptions}"
-                        SelectedItem="{Binding SelectedKomgaSeriesPageSize}"
-                        HorizontalAlignment="Stretch"
-                        Width="300"/>
-              <TextBlock Text="{Binding KomgaSeriesPageSizeDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding KomgaSearchLimit, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableKomgaSearchLimitOptions}"
-                        SelectedItem="{Binding SelectedKomgaSearchLimit}"
-                        HorizontalAlignment="Stretch"
-                        Width="300"/>
-              <TextBlock Text="{Binding KomgaSearchLimitDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding KomgaSmartListSize, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <ComboBox ItemsSource="{Binding AvailableKomgaSmartListSizeOptions}"
-                        SelectedItem="{Binding SelectedKomgaSmartListSize}"
-                        HorizontalAlignment="Stretch"
-                        Width="300"/>
-              <TextBlock Text="{Binding KomgaSmartListSizeDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <ToggleSwitch IsChecked="{Binding AllowMeteredKomgaDownloads}"
-                            OnContent="{Binding AllowMeteredKomgaDownloadsEnabled, Source={x:Static res:Loc.Instance}}"
-                            OffContent="{Binding AllowMeteredKomgaDownloadsDisabled, Source={x:Static res:Loc.Instance}}"/>
-              <TextBlock Text="{Binding AllowMeteredKomgaDownloadsDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <StackPanel Spacing="8">
-              <ToggleSwitch IsChecked="{Binding SkipExternalDeleteConfirmation}"
-                            OnContent="{Binding SkipExternalDeleteConfirmationEnabled, Source={x:Static res:Loc.Instance}}"
-                            OffContent="{Binding SkipExternalDeleteConfirmationDisabled, Source={x:Static res:Loc.Instance}}"/>
-              <TextBlock Text="{Binding SkipExternalDeleteConfirmationDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-
-            <Separator/>
-
-            <StackPanel Spacing="8">
-              <ToggleSwitch IsChecked="{Binding SyncReadProgress}"
-                            OnContent="{Binding SyncReadProgressEnabled, Source={x:Static res:Loc.Instance}}"
-                            OffContent="{Binding SyncReadProgressDisabled, Source={x:Static res:Loc.Instance}}"/>
-              <TextBlock Text="{Binding SyncReadProgressDescription, Source={x:Static res:Loc.Instance}}"
-                         Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-
-        <!-- Section Layout Settings -->
-        <TextBlock Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,16,0,0"/>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-          <StackPanel Spacing="16">
-            <TextBlock Text="{Binding SectionLayoutDescription, Source={x:Static res:Loc.Instance}}"
-                       Foreground="Gray" FontSize="12" TextWrapping="Wrap"/>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding KomgaHome, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
-                <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-                <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-                <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-              </Grid>
-              <ItemsControl ItemsSource="{Binding KomgaSections}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
-                    <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
-                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
-                            DragDrop.AllowDrop="True"
-                            DragDrop.DragOver="OnSectionDragOver"
-                            DragDrop.Drop="OnSectionDrop">
-                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
-                          <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
-                                     PointerPressed="OnSectionDragHandlePointerPressed"/>
-                          <StackPanel Orientation="Vertical" Spacing="1">
-                            <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
-                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
-                                    CommandParameter="{Binding}"/>
-                            <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
-                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
-                                    CommandParameter="{Binding}"/>
-                          </StackPanel>
-                        </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
-                        <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontWeight="SemiBold"/>
-              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Margin="10,0,10,4">
-                <TextBlock Text="↕" FontSize="12" Foreground="Gray" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="{Binding SectionLayout, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-                <TextBlock Grid.Column="2" Text="{Binding Shown, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-                <TextBlock Grid.Column="3" Text="{Binding Expanded, Source={x:Static res:Loc.Instance}}" Foreground="Gray" FontSize="12"/>
-              </Grid>
-              <ItemsControl ItemsSource="{Binding LibrarySections}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:SectionLayoutItemViewModel">
-                    <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="8"
-                            Background="{DynamicResource SystemControlBackgroundChromeLowBrush}"
-                            DragDrop.AllowDrop="True"
-                            DragDrop.DragOver="OnSectionDragOver"
-                            DragDrop.Drop="OnSectionDrop">
-                      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
-                          <TextBlock Text="⋮⋮" FontSize="16" Foreground="Gray" VerticalAlignment="Center" Cursor="SizeAll"
-                                     PointerPressed="OnSectionDragHandlePointerPressed"/>
-                          <StackPanel Orientation="Vertical" Spacing="1">
-                            <Button Content="▲" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
-                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionUpCommand}"
-                                    CommandParameter="{Binding}"/>
-                            <Button Content="▼" FontSize="10" Padding="4,2" MinWidth="0" MinHeight="0" Background="Transparent"
-                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).MoveSectionDownCommand}"
-                                    CommandParameter="{Binding}"/>
-                          </StackPanel>
-                        </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible}" VerticalAlignment="Center"/>
-                        <CheckBox Grid.Column="3" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"/>
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-
-      </StackPanel>
+      </Grid>
     </ScrollViewer>
 
     <!-- Edit Server Form -->
@@ -537,8 +529,8 @@
                   <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
                           Margin="4,0,0,0" ToolTip.Tip="{Binding ShowHidePassword, Source={x:Static res:Loc.Instance}}" Padding="8,6">
                     <Panel>
-                      <TextBlock Text="👁" FontSize="14" IsVisible="{Binding !IsPasswordVisible}"/>
-                      <TextBlock Text="🙈" FontSize="14" IsVisible="{Binding IsPasswordVisible}"/>
+                      <TextBlock Text="{Binding Show, Source={x:Static res:Loc.Instance}}" FontSize="11" IsVisible="{Binding !IsPasswordVisible}"/>
+                      <TextBlock Text="{Binding Hide, Source={x:Static res:Loc.Instance}}" FontSize="11" IsVisible="{Binding IsPasswordVisible}"/>
                     </Panel>
                   </Button>
                 </Grid>

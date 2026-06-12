@@ -35,6 +35,9 @@ public partial class KomgaSeriesDisplay : ObservableObject
     [ObservableProperty]
     private Bitmap? _thumbnail;
 
+    [ObservableProperty]
+    private bool _isThumbnailResolved;
+
     // Convenience properties for binding
     public string Id => Series.Id;
     public string Name => Series.Name;
@@ -56,4 +59,3 @@ public partial class KomgaSeriesDisplay : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsQueuedForDownload))]
     private bool _isDownloading;
 }
-
