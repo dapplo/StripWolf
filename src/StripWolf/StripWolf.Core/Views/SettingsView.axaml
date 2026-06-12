@@ -529,8 +529,8 @@
                   <Button Grid.Column="1" Command="{Binding TogglePasswordVisibilityCommand}" 
                           Margin="4,0,0,0" ToolTip.Tip="{Binding ShowHidePassword, Source={x:Static res:Loc.Instance}}" Padding="8,6">
                     <Panel>
-                      <TextBlock Text="Show" FontSize="11" IsVisible="{Binding !IsPasswordVisible}"/>
-                      <TextBlock Text="Hide" FontSize="11" IsVisible="{Binding IsPasswordVisible}"/>
+                      <TextBlock Text="{Binding Show, Source={x:Static res:Loc.Instance}}" FontSize="11" IsVisible="{Binding !IsPasswordVisible}"/>
+                      <TextBlock Text="{Binding Hide, Source={x:Static res:Loc.Instance}}" FontSize="11" IsVisible="{Binding IsPasswordVisible}"/>
                     </Panel>
                   </Button>
                 </Grid>

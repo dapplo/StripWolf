@@ -784,6 +784,12 @@
   <data name="ResolutionLow" xml:space="preserve">
     <value>Low</value>
   </data>
+  <data name="Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Hide</value>
+  </data>
   <data name="Shown" xml:space="preserve">
     <value>Shown</value>
   </data>

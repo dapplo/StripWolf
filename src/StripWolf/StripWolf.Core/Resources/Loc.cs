@@ -247,6 +247,8 @@ public class Loc : INotifyPropertyChanged
     public string ReadNowAction => GetString();
     public string MarkReadAction => GetString();
     public string DeleteComicAction => GetString();
+    public string Show => GetString();
+    public string Hide => GetString();
     public string ContinueReadingAction => GetString();
     public string HandednessAction => GetString();
     public string ReadingDirectionAction => GetString();
