@@ -11,11 +11,12 @@
 
   <UserControl.Styles>
     <Style Selector="Button.reading-mode">
-      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Background" Value="#26000000"/>
       <Setter Property="Foreground" Value="White"/>
       <Setter Property="Margin" Value="4,0"/>
-      <Setter Property="Padding" Value="8,4"/>
-      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="MinWidth" Value="40"/>
     </Style>
     <Style Selector="Button.reading-mode:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="#44FFFFFF"/>
@@ -25,6 +26,14 @@
     </Style>
     <Style Selector="Button.reading-mode.active /template/ ContentPresenter">
       <Setter Property="Background" Value="Red"/>
+    </Style>
+    <Style Selector="Button.reader-icon">
+      <Setter Property="Background" Value="#26000000"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="Margin" Value="4,0"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="MinWidth" Value="40"/>
     </Style>
   </UserControl.Styles>
 
@@ -58,15 +67,15 @@
                    TextTrimming="CharacterEllipsis" Margin="16,0"/>
 
         <!-- Save Page Button (Debug Only) -->
-        <Button Grid.Column="2" Command="{Binding SaveCurrentPageCommand}"
+        <Button Grid.Column="2" Classes="reader-icon" Command="{Binding SaveCurrentPageCommand}"
                 IsVisible="{Binding IsDebug}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding SaveOriginalPage, Source={x:Static res:Loc.Instance}}">
-          <TextBlock Text="⇩" FontSize="24"/>
+                ToolTip.Tip="{Binding SaveOriginalPage, Source={x:Static res:Loc.Instance}}">
+          <TextBlock Text="⤓" FontSize="20"/>
         </Button>
 
-        <Button Grid.Column="3" Command="{Binding ToggleInfoPanelCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding ShowComicInfo, Source={x:Static res:Loc.Instance}}">
-          <TextBlock Text="ⓘ" FontSize="24"/>
+        <Button Grid.Column="3" Classes="reader-icon" Command="{Binding ToggleInfoPanelCommand}"
+                ToolTip.Tip="{Binding ShowComicInfo, Source={x:Static res:Loc.Instance}}">
+          <TextBlock Text="i" FontSize="20" FontWeight="Bold"/>
         </Button>
 
         <!-- Reading Modes -->
@@ -92,27 +101,27 @@
           </Button>
         </StackPanel>
 
-        <Button Grid.Column="5" Command="{Binding ToggleHandednessCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding HandednessAction, Source={x:Static res:Loc.Instance}}"
+        <Button Grid.Column="5" Classes="reader-icon" Command="{Binding ToggleHandednessCommand}"
+                ToolTip.Tip="{Binding HandednessAction, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding !IsNormalMode}">
-          <TextBlock Text="⇄" FontSize="24"/>
+          <TextBlock Text="⇆" FontSize="20"/>
         </Button>
 
-        <Button Grid.Column="6" Command="{Binding ToggleTwoPageModeCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding TwoPageMode, Source={x:Static res:Loc.Instance}}"
+        <Button Grid.Column="6" Classes="reader-icon" Command="{Binding ToggleTwoPageModeCommand}"
+                ToolTip.Tip="{Binding TwoPageMode, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding CanUseTwoPageMode}">
-          <TextBlock Text="{Binding TwoPageModeIcon}" FontSize="24"/>
+          <TextBlock Text="{Binding TwoPageModeIcon}" FontSize="20"/>
         </Button>
 
-        <Button Grid.Column="7" Command="{Binding CycleStretchModeCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding FitMode, Source={x:Static res:Loc.Instance}}"
+        <Button Grid.Column="7" Classes="reader-icon" Command="{Binding CycleStretchModeCommand}"
+                ToolTip.Tip="{Binding FitMode, Source={x:Static res:Loc.Instance}}"
                 IsEnabled="{Binding IsNormalMode}">
-          <TextBlock Text="{Binding StretchModeIcon}" FontSize="24"/>
+          <TextBlock Text="{Binding StretchModeIcon}" FontSize="20"/>
         </Button>
 
-        <Button Grid.Column="8" Command="{Binding ToggleFullScreenCommand}"
-                Background="Transparent" Foreground="White" Margin="8,0" ToolTip.Tip="{Binding FullScreen, Source={x:Static res:Loc.Instance}}">
-          <TextBlock Text="⛶" FontSize="24"/>
+        <Button Grid.Column="8" Classes="reader-icon" Command="{Binding ToggleFullScreenCommand}"
+                ToolTip.Tip="{Binding FullScreen, Source={x:Static res:Loc.Instance}}">
+          <TextBlock Text="⛶" FontSize="20"/>
         </Button>
       </Grid>
     </Border>
@@ -180,7 +189,7 @@
                   HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"
                   IsVisible="{Binding CanViewSeriesOnKomgaOption}"/>
 
-          <Button Content="{Binding BackToLibrary, Source={x:Static res:Loc.Instance}, StringFormat='{}📚 {0}'}" Command="{Binding ReturnToLibraryCommand}"
+          <Button Content="{Binding BackToLibrary, Source={x:Static res:Loc.Instance}}" Command="{Binding ReturnToLibraryCommand}"
                   Background="#444" Foreground="White"
                   HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
         </StackPanel>
@@ -243,8 +252,15 @@
             <StackPanel Spacing="16">
               <Grid ColumnDefinitions="150,*">
                 <!-- Cover -->
-                <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
-                  <Image Source="{Binding ComicCoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
+                <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="#111" Height="200">
+                  <Panel>
+                    <Image Source="/Assets/Logo.png"
+                           Width="72" Height="72"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Opacity="0.28"/>
+                    <Image Source="{Binding ComicCoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
+                  </Panel>
                 </Border>
 
                 <!-- Basic Meta -->
@@ -350,7 +366,7 @@
 
               <!-- Actions -->
               <StackPanel Spacing="8" Margin="0,8,0,0">
-                <Button Content="{Binding ContinueReadingAction, Source={x:Static res:Loc.Instance}, StringFormat='{}📖 {0}'}" Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                <Button Content="{Binding ContinueReadingAction, Source={x:Static res:Loc.Instance}}" Background="{DynamicResource SystemAccentColor}" Foreground="White"
                         Command="{Binding ToggleInfoPanelCommand}"
                         HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
 
@@ -363,11 +379,11 @@
                         <TextBlock Text="{Binding Favorite, Source={x:Static res:Loc.Instance}}" />
                      </StackPanel>
                   </Button>
-                  <Button Grid.Column="1" Margin="4,0,0,0" Content="{Binding MarkReadAction, Source={x:Static res:Loc.Instance}, StringFormat='{}✓ {0}'}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  <Button Grid.Column="1" Margin="4,0,0,0" Content="{Binding MarkReadAction, Source={x:Static res:Loc.Instance}}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                           Command="{Binding ToggleReadStatusCommand}" Background="#444" Foreground="White"/>
                 </Grid>
 
-                <Button Content="{Binding DeleteComicAction, Source={x:Static res:Loc.Instance}, StringFormat='{}🗑️ {0}'}" Background="#D32F2F" Foreground="White"
+                <Button Content="{Binding DeleteComicAction, Source={x:Static res:Loc.Instance}}" Background="#D32F2F" Foreground="White"
                         Command="{Binding DeleteComicCommand}"
                         HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
               </StackPanel>

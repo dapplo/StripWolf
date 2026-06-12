@@ -36,6 +36,9 @@ public partial class KomgaBookDisplay : ObservableObject
     private Bitmap? _thumbnail;
 
     [ObservableProperty]
+    private bool _isThumbnailResolved;
+
+    [ObservableProperty]
     private bool _isQueued;
 
     [ObservableProperty]
@@ -102,4 +105,3 @@ public partial class KomgaBookDisplay : ObservableObject
         OnPropertyChanged(nameof(ReadingProgress));
     }
 }
-

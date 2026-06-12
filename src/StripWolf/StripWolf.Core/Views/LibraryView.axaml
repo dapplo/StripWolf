@@ -60,21 +60,25 @@
         <Grid RowDefinitions="200,Auto,Auto,Auto">
           <!-- Cover with click handler -->
           <Button Grid.Row="0" Padding="0" Background="Transparent" Height="200"
+                  HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                   IsEnabled="{Binding CanOpen}"
                   Command="{Binding OpenComicCommand, ElementName=Root}"
                   CommandParameter="{Binding}">
-            <Border Background="Black" CornerRadius="8,8,0,0">
-              <Panel>
-                <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
-                                     RenderOptions.BitmapInterpolationMode="LowQuality"
-                                     IsHitTestVisible="False"
-                                     VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+            <Border Background="#111" CornerRadius="8,8,0,0">
+              <Grid>
+               <Image Source="/Assets/Logo.png"
+                      Stretch="Uniform" Opacity="0.28"
+                      IsHitTestVisible="False"/>
+               <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
+                                    RenderOptions.BitmapInterpolationMode="LowQuality"
+                                    IsHitTestVisible="False"
+                                    IsVisible="{Binding CoverPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 <!-- Deleting overlay -->
                 <Border Background="#80000000" IsVisible="{Binding IsDeleting}" IsHitTestVisible="False">
                   <TextBlock Text="{Binding Deleting, Source={x:Static res:Loc.Instance}}" Foreground="White" FontWeight="Bold" 
                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-              </Panel>
+              </Grid>
             </Border>
           </Button>
           <Border Grid.Row="1" Height="36" Margin="8,4">
@@ -158,39 +162,51 @@
               <!-- 3D stacked cover visual for series -->
               <Grid Width="88" Height="104" Margin="0,0,8,0">
                 <!-- Third cover (back, rotated left) -->
-                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="#111"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         IsVisible="{Binding HasThirdCover}" Opacity="0.7">
                   <Border.RenderTransform>
                     <TransformOperations>translate(-8px, -4px) rotate(-6deg)</TransformOperations>
                   </Border.RenderTransform>
-                  <controls:AsyncImage SourceUrl="{Binding CoverPath3}" Stretch="Uniform"
-                                       RenderOptions.BitmapInterpolationMode="LowQuality"
-                                       IsHitTestVisible="False"
-                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                  <Grid>
+                    <Image Source="/Assets/Logo.png"
+                           Stretch="Uniform" Opacity="0.28"
+                           IsHitTestVisible="False"/>
+                    <controls:AsyncImage SourceUrl="{Binding CoverPath3}" Stretch="Uniform"
+                                         RenderOptions.BitmapInterpolationMode="LowQuality"
+                                         IsHitTestVisible="False"/>
+                  </Grid>
                 </Border>
 
                 <!-- Second cover (middle, rotated right) -->
-                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="#111"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         IsVisible="{Binding HasSecondCover}" Opacity="0.85">
                   <Border.RenderTransform>
                     <TransformOperations>translate(8px, -2px) rotate(6deg)</TransformOperations>
                   </Border.RenderTransform>
-                  <controls:AsyncImage SourceUrl="{Binding CoverPath2}" Stretch="Uniform"
-                                       RenderOptions.BitmapInterpolationMode="LowQuality"
-                                       IsHitTestVisible="False"
-                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                  <Grid>
+                    <Image Source="/Assets/Logo.png"
+                           Stretch="Uniform" Opacity="0.28"
+                           IsHitTestVisible="False"/>
+                    <controls:AsyncImage SourceUrl="{Binding CoverPath2}" Stretch="Uniform"
+                                         RenderOptions.BitmapInterpolationMode="LowQuality"
+                                         IsHitTestVisible="False"/>
+                  </Grid>
                 </Border>
 
                 <!-- First cover (front, straight) -->
-                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="Black"
+                <Border Width="72" Height="96" CornerRadius="6" ClipToBounds="True" Background="#111"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         BoxShadow="0 4 8 0 #35000000">
-                  <controls:AsyncImage SourceUrl="{Binding CoverPath1}" Stretch="Uniform"
-                                       RenderOptions.BitmapInterpolationMode="LowQuality"
-                                       IsHitTestVisible="False"
-                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                 <Grid>
+                   <Image Source="/Assets/Logo.png"
+                          Stretch="Uniform" Opacity="0.28"
+                          IsHitTestVisible="False"/>
+                   <controls:AsyncImage SourceUrl="{Binding CoverPath1}" Stretch="Uniform"
+                                        RenderOptions.BitmapInterpolationMode="LowQuality"
+                                        IsHitTestVisible="False"/>
+                 </Grid>
                 </Border>
               </Grid>
 
@@ -482,9 +498,14 @@
                 <StackPanel IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
                   <Grid x:DataType="models:Comic" DataContext="{Binding SelectedInfoComic, ElementName=Root}"
                         ColumnDefinitions="150,*">
-                     <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="Black" Height="200">
-                       <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
-                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                     <Border Grid.Column="0" CornerRadius="4" ClipToBounds="True" Background="#111" Height="200">
+                       <Grid>
+                         <Image Source="/Assets/Logo.png"
+                                Stretch="Uniform" Opacity="0.28"
+                                IsHitTestVisible="False"/>
+                         <controls:AsyncImage SourceUrl="{Binding CoverPath}" Stretch="Uniform"
+                                              IsVisible="{Binding CoverPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                       </Grid>
                      </Border>
                     <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="8">
                       <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap"/>

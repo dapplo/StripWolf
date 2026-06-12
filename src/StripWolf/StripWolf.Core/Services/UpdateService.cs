@@ -100,46 +100,42 @@ public partial class UpdateService : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(latestVersionStr)) return false;
 
-        var latestClean = latestVersionStr.Trim();
-        if (latestClean.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+        static string NormalizeVersion(string value)
         {
-            latestClean = latestClean.Substring(1);
-        }
-
-        var currentClean = currentVersionStr.Trim();
-        if (currentClean.StartsWith("v", StringComparison.OrdinalIgnoreCase))
-        {
-            currentClean = currentClean.Substring(1);
-        }
-
-        var currentBase = currentClean.Split('-')[0];
-        var latestBase = latestClean.Split('-')[0];
-
-        if (Version.TryParse(currentBase, out var currentVer) &&
-            Version.TryParse(latestBase, out var latestVer))
-        {
-            if (latestVer > currentVer)
+            var normalized = value.Trim();
+            if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                normalized = normalized[1..];
             }
-            if (latestVer == currentVer)
-            {
-                bool currentHasPre = currentClean.Contains('-');
-                bool latestHasPre = latestClean.Contains('-');
-                if (currentHasPre && !latestHasPre)
-                {
-                    return true;
-                }
-                if (currentHasPre && latestHasPre)
-                {
-                    var currentPre = currentClean.Substring(currentClean.IndexOf('-') + 1);
-                    var latestPre = latestClean.Substring(latestClean.IndexOf('-') + 1);
-                    return string.Compare(latestPre, currentPre, StringComparison.OrdinalIgnoreCase) > 0;
-                }
-            }
+
+            // Ignore metadata and prerelease labels for update prompts to avoid false positives.
+            normalized = normalized.Split('+')[0];
+            normalized = normalized.Split('-')[0];
+            return normalized;
         }
 
-        return false;
+        var currentClean = NormalizeVersion(currentVersionStr);
+        var latestClean = NormalizeVersion(latestVersionStr);
+
+        if (!Version.TryParse(currentClean, out var currentVer) ||
+            !Version.TryParse(latestClean, out var latestVer))
+        {
+            return false;
+        }
+
+        var normalizedCurrent = new Version(
+            currentVer.Major,
+            currentVer.Minor,
+            Math.Max(currentVer.Build, 0),
+            Math.Max(currentVer.Revision, 0));
+
+        var normalizedLatest = new Version(
+            latestVer.Major,
+            latestVer.Minor,
+            Math.Max(latestVer.Build, 0),
+            Math.Max(latestVer.Revision, 0));
+
+        return normalizedLatest > normalizedCurrent;
     }
 
     /// <summary>

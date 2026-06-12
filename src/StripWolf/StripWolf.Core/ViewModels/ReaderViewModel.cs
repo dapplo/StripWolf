@@ -373,18 +373,18 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string ReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "▯",
-        ReadingMode.Zoomed => "⊕",
-        ReadingMode.Guided => "⊞",
-        _ => "▯"
+        ReadingMode.Normal => "◫",
+        ReadingMode.Zoomed => "⌕",
+        ReadingMode.Guided => "▦",
+        _ => "◫"
     };
 
     public string NextReadingModeIcon => ReadingMode switch
     {
-        ReadingMode.Normal => "⊕",
-        ReadingMode.Zoomed => "⊞",
-        ReadingMode.Guided => "▯",
-        _ => "⊕"
+        ReadingMode.Normal => "⌕",
+        ReadingMode.Zoomed => "▦",
+        ReadingMode.Guided => "◫",
+        _ => "⌕"
     };
 
     public string PageDisplay
@@ -416,14 +416,14 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string StretchModeIcon => StretchMode switch
     {
-        StretchMode.FitPage => "↔",
-        StretchMode.FitWidth => "↕",
-        StretchMode.FitHeight => "1:1",
-        StretchMode.Original => "▣",
-        _ => "▣"
+        StretchMode.FitPage => "⤢",
+        StretchMode.FitWidth => "↔",
+        StretchMode.FitHeight => "↕",
+        StretchMode.Original => "1:1",
+        _ => "1:1"
     };
 
-    public string TwoPageModeIcon => IsTwoPageMode ? "▯" : "◫";
+    public string TwoPageModeIcon => IsTwoPageMode ? "▭" : "◫";
 
     public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 
@@ -446,8 +446,8 @@ public partial class ReaderViewModel : ViewModelBase
     };
 
     public bool IsRightToLeftNavigation => GetNavigationDirectionSign() < 0;
-    public string PreviousPageButtonGlyph => IsRightToLeftNavigation ? "▶" : "◀";
-    public string NextPageButtonGlyph => IsRightToLeftNavigation ? "◀" : "▶";
+    public string PreviousPageButtonGlyph => IsRightToLeftNavigation ? "❯" : "❮";
+    public string NextPageButtonGlyph => IsRightToLeftNavigation ? "❮" : "❯";
     public int ReadingStartPageIndex => GetReadingStartPageIndex();
     public int ReadingEndPageIndex => GetReadingEndPageIndex();
 

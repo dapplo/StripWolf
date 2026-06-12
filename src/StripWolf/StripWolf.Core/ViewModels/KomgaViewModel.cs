@@ -601,6 +601,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             Book = book,
             Thumbnail = thumbnail,
+            IsThumbnailResolved = thumbnail is not null || string.IsNullOrEmpty(book.ThumbnailUrl),
             IsDownloaded = isDownloaded,
             IsQueued = queueItem?.IsQueued ?? queuedForPostDownload || _downloadPendingBookIds.Contains(book.Id),
             IsDownloading = queueItem?.IsDownloading ?? importingPostDownload,
@@ -619,7 +620,8 @@ public partial class KomgaViewModel : ViewModelBase
         var display = new KomgaSeriesDisplay
         {
             Series = series,
-            Thumbnail = thumbnail
+            Thumbnail = thumbnail,
+            IsThumbnailResolved = thumbnail is not null || string.IsNullOrEmpty(series.ThumbnailUrl)
         };
         ApplySeriesDownloadState(display);
 
@@ -634,7 +636,8 @@ public partial class KomgaViewModel : ViewModelBase
         var display = new KomgaReadListDisplay
         {
             ReadList = readList,
-            Thumbnail = thumbnail
+            Thumbnail = thumbnail,
+            IsThumbnailResolved = thumbnail is not null
         };
 
         // Trigger loaded transition after a brief delay on UI thread
@@ -1816,6 +1819,7 @@ public partial class KomgaViewModel : ViewModelBase
                     {
                         display.Thumbnail = thumbnail;
                     }
+                    display.IsThumbnailResolved = true;
                 }
                 else
                 {
@@ -1826,6 +1830,16 @@ public partial class KomgaViewModel : ViewModelBase
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error loading details for series '{display.Series.Name}': {ex.Message}");
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        display.IsThumbnailResolved = true;
+                    }
+                });
+            }
         }
     }
 
@@ -2062,6 +2076,7 @@ public partial class KomgaViewModel : ViewModelBase
                     {
                         display.Thumbnail = thumbnail;
                     }
+                    display.IsThumbnailResolved = true;
                 }
                 else
                 {
@@ -2072,6 +2087,16 @@ public partial class KomgaViewModel : ViewModelBase
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error loading details for book '{display.Book.Name}': {ex.Message}");
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        display.IsThumbnailResolved = true;
+                    }
+                });
+            }
             
             // Fallback: check if downloaded and update display model
             if (!ct.IsCancellationRequested)
@@ -3367,6 +3392,7 @@ public partial class KomgaViewModel : ViewModelBase
                     {
                         display.Thumbnail = thumbnail;
                     }
+                    display.IsThumbnailResolved = true;
                 }
                 else
                 {
@@ -3377,6 +3403,16 @@ public partial class KomgaViewModel : ViewModelBase
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error loading details for read list '{display.ReadList.Name}': {ex.Message}");
+            if (!ct.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        display.IsThumbnailResolved = true;
+                    }
+                });
+            }
         }
     }
 

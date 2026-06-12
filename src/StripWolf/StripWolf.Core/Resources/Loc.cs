@@ -56,6 +56,9 @@ public class Loc : INotifyPropertyChanged
 
     // Settings Sections
     public string LanguageSettings => GetString();
+    public string UiSettings => GetString();
+    public string LibrarySettings => GetString();
+    public string KomgaSettings => GetString();
     public string ReadingSettings => GetString();
     public string SectionLayout => GetString();
     public string ServerConfiguration => GetString();

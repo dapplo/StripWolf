@@ -37,9 +37,11 @@ public partial class KomgaReadListDisplay : ObservableObject
     [ObservableProperty]
     private Bitmap? _thumbnail;
 
+    [ObservableProperty]
+    private bool _isThumbnailResolved;
+
     // Convenience properties for binding
     public string Id => ReadList.Id;
     public string Name => ReadList.Name;
     public int BookCount => ReadList.BookIds.Count;
 }
-
