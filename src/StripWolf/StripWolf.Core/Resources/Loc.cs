@@ -128,6 +128,7 @@ public class Loc : INotifyPropertyChanged
     public string Expanded => GetString();
     public string Collapsed => GetString();
     public string Browsing => GetString();
+    public string Edit => GetString();
     public string Delete => GetString();
     public string Cancel => GetString();
 

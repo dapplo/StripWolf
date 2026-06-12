@@ -348,7 +348,7 @@
                                     CommandParameter="{Binding}"
                                     IsVisible="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ActiveServerId, Converter={x:Static ObjectConverters.NotEqual}, ConverterParameter={Binding Id}}"
                                     Background="Transparent" Padding="8,4"/>
-                            <Button Grid.Column="2" Content="Edit"
+                            <Button Grid.Column="2" Content="{Binding Edit, Source={x:Static res:Loc.Instance}}"
                                     Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditServerCommand}"
                                     CommandParameter="{Binding}"
                                     Background="Transparent" Padding="8,4"/>
