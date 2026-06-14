@@ -108,6 +108,13 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSupportMeVisible;
 
+    public bool IsSupportMeAllowed =>
+#if PLAY_STORE_BUILD
+        false;
+#else
+        true;
+#endif
+
     public string AppVersion
     {
         get

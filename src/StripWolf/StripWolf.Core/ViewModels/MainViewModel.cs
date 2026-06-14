@@ -35,7 +35,11 @@ public record WelcomeThemeOption(AppThemePreference Value, string DisplayName);
 /// </summary>
 public partial class MainViewModel : ViewModelBase
 {
+#if PLAY_STORE_BUILD
+    private const int WelcomeExperienceStepCount = 6;
+#else
     private const int WelcomeExperienceStepCount = 7;
+#endif
     private readonly LibraryViewModel _libraryViewModel;
     private readonly KomgaViewModel _komgaViewModel;
     private readonly ActivityViewModel _activityViewModel;
@@ -344,8 +348,13 @@ public partial class MainViewModel : ViewModelBase
     public bool IsWelcomeLibraryImportStep => ShowWelcomeExperience && WelcomeExperienceStep == 2;
     public bool IsWelcomeKomgaStep => ShowWelcomeExperience && WelcomeExperienceStep == 3;
     public bool IsWelcomeActivityStep => ShowWelcomeExperience && WelcomeExperienceStep == 4;
+#if PLAY_STORE_BUILD
+    public bool IsWelcomeSettingsStep => ShowWelcomeExperience && WelcomeExperienceStep == 5;
+    public bool IsWelcomeSupportStep => false;
+#else
     public bool IsWelcomeSettingsStep => ShowWelcomeExperience && (WelcomeExperienceStep == 5 || WelcomeExperienceStep == 6);
     public bool IsWelcomeSupportStep => ShowWelcomeExperience && WelcomeExperienceStep == 6;
+#endif
     public bool HasWelcomeExperienceTargetHint => !string.IsNullOrWhiteSpace(WelcomeExperienceTargetHint);
     public double WelcomeBackgroundContentOpacity => ShowWelcomeExperience && WelcomeExperienceStep == 0 ? 0.08 : 1.0;
     public string WelcomeExperienceStepTitle => WelcomeExperienceStep switch
@@ -356,7 +365,9 @@ public partial class MainViewModel : ViewModelBase
         3 => Resources.Loc.Instance.WelcomeExperienceKomgaTitle,
         4 => Resources.Loc.Instance.WelcomeExperienceActivityTitle,
         5 => Resources.Loc.Instance.WelcomeExperienceSettingsTitle,
+#if !PLAY_STORE_BUILD
         6 => Resources.Loc.Instance.WelcomeExperienceSupportTitle,
+#endif
         _ => Resources.Loc.Instance.WelcomeExperienceIntroTitle
     };
     public string WelcomeExperienceStepDescription => WelcomeExperienceStep switch
@@ -367,7 +378,9 @@ public partial class MainViewModel : ViewModelBase
         3 => Resources.Loc.Instance.WelcomeExperienceKomgaDescription,
         4 => Resources.Loc.Instance.WelcomeExperienceActivityDescription,
         5 => Resources.Loc.Instance.WelcomeExperienceSettingsDescription,
+#if !PLAY_STORE_BUILD
         6 => Resources.Loc.Instance.WelcomeExperienceSupportDescription,
+#endif
         _ => Resources.Loc.Instance.WelcomeExperienceIntroDescription
     };
     public string WelcomeExperienceTargetHint => WelcomeExperienceStep switch
@@ -377,7 +390,9 @@ public partial class MainViewModel : ViewModelBase
         3 => Resources.Loc.Instance.WelcomeExperienceKomgaHint,
         4 => Resources.Loc.Instance.WelcomeExperienceActivityHint,
         5 => Resources.Loc.Instance.WelcomeExperienceSettingsHint,
+#if !PLAY_STORE_BUILD
         6 => Resources.Loc.Instance.WelcomeExperienceSupportHint,
+#endif
         _ => string.Empty
     };
 
@@ -545,7 +560,9 @@ public partial class MainViewModel : ViewModelBase
             3 => 1,
             4 => 2,
             5 => 3,
+#if !PLAY_STORE_BUILD
             6 => 3,
+#endif
             _ => (int?)null
         };
 

@@ -60,9 +60,9 @@
                         Background="Transparent" Padding="0"/>
               </StackPanel>
 
-              <Separator Margin="0,8"/>
+              <Separator Margin="0,8" IsVisible="{Binding IsSupportMeAllowed}"/>
 
-              <Expander IsExpanded="{Binding IsSupportMeVisible}" HorizontalAlignment="Stretch">
+              <Expander IsExpanded="{Binding IsSupportMeVisible}" IsVisible="{Binding IsSupportMeAllowed}" HorizontalAlignment="Stretch">
                 <Expander.Header>
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding SupportMe, Source={x:Static res:Loc.Instance}}"/>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Only backup settings and server credentials. Exclude DB and Covers. -->
+        <include domain="file" path=".local/share/StripWolf/settings.json" />
+        <include domain="file" path=".local/share/StripWolf/credentials.dat" />
+        <include domain="file" path=".local/share/StripWolf/.key" />
+    </cloud-backup>
+    <device-to-device-backup>
+        <include domain="file" path=".local/share/StripWolf/settings.json" />
+        <include domain="file" path=".local/share/StripWolf/credentials.dat" />
+        <include domain="file" path=".local/share/StripWolf/.key" />
+    </device-to-device-backup>
+</data-extraction-rules>

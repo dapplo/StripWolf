@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Only backup settings and server credentials. Exclude DB and Covers. -->
+    <include domain="file" path=".local/share/StripWolf/settings.json" />
+    <include domain="file" path=".local/share/StripWolf/credentials.dat" />
+    <include domain="file" path=".local/share/StripWolf/.key" />
+</full-backup-content>
