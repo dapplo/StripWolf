@@ -60,6 +60,9 @@ public class LibraryService
     /// </summary>
     public event EventHandler? LibraryChanged;
 
+    private readonly TrialService _trialService;
+    private readonly IAppEventsService _appEventsService;
+
     public LibraryService(
         DatabaseService databaseService,
         ComicReaderService comicReaderService,
@@ -69,7 +72,9 @@ public class LibraryService
         PdfToCbzConverterService pdfConverter,
         EpubToCbzConverterService epubConverter,
         EpubShadowConversionService epubShadowConversionService,
-        ComicConverterService comicConverter)
+        ComicConverterService comicConverter,
+        TrialService trialService,
+        IAppEventsService appEventsService)
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
@@ -80,6 +85,8 @@ public class LibraryService
         _epubConverter = epubConverter;
         _epubShadowConversionService = epubShadowConversionService;
         _comicConverter = comicConverter;
+        _trialService = trialService;
+        _appEventsService = appEventsService;
 
         _appDataDirectory = GetAppDataDirectory();
         _comicsDirectory = Path.Combine(_appDataDirectory, "Comics");
@@ -347,6 +354,13 @@ public class LibraryService
             return existing;
         }
 
+        // Enforce local import trial limit (capacity-based)
+        if (!await _trialService.CanImportLocalAsync(filePath))
+        {
+            _trialService.RequestPremiumUnlock();
+            throw new InvalidOperationException("TRIAL_LIMIT_REACHED");
+        }
+
         var format = ComicReaderService.GetComicFormat(filePath);
         if (format == ComicFormat.Unknown)
         {
@@ -432,6 +446,8 @@ public class LibraryService
             progress?.Report(1);
         }
 
+        _appEventsService.RaiseLocalComicImported(filePath);
+
         OnLibraryChanged();
         return comic;
     }
@@ -450,6 +466,13 @@ public class LibraryService
         if (_networkConnectionService.IsConnectionMetered() && !_settingsService.LoadSettings().AllowMeteredKomgaDownloads)
         {
             throw new InvalidOperationException("Downloads on metered connections are disabled. Enable the setting to allow this.");
+        }
+
+        // Enforce Komga download trial limit (capacity-based)
+        if (!await _trialService.CanDownloadKomgaAsync())
+        {
+            _trialService.RequestPremiumUnlock();
+            throw new InvalidOperationException("TRIAL_LIMIT_REACHED");
         }
 
         var existing = await _databaseService.GetComicByKomgaIdOrHashAsync(book.Id, book.FileHash);
@@ -472,6 +495,7 @@ public class LibraryService
             cancellationToken.ThrowIfCancellationRequested();
 
             var format = ComicReaderService.GetComicFormat(filePath);
+            _appEventsService.RaiseKomgaBookDownloaded(book.Id);
             return new KomgaDownloadedFile
             {
                 Book = book,

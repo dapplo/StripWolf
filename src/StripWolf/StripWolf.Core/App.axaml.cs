@@ -183,6 +183,8 @@ public partial class App : Application
         services.AddSingleton<ComicConverterService>();
         services.AddSingleton<IExternalLinkService, ExternalLinkService>();
         services.AddSingleton<UpdateService>();
+        services.AddSingleton<IAppEventsService, AppEventsService>();
+        services.AddSingleton<TrialService>();
 
         // Register platform-specific PDF renderer
         // Use the custom registration action if set (e.g., for Android), otherwise default to nothing

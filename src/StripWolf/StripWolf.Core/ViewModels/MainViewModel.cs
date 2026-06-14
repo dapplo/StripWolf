@@ -50,6 +50,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IExternalLinkService _externalLinkService;
     private readonly KomgaSyncService _komgaSyncService;
     private readonly UpdateService _updateService;
+    private readonly TrialService _trialService;
     private bool _isInitializing = true;
     private bool _isApplyingWelcomePreferences;
     private bool _shouldStartWelcomeAfterInitialization;
@@ -81,6 +82,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _showWelcomeExperience;
 
     [ObservableProperty]
+    private bool _showPremiumUnlockDialog;
+
+    [ObservableProperty]
     private int _welcomeExperienceStep;
 
     [ObservableProperty]
@@ -105,7 +109,8 @@ public partial class MainViewModel : ViewModelBase
         LocalizationService localizationService,
         IExternalLinkService externalLinkService,
         KomgaSyncService komgaSyncService,
-        UpdateService updateService)
+        UpdateService updateService,
+        TrialService trialService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
@@ -117,6 +122,9 @@ public partial class MainViewModel : ViewModelBase
         _externalLinkService = externalLinkService;
         _komgaSyncService = komgaSyncService;
         _updateService = updateService;
+        _trialService = trialService;
+        
+        _trialService.PremiumUnlockRequested += (s, e) => ShowPremiumUnlockDialog = true;
         
         Title = "StripWolf";
         _currentView = _libraryViewModel;
@@ -686,5 +694,18 @@ public partial class MainViewModel : ViewModelBase
             AppThemePreference.Dark => ThemeVariant.Dark,
             _ => ThemeVariant.Default
         };
+    }
+
+    [RelayCommand]
+    private void ClosePremiumUnlockDialog()
+    {
+        ShowPremiumUnlockDialog = false;
+    }
+
+    [RelayCommand]
+    private async Task PurchasePremiumUnlock()
+    {
+        await _trialService.UnlockPremiumAsync();
+        ShowPremiumUnlockDialog = false;
     }
 }

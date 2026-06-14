@@ -629,6 +629,9 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     public event EventHandler? CloseRequested;
 
+    private readonly TrialService _trialService;
+    private readonly IAppEventsService _appEventsService;
+
     public ReaderViewModel(
         LibraryService libraryService,
         ComicReaderService comicReaderService,
@@ -636,7 +639,9 @@ public partial class ReaderViewModel : ViewModelBase
         KomgaApiServiceFactory komgaApiServiceFactory,
         PanelDetectionService panelDetectionService,
         SettingsService settingsService,
-        EpubShadowConversionService epubShadowConversionService)
+        EpubShadowConversionService epubShadowConversionService,
+        TrialService trialService,
+        IAppEventsService appEventsService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
@@ -645,6 +650,8 @@ public partial class ReaderViewModel : ViewModelBase
         _panelDetectionService = panelDetectionService;
         _settingsService = settingsService;
         _epubShadowConversionService = epubShadowConversionService;
+        _trialService = trialService;
+        _appEventsService = appEventsService;
         _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
 
         _periodicSyncTimer = new DispatcherTimer
@@ -879,11 +886,39 @@ public partial class ReaderViewModel : ViewModelBase
             Comic = await _libraryService.GetComicAsync(ComicId);
             if (Comic is not null)
             {
+                // Enforce permanent view limits in trial
+                bool allowed = true;
+                if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId))
+                {
+                    if (int.TryParse(Comic.KomgaId, out var komgaBookId))
+                    {
+                        allowed = await _trialService.CanOpenKomgaAsync(komgaBookId);
+                    }
+                }
+                else
+                {
+                    allowed = await _trialService.CanOpenLocalAsync(Comic.FilePath);
+                }
+
+                if (!allowed)
+                {
+                    IsBusy = false;
+                    ErrorMessage = "You have reached some limits of the trial. Please unlock premium to read this comic.";
+                    _trialService.RequestPremiumUnlock();
+                    // Navigate back or close the reader since opening is blocked
+                    Dispatcher.UIThread.Post(() => _ = GoBackAsync());
+                    return;
+                }
+
                 // Save last opened comic info in settings
                 settings.LastOpenedComicId = Comic.Id;
                 settings.LastOpenedComicPath = Comic.FilePath;
                 settings.WasInReader = true;
                 _ = _settingsService.SaveSettingsAsync(settings);
+                _appEventsService.RaiseComicOpened(
+                    Comic.Id, 
+                    Comic.Source, 
+                    Comic.Source == ComicSource.Komga ? (Comic.KomgaId ?? string.Empty) : Comic.FilePath);
 
                 Title = Comic.Title;
                 OnPropertyChanged(nameof(MaxSliderValue));
@@ -1158,6 +1193,7 @@ public partial class ReaderViewModel : ViewModelBase
                     }
 
                     _lastLoadedPageIndex = pageIndex;
+                    _appEventsService.RaisePageRead();
 
                     // Reset zoom when changing pages
                     ZoomLevel = 1.0;

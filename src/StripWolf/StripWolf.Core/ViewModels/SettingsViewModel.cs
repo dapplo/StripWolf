@@ -17,13 +17,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StripWolf.Core.Data;
 using StripWolf.Core.Models;
 using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
@@ -49,6 +53,8 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly LocalizationService _localizationService;
     private readonly IExternalLinkService _externalLinkService;
     private readonly UpdateService _updateService;
+    private readonly TrialService _trialService;
+    private readonly DatabaseService _databaseService;
     
     private AppSettings? _appSettings;
     private int _nextServerId = 1;
@@ -320,13 +326,61 @@ public partial class SettingsViewModel : ViewModelBase
 
     public UpdateService UpdateService => _updateService;
 
-    public SettingsViewModel(SettingsService settingsService, LibraryService libraryService, LocalizationService localizationService, IExternalLinkService externalLinkService, UpdateService updateService)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPlayStoreBuildAndUnlocked))]
+    [NotifyPropertyChangedFor(nameof(IsPlayStoreBuildAndLocked))]
+    private bool _isUnlimitedUnlocked;
+
+    public bool IsPlayStoreBuildAndUnlocked => IsPlayStoreBuild && IsUnlimitedUnlocked;
+
+    public bool IsPlayStoreBuildAndLocked => IsPlayStoreBuild && !IsUnlimitedUnlocked;
+
+    public string LicenceSectionHeader => IsPlayStoreBuild ? "Licence & Statistics" : "Personal Reading Statistics";
+
+    [ObservableProperty]
+    private int _komgaDownloadsUsed;
+
+    [ObservableProperty]
+    private int _komgaViewsUsed;
+
+    [ObservableProperty]
+    private ObservableCollection<FormatTrialStatus> _localFormatStatuses = [];
+
+    [ObservableProperty]
+    private int _totalPagesRead;
+
+    [ObservableProperty]
+    private int _totalComicsOpened;
+
+    [ObservableProperty]
+    private int _totalLocalImports;
+
+    [ObservableProperty]
+    private int _totalKomgaDownloads;
+
+    public bool IsPlayStoreBuild =>
+#if PLAY_STORE_BUILD
+        true;
+#else
+        false;
+#endif
+
+    public SettingsViewModel(
+        SettingsService settingsService,
+        LibraryService libraryService,
+        LocalizationService localizationService,
+        IExternalLinkService externalLinkService,
+        UpdateService updateService,
+        TrialService trialService,
+        DatabaseService databaseService)
     {
         _settingsService = settingsService;
         _libraryService = libraryService;
         _localizationService = localizationService;
         _externalLinkService = externalLinkService;
         _updateService = updateService;
+        _trialService = trialService;
+        _databaseService = databaseService;
         Title = "Settings";
         _settingsService.SettingsChanged += (_, settings) =>
         {
@@ -336,6 +390,7 @@ public partial class SettingsViewModel : ViewModelBase
                 ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
                 ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
                 OnPropertyChanged(nameof(ActiveServerId));
+                _ = LoadTrialStatusAndStatsAsync();
             });
         };
     }
@@ -548,6 +603,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
         ReplaceSectionCollection(KomgaSections, _appSettings.KomgaSections);
+        _ = LoadTrialStatusAndStatsAsync();
     }
 
     partial void OnSyncReadProgressChanged(bool value)
@@ -1164,4 +1220,100 @@ public partial class SettingsViewModel : ViewModelBase
 
         await PersistSectionLayoutAsync(section);
     }
+
+    [RelayCommand]
+    private void RequestUnlock()
+    {
+        _trialService.RequestPremiumUnlock();
+    }
+
+    public async Task LoadTrialStatusAndStatsAsync()
+    {
+        IsUnlimitedUnlocked = _trialService.IsUnlimitedUnlocked;
+
+        // Load stats from database
+        TotalPagesRead = await _databaseService.GetUsageCountAsync("PagesRead");
+        TotalComicsOpened = await _databaseService.GetUsageCountAsync("ComicOpen");
+        TotalLocalImports = await _databaseService.GetUsageCountAsync("LocalImport");
+        TotalKomgaDownloads = await _databaseService.GetUsageCountAsync("KomgaDownload");
+
+        if (!IsUnlimitedUnlocked)
+        {
+            // Load trial limits
+            var settings = _settingsService.LoadSettings();
+            var comics = await _databaseService.GetComicsAsync();
+
+            KomgaDownloadsUsed = comics.Count(c => c.Source == ComicSource.Komga);
+            KomgaViewsUsed = settings.PermanentViewedKomgaBookIds.Count;
+
+            var formats = new[] { "cbz", "cbr", "cbt", "cb7", "epub", "pdf" };
+            var formatList = new List<FormatTrialStatus>();
+
+            foreach (var fmt in formats)
+            {
+                var imports = comics.Count(c => 
+                {
+                    if (c.Source == ComicSource.Komga) return false;
+                    var cExt = Path.GetExtension(c.FilePath)?.TrimStart('.')?.ToLowerInvariant();
+                    return cExt == fmt;
+                });
+
+                var views = settings.PermanentViewedLocalPaths.Count(p => 
+                {
+                    var cExt = Path.GetExtension(p)?.TrimStart('.')?.ToLowerInvariant();
+                    return cExt == fmt;
+                });
+
+                formatList.Add(new FormatTrialStatus(fmt.ToUpperInvariant(), imports, views));
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                LocalFormatStatuses.Clear();
+                foreach (var status in formatList)
+                {
+                    LocalFormatStatuses.Add(status);
+                }
+            });
+        }
+    }
+
+    [RelayCommand]
+    private void ReportIssue()
+    {
+        string platform = "Unknown";
+        if (System.OperatingSystem.IsAndroid()) platform = "Android";
+        else if (System.OperatingSystem.IsWindows()) platform = "Windows";
+        else if (System.OperatingSystem.IsMacOS()) platform = "macOS";
+        else if (System.OperatingSystem.IsLinux()) platform = "Linux";
+        else if (System.OperatingSystem.IsIOS()) platform = "iOS";
+
+        var osDesc = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+        var version = AppVersion;
+
+        var body = $"""
+**Describe the bug**
+[A clear and concise description of what the bug is.]
+
+**To Reproduce**
+1. Go to '...'
+2. Click on '...'
+3. Scroll down to '...'
+4. See error
+
+**Environment Details:**
+- App Version: {version}
+- Platform: {platform}
+- OS Description: {osDesc}
+""";
+
+        var url = $"https://github.com/dapplo/StripWolf/issues/new?body={System.Uri.EscapeDataString(body)}";
+        _externalLinkService.OpenUrl(url);
+    }
+}
+
+public record FormatTrialStatus(string Format, int ImportsUsed, int ViewsUsed)
+{
+    public int ImportsRemaining => Math.Max(0, 2 - ImportsUsed);
+    public int ViewsRemaining => Math.Max(0, 2 - ViewsUsed);
 }

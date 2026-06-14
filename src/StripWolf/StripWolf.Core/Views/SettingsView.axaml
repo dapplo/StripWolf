@@ -58,6 +58,9 @@
               <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
                 <Button Content="{Binding ProjectOnGitHub, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenGitHubCommand}"
                         Background="Transparent" Padding="0"/>
+                <TextBlock Text="•" Foreground="Gray" VerticalAlignment="Center"/>
+                <Button Content="Report an Issue" Command="{Binding ReportIssueCommand}"
+                        Background="Transparent" Padding="0"/>
               </StackPanel>
 
               <Separator Margin="0,8" IsVisible="{Binding IsSupportMeAllowed}"/>
@@ -74,6 +77,201 @@
                   <Button Content="{Binding DonateWithKoFi, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenKoFiCommand}" HorizontalAlignment="Stretch"/>
                 </StackPanel>
               </Expander>
+            </StackPanel>
+          </Border>
+
+          <!-- Trial Limits & Statistics Card -->
+          <TextBlock Text="{Binding LicenceSectionHeader}" FontSize="18" FontWeight="Bold"/>
+          
+          <!-- Locked Trial Panel (Play Store Only) -->
+          <Border CornerRadius="10" Padding="16" IsVisible="{Binding IsPlayStoreBuildAndLocked}">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#FF3A3A4A" Offset="0.0"/>
+                <GradientStop Color="#FF20202A" Offset="1.0"/>
+              </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel Spacing="16">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Trial Edition" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                  <TextBlock Text="Upgrade to Premium to get unlimited imports and views." FontSize="12" Foreground="#FFAAAAAA" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Border Grid.Column="1" Background="#E5A93C" CornerRadius="4" Padding="6,3" VerticalAlignment="Top">
+                  <TextBlock Text="Locked" FontSize="10" FontWeight="Bold" Foreground="Black"/>
+                </Border>
+              </Grid>
+
+              <Separator Background="#33FFFFFF"/>
+
+              <StackPanel Spacing="10">
+                <!-- Komga limits -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="Komga Server Integration" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                    <TextBlock Text="Active downloads &amp; permanent views limit" FontSize="11" Foreground="#FFAAAAAA"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <StackPanel HorizontalAlignment="Center">
+                      <TextBlock Text="Downloads" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding KomgaDownloadsUsed, StringFormat='{}{0}/2'}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel HorizontalAlignment="Center">
+                      <TextBlock Text="Views" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding KomgaViewsUsed, StringFormat='{}{0}/2'}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+
+                <Separator Background="#15FFFFFF"/>
+
+                <!-- Local import/view limits per format -->
+                <TextBlock Text="Local Library Trial (Imports &amp; Views per format)" FontSize="12" FontWeight="SemiBold" Foreground="#FFAAAAAA"/>
+                
+                <ItemsControl ItemsSource="{Binding LocalFormatStatuses}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="3" Rows="2"/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FormatTrialStatus">
+                      <Border Margin="4" Padding="8" Background="#15FFFFFF" CornerRadius="6">
+                        <StackPanel Spacing="4">
+                          <TextBlock Text="{Binding Format}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                          <Grid ColumnDefinitions="*,*">
+                            <StackPanel HorizontalAlignment="Center">
+                              <TextBlock Text="Imports" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding ImportsUsed, StringFormat='{}{0}/2'}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                              <TextBlock Text="Views" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding ViewsUsed, StringFormat='{}{0}/2'}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <Button Command="{Binding RequestUnlockCommand}" Classes="accent" HorizontalAlignment="Stretch" Height="40" Margin="0,8,0,0">
+                <Button.Background>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#FFE5A93C" Offset="0.0"/>
+                    <GradientStop Color="#FFF39C12" Offset="1.0"/>
+                  </LinearGradientBrush>
+                </Button.Background>
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Text="⭐" FontSize="16" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="Unlock Premium (One-Time Purchase)" FontSize="14" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+              </Button>
+            </StackPanel>
+          </Border>
+
+          <!-- Unlocked Premium Panel (Play Store Only) -->
+          <Border CornerRadius="10" Padding="16" IsVisible="{Binding IsPlayStoreBuildAndUnlocked}">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#FF3F51B5" Offset="0.0"/>
+                <GradientStop Color="#FF2196F3" Offset="1.0"/>
+              </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel Spacing="16">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Premium Edition" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                  <TextBlock Text="Thank you for supporting StripWolf! All features unlocked." FontSize="12" Foreground="#FFE0E0E0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Border Grid.Column="1" Background="#4CAF50" CornerRadius="4" Padding="6,3" VerticalAlignment="Top">
+                  <TextBlock Text="Unlocked" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                </Border>
+              </Grid>
+
+              <Separator Background="#33FFFFFF"/>
+
+              <TextBlock Text="Personal Reading Statistics" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+
+              <!-- 2x2 Grid for statistics dashboard -->
+              <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*" RowSpacing="8" ColumnSpacing="8">
+                <!-- Total Pages Read -->
+                <Border Grid.Row="0" Grid.Column="0" Background="#22FFFFFF" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Pages Read" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Comics Opened -->
+                <Border Grid.Row="0" Grid.Column="1" Background="#22FFFFFF" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Comics Opened" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Local Imports -->
+                <Border Grid.Row="1" Grid.Column="0" Background="#22FFFFFF" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Local Imports" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Komga Downloads -->
+                <Border Grid.Row="1" Grid.Column="1" Background="#22FFFFFF" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Komga Downloads" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- Non-Store Standard Statistics Panel (Sideloaded/Desktop) -->
+          <Border CornerRadius="10" Padding="16" 
+                  Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                  IsVisible="{Binding !IsPlayStoreBuild}">
+            <StackPanel Spacing="16">
+              <!-- 2x2 Grid for statistics dashboard -->
+              <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*" RowSpacing="8" ColumnSpacing="8">
+                <!-- Total Pages Read -->
+                <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Pages Read" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Comics Opened -->
+                <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Comics Opened" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Local Imports -->
+                <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Local Imports" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+                <!-- Komga Downloads -->
+                <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
+                  <StackPanel Spacing="4" HorizontalAlignment="Center">
+                    <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Komga Downloads" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                  </StackPanel>
+                </Border>
+              </Grid>
             </StackPanel>
           </Border>
 

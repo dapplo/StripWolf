@@ -252,5 +252,60 @@
         </Border>
       </Panel>
     </Panel>
+
+    <!-- Premium Unlock Overlay -->
+    <Panel Grid.RowSpan="2" Background="#B3000000" IsVisible="{Binding ShowPremiumUnlockDialog}">
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              CornerRadius="12" Padding="28" MaxWidth="500"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="20">
+          <TextBlock Text="Unlock Premium Features" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+          
+          <TextBlock Text="You have reached some limits of the trial in the free version. To read, download, and import unlimited comics, support the app by purchasing the premium unlock!" 
+                     TextWrapping="Wrap" FontSize="14" TextAlignment="Center" Foreground="Gray"/>
+          
+          <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
+            <StackPanel Spacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="Unlimited local library imports"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="Unlimited Komga server downloads &amp; viewing"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="Personal reading statistics dashboard"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="Supports ongoing development &amp; updates"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <StackPanel Spacing="10">
+            <Button Content="Unlock Premium (One-Time Purchase)" 
+                    Command="{Binding PurchasePremiumUnlockCommand}" 
+                    Classes="accent"
+                    Height="40"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+            
+            <Button Content="Keep Testing Free Version" 
+                    Command="{Binding ClosePremiumUnlockDialogCommand}" 
+                    Background="Transparent"
+                    Height="36"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
   </Grid>
 </UserControl>
