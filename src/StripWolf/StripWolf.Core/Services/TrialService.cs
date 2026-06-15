@@ -14,6 +14,13 @@ public class TrialService
 {
     public const int MaxTrialLimit = 5;
 
+    public static readonly System.Collections.Generic.HashSet<string> AllowedFormats = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cbz", "cbr", "cbt", "cb7", "epub", "pdf"
+    };
+
+    private readonly System.Threading.SemaphoreSlim _settingsSemaphore = new(1, 1);
+
     private readonly SettingsService _settingsService;
     private readonly DatabaseService _databaseService;
 
@@ -87,34 +94,49 @@ public class TrialService
 
     private async void OnComicOpened(object? sender, ComicOpenedEventArgs e)
     {
-        await LogUsageAsync("ComicOpen", e.ComicId);
-
-        if (!IsUnlimitedUnlocked)
+        try
         {
-            if (e.Source == ComicSource.Komga)
+            await LogUsageAsync("ComicOpen", e.ComicId);
+
+            if (!IsUnlimitedUnlocked)
             {
-                if (int.TryParse(e.Identifier, out var bookId))
+                await _settingsSemaphore.WaitAsync();
+                try
                 {
-                    await _settingsService.UpdateSettingsAsync(s =>
+                    if (e.Source == ComicSource.Komga)
                     {
-                        if (!s.PermanentViewedKomgaBookIds.Contains(bookId))
+                        if (int.TryParse(e.Identifier, out var bookId))
                         {
-                            s.PermanentViewedKomgaBookIds.Add(bookId);
+                            await _settingsService.UpdateSettingsAsync(s =>
+                            {
+                                if (!s.PermanentViewedKomgaBookIds.Contains(bookId))
+                                {
+                                    s.PermanentViewedKomgaBookIds.Add(bookId);
+                                }
+                            });
                         }
-                    });
+                    }
+                    else
+                    {
+                        var filename = Path.GetFileName(e.Identifier);
+                        await _settingsService.UpdateSettingsAsync(s =>
+                        {
+                            if (!s.PermanentViewedLocalPaths.Contains(filename))
+                            {
+                                s.PermanentViewedLocalPaths.Add(filename);
+                            }
+                        });
+                    }
+                }
+                finally
+                {
+                    _settingsSemaphore.Release();
                 }
             }
-            else
-            {
-                var filename = Path.GetFileName(e.Identifier);
-                await _settingsService.UpdateSettingsAsync(s =>
-                {
-                    if (!s.PermanentViewedLocalPaths.Contains(filename))
-                    {
-                        s.PermanentViewedLocalPaths.Add(filename);
-                    }
-                });
-            }
+        }
+        catch
+        {
+            // Gracefully ignore settings update/I/O exceptions from async void event handler
         }
     }
 
@@ -140,8 +162,7 @@ public class TrialService
         var ext = Path.GetExtension(filePath)?.TrimStart('.')?.ToLowerInvariant();
         if (string.IsNullOrEmpty(ext)) return true;
 
-        var allowedFormats = new[] { "cbz", "cbr", "cbt", "cb7", "epub", "pdf" };
-        if (!allowedFormats.Contains(ext)) return true;
+        if (!AllowedFormats.Contains(ext)) return true;
 
         // Count how many local comics of this extension currently exist in the database library
         var comics = await _databaseService.GetComicsAsync();

@@ -967,13 +967,13 @@
     <value>Sie haben einige Limits der Testversion erreicht. Bitte schalten Sie Premium frei, um diesen Comic zu lesen.</value>
   </data>
   <data name="TrialStatsDashboard" xml:space="preserve">
-    <value>PersÃ¶nliches Lese-Statistik-Dashboard</value>
+    <value>Persönliches Lese-Statistik-Dashboard</value>
   </data>
   <data name="TrialComicsOpened" xml:space="preserve">
-    <value>GeÃ¶ffnete Comics</value>
+    <value>Geöffnete Comics</value>
   </data>
   <data name="TrialPersonalReadingStats" xml:space="preserve">
-    <value>PersÃ¶nliche Lesestatistik</value>
+    <value>Persönliche Lesestatistik</value>
   </data>
   <data name="TrialUnlockButton" xml:space="preserve">
     <value>Premium freischalten (Einmaliger Kauf)</value>
@@ -1009,16 +1009,16 @@
     <value>Kostenlose Version weiter testen</value>
   </data>
   <data name="TrialUpgradeDesc" xml:space="preserve">
-    <value>FÃ¼hren Sie ein Upgrade auf Premium durch, um unbegrenzte Importe und Ansichten zu erhalten.</value>
+    <value>Führen Sie ein Upgrade auf Premium durch, um unbegrenzte Importe und Ansichten zu erhalten.</value>
   </data>
   <data name="TrialReachedLimitsDesc" xml:space="preserve">
-    <value>Sie haben einige Limits der Testversion in der kostenlosen Version erreicht. Um unbegrenzt Comics zu lesen, herunterzuladen und zu importieren, unterstÃ¼tzen Sie die App, indem Sie das Premium-Upgrade erwerben!</value>
+    <value>Sie haben einige Limits der Testversion in der kostenlosen Version erreicht. Um unbegrenzt Comics zu lesen, herunterzuladen und zu importieren, unterstützen Sie die App, indem Sie das Premium-Upgrade erwerben!</value>
   </data>
   <data name="TrialEdition" xml:space="preserve">
     <value>Testversion</value>
   </data>
   <data name="TrialSupportsDevelopment" xml:space="preserve">
-    <value>UnterstÃ¼tzt die laufende Entwicklung &amp; Updates</value>
+    <value>Unterstützt die laufende Entwicklung &amp; Updates</value>
   </data>
   <data name="TrialViews" xml:space="preserve">
     <value>Ansichten</value>
@@ -1030,10 +1030,10 @@
     <value>Unbegrenzte lokale Bibliotheks-Importe</value>
   </data>
   <data name="TrialKomgaLimitsDesc" xml:space="preserve">
-    <value>Limit fÃ¼r aktive Downloads &amp; permanente Ansichten</value>
+    <value>Limit für aktive Downloads &amp; permanente Ansichten</value>
   </data>
   <data name="TrialAllFeaturesUnlocked" xml:space="preserve">
-    <value>Vielen Dank fÃ¼r Ihre UnterstÃ¼tzung von StripWolf! Alle Funktionen freigeschaltet.</value>
+    <value>Vielen Dank für Ihre Unterstützung von StripWolf! Alle Funktionen freigeschaltet.</value>
   </data>
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Komga-Server-Integration</value>

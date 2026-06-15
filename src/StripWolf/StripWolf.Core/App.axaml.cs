@@ -63,6 +63,12 @@ public partial class App : Application
     /// </summary>
     public static Action<IServiceCollection>? RegisterFullScreenService { get; set; }
 
+    /// <summary>
+    /// Action to register the platform-specific billing service.
+    /// Set this before Initialize() is called if you need a custom implementation (e.g., on Android).
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterBillingService { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -185,6 +191,11 @@ public partial class App : Application
         services.AddSingleton<UpdateService>();
         services.AddSingleton<IAppEventsService, AppEventsService>();
         services.AddSingleton<TrialService>();
+
+        if (RegisterBillingService != null)
+        {
+            RegisterBillingService(services);
+        }
 
         // Register platform-specific PDF renderer
         // Use the custom registration action if set (e.g., for Android), otherwise default to nothing

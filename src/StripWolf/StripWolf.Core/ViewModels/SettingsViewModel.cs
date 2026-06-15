@@ -1251,7 +1251,7 @@ public partial class SettingsViewModel : ViewModelBase
             KomgaDownloadsUsed = comics.Count(c => c.Source == ComicSource.Komga);
             KomgaViewsUsed = settings.PermanentViewedKomgaBookIds.Count;
 
-            var formats = new[] { "cbz", "cbr", "cbt", "cb7", "epub", "pdf" };
+            var formats = TrialService.AllowedFormats;
             var formatList = new List<FormatTrialStatus>();
 
             foreach (var fmt in formats)

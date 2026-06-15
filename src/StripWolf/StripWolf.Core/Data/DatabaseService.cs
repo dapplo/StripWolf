@@ -94,7 +94,6 @@ public class DatabaseService : IAsyncDisposable
             await _database.CreateTableAsync<KomgaPendingReadProgress>();
             await _database.CreateTableAsync<UsageStats>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
-            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_UsageStats_Metric ON UsageStats(Metric)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
 
             _isInitialized = true;
