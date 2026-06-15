@@ -94,39 +94,39 @@
             <StackPanel Spacing="16">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="4">
-                  <TextBlock Text="Trial Edition" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                  <TextBlock Text="Upgrade to Premium to get unlimited imports and views." FontSize="12" Foreground="#FFAAAAAA" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding TrialEdition, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                  <TextBlock Text="{Binding TrialUpgradeDesc, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#FFAAAAAA" TextWrapping="Wrap"/>
                 </StackPanel>
                 <Border Grid.Column="1" Background="#E5A93C" CornerRadius="4" Padding="6,3" VerticalAlignment="Top">
-                  <TextBlock Text="Locked" FontSize="10" FontWeight="Bold" Foreground="Black"/>
+                  <TextBlock Text="{Binding TrialLocked, Source={x:Static res:Loc.Instance}}" FontSize="10" FontWeight="Bold" Foreground="Black"/>
                 </Border>
               </Grid>
-
+ 
               <Separator Background="#33FFFFFF"/>
-
+ 
               <StackPanel Spacing="10">
                 <!-- Komga limits -->
                 <Grid ColumnDefinitions="*,Auto" Margin="0,4">
                   <StackPanel Spacing="2">
-                    <TextBlock Text="Komga Server Integration" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                    <TextBlock Text="Active downloads &amp; permanent views limit" FontSize="11" Foreground="#FFAAAAAA"/>
+                    <TextBlock Text="{Binding TrialKomgaServerIntegration, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                    <TextBlock Text="{Binding TrialKomgaLimitsDesc, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFAAAAAA"/>
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <StackPanel HorizontalAlignment="Center">
-                      <TextBlock Text="Downloads" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
-                      <TextBlock Text="{Binding KomgaDownloadsUsed, StringFormat='{}{0}/2'}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding Downloads, Source={x:Static res:Loc.Instance}}" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding KomgaDownloadsDisplay}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel HorizontalAlignment="Center">
-                      <TextBlock Text="Views" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
-                      <TextBlock Text="{Binding KomgaViewsUsed, StringFormat='{}{0}/2'}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding TrialViews, Source={x:Static res:Loc.Instance}}" FontSize="9" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding KomgaViewsDisplay}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     </StackPanel>
                   </StackPanel>
                 </Grid>
-
+ 
                 <Separator Background="#15FFFFFF"/>
-
+ 
                 <!-- Local import/view limits per format -->
-                <TextBlock Text="Local Library Trial (Imports &amp; Views per format)" FontSize="12" FontWeight="SemiBold" Foreground="#FFAAAAAA"/>
+                <TextBlock Text="{Binding TrialLocalLimitsTitle, Source={x:Static res:Loc.Instance}}" FontSize="12" FontWeight="SemiBold" Foreground="#FFAAAAAA"/>
                 
                 <ItemsControl ItemsSource="{Binding LocalFormatStatuses}">
                   <ItemsControl.ItemsPanel>
@@ -141,12 +141,12 @@
                           <TextBlock Text="{Binding Format}" FontSize="12" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                           <Grid ColumnDefinitions="*,*">
                             <StackPanel HorizontalAlignment="Center">
-                              <TextBlock Text="Imports" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
-                              <TextBlock Text="{Binding ImportsUsed, StringFormat='{}{0}/2'}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding Imports, Source={x:Static res:Loc.Instance}}" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding ImportsDisplay}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                              <TextBlock Text="Views" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
-                              <TextBlock Text="{Binding ViewsUsed, StringFormat='{}{0}/2'}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding TrialViews, Source={x:Static res:Loc.Instance}}" FontSize="8" Foreground="#FFAAAAAA" HorizontalAlignment="Center"/>
+                              <TextBlock Text="{Binding ViewsDisplay}" FontSize="10" Foreground="White" HorizontalAlignment="Center"/>
                             </StackPanel>
                           </Grid>
                         </StackPanel>
@@ -155,7 +155,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </StackPanel>
-
+ 
               <Button Command="{Binding RequestUnlockCommand}" Classes="accent" HorizontalAlignment="Stretch" Height="40" Margin="0,8,0,0">
                 <Button.Background>
                   <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -165,7 +165,7 @@
                 </Button.Background>
                 <Grid ColumnDefinitions="Auto,*">
                   <TextBlock Text="⭐" FontSize="16" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Text="Unlock Premium (One-Time Purchase)" FontSize="14" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="1" Text="{Binding TrialUnlockButton, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
               </Button>
             </StackPanel>
@@ -182,18 +182,18 @@
             <StackPanel Spacing="16">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="4">
-                  <TextBlock Text="Premium Edition" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                  <TextBlock Text="Thank you for supporting StripWolf! All features unlocked." FontSize="12" Foreground="#FFE0E0E0" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding TrialPremiumEdition, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                  <TextBlock Text="{Binding TrialAllFeaturesUnlocked, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="#FFE0E0E0" TextWrapping="Wrap"/>
                 </StackPanel>
                 <Border Grid.Column="1" Background="#4CAF50" CornerRadius="4" Padding="6,3" VerticalAlignment="Top">
-                  <TextBlock Text="Unlocked" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                  <TextBlock Text="{Binding TrialUnlocked, Source={x:Static res:Loc.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                 </Border>
               </Grid>
-
+ 
               <Separator Background="#33FFFFFF"/>
-
-              <TextBlock Text="Personal Reading Statistics" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-
+ 
+              <TextBlock Text="{Binding TrialPersonalReadingStats, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+ 
               <!-- 2x2 Grid for statistics dashboard -->
               <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*" RowSpacing="8" ColumnSpacing="8">
                 <!-- Total Pages Read -->
@@ -201,7 +201,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Pages Read" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialPagesRead, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Comics Opened -->
@@ -209,7 +209,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Comics Opened" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialComicsOpened, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Local Imports -->
@@ -217,7 +217,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Local Imports" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialLocalImports, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Komga Downloads -->
@@ -225,7 +225,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Komga Downloads" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialKomgaDownloads, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
               </Grid>
@@ -244,7 +244,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Pages Read" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialPagesRead, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Comics Opened -->
@@ -252,7 +252,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Comics Opened" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialComicsOpened, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Local Imports -->
@@ -260,7 +260,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Local Imports" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialLocalImports, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
                 <!-- Komga Downloads -->
@@ -268,7 +268,7 @@
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
                     <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Komga Downloads" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding TrialKomgaDownloads, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
                 </Border>
               </Grid>

@@ -12,6 +12,8 @@ namespace StripWolf.Core.Services;
 /// </summary>
 public class TrialService
 {
+    public const int MaxTrialLimit = 5;
+
     private readonly SettingsService _settingsService;
     private readonly DatabaseService _databaseService;
 
@@ -129,7 +131,7 @@ public class TrialService
     }
 
     /// <summary>
-    /// Checks if a local import of a specific file type is allowed (capacity limit: max 2).
+    /// Checks if a local import of a specific file type is allowed (capacity limit: max MaxTrialLimit).
     /// </summary>
     public async Task<bool> CanImportLocalAsync(string filePath)
     {
@@ -150,11 +152,11 @@ public class TrialService
             return cExt == ext;
         });
 
-        return currentCount < 2;
+        return currentCount < MaxTrialLimit;
     }
 
     /// <summary>
-    /// Checks if a Komga download is allowed (capacity limit: max 2).
+    /// Checks if a Komga download is allowed (capacity limit: max MaxTrialLimit).
     /// </summary>
     public async Task<bool> CanDownloadKomgaAsync()
     {
@@ -164,11 +166,11 @@ public class TrialService
         var comics = await _databaseService.GetComicsAsync();
         var currentCount = comics.Count(c => c.Source == ComicSource.Komga);
 
-        return currentCount < 2;
+        return currentCount < MaxTrialLimit;
     }
 
     /// <summary>
-    /// Checks if opening a local comic is allowed (permanent view limit: max 2 unique files per format).
+    /// Checks if opening a local comic is allowed (permanent view limit: max MaxTrialLimit unique files per format).
     /// </summary>
     public async Task<bool> CanOpenLocalAsync(string filePath)
     {
@@ -190,11 +192,11 @@ public class TrialService
         var currentViewedCount = settings.PermanentViewedLocalPaths
             .Count(p => Path.GetExtension(p)?.TrimStart('.')?.ToLowerInvariant() == ext);
 
-        return currentViewedCount < 2;
+        return currentViewedCount < MaxTrialLimit;
     }
 
     /// <summary>
-    /// Checks if opening a Komga comic is allowed (permanent view limit: max 2 unique files).
+    /// Checks if opening a Komga comic is allowed (permanent view limit: max MaxTrialLimit unique files).
     /// </summary>
     public async Task<bool> CanOpenKomgaAsync(int bookId)
     {
@@ -208,7 +210,7 @@ public class TrialService
             return true;
         }
 
-        return settings.PermanentViewedKomgaBookIds.Count < 2;
+        return settings.PermanentViewedKomgaBookIds.Count < MaxTrialLimit;
     }
 
     /// <summary>

@@ -261,34 +261,34 @@
               BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
               BorderThickness="1">
         <StackPanel Spacing="20">
-          <TextBlock Text="Unlock Premium Features" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+          <TextBlock Text="{Binding TrialUnlockPremiumFeatures, Source={x:Static res:Loc.Instance}}" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
           
-          <TextBlock Text="You have reached some limits of the trial in the free version. To read, download, and import unlimited comics, support the app by purchasing the premium unlock!" 
+          <TextBlock Text="{Binding TrialReachedLimitsDesc, Source={x:Static res:Loc.Instance}}" 
                      TextWrapping="Wrap" FontSize="14" TextAlignment="Center" Foreground="Gray"/>
           
           <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
             <StackPanel Spacing="10">
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
-                <TextBlock Text="Unlimited local library imports"/>
+                <TextBlock Text="{Binding TrialUnlimitedLocalImports, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
-                <TextBlock Text="Unlimited Komga server downloads &amp; viewing"/>
+                <TextBlock Text="{Binding TrialUnlimitedKomga, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
-                <TextBlock Text="Personal reading statistics dashboard"/>
+                <TextBlock Text="{Binding TrialStatsDashboard, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
-                <TextBlock Text="Supports ongoing development &amp; updates"/>
+                <TextBlock Text="{Binding TrialSupportsDevelopment, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
             </StackPanel>
           </Border>
 
           <StackPanel Spacing="10">
-            <Button Content="Unlock Premium (One-Time Purchase)" 
+            <Button Content="{Binding TrialUnlockButton, Source={x:Static res:Loc.Instance}}" 
                     Command="{Binding PurchasePremiumUnlockCommand}" 
                     Classes="accent"
                     Height="40"
@@ -296,7 +296,7 @@
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"/>
             
-            <Button Content="Keep Testing Free Version" 
+            <Button Content="{Binding TrialKeepTesting, Source={x:Static res:Loc.Instance}}" 
                     Command="{Binding ClosePremiumUnlockDialogCommand}" 
                     Background="Transparent"
                     Height="36"

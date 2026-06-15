@@ -903,7 +903,7 @@ public partial class ReaderViewModel : ViewModelBase
                 if (!allowed)
                 {
                     IsBusy = false;
-                    ErrorMessage = "You have reached some limits of the trial. Please unlock premium to read this comic.";
+                    ErrorMessage = Resources.Loc.Instance.TrialLimitReachedError;
                     _trialService.RequestPremiumUnlock();
                     // Navigate back or close the reader since opening is blocked
                     Dispatcher.UIThread.Post(() => _ = GoBackAsync());

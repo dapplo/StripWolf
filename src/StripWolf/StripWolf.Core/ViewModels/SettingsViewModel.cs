@@ -335,13 +335,18 @@ public partial class SettingsViewModel : ViewModelBase
 
     public bool IsPlayStoreBuildAndLocked => IsPlayStoreBuild && !IsUnlimitedUnlocked;
 
-    public string LicenceSectionHeader => IsPlayStoreBuild ? "Licence & Statistics" : "Personal Reading Statistics";
+    public string LicenceSectionHeader => IsPlayStoreBuild ? Resources.Loc.Instance.TrialLicenceAndStats : Resources.Loc.Instance.TrialPersonalReadingStats;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KomgaDownloadsDisplay))]
     private int _komgaDownloadsUsed;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KomgaViewsDisplay))]
     private int _komgaViewsUsed;
+
+    public string KomgaDownloadsDisplay => $"{KomgaDownloadsUsed}/{TrialService.MaxTrialLimit}";
+    public string KomgaViewsDisplay => $"{KomgaViewsUsed}/{TrialService.MaxTrialLimit}";
 
     [ObservableProperty]
     private ObservableCollection<FormatTrialStatus> _localFormatStatuses = [];
@@ -1314,6 +1319,8 @@ public partial class SettingsViewModel : ViewModelBase
 
 public record FormatTrialStatus(string Format, int ImportsUsed, int ViewsUsed)
 {
-    public int ImportsRemaining => Math.Max(0, 2 - ImportsUsed);
-    public int ViewsRemaining => Math.Max(0, 2 - ViewsUsed);
+    public int ImportsRemaining => Math.Max(0, TrialService.MaxTrialLimit - ImportsUsed);
+    public int ViewsRemaining => Math.Max(0, TrialService.MaxTrialLimit - ViewsUsed);
+    public string ImportsDisplay => $"{ImportsUsed}/{TrialService.MaxTrialLimit}";
+    public string ViewsDisplay => $"{ViewsUsed}/{TrialService.MaxTrialLimit}";
 }

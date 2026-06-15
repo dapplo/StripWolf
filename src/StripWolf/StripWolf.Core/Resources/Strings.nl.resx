@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -972,5 +972,80 @@
   </data>
   <data name="WelcomeExperienceFinish" xml:space="preserve">
     <value>Voltooien</value>
+  </data>
+  <data name="TrialLimitReachedError" xml:space="preserve">
+    <value>Je hebt enkele limieten van de proefversie bereikt. Ontgrendel premium om deze strip te lezen.</value>
+  </data>
+  <data name="TrialStatsDashboard" xml:space="preserve">
+    <value>Persoonlijk leesstatistieken dashboard</value>
+  </data>
+  <data name="TrialComicsOpened" xml:space="preserve">
+    <value>Geopende strips</value>
+  </data>
+  <data name="TrialPersonalReadingStats" xml:space="preserve">
+    <value>Persoonlijke leesstatistieken</value>
+  </data>
+  <data name="TrialUnlockButton" xml:space="preserve">
+    <value>Premium ontgrendelen (Eenmalige aankoop)</value>
+  </data>
+  <data name="TrialUnlimitedKomga" xml:space="preserve">
+    <value>Onbekt downloaden &amp; bekijken vanaf de Komga-server</value>
+  </data>
+  <data name="TrialUnlocked" xml:space="preserve">
+    <value>Ontgrendeld</value>
+  </data>
+  <data name="TrialUnlockPremiumFeatures" xml:space="preserve">
+    <value>Premium functies ontgrendelen</value>
+  </data>
+  <data name="TrialLicenceAndStats" xml:space="preserve">
+    <value>Licentie &amp; statistieken</value>
+  </data>
+  <data name="TrialLocked" xml:space="preserve">
+    <value>Vergrendeld</value>
+  </data>
+  <data name="TrialPagesRead" xml:space="preserve">
+    <value>Gelezen pagina's</value>
+  </data>
+  <data name="TrialLocalLimitsTitle" xml:space="preserve">
+    <value>Lokale bibliotheek proefversie (Importen &amp; weergaven per formaat)</value>
+  </data>
+  <data name="TrialPremiumEdition" xml:space="preserve">
+    <value>Premium-editie</value>
+  </data>
+  <data name="TrialLocalImports" xml:space="preserve">
+    <value>Lokale importen</value>
+  </data>
+  <data name="TrialKeepTesting" xml:space="preserve">
+    <value>De gratis versie blijven proberen</value>
+  </data>
+  <data name="TrialUpgradeDesc" xml:space="preserve">
+    <value>Upgrade naar Premium voor onbeperkt importeren en bekijken.</value>
+  </data>
+  <data name="TrialReachedLimitsDesc" xml:space="preserve">
+    <value>Je hebt enkele limieten van de proefversie in de gratis versie bereikt. Om onbeperkt strips te lezen, downloaden en importeren, kun je de app steunen door de premium ontgrendeling te kopen!</value>
+  </data>
+  <data name="TrialEdition" xml:space="preserve">
+    <value>Proefversie</value>
+  </data>
+  <data name="TrialSupportsDevelopment" xml:space="preserve">
+    <value>Ondersteunt voortdurende ontwikkeling &amp; updates</value>
+  </data>
+  <data name="TrialViews" xml:space="preserve">
+    <value>Weergaven</value>
+  </data>
+  <data name="TrialKomgaDownloads" xml:space="preserve">
+    <value>Komga downloads</value>
+  </data>
+  <data name="TrialUnlimitedLocalImports" xml:space="preserve">
+    <value>Onbeperkte lokale bibliotheekimporten</value>
+  </data>
+  <data name="TrialKomgaLimitsDesc" xml:space="preserve">
+    <value>Limiet voor actieve downloads &amp; permanente weergaven</value>
+  </data>
+  <data name="TrialAllFeaturesUnlocked" xml:space="preserve">
+    <value>Bedankt voor het steunen van StripWolf! Alle functies ontgrendeld.</value>
+  </data>
+  <data name="TrialKomgaServerIntegration" xml:space="preserve">
+    <value>Komga server integratie</value>
   </data>
 </root>

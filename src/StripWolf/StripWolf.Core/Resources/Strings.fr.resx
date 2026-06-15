@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -962,5 +962,80 @@
   </data>
   <data name="WelcomeExperienceFinish" xml:space="preserve">
     <value>Terminer</value>
+  </data>
+  <data name="TrialLimitReachedError" xml:space="preserve">
+    <value>Vous avez atteint certaines limites de la version d'essai. Veuillez dÃ©bloquer la version premium pour lire cette bande dessinÃ©e.</value>
+  </data>
+  <data name="TrialStatsDashboard" xml:space="preserve">
+    <value>Tableau de bord des statistiques de lecture personnelles</value>
+  </data>
+  <data name="TrialComicsOpened" xml:space="preserve">
+    <value>Bandes dessinÃ©es ouvertes</value>
+  </data>
+  <data name="TrialPersonalReadingStats" xml:space="preserve">
+    <value>Statistiques de lecture personnelles</value>
+  </data>
+  <data name="TrialUnlockButton" xml:space="preserve">
+    <value>DÃ©bloquer Premium (Achat unique)</value>
+  </data>
+  <data name="TrialUnlimitedKomga" xml:space="preserve">
+    <value>TÃ©lÃ©chargements et visionnages illimitÃ©s sur le serveur Komga</value>
+  </data>
+  <data name="TrialUnlocked" xml:space="preserve">
+    <value>DÃ©bloquÃ©</value>
+  </data>
+  <data name="TrialUnlockPremiumFeatures" xml:space="preserve">
+    <value>DÃ©bloquer les fonctionnalitÃ©s premium</value>
+  </data>
+  <data name="TrialLicenceAndStats" xml:space="preserve">
+    <value>Licence et statistiques</value>
+  </data>
+  <data name="TrialLocked" xml:space="preserve">
+    <value>VerrouillÃ©</value>
+  </data>
+  <data name="TrialPagesRead" xml:space="preserve">
+    <value>Pages lues</value>
+  </data>
+  <data name="TrialLocalLimitsTitle" xml:space="preserve">
+    <value>Essai de bibliothÃ¨que locale (Imports et lectures par format)</value>
+  </data>
+  <data name="TrialPremiumEdition" xml:space="preserve">
+    <value>Ã‰dition Premium</value>
+  </data>
+  <data name="TrialLocalImports" xml:space="preserve">
+    <value>Importations locales</value>
+  </data>
+  <data name="TrialKeepTesting" xml:space="preserve">
+    <value>Continuer Ã  tester la version gratuite</value>
+  </data>
+  <data name="TrialUpgradeDesc" xml:space="preserve">
+    <value>Passez Ã  la version Premium pour obtenir des imports et des lectures illimitÃ©s.</value>
+  </data>
+  <data name="TrialReachedLimitsDesc" xml:space="preserve">
+    <value>Vous avez atteint certaines limites de la version d'essai dans la version gratuite. Pour lire, tÃ©lÃ©charger et importer des bandes dessinÃ©es en illimitÃ©, soutenez l'application en achetant le dÃ©verrouillage premium !</value>
+  </data>
+  <data name="TrialEdition" xml:space="preserve">
+    <value>Ã‰dition d'essai</value>
+  </data>
+  <data name="TrialSupportsDevelopment" xml:space="preserve">
+    <value>Soutient le dÃ©veloppement et les mises Ã  jour en cours</value>
+  </data>
+  <data name="TrialViews" xml:space="preserve">
+    <value>Visionnages</value>
+  </data>
+  <data name="TrialKomgaDownloads" xml:space="preserve">
+    <value>TÃ©lÃ©chargements Komga</value>
+  </data>
+  <data name="TrialUnlimitedLocalImports" xml:space="preserve">
+    <value>Imports de bibliothÃ¨que locale illimitÃ©s</value>
+  </data>
+  <data name="TrialKomgaLimitsDesc" xml:space="preserve">
+    <value>Limite des tÃ©lÃ©chargements actifs et des lectures permanentes</value>
+  </data>
+  <data name="TrialAllFeaturesUnlocked" xml:space="preserve">
+    <value>Merci de soutenir StripWolf ! Toutes les fonctionnalitÃ©s sont dÃ©bloquÃ©es.</value>
+  </data>
+  <data name="TrialKomgaServerIntegration" xml:space="preserve">
+    <value>IntÃ©gration du serveur Komga</value>
   </data>
 </root>
