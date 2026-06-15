@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -15,6 +15,7 @@
     <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
     <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
     <AssemblyTitle>StripWolf.Core</AssemblyTitle>
+	  <IsPlayStoreBuild>true</IsPlayStoreBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">
@@ -23,6 +24,10 @@
 
   <PropertyGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
     <DefineConstants>$(DefineConstants);DISABLE_GUIDED_READING</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(IsPlayStoreBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);PLAY_STORE_BUILD</DefineConstants>
   </PropertyGroup>
   
   <ItemGroup>

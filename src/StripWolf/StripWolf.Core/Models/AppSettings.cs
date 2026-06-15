@@ -62,6 +62,21 @@ public class AppSettings
     public bool? HasCompletedWelcomeExperience { get; set; }
 
     /// <summary>
+    /// Whether the user has purchased the unlimited premium unlock.
+    /// </summary>
+    public bool IsUnlimitedUnlocked { get; set; } = false;
+
+    /// <summary>
+    /// Book IDs of Komga comics that have been opened (Max 2 in trial).
+    /// </summary>
+    public List<int> PermanentViewedKomgaBookIds { get; set; } = [];
+
+    /// <summary>
+    /// Local comic paths/filenames that have been opened (Max 2 per format in trial).
+    /// </summary>
+    public List<string> PermanentViewedLocalPaths { get; set; } = [];
+
+    /// <summary>
     /// Preferred reading mode for the comic reader
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<ReadingMode>))]
@@ -189,6 +204,9 @@ public class AppSettings
             WasInReader = WasInReader,
             LastTabIndex = LastTabIndex,
             HasCompletedWelcomeExperience = HasCompletedWelcomeExperience,
+            IsUnlimitedUnlocked = IsUnlimitedUnlocked,
+            PermanentViewedKomgaBookIds = PermanentViewedKomgaBookIds.ToList(),
+            PermanentViewedLocalPaths = PermanentViewedLocalPaths.ToList(),
             AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,

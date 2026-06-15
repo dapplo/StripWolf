@@ -288,7 +288,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
-      - name: Build Android ARM64
+      - name: Build Android ARM64 APK
         run: |
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-arm64 -o publish/android-arm64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
@@ -299,7 +299,7 @@ jobs:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
 
-      - name: Build Android x64
+      - name: Build Android x64 APK
         run: |
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-x64 -o publish/android-x64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
@@ -310,27 +310,59 @@ jobs:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
 
-      - name: Find and rename APKs
+      - name: Build Android App Bundle (AAB)
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -o publish/android-aab \
+            -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
+            -p:AndroidPackageFormat=aab \
+            -p:AndroidCreatePackagePerAbi=false \
+            -p:IsPlayStoreBuild=true \
+            -p:RuntimeIdentifiers="android-arm64;android-x64" \
+            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
+            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
+        env:
+          ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
+          ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
+
+      - name: Find and rename Android Artifacts
         run: |
           mkdir -p release-artifacts
           
-          # Process ARM64
+          # Process ARM64 APK
           APK_ARM=$(find publish/android-arm64 -name "*-Signed.apk" | head -1)
           if [ -n "$APK_ARM" ]; then
             cp "$APK_ARM" "release-artifacts/StripWolf-Android-arm64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
           fi
 
-          # Process x64
+          # Process x64 APK
           APK_X64=$(find publish/android-x64 -name "*-Signed.apk" | head -1)
           if [ -n "$APK_X64" ]; then
             cp "$APK_X64" "release-artifacts/StripWolf-Android-x86_64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.apk"
+          fi
+
+          # Process AAB
+          AAB_FILE=$(find publish/android-aab -name "*-Signed.aab" | head -1)
+          if [ -n "$AAB_FILE" ]; then
+            cp "$AAB_FILE" "release-artifacts/StripWolf-Android-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.aab"
           fi
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
-          files: release-artifacts/*.apk
+          files: |
+            release-artifacts/*.apk
+            release-artifacts/*.aab
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v2
+        if: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY != '' }}
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY }}
+          packageName: com.dapplo.StripWolf
+          releaseFiles: release-artifacts/*.aab
+          track: internal
+          status: completed

@@ -62,6 +62,9 @@ public class DatabaseService : IAsyncDisposable
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
         typeof(KomgaPendingReadProgress))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(UsageStats))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
         if (_isInitialized && _database is not null)
@@ -89,6 +92,7 @@ public class DatabaseService : IAsyncDisposable
             await _database.CreateTableAsync<KomgaServer>();
             await _database.CreateTableAsync<KomgaPendingDownload>();
             await _database.CreateTableAsync<KomgaPendingReadProgress>();
+            await _database.CreateTableAsync<UsageStats>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
 
@@ -465,6 +469,42 @@ public class DatabaseService : IAsyncDisposable
                 });
             }
         });
+    }
+
+    #endregion
+
+    #region Usage Stats
+
+    public async Task LogUsageAsync(string metric, string? metadata = null)
+    {
+        try
+        {
+            var db = await GetDatabaseAsync();
+            var stat = new UsageStats
+            {
+                Metric = metric,
+                Timestamp = DateTime.UtcNow,
+                Metadata = metadata
+            };
+            await db.InsertAsync(stat);
+        }
+        catch
+        {
+            // Ignore stats errors so they don't crash the app
+        }
+    }
+
+    public async Task<int> GetUsageCountAsync(string metric)
+    {
+        try
+        {
+            var db = await GetDatabaseAsync();
+            return await db.Table<UsageStats>().Where(s => s.Metric == metric).CountAsync();
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     #endregion

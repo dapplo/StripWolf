@@ -357,4 +357,31 @@ public class Loc : INotifyPropertyChanged
     public string WelcomeExperienceActivityHint => GetString();
     public string WelcomeExperienceSettingsHint => GetString();
     public string WelcomeExperienceSupportHint => GetString();
+
+    // Google Play Store Trial limits and stats translations
+    public string TrialUnlockPremiumFeatures => GetString();
+    public string TrialReachedLimitsDesc => GetString();
+    public string TrialUnlimitedLocalImports => GetString();
+    public string TrialUnlimitedKomga => GetString();
+    public string TrialStatsDashboard => GetString();
+    public string TrialSupportsDevelopment => GetString();
+    public string TrialUnlockButton => GetString();
+    public string TrialKeepTesting => GetString();
+    public string TrialLimitReachedError => GetString();
+    public string TrialEdition => GetString();
+    public string TrialUpgradeDesc => GetString();
+    public string TrialLocked => GetString();
+    public string TrialKomgaLimitsDesc => GetString();
+    public string TrialLocalLimitsTitle => GetString();
+    public string TrialPremiumEdition => GetString();
+    public string TrialAllFeaturesUnlocked => GetString();
+    public string TrialUnlocked => GetString();
+    public string TrialPersonalReadingStats => GetString();
+    public string TrialLicenceAndStats => GetString();
+    public string TrialViews => GetString();
+    public string TrialPagesRead => GetString();
+    public string TrialComicsOpened => GetString();
+    public string TrialLocalImports => GetString();
+    public string TrialKomgaDownloads => GetString();
+    public string TrialKomgaServerIntegration => GetString();
 }

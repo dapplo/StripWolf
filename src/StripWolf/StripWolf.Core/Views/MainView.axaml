@@ -252,5 +252,60 @@
         </Border>
       </Panel>
     </Panel>
+
+    <!-- Premium Unlock Overlay -->
+    <Panel Grid.RowSpan="2" Background="#B3000000" IsVisible="{Binding ShowPremiumUnlockDialog}">
+      <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+              CornerRadius="12" Padding="28" MaxWidth="500"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="20">
+          <TextBlock Text="{Binding TrialUnlockPremiumFeatures, Source={x:Static res:Loc.Instance}}" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"/>
+          
+          <TextBlock Text="{Binding TrialReachedLimitsDesc, Source={x:Static res:Loc.Instance}}" 
+                     TextWrapping="Wrap" FontSize="14" TextAlignment="Center" Foreground="Gray"/>
+          
+          <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
+            <StackPanel Spacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="{Binding TrialUnlimitedLocalImports, Source={x:Static res:Loc.Instance}}"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="{Binding TrialUnlimitedKomga, Source={x:Static res:Loc.Instance}}"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="{Binding TrialStatsDashboard, Source={x:Static res:Loc.Instance}}"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <TextBlock Text="{Binding TrialSupportsDevelopment, Source={x:Static res:Loc.Instance}}"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <StackPanel Spacing="10">
+            <Button Content="{Binding TrialUnlockButton, Source={x:Static res:Loc.Instance}}" 
+                    Command="{Binding PurchasePremiumUnlockCommand}" 
+                    Classes="accent"
+                    Height="40"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+            
+            <Button Content="{Binding TrialKeepTesting, Source={x:Static res:Loc.Instance}}" 
+                    Command="{Binding ClosePremiumUnlockDialogCommand}" 
+                    Background="Transparent"
+                    Height="36"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
   </Grid>
 </UserControl>
