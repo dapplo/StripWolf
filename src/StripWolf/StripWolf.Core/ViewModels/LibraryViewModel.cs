@@ -17,6 +17,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System.Threading;
+using Avalonia.Platform.Storage;
+using StripWolf.Core.Data;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -41,6 +44,9 @@ public partial class LibraryViewModel : ViewModelBase
     private readonly KomgaApiServiceFactory _komgaApiServiceFactory;
     private readonly KomgaSyncService _komgaSyncService;
     private readonly IExternalLinkService _externalLinkService;
+    private readonly DatabaseService _databaseService;
+    private readonly ICloudLibraryService _cloudLibraryService;
+    private readonly SemaphoreSlim _scanSemaphore = new(1, 1);
     private CancellationTokenSource? _deleteCountdownLoopCancellation;
     private Task? _deleteCountdownLoopTask;
     private bool _hasLoadedComics;
@@ -171,7 +177,9 @@ public partial class LibraryViewModel : ViewModelBase
         SettingsService settingsService,
         KomgaApiServiceFactory komgaApiServiceFactory,
         KomgaSyncService komgaSyncService,
-        IExternalLinkService externalLinkService)
+        IExternalLinkService externalLinkService,
+        DatabaseService databaseService,
+        ICloudLibraryService cloudLibraryService)
     {
         _libraryService = libraryService;
         _comicReaderService = comicReaderService;
@@ -180,6 +188,8 @@ public partial class LibraryViewModel : ViewModelBase
         _komgaApiServiceFactory = komgaApiServiceFactory;
         _komgaSyncService = komgaSyncService;
         _externalLinkService = externalLinkService;
+        _databaseService = databaseService;
+        _cloudLibraryService = cloudLibraryService;
         Title = Loc.Instance.Library;
 
         RegisterSectionLayoutState(ContinueReadingSection);
@@ -378,6 +388,27 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 _ = _komgaSyncService.SyncAllComicsAsync();
             }
+
+            // Trigger background scanning of bookmarked cloud folders
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    for (int i = 0; i < 50 && App.TopLevel is null; i++)
+                    {
+                        await Task.Delay(100);
+                    }
+
+                    if (App.TopLevel?.StorageProvider is { } storageProvider)
+                    {
+                        await ScanBookmarkedFoldersAsync(storageProvider);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Failed to auto-scan bookmarked cloud folders: {ex.Message}");
+                }
+            });
 
             _hasLoadedComics = true;
         });
@@ -736,6 +767,222 @@ public partial class LibraryViewModel : ViewModelBase
         }
 
         await ImportFilesCoreAsync(filePaths, directoryPath, seriesNameFallback, suppressAutomaticDirectoryFallback);
+    }
+
+    public async Task ImportCloudFolderWithOptionsAsync(IStorageFolder folder, string? seriesNameFallback)
+    {
+        if (folder is null)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+
+        var files = new List<IStorageFile>();
+        try
+        {
+            await foreach (var file in _cloudLibraryService.EnumerateComicFilesAsync(folder))
+            {
+                files.Add(file);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to read folder contents: {ex.Message}";
+            return;
+        }
+
+        if (files.Count == 0)
+        {
+            ErrorMessage = "No supported comic files were found in the selected folder.";
+            return;
+        }
+
+        var pendingItems = new List<PendingImport>();
+        foreach (var file in files)
+        {
+            var pending = new PendingImport
+            {
+                FileName = file.Name,
+                FilePath = file.TryGetLocalPath() ?? file.Path.ToString(),
+                StorageFile = file,
+                Status = "Waiting..."
+            };
+            pendingItems.Add(pending);
+            await _importQueueService.EnqueueAsync(pending);
+        }
+
+        using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
+
+        foreach (var pending in pendingItems)
+        {
+            pending.IsProcessing = true;
+            try
+            {
+                pending.Status = "Streaming file...";
+                pending.Progress = 0.05;
+
+                string? localPath = null;
+                if (pending.StorageFile is not null)
+                {
+                    localPath = await _cloudLibraryService.CopyToLocalDirectoryAsync(pending.StorageFile, _libraryService.ComicsDirectory);
+                }
+
+                if (string.IsNullOrEmpty(localPath) || !File.Exists(localPath))
+                {
+                    throw new FileNotFoundException("Failed to stream/copy the file to local storage.");
+                }
+
+                pending.FilePath = localPath;
+
+                var format = ComicReaderService.GetComicFormat(pending.FilePath);
+                var useLazyUnsupportedFormats = _settingsService.LoadSettings().UnsupportedFormatHandlingMode == UnsupportedFormatHandlingMode.ConvertWhileReading;
+                var isLazyEpubImport = useLazyUnsupportedFormats && format == ComicFormat.Epub;
+                
+                pending.Status = format switch
+                {
+                    ComicFormat.Epub when isLazyEpubImport => "Analyzing EPUB...",
+                    ComicFormat.Pdf => "Converting PDF...",
+                    ComicFormat.Epub => "Converting EPUB...",
+                    _ => "Importing..."
+                };
+
+                var progress = UiProgressThrottle.Create(p =>
+                {
+                    pending.Progress = 0.2 + (p * 0.8);
+                    pending.Status = isLazyEpubImport
+                        ? p switch
+                        {
+                            < 0.7 => $"Preparing EPUB... {p:P0}",
+                            < 0.95 => $"Copying EPUB... {p:P0}",
+                            _ => $"Finalizing EPUB... {p:P0}"
+                        }
+                        : $"Converting... {p:P0}";
+                });
+
+                var fallback = seriesNameFallback;
+                if (string.IsNullOrEmpty(fallback))
+                {
+                    fallback = LibraryService.GetSuggestedSeriesNameFromDirectoryName(folder.Name);
+                }
+
+                var comic = await _libraryService.ImportLocalComicAsync(
+                    pending.FilePath,
+                    progress,
+                    fallback);
+
+                pending.IsProcessing = false;
+                pending.IsCompleted = true;
+                pending.Status = "Completed";
+                pending.Progress = 1.0;
+
+                if (!NewComics.Any(c => c.Id == comic.Id))
+                {
+                    NewComics.Insert(0, comic);
+                }
+
+                RefreshSeriesGroups();
+                ScheduleCompletedImportRemoval(pending);
+            }
+            catch (Exception ex)
+            {
+                pending.IsProcessing = false;
+                pending.IsFailed = true;
+                pending.Status = "Failed";
+                pending.ErrorMessage = ex.Message;
+                ErrorMessage = $"Failed to import '{pending.FileName}': {ex.Message}";
+            }
+        }
+    }
+
+    public async Task ScanBookmarkedFoldersAsync(IStorageProvider storageProvider)
+    {
+        if (!await _scanSemaphore.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            var folders = await _cloudLibraryService.GetBookmarkedFoldersAsync(storageProvider);
+            if (folders.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var folder in folders)
+            {
+                try
+                {
+                    var files = new List<IStorageFile>();
+                    await foreach (var file in _cloudLibraryService.EnumerateComicFilesAsync(folder))
+                    {
+                        files.Add(file);
+                    }
+
+                    if (files.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
+                    foreach (var file in files)
+                    {
+                        var sanitizedName = LibraryService.SanitizeFileName(file.Name);
+                        var targetPath = Path.Combine(_libraryService.ComicsDirectory, sanitizedName);
+
+                        if (!File.Exists(targetPath))
+                        {
+                            var copiedPath = await _cloudLibraryService.CopyToLocalDirectoryAsync(file, _libraryService.ComicsDirectory);
+                            if (!string.IsNullOrEmpty(copiedPath))
+                            {
+                                var fallback = LibraryService.GetSuggestedSeriesNameFromDirectoryName(folder.Name);
+                                var comic = await _libraryService.ImportLocalComicAsync(copiedPath, seriesNameFallback: fallback);
+                                
+                                Dispatcher.UIThread.Post(() =>
+                                {
+                                    if (!NewComics.Any(c => c.Id == comic.Id))
+                                    {
+                                        NewComics.Insert(0, comic);
+                                    }
+                                });
+                            }
+                        }
+                        else
+                        {
+                            var existing = await _databaseService.GetComicByFilePathAsync(targetPath);
+                            if (existing is null)
+                            {
+                                var fallback = LibraryService.GetSuggestedSeriesNameFromDirectoryName(folder.Name);
+                                var comic = await _libraryService.ImportLocalComicAsync(targetPath, seriesNameFallback: fallback);
+                                
+                                Dispatcher.UIThread.Post(() =>
+                                {
+                                    if (!NewComics.Any(c => c.Id == comic.Id))
+                                    {
+                                        NewComics.Insert(0, comic);
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        RefreshSeriesGroups();
+                        RefreshSectionVisibilityState();
+                    });
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Error scanning bookmarked folder '{folder.Name}': {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            _scanSemaphore.Release();
+        }
     }
 
     private async Task ImportFilesCoreAsync(

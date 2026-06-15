@@ -77,6 +77,11 @@ public class AppSettings
     public List<string> PermanentViewedLocalPaths { get; set; } = [];
 
     /// <summary>
+    /// Bookmarks for bookmarked cloud/external folders.
+    /// </summary>
+    public List<string> CloudFolderBookmarks { get; set; } = [];
+
+    /// <summary>
     /// Preferred reading mode for the comic reader
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<ReadingMode>))]
@@ -207,6 +212,7 @@ public class AppSettings
             IsUnlimitedUnlocked = IsUnlimitedUnlocked,
             PermanentViewedKomgaBookIds = PermanentViewedKomgaBookIds.ToList(),
             PermanentViewedLocalPaths = PermanentViewedLocalPaths.ToList(),
+            CloudFolderBookmarks = CloudFolderBookmarks.ToList(),
             AppTheme = AppTheme,
             PreferredReadingMode = PreferredReadingMode,
             Handedness = Handedness,

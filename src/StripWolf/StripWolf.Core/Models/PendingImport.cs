@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Core.Models;
@@ -36,6 +37,11 @@ public partial class PendingImport : ObservableObject
     /// The original file path
     /// </summary>
     public string FilePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The storage file object if importing from cloud/external folders
+    /// </summary>
+    public IStorageFile? StorageFile { get; set; }
 
     /// <summary>
     /// Import progress (0-1)

@@ -182,6 +182,7 @@ public partial class App : Application
         // Register services
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<SettingsService>();
+        services.AddSingleton<ICloudLibraryService, CloudLibraryService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<ComicReaderService>();
         services.AddSingleton<PanelDetectionService>();

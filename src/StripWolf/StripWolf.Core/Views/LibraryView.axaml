@@ -260,7 +260,7 @@
         <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="{Binding OpenFolder, Source={x:Static res:Loc.Instance}, StringFormat='{}📁 {0}'}" Command="{Binding OpenComicsDirectoryCommand}" 
                 Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
-        <Button Grid.Column="2" Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
+        <Button Grid.Column="2" Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" Padding="16,8" Margin="0,0,8,0"/>
         <Button Grid.Column="3" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
       </Grid>
     </Border>
@@ -369,7 +369,7 @@
                 <TextBlock Text="{Binding NoNewComicsHint, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                   <Button Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" HorizontalAlignment="Center"/>
-                  <Button Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" HorizontalAlignment="Center" IsVisible="{Binding IsDesktop}"/>
+                  <Button Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" HorizontalAlignment="Center"/>
                 </StackPanel>
               </StackPanel>
 

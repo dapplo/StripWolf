@@ -280,46 +280,43 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
     public async Task OpenFolderPickerAsync()
     {
         var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel is null)
+        if (topLevel is null || DataContext is not LibraryViewModel viewModel)
         {
             return;
         }
 
-        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Select Comic Folder",
-            AllowMultiple = false
-        });
-
-        if (folders.Count == 0 || DataContext is not LibraryViewModel viewModel)
+        var cloudLibraryService = App.Services?.GetService<ICloudLibraryService>();
+        if (cloudLibraryService is null)
         {
             return;
         }
 
-        var localPath = folders[0].TryGetLocalPath();
-        if (!string.IsNullOrWhiteSpace(localPath))
+        var folder = await cloudLibraryService.SelectAndBookmarkFolderAsync(topLevel.StorageProvider);
+        if (folder is null)
         {
-            var owner = topLevel as Window;
-            if (owner is null)
-            {
-                await viewModel.ImportDirectoryCommand.ExecuteAsync(localPath);
-                return;
-            }
+            return;
+        }
 
+        string? seriesName = null;
+        var owner = topLevel as Window;
+        if (owner is not null)
+        {
+            var folderName = folder.Name;
             var prompt = new DirectoryImportSeriesPromptWindow(
-                LibraryService.GetDirectoryDisplayName(localPath),
-                LibraryService.GetSuggestedSeriesNameFromDirectory(localPath));
+                folderName,
+                LibraryService.GetSuggestedSeriesNameFromDirectoryName(folderName));
             var promptResult = await prompt.ShowDialog<DirectoryImportSeriesPromptResult?>(owner);
             if (promptResult is null)
             {
                 return;
             }
-
-            await viewModel.ImportDirectoryWithOptionsAsync(
-                localPath,
-                promptResult.UseSeriesName ? promptResult.SeriesName : null,
-                suppressAutomaticDirectoryFallback: !promptResult.UseSeriesName);
+            if (promptResult.UseSeriesName)
+            {
+                seriesName = promptResult.SeriesName;
+            }
         }
+
+        await viewModel.ImportCloudFolderWithOptionsAsync(folder, seriesName);
     }
 
     /// <summary>
