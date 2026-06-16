@@ -38,7 +38,7 @@ public class AndroidFullScreenService : IFullScreenService
 
         activity.RunOnUiThread(() =>
         {
-            if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+            if (System.OperatingSystem.IsAndroidVersionAtLeast(30))
             {
                 SetFullScreenApi30(window, fullScreen);
             }
@@ -49,6 +49,7 @@ public class AndroidFullScreenService : IFullScreenService
         });
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("android30.0")]
     private static void SetFullScreenApi30(global::Android.Views.Window window, bool fullScreen)
     {
         var controller = window.InsetsController;
@@ -65,7 +66,7 @@ public class AndroidFullScreenService : IFullScreenService
         }
     }
 
-#pragma warning disable CA1416 // Validate platform compatibility – guarded by version check above
+#pragma warning disable CA1416, CS0618 // Validate platform compatibility – guarded by version check above
     private static void SetFullScreenLegacy(global::Android.Views.Window window, bool fullScreen)
     {
         var decorView = window.DecorView;
@@ -81,5 +82,5 @@ public class AndroidFullScreenService : IFullScreenService
                 (int)SystemUiFlags.LayoutHideNavigation)
             : StatusBarVisibility.Visible;
     }
-#pragma warning restore CA1416
+#pragma warning restore CA1416, CS0618
 }

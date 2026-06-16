@@ -15,7 +15,6 @@
     <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
     <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
     <AssemblyTitle>StripWolf.Core</AssemblyTitle>
-	  <IsPlayStoreBuild>true</IsPlayStoreBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseEpubSupport)' == 'false'">

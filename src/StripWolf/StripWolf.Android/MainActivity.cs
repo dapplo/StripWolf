@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -37,7 +37,7 @@ public class MainActivity : AvaloniaMainActivity
     /// <summary>
     /// The currently active <see cref="MainActivity"/> instance.
     /// Used by platform services (e.g. <see cref="Services.AndroidFullScreenService"/>) that need
-    /// access to the Android <see cref="Android.App.Activity.Window"/>.
+    /// access to the Android Window.
     /// </summary>
     public static MainActivity? Current { get; private set; }
 
