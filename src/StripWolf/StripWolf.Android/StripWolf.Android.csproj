@@ -53,6 +53,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" />
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" UndefineProperties="RuntimeIdentifier" />
   </ItemGroup>
 </Project>
