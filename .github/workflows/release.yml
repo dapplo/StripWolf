@@ -359,9 +359,11 @@ jobs:
 
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v2
-        if: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY != '' }}
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_KEY != '' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY }}
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY }}
+          serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_KEY }}
           packageName: com.dapplo.StripWolf
           releaseFiles: release-artifacts/*.aab
           track: internal
