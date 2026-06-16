@@ -16,18 +16,18 @@ jobs:
       hash: ${{ steps.version.outputs.hash }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v3
+        uses: gittools/actions/gitversion/setup@v4
         with:
           versionSpec: '6.x'
 
       - name: Determine Version
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v3
+        uses: gittools/actions/gitversion/execute@v4
 
       - name: Generate version
         id: version
@@ -63,7 +63,7 @@ jobs:
           fi
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}-g${{ steps.version.outputs.hash }}
@@ -78,12 +78,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -97,7 +97,7 @@ jobs:
         run: Compress-Archive -Path publish/windows/* -DestinationPath StripWolf-Windows-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.zip
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: StripWolf-Windows-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.zip
@@ -110,12 +110,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -129,7 +129,7 @@ jobs:
         run: tar -czvf StripWolf-Linux-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/linux .
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: StripWolf-Linux-x64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz
@@ -142,12 +142,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -237,7 +237,7 @@ jobs:
         run: tar -czvf StripWolf-macOS-arm64-${{ needs.prepare.outputs.version }}-g${{ needs.prepare.outputs.hash }}.tar.gz -C publish/macos-arm64 StripWolf.app
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: |
@@ -252,12 +252,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -293,8 +293,8 @@ jobs:
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-arm64 -o publish/android-arm64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
             -p:RuntimeIdentifier=android-arm64 \
-            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
-            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
+            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
+            -p:GitVersion_SemVer="$GitVersion_SemVer"
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -304,8 +304,8 @@ jobs:
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-x64 -o publish/android-x64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
             -p:RuntimeIdentifier=android-x64 \
-            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
-            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
+            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
+            -p:GitVersion_SemVer="$GitVersion_SemVer"
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -317,9 +317,9 @@ jobs:
             -p:AndroidPackageFormat=aab \
             -p:AndroidCreatePackagePerAbi=false \
             -p:IsPlayStoreBuild=true \
-            -p:RuntimeIdentifiers="android-arm64;android-x64" \
-            -p:GitVersion_CommitsSinceVersionSource=${{ steps.gitversion.outputs.commitsSinceVersionSource }} \
-            -p:GitVersion_SemVer=${{ steps.gitversion.outputs.semVer }}
+            -p:RuntimeIdentifiers='"android-arm64;android-x64"' \
+            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
+            -p:GitVersion_SemVer="$GitVersion_SemVer"
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -347,7 +347,7 @@ jobs:
           fi
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: |
