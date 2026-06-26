@@ -18,13 +18,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia;
+using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
 using StripWolf.Core.Services;
+using System;
 using System.Diagnostics;
+using System.IO;
 
 namespace StripWolf.Core.ViewModels;
 
@@ -51,6 +54,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly KomgaSyncService _komgaSyncService;
     private readonly UpdateService _updateService;
     private readonly TrialService _trialService;
+    private readonly LibraryService _libraryService;
+    private readonly ICloudLibraryService _cloudLibraryService;
     private bool _isInitializing = true;
     private bool _isApplyingWelcomePreferences;
     private bool _shouldStartWelcomeAfterInitialization;
@@ -110,7 +115,9 @@ public partial class MainViewModel : ViewModelBase
         IExternalLinkService externalLinkService,
         KomgaSyncService komgaSyncService,
         UpdateService updateService,
-        TrialService trialService)
+        TrialService trialService,
+        LibraryService libraryService,
+        ICloudLibraryService cloudLibraryService)
     {
         _libraryViewModel = libraryViewModel;
         _komgaViewModel = komgaViewModel;
@@ -123,6 +130,8 @@ public partial class MainViewModel : ViewModelBase
         _komgaSyncService = komgaSyncService;
         _updateService = updateService;
         _trialService = trialService;
+        _libraryService = libraryService;
+        _cloudLibraryService = cloudLibraryService;
         
         _trialService.PremiumUnlockRequested += (s, e) => ShowPremiumUnlockDialog = true;
         
@@ -707,5 +716,65 @@ public partial class MainViewModel : ViewModelBase
     {
         await _trialService.UnlockPremiumAsync();
         ShowPremiumUnlockDialog = false;
+    }
+
+    /// <summary>
+    /// Open a file path in the reader, importing it first if necessary.
+    /// </summary>
+    public async Task OpenFileAsync(string filePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !ComicConstants.IsSupportedComicFile(filePath))
+            {
+                return;
+            }
+
+            // If already open in the reader, do nothing
+            if (IsInReader && _readerViewModel.Comic?.FilePath != null && 
+                string.Equals(_readerViewModel.Comic.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var comic = await _libraryService.ImportLocalComicAsync(filePath);
+            await OpenReaderAsync(comic.Id);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to open file: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Open an IStorageFile, streaming/copying it locally first if needed.
+    /// </summary>
+    public async Task OpenStorageFileAsync(IStorageFile file)
+    {
+        try
+        {
+            if (file is null)
+            {
+                return;
+            }
+
+            var localPath = file.TryGetLocalPath();
+            if (string.IsNullOrEmpty(localPath) || !File.Exists(localPath))
+            {
+                // Copy/stream to the local comics directory
+                localPath = await _cloudLibraryService.CopyToLocalDirectoryAsync(file, _libraryService.ComicsDirectory);
+            }
+
+            if (string.IsNullOrEmpty(localPath) || !File.Exists(localPath))
+            {
+                return;
+            }
+
+            await OpenFileAsync(localPath);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to open storage file: {ex.Message}");
+        }
     }
 }

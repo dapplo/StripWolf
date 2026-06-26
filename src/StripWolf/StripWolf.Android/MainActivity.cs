@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Avalonia.Android;
@@ -31,7 +32,46 @@ namespace StripWolf.Core.Android;
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@drawable/icon",
     MainLauncher = true,
+    LaunchMode = LaunchMode.SingleTask,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/pdf")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/epub+zip")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/x-cbz")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/x-cbr")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/octet-stream",
+    DataPathPatterns = new[] { ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub" })]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "*/*",
+    DataPathPatterns = new[] { ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub" })]
 public class MainActivity : AvaloniaMainActivity
 {
     /// <summary>

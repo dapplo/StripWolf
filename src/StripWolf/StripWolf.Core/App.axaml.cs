@@ -27,6 +27,7 @@ using StripWolf.Core.Services;
 using StripWolf.Core.ViewModels;
 using StripWolf.Core.Views;
 using Microsoft.Extensions.DependencyInjection;
+using Avalonia.Platform.Storage;
 
 namespace StripWolf;
 
@@ -102,6 +103,20 @@ public partial class App : Application
             {
                 await mainViewModel.OnShutdownAsync();
             };
+
+            // Handle command line arguments for opening files at startup
+            if (desktop.Args is { Length: > 0 })
+            {
+                var filePath = desktop.Args[0];
+                if (!string.IsNullOrWhiteSpace(filePath))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500);
+                        await mainViewModel.OpenFileAsync(filePath);
+                    });
+                }
+            }
         }
         else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
         {
@@ -125,6 +140,21 @@ public partial class App : Application
                 if (e.Kind == ActivationKind.Background)
                 {
                     await mainViewModel.OnAppResumedAsync();
+                }
+                else if (e is FileActivatedEventArgs fileArgs)
+                {
+                    if (fileArgs.Files is { Count: > 0 })
+                    {
+                        var firstFile = fileArgs.Files.OfType<IStorageFile>().FirstOrDefault();
+                        if (firstFile is not null)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(500);
+                                await mainViewModel.OpenStorageFileAsync(firstFile);
+                            });
+                        }
+                    }
                 }
             };
         }

@@ -21,9 +21,9 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
     <PackageVersion Include="Microsoft.XmlSerializer.Generator" Version="10.0.8" />
-    <PackageVersion Include="PDFiumCore" Version="150.0.7869" />
+    <PackageVersion Include="PDFiumCore" Version="151.0.7891" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="4.0.0" />
-    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.2" />
     <PackageVersion Include="VersOne.Epub" Version="3.3.6" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.2.0.2" />
     <!-- For SQLite local storage -->
@@ -37,8 +37,8 @@
     <PackageVersion Include="OpenCvSharp4.runtime.ubuntu.22.04-x64" Version="4.6.0.20220608" />
     <PackageVersion Include="OpenCvSharp4.runtime.osx-arm64" Version="4.6.0.20230105" />
     <PackageVersion Include="OpenCvSharp4.runtime.osx-x64" Version="4.6.0.20230105" />
-    <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" Version="4.11.0.35" />
-    <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-x64" Version="4.11.0.35" />
+    <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" Version="4.13.0.45" />
+    <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-x64" Version="4.13.0.45" />
     <PackageVersion Include="GitVersion.MsBuild" Version="6.7.0" />
   </ItemGroup>
 </Project>
