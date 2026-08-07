@@ -56,6 +56,7 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
     <PackageReference Include="Tmds.DBus.Protocol" />
     <PackageReference Include="PDFiumCore" />
     <PackageReference Include="GitVersion.MsBuild">

@@ -47,10 +47,10 @@
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
     <PackageReference Include="VersOne.Epub" />
     <!-- For SQLite local storage -->
     <PackageReference Include="sqlite-net-pcl" />
-    <PackageReference Include="SQLitePCLRaw.bundle_green" />
     <!-- For CBR (RAR) file support -->
     <PackageReference Include="SharpCompress" />
     <PackageReference Include="GitVersion.MsBuild">

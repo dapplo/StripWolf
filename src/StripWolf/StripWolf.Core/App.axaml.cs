@@ -28,11 +28,14 @@ using StripWolf.Core.ViewModels;
 using StripWolf.Core.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Avalonia.Platform.Storage;
+using System.Threading;
 
 namespace StripWolf;
 
 public partial class App : Application
 {
+    private Mutex? _stripWolfMutex;
+
     public static IServiceProvider? Services { get; private set; }
 
     /// <summary>
@@ -90,6 +93,46 @@ public partial class App : Application
 
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
 
+        if (OperatingSystem.IsWindows())
+        {
+            _stripWolfMutex = new Mutex(true, @"Local\StripWolf_Mutex", out var createdNew);
+            if (!createdNew)
+            {
+                // Another instance of StripWolf is running.
+                // If launched with command-line arguments, forward it to the running instance and exit.
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopArgs && desktopArgs.Args is { Length: > 0 })
+                {
+                    var filePath = desktopArgs.Args[0];
+                    if (!string.IsNullOrWhiteSpace(filePath))
+                    {
+                        try
+                        {
+                            filePath = Path.GetFullPath(filePath);
+                        }
+                        catch { }
+
+                        ForwardPathToRunningInstance(filePath);
+                    }
+                }
+
+                // Close this duplicate instance
+                _stripWolfMutex.Dispose();
+                _stripWolfMutex = null;
+                Environment.Exit(0);
+                return;
+            }
+
+            var activationManager = Services.GetRequiredService<ActivationManager>();
+            activationManager.PathReceived += (path) =>
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                {
+                    await mainViewModel.OpenFileAsync(path);
+                });
+            };
+            activationManager.StartServer();
+        }
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow
@@ -102,6 +145,12 @@ public partial class App : Application
             desktop.ShutdownRequested += async (sender, args) =>
             {
                 await mainViewModel.OnShutdownAsync();
+
+                if (OperatingSystem.IsWindows())
+                {
+                    Services?.GetService<ActivationManager>()?.StopServer();
+                    _stripWolfMutex?.Dispose();
+                }
             };
 
             // Handle command line arguments for opening files at startup
@@ -164,6 +213,22 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
     
+    private void ForwardPathToRunningInstance(string filePath)
+    {
+        try
+        {
+            using var pipeClient = new System.IO.Pipes.NamedPipeClientStream(".", "StripWolf_Activation_Pipe", System.IO.Pipes.PipeDirection.Out);
+            pipeClient.Connect(1000); // 1-second timeout
+            using var writer = new StreamWriter(pipeClient, System.Text.Encoding.UTF8);
+            writer.WriteLine($"OPEN:{filePath}");
+            writer.Flush();
+        }
+        catch
+        {
+            // Ignore
+        }
+    }
+
     /// <summary>
     /// Apply saved language settings before UI creation
     /// </summary>
@@ -199,12 +264,15 @@ public partial class App : Application
 
     private void ApplyTheme(AppThemePreference theme)
     {
-        RequestedThemeVariant = theme switch
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            AppThemePreference.Light => ThemeVariant.Light,
-            AppThemePreference.Dark => ThemeVariant.Dark,
-            _ => ThemeVariant.Default
-        };
+            RequestedThemeVariant = theme switch
+            {
+                AppThemePreference.Light => ThemeVariant.Light,
+                AppThemePreference.Dark => ThemeVariant.Dark,
+                _ => ThemeVariant.Default
+            };
+        });
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -222,6 +290,7 @@ public partial class App : Application
         services.AddSingleton<UpdateService>();
         services.AddSingleton<IAppEventsService, AppEventsService>();
         services.AddSingleton<TrialService>();
+        services.AddSingleton<ActivationManager>();
 
         if (RegisterBillingService != null)
         {

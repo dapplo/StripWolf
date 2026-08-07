@@ -67,7 +67,9 @@ public partial class NormalReadingView : UserControl
             {
                 if (e.Property == ScrollViewer.ViewportProperty) UpdateImageSize();
             };
+            _imageScroller.SizeChanged += (s, e) => UpdateImageSize();
         }
+        this.SizeChanged += (s, e) => UpdateImageSize();
     }
 
     private void EnsureControls()

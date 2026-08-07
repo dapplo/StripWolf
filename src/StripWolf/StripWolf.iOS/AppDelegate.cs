@@ -1,4 +1,4 @@
-﻿// StripWolf - an open source comic book reader
+// StripWolf - an open source comic book reader
 // Copyright (C) 2026 Dapplo - Robin Krom
 //
 // For more information see: https://github.com/dapplo/StripWolf
@@ -23,6 +23,7 @@ using Avalonia;
 using Avalonia.iOS;
 using Microsoft.Extensions.DependencyInjection;
 using StripWolf.Core.ViewModels;
+using StripWolf.Core.Services;
 
 namespace StripWolf.Core.iOS;
 
@@ -34,8 +35,15 @@ public partial class AppDelegate : AvaloniaAppDelegate<App>
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
         // Register iOS-specific services here if needed
-        // App.RegisterPdfRenderer = ...
-        // App.RegisterWebViewSnapshotService = ...
+        App.RegisterPdfRenderer = services =>
+        {
+            services.AddSingleton<IPdfRenderer, Services.IosPdfRenderer>();
+        };
+
+        App.RegisterFullScreenService = services =>
+        {
+            services.AddSingleton<IFullScreenService, Services.IosFullScreenService>();
+        };
         
         return base.CustomizeAppBuilder(builder)
             .WithInterFont();
