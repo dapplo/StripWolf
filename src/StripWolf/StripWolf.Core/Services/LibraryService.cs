@@ -825,7 +825,11 @@ public class LibraryService
         });
     }
 
-    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage, DateTime? lastModified = null, bool? isCompletedOverride = null)
+    /// <param name="notifyLibraryChanged">
+    /// The reader passes false: it saves the progress on every page turn, and a LibraryChanged event makes the
+    /// library reload all its sections each time. The library is refreshed when the reader is closed.
+    /// </param>
+    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage, DateTime? lastModified = null, bool? isCompletedOverride = null, bool notifyLibraryChanged = true)
     {
         if (comic.PageCount <= 0)
         {
@@ -863,7 +867,10 @@ public class LibraryService
             comic.KomgaSyncStatus = "Pending sync";
         }
 
-        OnLibraryChanged();
+        if (notifyLibraryChanged)
+        {
+            OnLibraryChanged();
+        }
     }
 
     public Task<EpubConversionState?> GetEpubConversionStateAsync(int comicId)

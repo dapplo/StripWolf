@@ -21,6 +21,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
@@ -48,6 +49,7 @@ public partial class GuidedReadingView : ZoomViewBase
         InitializeZoomLogic();
     }
 
+    private static readonly IImmutableSolidColorBrush CurrentPanelFill = new ImmutableSolidColorBrush(Colors.Yellow, 0.2);
     private Rectangle? _zoomRect;
     private readonly List<Rectangle> _panelRects = new();
 
@@ -86,7 +88,7 @@ public partial class GuidedReadingView : ZoomViewBase
                 
                 rect.Stroke = isCurrent ? Brushes.Yellow : Brushes.Blue;
                 rect.StrokeThickness = isCurrent ? 3 : 1;
-                rect.Fill = isCurrent ? new SolidColorBrush(Colors.Yellow, 0.2) : Brushes.Transparent;
+                rect.Fill = isCurrent ? CurrentPanelFill : Brushes.Transparent;
                 rect.Width = panel.Width * canvas.Width;
                 rect.Height = panel.Height * canvas.Height;
                 Canvas.SetLeft(rect, panel.X * canvas.Width);
@@ -130,13 +132,6 @@ public partial class GuidedReadingView : ZoomViewBase
         return false;
     }
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        if (change.Property.Name == "Bounds")
-        {
-            UpdateZoomRegion();
-        }
-    }
+    // Note: the former OnPropertyChanged("Bounds") override was removed, ZoomViewBase already updates on SizeChanged.
 }
 

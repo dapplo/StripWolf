@@ -100,7 +100,10 @@ public class KomgaApiService : IDisposable
         _httpClient = new HttpClient(backgroundHandler)
         {
             BaseAddress = new Uri(NormalizeServerBaseUrl(server.BaseUrl).TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromMinutes(20)
+            // Was 20 minutes, which made every call against an unreachable server hang for that long.
+            // Book downloads use HttpCompletionOption.ResponseHeadersRead, the timeout then only covers the time
+            // until the response headers arrive, not the download of the body.
+            Timeout = TimeSpan.FromMinutes(2)
         };
         
         _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -194,7 +197,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -233,7 +236,7 @@ public class KomgaApiService : IDisposable
             url += $"&search_regex={Uri.EscapeDataString(regex + ",TITLE")}";
         }
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -250,7 +253,7 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/series?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -267,7 +270,7 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/books?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -281,7 +284,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -302,7 +305,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/series/{seriesId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -322,7 +325,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -368,7 +371,7 @@ public class KomgaApiService : IDisposable
             url += $"&library_id={libraryId}";
         }
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -382,7 +385,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -403,7 +406,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -419,7 +422,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -433,7 +436,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}", HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -452,9 +455,11 @@ public class KomgaApiService : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         
+        // The response is not disposed on success: the caller owns the returned content stream
         var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
+            response.Dispose();
             return null;
         }
         
@@ -756,7 +761,7 @@ public class KomgaApiService : IDisposable
         var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadProgressUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         
-        var response = await _httpClient!.PatchAsync($"api/v1/books/{bookId}/read-progress", content);
+        using var response = await _httpClient!.PatchAsync($"api/v1/books/{bookId}/read-progress", content);
         return response.IsSuccessStatusCode;
     }
 
@@ -777,7 +782,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.DeleteAsync($"api/v1/books/{bookId}/read-progress");
+        using var response = await _httpClient!.DeleteAsync($"api/v1/books/{bookId}/read-progress");
         return response.IsSuccessStatusCode;
     }
 
@@ -794,7 +799,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/readlists?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -834,7 +839,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -864,7 +869,7 @@ public class KomgaApiService : IDisposable
         var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadListUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
+        using var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
         return response.IsSuccessStatusCode;
         }
 
@@ -877,7 +882,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/readlists/{readListId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -893,7 +898,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -921,7 +926,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books?page={page}&size={size}&read_status=IN_PROGRESS&sort=readProgress.lastModified,desc";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -937,7 +942,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/ondeck?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -953,7 +958,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -969,7 +974,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/series/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();

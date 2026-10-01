@@ -197,7 +197,9 @@ public class AppSettings
                 Password = s.Password,
                 ApiKey = s.ApiKey,
                 CustomHeaders = s.CustomHeaders.Select(h => new KomgaHeader { Name = h.Name, Value = h.Value }).ToList(),
-                LastConnected = s.LastConnected
+                LastConnected = s.LastConnected,
+                // Was missing: the "bypass SSL validation" option was lost on every load/save
+                BypassSslValidation = s.BypassSslValidation
             }).ToList(),
             ActiveServerId = ActiveServerId,
             LastOpenedComicPath = LastOpenedComicPath,

@@ -38,12 +38,18 @@ public class AsyncImage : Control
     // This is the recommended pattern for HttpClient as per Microsoft guidelines.
     // The client is never disposed as it's shared across all AsyncImage instances.
     private static readonly HttpClient SharedHttpClient;
-    private static readonly LruCache<string, Bitmap> LocalBitmapCache = new(200); // Cache up to 200 bitmaps
-    private static readonly SemaphoreSlim BitmapDecodeSemaphore = new(1, 1);
+    private static readonly SharedBitmapCache LocalBitmapCache = new(200); // Cache up to 200 bitmaps
+    // Decoding happens on the thread pool now (it used to run on the UI thread), allow a little parallelism
+    private static readonly SemaphoreSlim BitmapDecodeSemaphore = new(2, 2);
+    // Small debounce so items which are only scrolled past quickly don't read and decode their image
     private const int UncachedLocalLoadDelayMs = 150;
+    // Covers/thumbnails never need to be larger than this (in pixels), large originals (e.g. EPUB covers)
+    // are decoded at this width instead of their full size.
+    private const int MaxDecodeWidth = 600;
     
     private Bitmap? _loadedBitmap;
     private bool _ownsLoadedBitmap;
+    private SharedBitmapCache.Entry? _sharedEntry;
     private bool _isLoading;
     private int _loadVersion;
     private int _activeLoadVersion;
@@ -243,14 +249,11 @@ public class AsyncImage : Control
                     await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
                     try
                     {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        if (!IsStale(loadVersion))
                         {
-                            if (!IsStale(loadVersion))
-                            {
-                                using var stream = new MemoryStream(imageBytes, writable: false);
-                                bitmap = new Bitmap(stream);
-                            }
-                        }, DispatcherPriority.ContextIdle);
+                            // Decode on a background thread, bitmaps can be created off the UI thread
+                            bitmap = await Task.Run(() => DecodeThumbnail(imageBytes), cancellationToken);
+                        }
                     }
                     finally
                     {
@@ -284,14 +287,16 @@ public class AsyncImage : Control
         }
         else
         {
-            if (LocalBitmapCache.TryGetValue(SourceUrl, out var cachedBitmap))
+            var sourceUrl = SourceUrl;
+            if (LocalBitmapCache.TryAcquire(sourceUrl, out var cachedEntry))
             {
                 if (!IsStale(loadVersion))
                 {
-                    _loadedBitmap = cachedBitmap;
-                    _ownsLoadedBitmap = false;
-                    IsImageLoaded = true;
-                    InvalidateVisual();
+                    SetSharedBitmap(cachedEntry);
+                }
+                else
+                {
+                    LocalBitmapCache.Release(cachedEntry);
                 }
                 return;
             }
@@ -307,26 +312,19 @@ public class AsyncImage : Control
                 return;
             }
 
-            var imageBytes = await File.ReadAllBytesAsync(SourceUrl, cancellationToken);
-            Bitmap? sharedBitmap = null;
+            var imageBytes = await File.ReadAllBytesAsync(sourceUrl, cancellationToken);
+            SharedBitmapCache.Entry sharedEntry;
             await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
             try
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                if (IsStale(loadVersion))
                 {
-                    if (IsStale(loadVersion))
-                    {
-                        return;
-                    }
+                    return;
+                }
 
-                    using var stream = new MemoryStream(imageBytes, writable: false);
-                    var bitmap = new Bitmap(stream);
-                    sharedBitmap = LocalBitmapCache.GetOrAdd(SourceUrl, bitmap);
-                    if (!ReferenceEquals(sharedBitmap, bitmap))
-                    {
-                        bitmap.Dispose();
-                    }
-                }, DispatcherPriority.ContextIdle);
+                // Decode on a background thread (this used to run on the UI thread and caused scroll stutter)
+                var bitmap = await Task.Run(() => DecodeThumbnail(imageBytes), cancellationToken);
+                sharedEntry = LocalBitmapCache.AddOrAcquire(sourceUrl, bitmap);
             }
             finally
             {
@@ -337,74 +335,157 @@ public class AsyncImage : Control
             {
                 if (!IsStale(loadVersion))
                 {
-                    _loadedBitmap = sharedBitmap;
-                    _ownsLoadedBitmap = false;
-                    IsImageLoaded = true;
-                    InvalidateVisual();
+                    SetSharedBitmap(sharedEntry);
+                }
+                else
+                {
+                    LocalBitmapCache.Release(sharedEntry);
                 }
             });
         }
     }
 
-    private class LruCache<TKey, TValue> where TKey : notnull where TValue : IDisposable
+    private void SetSharedBitmap(SharedBitmapCache.Entry entry)
     {
-        private readonly int _capacity;
-        private readonly ConcurrentDictionary<TKey, LinkedListNode<CacheEntry>> _dictionary = new();
-        private readonly LinkedList<CacheEntry> _list = new();
-        private readonly object _lock = new();
+        if (_sharedEntry is not null)
+        {
+            LocalBitmapCache.Release(_sharedEntry);
+        }
+        _sharedEntry = entry;
+        _loadedBitmap = entry.Bitmap;
+        _ownsLoadedBitmap = false;
+        IsImageLoaded = true;
+        InvalidateVisual();
+    }
 
-        public LruCache(int capacity)
+    /// <summary>
+    /// Decode an image for display as a cover/thumbnail, large images are decoded at a reduced width.
+    /// </summary>
+    private static Bitmap DecodeThumbnail(byte[] imageBytes)
+    {
+        using var stream = new MemoryStream(imageBytes, writable: false);
+        try
+        {
+            var info = SixLabors.ImageSharp.Image.Identify(imageBytes.AsSpan());
+            if (info.Width > MaxDecodeWidth)
+            {
+                return Bitmap.DecodeToWidth(stream, MaxDecodeWidth, BitmapInterpolationMode.HighQuality);
+            }
+        }
+        catch
+        {
+            // Format unknown to ImageSharp, decode normally
+        }
+
+        stream.Position = 0;
+        return new Bitmap(stream);
+    }
+
+    /// <summary>
+    /// LRU cache of decoded local images, shared between AsyncImage instances.
+    /// Entries are reference counted: the previous cache disposed evicted bitmaps even when another AsyncImage
+    /// was still displaying it, which throws an ObjectDisposedException in the next render pass.
+    /// </summary>
+    private sealed class SharedBitmapCache
+    {
+        public sealed class Entry
+        {
+            public Entry(string key, Bitmap bitmap)
+            {
+                Key = key;
+                Bitmap = bitmap;
+            }
+
+            public string Key { get; }
+            public Bitmap Bitmap { get; }
+            internal int RefCount;
+            internal bool IsEvicted;
+            internal LinkedListNode<Entry>? Node;
+        }
+
+        private readonly int _capacity;
+        private readonly Dictionary<string, Entry> _dictionary = new();
+        private readonly LinkedList<Entry> _list = new();
+        private readonly Lock _lock = new();
+
+        public SharedBitmapCache(int capacity)
         {
             _capacity = capacity;
         }
 
-        public bool TryGetValue(TKey key, out TValue value)
-        {
-            if (_dictionary.TryGetValue(key, out var node))
-            {
-                lock (_lock)
-                {
-                    _list.Remove(node);
-                    _list.AddFirst(node);
-                }
-                value = node.Value.Value;
-                return true;
-            }
-
-            value = default!;
-            return false;
-        }
-
-        public TValue GetOrAdd(TKey key, TValue value)
+        public bool TryAcquire(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Entry? entry)
         {
             lock (_lock)
             {
-                if (_dictionary.TryGetValue(key, out var existingNode))
+                if (_dictionary.TryGetValue(key, out entry))
                 {
-                    _list.Remove(existingNode);
-                    _list.AddFirst(existingNode);
-                    return existingNode.Value.Value;
+                    MoveToFront(entry);
+                    entry.RefCount++;
+                    return true;
+                }
+            }
+
+            entry = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Add the bitmap (or use the entry another load added in the meantime) and acquire a reference.
+        /// </summary>
+        public Entry AddOrAcquire(string key, Bitmap bitmap)
+        {
+            lock (_lock)
+            {
+                if (_dictionary.TryGetValue(key, out var existing))
+                {
+                    bitmap.Dispose();
+                    MoveToFront(existing);
+                    existing.RefCount++;
+                    return existing;
                 }
 
-                if (_dictionary.Count >= _capacity)
+                while (_dictionary.Count >= _capacity && _list.Last is { } last)
                 {
-                    var last = _list.Last;
-                    if (last != null)
+                    var evicted = last.Value;
+                    _list.RemoveLast();
+                    evicted.Node = null;
+                    _dictionary.Remove(evicted.Key);
+                    evicted.IsEvicted = true;
+                    if (evicted.RefCount == 0)
                     {
-                        _list.RemoveLast();
-                        _dictionary.TryRemove(last.Value.Key, out _);
-                        last.Value.Value.Dispose();
+                        evicted.Bitmap.Dispose();
                     }
                 }
 
-                var newNode = new LinkedListNode<CacheEntry>(new CacheEntry(key, value));
-                _list.AddFirst(newNode);
-                _dictionary[key] = newNode;
-                return value;
+                var entry = new Entry(key, bitmap) { RefCount = 1 };
+                entry.Node = _list.AddFirst(entry);
+                _dictionary[key] = entry;
+                return entry;
             }
         }
 
-        private record CacheEntry(TKey Key, TValue Value);
+        public void Release(Entry entry)
+        {
+            lock (_lock)
+            {
+                if (entry.RefCount > 0)
+                {
+                    entry.RefCount--;
+                }
+
+                if (entry.IsEvicted && entry.RefCount == 0)
+                {
+                    entry.Bitmap.Dispose();
+                }
+            }
+        }
+
+        private void MoveToFront(Entry entry)
+        {
+            if (entry.Node is null) return;
+            _list.Remove(entry.Node);
+            _list.AddFirst(entry.Node);
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -564,6 +645,12 @@ public class AsyncImage : Control
         if (_ownsLoadedBitmap)
         {
             _loadedBitmap?.Dispose();
+        }
+
+        if (_sharedEntry is not null)
+        {
+            LocalBitmapCache.Release(_sharedEntry);
+            _sharedEntry = null;
         }
 
         _loadedBitmap = null;

@@ -78,21 +78,13 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
+    private Task _initializationTask = Task.CompletedTask;
+
     public override void OnFrameworkInitializationCompleted()
     {
-        // Set up dependency injection
-        var services = new ServiceCollection();
-        ConfigureServices(services);
-        Services = services.BuildServiceProvider();
-
-        EpubToCbzConverterService.CleanupTemporaryDirectories();
-        
-        // Apply saved language settings before creating any UI
-        ApplyLanguageSettings();
-        ApplyThemeSettings();
-
-        var mainViewModel = Services.GetRequiredService<MainViewModel>();
-
+        // Check for a running instance *before* building the service provider and cleaning up temp directories:
+        // a second instance only forwards its argument and exits, it should not pay the startup cost, and must not
+        // delete temporary directories which the running instance is using.
         if (OperatingSystem.IsWindows())
         {
             _stripWolfMutex = new Mutex(true, @"Local\StripWolf_Mutex", out var createdNew);
@@ -121,7 +113,25 @@ public partial class App : Application
                 Environment.Exit(0);
                 return;
             }
+        }
 
+        // Set up dependency injection
+        var services = new ServiceCollection();
+        ConfigureServices(services);
+        Services = services.BuildServiceProvider();
+
+        // Only the first instance cleans up (see the mutex check above). This must finish before a comic can be
+        // opened, otherwise it could delete the temporary directory of an EPUB reading session.
+        EpubToCbzConverterService.CleanupTemporaryDirectories();
+        
+        // Apply saved language settings before creating any UI
+        ApplyLanguageSettings();
+        ApplyThemeSettings();
+
+        var mainViewModel = Services.GetRequiredService<MainViewModel>();
+
+        if (OperatingSystem.IsWindows())
+        {
             var activationManager = Services.GetRequiredService<ActivationManager>();
             activationManager.PathReceived += (path) =>
             {
@@ -141,15 +151,39 @@ public partial class App : Application
             };
             App.TopLevel = desktop.MainWindow;
             
-            // Handle shutdown to delete pending comics
+            // Handle shutdown to delete pending comics.
+            // The handler is async void: without cancelling the shutdown the process ended at the first await,
+            // so pending deletes were cut off (and the deleted comics came back on the next start).
+            var shutdownCleanupDone = false;
             desktop.ShutdownRequested += async (sender, args) =>
             {
-                await mainViewModel.OnShutdownAsync();
-
-                if (OperatingSystem.IsWindows())
+                if (shutdownCleanupDone)
                 {
-                    Services?.GetService<ActivationManager>()?.StopServer();
-                    _stripWolfMutex?.Dispose();
+                    return;
+                }
+
+                args.Cancel = true;
+                try
+                {
+                    var cleanupTask = mainViewModel.OnShutdownAsync();
+                    // Never hang on exit
+                    await Task.WhenAny(cleanupTask, Task.Delay(TimeSpan.FromSeconds(5)));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"App: Shutdown cleanup failed: {ex.Message}");
+                }
+                finally
+                {
+                    if (OperatingSystem.IsWindows())
+                    {
+                        Services?.GetService<ActivationManager>()?.StopServer();
+                        _stripWolfMutex?.Dispose();
+                        _stripWolfMutex = null;
+                    }
+
+                    shutdownCleanupDone = true;
+                    desktop.Shutdown();
                 }
             };
 
@@ -159,10 +193,21 @@ public partial class App : Application
                 var filePath = desktop.Args[0];
                 if (!string.IsNullOrWhiteSpace(filePath))
                 {
-                    _ = Task.Run(async () =>
+                    // Run on the UI thread (OpenFileAsync changes view model state which is bound to the UI,
+                    // from a Task.Run this failed with an invalid thread exception which was swallowed),
+                    // after the main view model finished initializing.
+                    Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                     {
-                        await Task.Delay(500);
-                        await mainViewModel.OpenFileAsync(filePath);
+                        try
+                        {
+                            await _initializationTask;
+                            await Task.Delay(500);
+                            await mainViewModel.OpenFileAsync(filePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"App: Failed to open '{filePath}': {ex.Message}");
+                        }
                     });
                 }
             }
@@ -188,7 +233,15 @@ public partial class App : Application
             {
                 if (e.Kind == ActivationKind.Background)
                 {
-                    await mainViewModel.OnAppResumedAsync();
+                    // async void handler: an exception must not crash the app when it is resumed
+                    try
+                    {
+                        await mainViewModel.OnAppResumedAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"App: Resume handling failed: {ex.Message}");
+                    }
                 }
                 else if (e is FileActivatedEventArgs fileArgs)
                 {
@@ -197,10 +250,19 @@ public partial class App : Application
                         var firstFile = fileArgs.Files.OfType<IStorageFile>().FirstOrDefault();
                         if (firstFile is not null)
                         {
-                            _ = Task.Run(async () =>
+                            // See above: must run on the UI thread, after initialization
+                            Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                             {
-                                await Task.Delay(500);
-                                await mainViewModel.OpenStorageFileAsync(firstFile);
+                                try
+                                {
+                                    await _initializationTask;
+                                    await Task.Delay(500);
+                                    await mainViewModel.OpenStorageFileAsync(firstFile);
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"App: Failed to open activated file: {ex.Message}");
+                                }
                             });
                         }
                     }
@@ -208,7 +270,7 @@ public partial class App : Application
             };
         }
 
-        _ = mainViewModel.InitializeAsync();
+        _initializationTask = mainViewModel.InitializeAsync();
 
         base.OnFrameworkInitializationCompleted();
     }

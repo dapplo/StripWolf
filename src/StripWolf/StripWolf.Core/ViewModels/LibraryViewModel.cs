@@ -208,8 +208,9 @@ public partial class LibraryViewModel : ViewModelBase
             });
         };
         
-        // Refresh when library changes
-        _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
+        // Refresh when library changes. LibraryChanged is also raised from background threads (EPUB conversion,
+        // folder scans), the refresh touches observable collections and must run on the UI thread.
+        _libraryService.LibraryChanged += (s, e) => Dispatcher.UIThread.Post(() => _ = RefreshAsync());
     }
 
     private void RefreshLocalization()
@@ -350,6 +351,9 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private Comic? _comicPendingDeletion;
 
+    private static readonly TimeSpan BackgroundMaintenanceInterval = TimeSpan.FromMinutes(5);
+    private DateTime _lastBackgroundMaintenance = DateTime.MinValue;
+
     [RelayCommand]
     private async Task LoadComicsAsync()
     {
@@ -376,6 +380,19 @@ public partial class LibraryViewModel : ViewModelBase
 
             RefreshSeriesGroups();
             RefreshSectionVisibilityState();
+
+            _hasLoadedComics = true;
+
+            // The maintenance below (missing file cleanup, a Komga request per Komga comic, scanning bookmarked
+            // folders) used to run on *every* refresh. Refreshes are triggered by LibraryChanged, which is raised
+            // by imports, the scan itself and Komga sync updates, so this caused a continuous stream of disk and
+            // network work (and could feed itself). Now it runs at most once per interval.
+            var now = DateTime.UtcNow;
+            if (now - _lastBackgroundMaintenance < BackgroundMaintenanceInterval)
+            {
+                return;
+            }
+            _lastBackgroundMaintenance = now;
 
             // Defer cleanup to background after initial load is done
             _ = Task.Run(async () => 
@@ -409,8 +426,6 @@ public partial class LibraryViewModel : ViewModelBase
                     System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Failed to auto-scan bookmarked cloud folders: {ex.Message}");
                 }
             });
-
-            _hasLoadedComics = true;
         });
     }
 
@@ -688,12 +703,35 @@ public partial class LibraryViewModel : ViewModelBase
         }
     }
 
+    private bool _refreshRequested;
+    private bool _refreshRunning;
+
     [RelayCommand]
     private async Task RefreshAsync()
     {
+        // Coalesce refresh requests: when a refresh is already running, remember that another one is needed
+        // instead of starting a parallel one (which ExecuteAsync silently dropped, leaving a stale list).
+        _refreshRequested = true;
+        if (_refreshRunning)
+        {
+            return;
+        }
+
+        _refreshRunning = true;
         IsRefreshing = true;
-        await LoadComicsAsync();
-        IsRefreshing = false;
+        try
+        {
+            while (_refreshRequested)
+            {
+                _refreshRequested = false;
+                await LoadComicsAsync();
+            }
+        }
+        finally
+        {
+            _refreshRunning = false;
+            IsRefreshing = false;
+        }
     }
 
     [RelayCommand]

@@ -20,6 +20,7 @@
 using Avalonia.Media.Imaging;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StripWolf.Core.Models;
@@ -132,6 +133,16 @@ public partial class ReaderViewModel : ViewModelBase
     {
         // Reset manual zoom when switching fit modes
         ZoomLevel = 1.0;
+        OnDecodeRequirementsChanged();
+    }
+
+    partial void OnZoomLevelChanged(double value)
+    {
+        if (value > 1.01)
+        {
+            // Zooming in on a page which was decoded at screen resolution: load the full resolution version
+            _ = ReloadCurrentPageAtFullResolutionAsync();
+        }
     }
 
     [ObservableProperty]
@@ -150,6 +161,21 @@ public partial class ReaderViewModel : ViewModelBase
     // Static semaphore to limit concurrent bitmap decodes globally in the reader
     // This prevents memory spikes during rapid page flipping
     private static readonly SemaphoreSlim GlobalDecodeSemaphore = new(2, 2);
+
+    // Separate (single) slot for background prefetching, so prefetches of the previous/next page can never
+    // block the decode of the page the user actually navigated to.
+    private static readonly SemaphoreSlim PrefetchDecodeSemaphore = new(1, 1);
+    private CancellationTokenSource? _prefetchCts;
+
+    // Original (file) size of pages which were decoded smaller than their native resolution
+    private readonly ConditionalWeakTable<Bitmap, StrongBox<Avalonia.Size>> _originalPageSizes = new();
+    private bool _isUpgradingResolution;
+
+    /// <summary>
+    /// True while the current page bitmap is swapped for the same page at a higher resolution,
+    /// views should keep their scroll position.
+    /// </summary>
+    public bool IsReplacingPageResolution { get; private set; }
 
     // Pre-decoded bitmap cache for instant page display without loading bar
     private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
@@ -265,6 +291,8 @@ public partial class ReaderViewModel : ViewModelBase
             CurrentPanel = null;
             CurrentPanelIndex = 0;
         }
+
+        OnDecodeRequirementsChanged();
     }
 
     partial void OnSelectedReadingDirectionModeOptionChanged(ReadingDirectionModeOption? value)
@@ -345,8 +373,56 @@ public partial class ReaderViewModel : ViewModelBase
     [ObservableProperty]
     private int _decodeHeight;
 
-    partial void OnDecodeWidthChanged(int value) => ClearBitmapPrefetchCache();
-    partial void OnDecodeHeightChanged(int value) => ClearBitmapPrefetchCache();
+    partial void OnDecodeWidthChanged(int value) => OnViewportSizeChanged();
+    partial void OnDecodeHeightChanged(int value) => OnViewportSizeChanged();
+
+    private CancellationTokenSource? _viewportChangedCts;
+
+    private void OnViewportSizeChanged()
+    {
+        ClearBitmapPrefetchCache();
+        if (!IsDownscaled(CurrentPageImage))
+        {
+            return;
+        }
+
+        // E.g. a rotation from portrait to landscape in fit-width mode: the page decoded for the old size can be
+        // too small now. Debounced, a window resize changes the size many times.
+        _viewportChangedCts?.Cancel();
+        _viewportChangedCts = new CancellationTokenSource();
+        _ = ReloadCurrentPageForViewportAsync(_viewportChangedCts.Token);
+    }
+
+    private async Task ReloadCurrentPageForViewportAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(300, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        var current = CurrentPageImage;
+        if (current is null || !_originalPageSizes.TryGetValue(current, out var originalSize))
+        {
+            return;
+        }
+
+        var target = GetDecodeTarget();
+        if (target is { } decodeTarget)
+        {
+            var neededWidth = originalSize.Value.Width * Math.Min(1, decodeTarget.GetScale((int)originalSize.Value.Width, (int)originalSize.Value.Height));
+            if (neededWidth <= current.PixelSize.Width * 1.05)
+            {
+                // The current bitmap is still good enough for the new size
+                return;
+            }
+        }
+
+        await ReloadCurrentPageAsync(target);
+    }
 
     public GridLength LeftColumnWidth => IsOverviewOnLeft ? OverviewGridLength : ZoomGridLength;
     public GridLength RightColumnWidth => IsOverviewOnLeft ? ZoomGridLength : OverviewGridLength;
@@ -582,8 +658,19 @@ public partial class ReaderViewModel : ViewModelBase
                 if (server is not null)
                 {
                     var komgaApiService = _komgaApiServiceFactory.GetForServer(server);
-                    var series = await komgaApiService.GetSeriesAsync(comic.KomgaSeriesId);
-                    _detectedReadingDirectionMode = ParseDirectionValue(series?.Metadata?.ReadingDirection);
+                    // This runs before the first page is shown, an unreachable server must not keep the reader
+                    // blank until the HTTP timeout, so give up after a few seconds and fall back to ComicInfo.
+                    var seriesTask = komgaApiService.GetSeriesAsync(comic.KomgaSeriesId);
+                    if (await Task.WhenAny(seriesTask, Task.Delay(TimeSpan.FromSeconds(3))) == seriesTask)
+                    {
+                        var series = await seriesTask;
+                        _detectedReadingDirectionMode = ParseDirectionValue(series?.Metadata?.ReadingDirection);
+                    }
+                    else
+                    {
+                        // Observe a later failure so it doesn't surface as an unobserved task exception
+                        _ = seriesTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+                    }
                 }
             }
             catch
@@ -658,7 +745,18 @@ public partial class ReaderViewModel : ViewModelBase
         {
             Interval = TimeSpan.FromMinutes(5)
         };
-        _periodicSyncTimer.Tick += async (_, _) => await SyncProgressWithKomgaAsync();
+        _periodicSyncTimer.Tick += async (_, _) =>
+        {
+            // async void event handler: an exception here would otherwise crash the application
+            try
+            {
+                await SyncProgressWithKomgaAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Periodic Komga sync failed: {ex.Message}");
+            }
+        };
 
         Title = "Reader";
     }
@@ -674,6 +772,11 @@ public partial class ReaderViewModel : ViewModelBase
 
         _isLoadingPage = false;
         _isInitializingComic = false;
+
+        // Stop page loads and prefetches which are still running for the comic we are leaving,
+        // otherwise they can store bitmaps into the (just cleared) cache or set CurrentPageImage after closing.
+        _pageLoadingCts?.Cancel();
+        CancelPrefetch();
 
         var cts = Interlocked.Exchange(ref _saveProgressCts, null);
         if (cts is not null)
@@ -693,25 +796,7 @@ public partial class ReaderViewModel : ViewModelBase
         HasPendingEpubConversion = false;
         ReaderStatusMessage = null;
 
-        var oldCurrentPageImage = CurrentPageImage;
-        CurrentPageImage = null;
-
-        var oldLeftPageImage = LeftPageImage;
-        LeftPageImage = null;
-
-        var oldRightPageImage = RightPageImage;
-        RightPageImage = null;
-
-        oldCurrentPageImage?.Dispose();
-        if (!ReferenceEquals(oldLeftPageImage, oldCurrentPageImage))
-        {
-            oldLeftPageImage?.Dispose();
-        }
-        if (!ReferenceEquals(oldRightPageImage, oldCurrentPageImage) &&
-            !ReferenceEquals(oldRightPageImage, oldLeftPageImage))
-        {
-            oldRightPageImage?.Dispose();
-        }
+        ReplacePageImages(null, null, null);
 
         CurrentPagePanels = null;
         CurrentPanel = null;
@@ -729,8 +814,9 @@ public partial class ReaderViewModel : ViewModelBase
         // Force ImageSharp to release its internal memory pools
         SixLabors.ImageSharp.Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
 
-        // Suggest a collection to the runtime
-        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        // Note: the forced, blocking, compacting GC.Collect which was here ran on the UI thread every time a comic
+        // was opened or closed and caused visible pauses. Page bitmaps are now disposed deterministically
+        // (see ReplacePageImages), so the native memory is released without it.
     }
 
     private string GetActiveReadPath()
@@ -746,8 +832,20 @@ public partial class ReaderViewModel : ViewModelBase
         }
 
         var updateVersion = Interlocked.Increment(ref _epubConversionUpdateVersion);
-        var refreshedComic = await _libraryService.GetComicAsync(comicId);
-        var state = await _libraryService.GetEpubConversionStateAsync(comicId);
+        Comic? refreshedComic;
+        EpubConversionState? state;
+        try
+        {
+            refreshedComic = await _libraryService.GetComicAsync(comicId);
+            state = await _libraryService.GetEpubConversionStateAsync(comicId);
+        }
+        catch (Exception ex)
+        {
+            // async void: never let an exception escape, it would crash the application
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to refresh EPUB conversion state: {ex.Message}");
+            return;
+        }
+
         if (updateVersion != Interlocked.Read(ref _epubConversionUpdateVersion))
         {
             return;
@@ -979,6 +1077,12 @@ public partial class ReaderViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsLastPage));
                 await LoadPageAsync();
 
+                // The first page is visible: from here on navigation must work. Before, _isInitializingComic stayed
+                // true until the progress was saved (which also refreshed the library), and every page change in that
+                // window was silently ignored by the CurrentPage setter.
+                _isInitializingComic = false;
+                IsBusy = false;
+
                 // Load the first page before syncing with Komga so server issues never block opening the reader.
                 if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId) && Comic.KomgaServerId.HasValue)
                 {
@@ -1119,13 +1223,26 @@ public partial class ReaderViewModel : ViewModelBase
                         var readPath = GetActiveReadPath();
 
                         // Load in parallel but with cancellation support
-                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct);
+                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, null);
                         var rightTask = pageIndex + 1 < Comic.PageCount
-                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct)
+                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, null)
                             : Task.FromResult<Bitmap?>(null);
 
-                        var newLeftBitmap = await leftTask;
-                        var newRightBitmap = await rightTask;
+                        Bitmap? newLeftBitmap = null;
+                        Bitmap? newRightBitmap = null;
+                        try
+                        {
+                            // Await both, so the right page is never leaked when the left one fails or is cancelled
+                            await Task.WhenAll(leftTask, rightTask);
+                        }
+                        catch
+                        {
+                            if (leftTask.IsCompletedSuccessfully) leftTask.Result?.Dispose();
+                            if (rightTask.IsCompletedSuccessfully) rightTask.Result?.Dispose();
+                            throw;
+                        }
+                        newLeftBitmap = leftTask.Result;
+                        newRightBitmap = rightTask.Result;
 
                         if (ct.IsCancellationRequested)
                         {
@@ -1134,16 +1251,8 @@ public partial class ReaderViewModel : ViewModelBase
                             return;
                         }
 
-                        var oldLeftBitmap = LeftPageImage;
-                        LeftPageImage = newLeftBitmap;
-                        oldLeftBitmap?.Dispose();
-
-                        // Also update the single page image for consistency
-                        CurrentPageImage = LeftPageImage;
-
-                        var oldRightBitmap = RightPageImage;
-                        RightPageImage = newRightBitmap;
-                        oldRightBitmap?.Dispose();
+                        // CurrentPageImage is the left page as well, used by the size calculations of the views
+                        ReplacePageImages(newLeftBitmap, newLeftBitmap, newRightBitmap);
                     }
                     else
                     {
@@ -1159,7 +1268,7 @@ public partial class ReaderViewModel : ViewModelBase
                             }
                             else
                             {
-                                newBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex, ct);
+                                newBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex, ct, GetDecodeTarget());
                             }
                         }
                         else if (ReadingMode == ReadingMode.Guided)
@@ -1174,9 +1283,8 @@ public partial class ReaderViewModel : ViewModelBase
                             return;
                         }
 
-                        var oldBitmap = CurrentPageImage;
-                        CurrentPageImage = newBitmap;
-                        oldBitmap?.Dispose();
+                        // Also drops (and disposes) left/right images left over from two-page mode
+                        ReplacePageImages(newBitmap, null, null);
                     }
 
                     // If in guided mode, detect panels
@@ -1244,6 +1352,14 @@ public partial class ReaderViewModel : ViewModelBase
 
     private void OnCurrentPageChanged(int value)
     {
+        if (ReadingMode == ReadingMode.Guided && CurrentPagePanels is not null && CurrentPagePanels.PageIndex != value)
+        {
+            // The panels belong to the previous page, don't navigate/draw them on the new page
+            CurrentPagePanels = null;
+            CurrentPanel = null;
+            CurrentPanelIndex = 0;
+        }
+
         if (Comic is not null && !_isLoadingPage)
         {
             _ = LoadAndSaveProgressAsync();
@@ -1258,8 +1374,10 @@ public partial class ReaderViewModel : ViewModelBase
 
     partial void OnIsTwoPageModeChanged(bool value)
     {
-        // Force a reload of the current page when switching modes to avoid black screen
-        if (Comic is not null && !_isLoadingPage)
+        // Force a reload of the current page when switching modes to avoid black screen.
+        // Also when a load is in progress: LoadPageAsync cancels it and starts over, previously the switch was
+        // ignored in that case and the view kept showing the wrong layout.
+        if (Comic is not null)
         {
             _lastLoadedPageIndex = -1;
             _ = LoadPageAsync();
@@ -1598,7 +1716,7 @@ public partial class ReaderViewModel : ViewModelBase
                 await Task.Delay(500, cts.Token);
             }
 
-            await _libraryService.UpdateReadingProgressAsync(comic, currentPage);
+            await _libraryService.UpdateReadingProgressAsync(comic, currentPage, notifyLibraryChanged: false);
             OnPropertyChanged(nameof(KomgaSyncStatus));
         }
         catch (OperationCanceledException)
@@ -1889,23 +2007,211 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
-    private async Task<Bitmap?> LoadBitmapAsync(string filePath, int pageIndex, CancellationToken ct)
+    /// <summary>
+    /// Describes the size a page will be displayed at, used to decode large pages at screen resolution.
+    /// </summary>
+    private readonly record struct DecodeTarget(int ViewportWidth, int ViewportHeight, StretchMode StretchMode)
     {
+        /// <summary>
+        /// Scale factor (&lt;= 1 means the page is shown smaller than its native resolution)
+        /// </summary>
+        public double GetScale(int pageWidth, int pageHeight)
+        {
+            if (pageWidth <= 0 || pageHeight <= 0) return 1;
+            double scaleX = (double)ViewportWidth / pageWidth;
+            double scaleY = (double)ViewportHeight / pageHeight;
+            return StretchMode switch
+            {
+                StretchMode.FitWidth => scaleX,
+                StretchMode.FitHeight => scaleY,
+                StretchMode.FitPage => Math.Min(scaleX, scaleY),
+                _ => 1
+            };
+        }
+    }
+
+    /// <summary>
+    /// Returns the decode target for the current state, or null when the page must be decoded at full resolution
+    /// (zoomed/guided modes magnify parts of the page, "original" shows it 1:1, and manual zoom needs the detail).
+    /// </summary>
+    private DecodeTarget? GetDecodeTarget()
+    {
+        if (ReadingMode != ReadingMode.Normal || IsTwoPageMode || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
+        {
+            return null;
+        }
+
+        // DecodeWidth/DecodeHeight are the physical pixel size of the reader including a 20% buffer
+        if (DecodeWidth <= 0 || DecodeHeight <= 0)
+        {
+            return null;
+        }
+
+        return new DecodeTarget(DecodeWidth, DecodeHeight, StretchMode);
+    }
+
+    /// <summary>
+    /// Decode a page. When a decode target is given and the page is (a lot) larger than needed for the screen,
+    /// it is decoded at screen resolution: a 4000x6000 scan otherwise takes ~96MB of native memory per bitmap,
+    /// and the reader keeps the current page plus prefetched neighbours in memory.
+    /// </summary>
+    private Bitmap DecodePage(Stream stream, DecodeTarget? target)
+    {
+        if (target is { } decodeTarget)
+        {
+            try
+            {
+                // Only reads the header, no pixel data is decoded
+                var info = SixLabors.ImageSharp.Image.Identify(stream);
+                stream.Position = 0;
+                double scale = decodeTarget.GetScale(info.Width, info.Height);
+                if (scale < 0.9)
+                {
+                    int targetWidth = Math.Max(1, (int)Math.Ceiling(info.Width * scale));
+                    var scaledBitmap = Bitmap.DecodeToWidth(stream, targetWidth, BitmapInterpolationMode.HighQuality);
+                    _originalPageSizes.AddOrUpdate(scaledBitmap, new StrongBox<Avalonia.Size>(new Avalonia.Size(info.Width, info.Height)));
+                    return scaledBitmap;
+                }
+            }
+            catch
+            {
+                // Unknown format for ImageSharp (e.g. AVIF/JXL) or a broken header: fall back to a normal decode
+            }
+            stream.Position = 0;
+        }
+
+        return new Bitmap(stream);
+    }
+
+    /// <summary>
+    /// The size the page has at its native resolution (in DIPs, like <see cref="Bitmap.Size"/>),
+    /// this can differ from the bitmap size when the page was decoded at screen resolution.
+    /// </summary>
+    public Avalonia.Size GetDisplayPageSize(Bitmap bitmap)
+    {
+        return _originalPageSizes.TryGetValue(bitmap, out var originalSize) ? originalSize.Value : bitmap.Size;
+    }
+
+    private bool IsDownscaled(Bitmap? bitmap) => bitmap is not null && _originalPageSizes.TryGetValue(bitmap, out _);
+
+    /// <summary>
+    /// Reading mode, stretch mode or zoom changed: prefetched bitmaps might have the wrong resolution
+    /// and the current page might need to be reloaded at full resolution.
+    /// </summary>
+    private void OnDecodeRequirementsChanged()
+    {
+        ClearBitmapPrefetchCache();
+        if (GetDecodeTarget() is null)
+        {
+            _ = ReloadCurrentPageAtFullResolutionAsync();
+        }
+    }
+
+    private Task ReloadCurrentPageAtFullResolutionAsync() => ReloadCurrentPageAsync(null);
+
+    /// <summary>
+    /// Reload the page which is currently shown with a different decode target (null = full resolution),
+    /// keeping the zoom and scroll position.
+    /// </summary>
+    private async Task ReloadCurrentPageAsync(DecodeTarget? decodeTarget)
+    {
+        var current = CurrentPageImage;
+        if (_isUpgradingResolution || Comic is null || IsTwoPageMode || !IsDownscaled(current))
+        {
+            return;
+        }
+
+        _isUpgradingResolution = true;
+        var pageIndex = _lastLoadedPageIndex;
+        var ct = _pageLoadingCts?.Token ?? CancellationToken.None;
+        try
+        {
+            var fullBitmap = await LoadBitmapAsync(GetActiveReadPath(), pageIndex, ct, decodeTarget);
+            if (fullBitmap is null)
+            {
+                return;
+            }
+
+            // Only swap when we are still looking at the same page
+            if (ct.IsCancellationRequested || _lastLoadedPageIndex != pageIndex || !ReferenceEquals(CurrentPageImage, current))
+            {
+                fullBitmap.Dispose();
+                return;
+            }
+
+            IsReplacingPageResolution = true;
+            try
+            {
+                ReplacePageImages(fullBitmap, null, null);
+            }
+            finally
+            {
+                IsReplacingPageResolution = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to load page at full resolution: {ex.Message}");
+        }
+        finally
+        {
+            _isUpgradingResolution = false;
+        }
+    }
+
+    /// <summary>
+    /// Replace the displayed page bitmaps and dispose the previous ones which are no longer used.
+    /// In two-page mode CurrentPageImage and LeftPageImage are the same instance, which the old code
+    /// disposed twice or leaked depending on the direction of the mode switch.
+    /// </summary>
+    private void ReplacePageImages(Bitmap? current, Bitmap? left, Bitmap? right)
+    {
+        var oldCurrent = CurrentPageImage;
+        var oldLeft = LeftPageImage;
+        var oldRight = RightPageImage;
+
+        CurrentPageImage = current;
+        LeftPageImage = left;
+        RightPageImage = right;
+
+        DisposeIfUnused(oldCurrent);
+        if (!ReferenceEquals(oldLeft, oldCurrent))
+        {
+            DisposeIfUnused(oldLeft);
+        }
+        if (!ReferenceEquals(oldRight, oldCurrent) && !ReferenceEquals(oldRight, oldLeft))
+        {
+            DisposeIfUnused(oldRight);
+        }
+
+        void DisposeIfUnused(Bitmap? bitmap)
+        {
+            if (bitmap is null || ReferenceEquals(bitmap, current) || ReferenceEquals(bitmap, left) || ReferenceEquals(bitmap, right))
+            {
+                return;
+            }
+            bitmap.Dispose();
+        }
+    }
+
+    private async Task<Bitmap?> LoadBitmapAsync(string filePath, int pageIndex, CancellationToken ct, DecodeTarget? decodeTarget, SemaphoreSlim? decodeSemaphore = null)
+    {
+        decodeSemaphore ??= GlobalDecodeSemaphore;
         using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ReaderViewModel));
         await _comicReaderService.CopyPageAsync(filePath, pageIndex, stream);
 
         if (ct.IsCancellationRequested) return null;
         stream.Position = 0;
 
-        await GlobalDecodeSemaphore.WaitAsync(ct);
+        await decodeSemaphore.WaitAsync(ct);
         try
         {
             if (ct.IsCancellationRequested) return null;
-            return await Task.Run(() => new Bitmap(stream));
+            return await Task.Run(() => DecodePage(stream, decodeTarget), ct);
         }
         finally
         {
-            GlobalDecodeSemaphore.Release();
+            decodeSemaphore.Release();
         }
     }
 
@@ -1919,7 +2225,7 @@ public partial class ReaderViewModel : ViewModelBase
             {
                 using var stream = new MemoryStream(pageData, writable: false);
                 return new Bitmap(stream);
-            });
+            }, ct);
         }
         finally
         {
@@ -2008,15 +2314,16 @@ public partial class ReaderViewModel : ViewModelBase
             }
         }
 
+        var ct = _prefetchCts?.Token ?? CancellationToken.None;
         try
         {
             var filePath = GetActiveReadPath();
-            var bitmap = await LoadBitmapAsync(filePath, pageIndex, CancellationToken.None);
+            var bitmap = await LoadBitmapAsync(filePath, pageIndex, ct, GetDecodeTarget(), PrefetchDecodeSemaphore);
 
             if (bitmap is null) return;
 
             // Only cache if still reading the same comic
-            if (GetActiveReadPath() == filePath)
+            if (!ct.IsCancellationRequested && GetActiveReadPath() == filePath)
             {
                 StorePrefetchedBitmap(pageIndex, bitmap);
             }
@@ -2031,6 +2338,12 @@ public partial class ReaderViewModel : ViewModelBase
         }
     }
 
+    private void CancelPrefetch()
+    {
+        var cts = Interlocked.Exchange(ref _prefetchCts, null);
+        cts?.Cancel();
+    }
+
     /// <summary>
     /// Kick off background prefetch tasks for the pages immediately before and after the current one
     /// </summary>
@@ -2040,6 +2353,8 @@ public partial class ReaderViewModel : ViewModelBase
         {
             return;
         }
+
+        _prefetchCts ??= new CancellationTokenSource();
 
         if (currentPage + 1 < Comic.PageCount)
         {
@@ -2080,13 +2395,11 @@ public partial class ReaderViewModel : ViewModelBase
         }
         else if (HasNextPage)
         {
-            // Go to first panel of next page
+            // Go to first panel of next page. The panel is selected once the panels of the new page are detected,
+            // CurrentPagePanels still describes the old page at this point (selecting from it jumped the view
+            // to the first panel of the previous page).
+            _shouldSelectLastPanel = false;
             await GoToNextPageAsync();
-            CurrentPanelIndex = 0;
-            if (CurrentPagePanels?.Panels.Count > 0)
-            {
-                CurrentPanel = CurrentPagePanels.Panels[0];
-            }
         }
         else if (IsLastPage)
         {
@@ -2222,15 +2535,13 @@ public partial class ReaderViewModel : ViewModelBase
         // Fire and forget the Komga sync in the background so it doesn't delay UI closing
         _ = SyncProgressWithKomgaAsync();
 
-        _ = SaveProgressAsync(forceImmediate: true);
+        // Await the (fast, local) progress save: the reader saves without raising LibraryChanged, the library refresh
+        // triggered by CloseRequested must see the final position.
+        await SaveProgressAsync(forceImmediate: true);
         ReleaseReaderResources();
         CloseRequested?.Invoke(this, EventArgs.Empty);
-
-        // Force a cleanup after leaving the reader to ensure high-res bitmaps are truly gone
-        await Task.Delay(500); // Give UI time to detach
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
+        // The forced GC.Collect/WaitForPendingFinalizers which was here is no longer needed,
+        // page bitmaps are disposed deterministically in ReleaseReaderResources.
     }
 
     private async Task RefreshSeriesNavigationTargetsAsync()

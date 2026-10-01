@@ -715,22 +715,32 @@ public partial class KomgaViewModel : ViewModelBase
         {
             Dispatcher.UIThread.Post(async () =>
             {
-                ApplySectionLayout(settings);
-                ApplyDownloadSettings(settings);
-                RefreshLocalization();
-                
-                RefreshConfiguredServers(settings);
-                
-                if (_activeServer is not null)
+                // async void (posted async lambda): exceptions must not escape, they would crash the app
+                try
                 {
-                    var updatedServer = settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id);
-                    if (updatedServer is not null)
+                    ApplySectionLayout(settings);
+                    ApplyDownloadSettings(settings);
+                    RefreshLocalization();
+                    
+                    RefreshConfiguredServers(settings);
+                    
+                    if (_activeServer is not null)
                     {
-                        await ApplyServerAsync(updatedServer, useCache: true, persistSelection: false);
+                        var updatedServer = settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id);
+                        // Settings are saved for many unrelated reasons (tab switch, opening a comic, ...).
+                        // Only reconnect (a network round trip) when the connection settings actually changed.
+                        if (updatedServer is not null && !HasSameConnectionSettings(_activeServer, updatedServer))
+                        {
+                            await ApplyServerAsync(updatedServer, useCache: true, persistSelection: false);
+                        }
                     }
+                    
+                    await LoadVisibleAndExpandedSectionsAsync(useCache: true);
                 }
-                
-                await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"KomgaViewModel: Failed to apply changed settings: {ex.Message}");
+                }
             });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
@@ -1454,6 +1464,20 @@ public partial class KomgaViewModel : ViewModelBase
         {
             await ApplyServerAsync(server, useCache: false, persistSelection: true);
         }, "Failed to switch Komga server");
+    }
+
+    private static bool HasSameConnectionSettings(KomgaServer current, KomgaServer updated)
+    {
+        return string.Equals(current.Name, updated.Name, StringComparison.Ordinal) &&
+               string.Equals(current.BaseUrl, updated.BaseUrl, StringComparison.Ordinal) &&
+               string.Equals(current.Username, updated.Username, StringComparison.Ordinal) &&
+               string.Equals(current.Password, updated.Password, StringComparison.Ordinal) &&
+               string.Equals(current.ApiKey, updated.ApiKey, StringComparison.Ordinal) &&
+               current.BypassSslValidation == updated.BypassSslValidation &&
+               current.CustomHeaders.Count == updated.CustomHeaders.Count &&
+               current.CustomHeaders.Zip(updated.CustomHeaders).All(pair =>
+                   string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.Value, pair.Second.Value, StringComparison.Ordinal));
     }
 
     private async Task ApplyServerAsync(KomgaServer? server, bool useCache, bool persistSelection)

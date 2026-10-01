@@ -45,9 +45,19 @@ public static class ComicInfoXmlService
             if (!reader.ReadToFollowing("ComicInfo")) return null;
 
             using var subReader = reader.ReadSubtree();
-            while (subReader.Read())
+            // Position on <ComicInfo> and then on its first child.
+            // Note: ReadElementContentAsString() already moves the reader to the next node. The previous
+            // "while (subReader.Read())" loop then skipped that node, so every second field (e.g. Series after Title)
+            // was lost when the elements directly follow each other.
+            subReader.Read();
+            subReader.Read();
+            while (!subReader.EOF)
             {
-                if (subReader.NodeType != XmlNodeType.Element) continue;
+                if (subReader.NodeType != XmlNodeType.Element)
+                {
+                    subReader.Read();
+                    continue;
+                }
 
                 var name = subReader.Name;
                 switch (name)
@@ -92,7 +102,15 @@ public static class ComicInfoXmlService
                     case "AgeRating": if (Enum.TryParse<AgeRating>(subReader.ReadElementContentAsString().Replace(" ", ""), out var ar)) info.AgeRating = ar; break;
                     case "CommunityRating": if (decimal.TryParse(subReader.ReadElementContentAsString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cr)) info.CommunityRating = cr; break;
                     case "ScanInformation": info.ScanInformation = subReader.ReadElementContentAsString(); break;
-                    case "Pages": info.Pages = ReadPages(subReader); break;
+                    case "Pages":
+                        info.Pages = ReadPages(subReader);
+                        // ReadSubtree leaves the reader on the (end) element of Pages, move past it
+                        subReader.Read();
+                        break;
+                    default:
+                        // Unknown element: skip it including its children
+                        subReader.Skip();
+                        break;
                 }
             }
 

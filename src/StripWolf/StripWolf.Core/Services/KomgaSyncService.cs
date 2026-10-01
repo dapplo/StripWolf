@@ -91,10 +91,18 @@ public class KomgaSyncService
         }
 
         var komgaApiService = configuredApiService ?? _komgaApiServiceFactory.GetForServer(server);
-        await komgaApiService.UpdateReadProgressAsync(
+        var pushed = await komgaApiService.UpdateReadProgressAsync(
             pendingReadProgress.BookId,
             pendingReadProgress.Page + 1,
             pendingReadProgress.IsCompleted);
+
+        if (!pushed)
+        {
+            // Keep the pending progress so it is retried later. Before, the result was ignored: the pending entry
+            // was deleted and "Synced to Komga" was shown even for a 401/403/500 response.
+            comic.KomgaSyncStatus = "Sync failed";
+            return false;
+        }
 
         await _databaseService.DeletePendingKomgaReadProgressAsync(comic.Id);
         comic.KomgaSyncStatus = "Synced to Komga";

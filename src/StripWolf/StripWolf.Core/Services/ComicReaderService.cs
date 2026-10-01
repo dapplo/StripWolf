@@ -225,7 +225,7 @@ public class ComicReaderService
         }
 
         var sortedNames = await GetPageNamesWithoutCacheAsync(filePath);
-        return await ReadPageAsync(filePath, pageIndex, sortedNames);
+        return await ReadPageAsync(filePath, pageIndex, sortedNames, populateCache: false);
     }
 
     /// <summary>
@@ -249,17 +249,18 @@ public class ComicReaderService
     public async Task CopyPageWithoutCacheAsync(string filePath, int pageIndex, Stream outputStream)
     {
         var sortedNames = await GetPageNamesWithoutCacheAsync(filePath);
-        await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream);
+        await CopyPageAsync(filePath, pageIndex, sortedNames, outputStream, populateCache: false);
     }
 
-    private async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames)
+    private async Task<byte[]> ReadPageAsync(string filePath, int pageIndex, List<string> sortedNames, bool populateCache = true)
     {
         using var stream = RecyclableStreamManagerProvider.Manager.GetStream(nameof(ComicReaderService));
-        await CopyPageAsync(filePath, pageIndex, sortedNames, stream);
+        await CopyPageAsync(filePath, pageIndex, sortedNames, stream, populateCache);
         return stream.ToArray();
     }
 
-    private async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream)
+    /// <param name="populateCache">When false (one-off reads like import/thumbnails) solid archives don't read ahead into the page cache</param>
+    private async Task CopyPageAsync(string filePath, int pageIndex, List<string> sortedNames, Stream outputStream, bool populateCache = true)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
@@ -281,10 +282,10 @@ public class ComicReaderService
                 await CopyCbzPageAsync(filePath, entryName, outputStream);
                 break;
             case ComicFormat.Cbr:
-                await CopyCbrPageAsync(filePath, pageIndex, entryName, sortedNames, outputStream);
+                await CopyCbrPageAsync(filePath, pageIndex, entryName, sortedNames, outputStream, populateCache);
                 break;
             case ComicFormat.Cb7:
-                await CopyCb7PageAsync(filePath, entryName, outputStream);
+                await CopyCb7PageAsync(filePath, pageIndex, entryName, sortedNames, outputStream, populateCache);
                 break;
             case ComicFormat.Cbt:
                 await CopyCbtPageAsync(filePath, entryName, outputStream);
@@ -630,26 +631,6 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> ReadCbzPageAsync(string filePath, string entryName)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-
-            var entry = archive.GetEntry(entryName);
-            if (entry is null)
-            {
-                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
-            }
-
-            using var entryStream = entry.Open();
-            using var memoryStream = new MemoryStream();
-            entryStream.CopyTo(memoryStream);
-            return memoryStream.ToArray();
-        });
-    }
-
     private static async Task CopyCbzPageAsync(string filePath, string entryName, Stream outputStream)
     {
         await Task.Run(() =>
@@ -688,38 +669,7 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> ReadCbrPageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = RarArchive.OpenArchive(stream);
-
-            // Solid archives must be read sequentially
-            if (archive.IsSolid)
-            {
-                return ReadPageFromSolidRar(archive, pageIndex, entryName, sortedNames);
-            }
-
-            var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
-            if (entry is null)
-            {
-                throw new InvalidOperationException($"Could not find entry '{entryName}' in archive");
-            }
-
-            using var entryStream = entry.OpenEntryStream();
-            if (entryStream is null)
-            {
-                throw new InvalidOperationException($"Could not extract entry '{entryName}' from CBR archive. The entry may be corrupted or use an unsupported compression method.");
-            }
-
-            using var memoryStream = new MemoryStream();
-            entryStream.CopyTo(memoryStream);
-            return memoryStream.ToArray();
-        });
-    }
-
-    private static async Task CopyCbrPageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames, Stream outputStream)
+    private async Task CopyCbrPageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames, Stream outputStream, bool populateCache)
     {
         await Task.Run(() =>
         {
@@ -728,7 +678,8 @@ public class ComicReaderService
 
             if (archive.IsSolid)
             {
-                CopyPageFromSolidRar(archive, pageIndex, entryName, sortedNames, outputStream);
+                using var reader = archive.ExtractAllEntries();
+                CopyPageFromSolidReader(reader.MoveToNextEntry, () => (reader.Entry.IsDirectory, reader.Entry.Key), reader.OpenEntryStream, filePath, pageIndex, entryName, sortedNames, outputStream, populateCache);
                 return;
             }
 
@@ -748,48 +699,86 @@ public class ComicReaderService
         });
     }
 
-    private static byte[] ReadPageFromSolidRar(IRarArchive archive, int pageIndex, string targetName, List<string> sortedNames)
+    /// <summary>
+    /// Number of pages after the requested one which are cached while reading a solid archive sequentially.
+    /// </summary>
+    private const int SolidArchiveReadAhead = 3;
+
+    /// <summary>
+    /// Solid archives (RAR/7z) can only be read sequentially: to get page N all entries before it have to be
+    /// decompressed. Previously every page (and every prefetch of the previous/next page) started from the beginning
+    /// of the archive, which makes reading a book quadratic. Pages close to the requested one are now put into the
+    /// page cache while passing them, so turning pages mostly hits the cache.
+    /// </summary>
+    private void CopyPageFromSolidReader(Func<bool> moveToNextEntry, Func<(bool IsDirectory, string? Key)> getCurrentEntry, Func<Stream> openEntryStream, string filePath, int pageIndex, string targetName, List<string> sortedNames, Stream outputStream, bool populateCache)
     {
         if (pageIndex < 0 || pageIndex >= sortedNames.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
         }
 
-        // For solid archives, we must read through sequentially
-        using var reader = archive.ExtractAllEntries();
-        while (reader.MoveToNextEntry())
+        var wanted = new Dictionary<string, int>(StringComparer.Ordinal) { [targetName] = pageIndex };
+        if (populateCache)
         {
-            if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
+            var firstIndex = Math.Max(0, pageIndex - 1);
+            var lastIndex = Math.Min(sortedNames.Count - 1, pageIndex + SolidArchiveReadAhead);
+            for (var i = firstIndex; i <= lastIndex; i++)
             {
-                using var entryStream = reader.OpenEntryStream();
+                if (i != pageIndex && !IsPageCached(filePath, i))
+                {
+                    wanted.TryAdd(sortedNames[i], i);
+                }
+            }
+        }
+
+        var found = false;
+        var entriesAfterTarget = 0;
+        while (wanted.Count > 0 && moveToNextEntry())
+        {
+            var (isDirectory, entryKey) = getCurrentEntry();
+            if (isDirectory)
+            {
+                continue;
+            }
+
+            if (found && ++entriesAfterTarget > SolidArchiveReadAhead + 2)
+            {
+                // Don't decompress the rest of the archive when its physical order differs from the page order
+                break;
+            }
+
+            var key = entryKey ?? string.Empty;
+            if (!wanted.Remove(key, out var index))
+            {
+                continue;
+            }
+
+            using var entryStream = openEntryStream();
+            if (key == targetName)
+            {
+                entryStream.CopyTo(outputStream);
+                found = true;
+            }
+            else
+            {
                 using var memoryStream = new MemoryStream();
                 entryStream.CopyTo(memoryStream);
-                return memoryStream.ToArray();
+                CachePageData(filePath, index, memoryStream.ToArray());
             }
         }
 
-        throw new InvalidOperationException($"Could not find page {pageIndex} in solid RAR archive");
+        if (!found)
+        {
+            throw new InvalidOperationException($"Could not find page {pageIndex} ('{targetName}') in solid archive");
+        }
     }
 
-    private static void CopyPageFromSolidRar(IRarArchive archive, int pageIndex, string targetName, List<string> sortedNames, Stream outputStream)
+    private bool IsPageCached(string filePath, int pageIndex)
     {
-        if (pageIndex < 0 || pageIndex >= sortedNames.Count)
+        lock (_cacheLock)
         {
-            throw new ArgumentOutOfRangeException(nameof(pageIndex), "Page index is out of range");
+            return _pageCache.ContainsKey((filePath, pageIndex));
         }
-
-        using var reader = archive.ExtractAllEntries();
-        while (reader.MoveToNextEntry())
-        {
-            if (!reader.Entry.IsDirectory && reader.Entry.Key == targetName)
-            {
-                using var entryStream = reader.OpenEntryStream();
-                entryStream.CopyTo(outputStream);
-                return;
-            }
-        }
-
-        throw new InvalidOperationException($"Could not find page {pageIndex} in solid RAR archive");
     }
 
     #endregion
@@ -812,49 +801,29 @@ public class ComicReaderService
         });
     }
 
-    private static async Task<byte[]> ReadCb7PageAsync(string filePath, string entryName)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = SevenZipArchive.OpenArchive(stream);
-
-            // 7z archives may be solid, so we use ExtractAllEntries
-            using var reader = archive.ExtractAllEntries();
-            while (reader.MoveToNextEntry())
-            {
-                if (!reader.Entry.IsDirectory && reader.Entry.Key == entryName)
-                {
-                    using var entryStream = reader.OpenEntryStream();
-                    using var memoryStream = new MemoryStream();
-                    entryStream.CopyTo(memoryStream);
-                    return memoryStream.ToArray();
-                }
-            }
-
-            throw new InvalidOperationException($"Could not find entry '{entryName}' in CB7 archive");
-        });
-    }
-
-    private static async Task CopyCb7PageAsync(string filePath, string entryName, Stream outputStream)
+    private async Task CopyCb7PageAsync(string filePath, int pageIndex, string entryName, List<string> sortedNames, Stream outputStream, bool populateCache)
     {
         await Task.Run(() =>
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var archive = SevenZipArchive.OpenArchive(stream);
 
-            using var reader = archive.ExtractAllEntries();
-            while (reader.MoveToNextEntry())
+            if (!archive.IsSolid)
             {
-                if (!reader.Entry.IsDirectory && reader.Entry.Key == entryName)
+                // Non-solid archives support random access, no need to decompress everything before the entry
+                var entry = archive.Entries.FirstOrDefault(e => !e.IsDirectory && e.Key == entryName);
+                if (entry is null)
                 {
-                    using var entryStream = reader.OpenEntryStream();
-                    entryStream.CopyTo(outputStream);
-                    return;
+                    throw new InvalidOperationException($"Could not find entry '{entryName}' in CB7 archive");
                 }
+
+                using var entryStream = entry.OpenEntryStream();
+                entryStream.CopyTo(outputStream);
+                return;
             }
 
-            throw new InvalidOperationException($"Could not find entry '{entryName}' in CB7 archive");
+            using var reader = archive.ExtractAllEntries();
+            CopyPageFromSolidReader(reader.MoveToNextEntry, () => (reader.Entry.IsDirectory, reader.Entry.Key), reader.OpenEntryStream, filePath, pageIndex, entryName, sortedNames, outputStream, populateCache);
         });
     }
 
@@ -875,28 +844,6 @@ public class ComicReaderService
                 .Select(e => e.Key ?? string.Empty)
                 .OrderBy(name => name, ComicPageComparer.Instance)
                 .ToList();
-        });
-    }
-
-    private static async Task<byte[]> ReadCbtPageAsync(string filePath, string entryName)
-    {
-        return await Task.Run(() =>
-        {
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var archive = TarArchive.OpenArchive(stream);
-
-            var entry = archive.Entries
-                .FirstOrDefault(e => !e.IsDirectory && e.Key == entryName);
-
-            if (entry is null)
-            {
-                throw new InvalidOperationException($"Could not find entry '{entryName}' in CBT archive");
-            }
-
-            using var entryStream = entry.OpenEntryStream();
-            using var memoryStream = new MemoryStream();
-            entryStream.CopyTo(memoryStream);
-            return memoryStream.ToArray();
         });
     }
 

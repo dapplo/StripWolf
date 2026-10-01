@@ -23,6 +23,12 @@ namespace StripWolf.Core.Services;
 
 public static class RecyclableStreamManagerProvider
 {
-    public static RecyclableMemoryStreamManager Manager { get; } = new();
+    // With the default options the pools never release anything: the largest pages ever read (plus every buffer
+    // size in between) stay allocated for the lifetime of the process. Cap what is kept in the free pools.
+    public static RecyclableMemoryStreamManager Manager { get; } = new(new RecyclableMemoryStreamManager.Options
+    {
+        MaximumSmallPoolFreeBytes = 16 * 1024 * 1024,
+        MaximumLargePoolFreeBytes = 64 * 1024 * 1024
+    });
 }
 

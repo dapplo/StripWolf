@@ -182,7 +182,18 @@ public class SettingsService
 
         var json = JsonSerializer.Serialize(sensitiveData, StripWolfJsonContext.Default.DictionaryIntSensitiveServerData);
         var encrypted = Encrypt(json);
-        await File.WriteAllBytesAsync(_passwordsPath, encrypted);
+        await WriteFileAtomicallyAsync(_passwordsPath, encrypted);
+    }
+
+    /// <summary>
+    /// Write to a temporary file and move it over the target, so a crash or power loss while writing
+    /// can never leave a truncated settings/credentials file behind (File.WriteAll* truncates first).
+    /// </summary>
+    private static async Task WriteFileAtomicallyAsync(string path, byte[] content)
+    {
+        var tempPath = path + ".tmp";
+        await File.WriteAllBytesAsync(tempPath, content);
+        File.Move(tempPath, path, overwrite: true);
     }
 
     /// <summary>
@@ -244,6 +255,11 @@ public class SettingsService
         {
             // If decryption fails (key changed), passwords will need to be re-entered
         }
+        catch (Exception ex)
+        {
+            // Anything else (e.g. a truncated file) must not prevent the settings from loading
+            System.Diagnostics.Debug.WriteLine($"SettingsService: Failed to load credentials: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -275,6 +291,11 @@ public class SettingsService
     {
         var nonceSize = AesGcm.NonceByteSizes.MaxSize;
         var tagSize = AesGcm.TagByteSizes.MaxSize;
+
+        if (encrypted.Length < nonceSize + tagSize)
+        {
+            throw new CryptographicException("Encrypted data is too short");
+        }
 
         var nonce = new byte[nonceSize];
         var tag = new byte[tagSize];
@@ -404,7 +425,7 @@ public class SettingsService
         }
 
         var json = JsonSerializer.Serialize(settingsToSave, StripWolfJsonContext.Default.AppSettings);
-        await File.WriteAllTextAsync(_settingsPath, json);
+        await WriteFileAtomicallyAsync(_settingsPath, Encoding.UTF8.GetBytes(json));
         await SavePasswordsAsync(snapshot);
     }
 }
