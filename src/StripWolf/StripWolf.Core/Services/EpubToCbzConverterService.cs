@@ -62,6 +62,13 @@ public sealed class EpubToCbzConverterService
                     }
                 } catch {
                 }
+                try {
+                    // Avalonia.Controls.WebView (NativeWebView, used on Linux) injects invokeCSharpAction
+                    if (typeof window.invokeCSharpAction === 'function') {
+                        window.invokeCSharpAction('stripwolf-ready');
+                    }
+                } catch {
+                }
             };
             const scheduleReady = () => {
                 requestAnimationFrame(() => requestAnimationFrame(notifyReady));
@@ -1091,6 +1098,7 @@ public sealed class EpubToCbzConverterService
         private readonly IReadOnlyList<EpubRenderedChapter> _chapters;
         private readonly SemaphoreSlim _gate = new(1, 1);
         private int? _loadedChapterIndex;
+        private bool _disposed;
 
         internal EpubReaderSession(
             IWebViewPaginationSession paginationSession,
@@ -1129,6 +1137,7 @@ public sealed class EpubToCbzConverterService
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                ObjectDisposedException.ThrowIf(_disposed, this);
 
                 if (_loadedChapterIndex != chapter.RenderIndex)
                 {
@@ -1146,21 +1155,37 @@ public sealed class EpubToCbzConverterService
 
         public async ValueTask DisposeAsync()
         {
-            _gate.Dispose();
-            await _paginationSession.DisposeAsync();
-
+            // Wait for a page render which is still running (e.g. a prefetch) before tearing the session down.
+            // Before, the gate was disposed right away, so the running render failed on Release() and its browser
+            // session and temp files were removed underneath it. The gate itself is not disposed for the same reason.
+            await _gate.WaitAsync();
             try
             {
-                if (Directory.Exists(_tempRoot))
+                if (_disposed)
                 {
-                    Directory.Delete(_tempRoot, true);
+                    return;
+                }
+
+                _disposed = true;
+                await _paginationSession.DisposeAsync();
+
+                try
+                {
+                    if (Directory.Exists(_tempRoot))
+                    {
+                        Directory.Delete(_tempRoot, true);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
                 }
             }
-            catch (IOException)
+            finally
             {
-            }
-            catch (UnauthorizedAccessException)
-            {
+                _gate.Release();
             }
         }
     }

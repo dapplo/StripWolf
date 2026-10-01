@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Core.Models.Komga;
@@ -25,7 +24,7 @@ namespace StripWolf.Core.Models.Komga;
 /// <summary>
 /// Display model for a Komga read list with pre-loaded thumbnail
 /// </summary>
-public partial class KomgaReadListDisplay : ObservableObject
+public partial class KomgaReadListDisplay : KomgaThumbnailDisplay
 {
     [ObservableProperty]
     private bool _isLoaded;
@@ -33,12 +32,6 @@ public partial class KomgaReadListDisplay : ObservableObject
     /// The underlying Komga read list data
     /// </summary>
     public KomgaReadList ReadList { get; set; } = new();
-
-    [ObservableProperty]
-    private Bitmap? _thumbnail;
-
-    [ObservableProperty]
-    private bool _isThumbnailResolved;
 
     // Convenience properties for binding
     public string Id => ReadList.Id;

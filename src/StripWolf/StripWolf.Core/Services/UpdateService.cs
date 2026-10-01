@@ -198,10 +198,14 @@ public partial class UpdateService : ObservableObject
                     var currentVersion = GetRawCurrentVersion();
                     var isNewer = IsNewerVersion(currentVersion, release.TagName);
 
-                    var settings = _settingsService.LoadSettings();
-                    settings.LastUpdateCheckTime = DateTime.UtcNow;
-                    settings.LatestAvailableVersion = release.TagName;
-                    await _settingsService.SaveSettingsAsync(settings);
+                    // Only update the update-check fields, saving a whole settings snapshot could overwrite
+                    // concurrent changes made elsewhere
+                    var latestVersion = release.TagName;
+                    await _settingsService.UpdateSettingsAsync(s =>
+                    {
+                        s.LastUpdateCheckTime = DateTime.UtcNow;
+                        s.LatestAvailableVersion = latestVersion;
+                    });
 
                     Dispatcher.UIThread.Post(() =>
                     {

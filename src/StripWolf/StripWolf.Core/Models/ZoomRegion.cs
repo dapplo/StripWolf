@@ -94,26 +94,39 @@ public class ZoomRegion
     /// </summary>
     public void Resize(double delta)
     {
-        if (Width <= 0 || Height <= 0) return;
-        
-        double aspectRatio = Width / Height;
-        double newWidth = Math.Max(MinSize, Math.Min(MaxSize, Width + delta));
-        double newHeight = newWidth / aspectRatio;
+        SetSize(Size + delta);
+    }
 
-        if (newHeight > MaxSize)
+    /// <summary>
+    /// Scale the zoom region so that <see cref="Size"/> (the larger side) becomes <paramref name="targetSize"/>,
+    /// maintaining the aspect ratio and keeping both sides within [MinSize, MaxSize].
+    /// </summary>
+    /// <remarks>
+    /// Previously Resize added the delta to Width while callers computed the delta from Size (= max(Width, Height)).
+    /// For tall regions (typical for panels in guided mode) this never converged and made pinch-zoom oscillate
+    /// or "stick" at the min/max size.
+    /// </remarks>
+    public void SetSize(double targetSize)
+    {
+        if (Width <= 0 || Height <= 0 || double.IsNaN(targetSize) || double.IsInfinity(targetSize)) return;
+
+        double currentSize = Size;
+        double currentMin = Math.Min(Width, Height);
+
+        // Allowed scale factors so that the larger side stays <= MaxSize and the smaller side >= MinSize
+        double minFactor = MinSize / currentMin;
+        double maxFactor = MaxSize / currentSize;
+        if (minFactor > maxFactor)
         {
-            newHeight = MaxSize;
-            newWidth = newHeight * aspectRatio;
-        }
-        else if (newHeight < MinSize)
-        {
-            newHeight = MinSize;
-            newWidth = newHeight * aspectRatio;
+            // Extreme aspect ratio: prefer respecting the maximum
+            minFactor = maxFactor;
         }
 
-        Width = newWidth;
-        Height = newHeight;
-        
+        double factor = Math.Clamp(targetSize / currentSize, minFactor, maxFactor);
+
+        Width *= factor;
+        Height *= factor;
+
         // Clamp position with new size
         Move(0, 0);
     }

@@ -208,8 +208,9 @@ public partial class LibraryViewModel : ViewModelBase
             });
         };
         
-        // Refresh when library changes
-        _libraryService.LibraryChanged += (s, e) => _ = RefreshAsync();
+        // Refresh when library changes. LibraryChanged is also raised from background threads (EPUB conversion,
+        // folder scans), the refresh touches observable collections and must run on the UI thread.
+        _libraryService.LibraryChanged += (s, e) => Dispatcher.UIThread.Post(() => _ = RefreshAsync());
     }
 
     private void RefreshLocalization()
@@ -350,6 +351,9 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty]
     private Comic? _comicPendingDeletion;
 
+    private static readonly TimeSpan BackgroundMaintenanceInterval = TimeSpan.FromMinutes(5);
+    private DateTime _lastBackgroundMaintenance = DateTime.MinValue;
+
     [RelayCommand]
     private async Task LoadComicsAsync()
     {
@@ -376,6 +380,19 @@ public partial class LibraryViewModel : ViewModelBase
 
             RefreshSeriesGroups();
             RefreshSectionVisibilityState();
+
+            _hasLoadedComics = true;
+
+            // The maintenance below (missing file cleanup, a Komga request per Komga comic, scanning bookmarked
+            // folders) used to run on *every* refresh. Refreshes are triggered by LibraryChanged, which is raised
+            // by imports, the scan itself and Komga sync updates, so this caused a continuous stream of disk and
+            // network work (and could feed itself). Now it runs at most once per interval.
+            var now = DateTime.UtcNow;
+            if (now - _lastBackgroundMaintenance < BackgroundMaintenanceInterval)
+            {
+                return;
+            }
+            _lastBackgroundMaintenance = now;
 
             // Defer cleanup to background after initial load is done
             _ = Task.Run(async () => 
@@ -409,8 +426,6 @@ public partial class LibraryViewModel : ViewModelBase
                     System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Failed to auto-scan bookmarked cloud folders: {ex.Message}");
                 }
             });
-
-            _hasLoadedComics = true;
         });
     }
 
@@ -688,12 +703,35 @@ public partial class LibraryViewModel : ViewModelBase
         }
     }
 
+    private bool _refreshRequested;
+    private bool _refreshRunning;
+
     [RelayCommand]
     private async Task RefreshAsync()
     {
+        // Coalesce refresh requests: when a refresh is already running, remember that another one is needed
+        // instead of starting a parallel one (which ExecuteAsync silently dropped, leaving a stale list).
+        _refreshRequested = true;
+        if (_refreshRunning)
+        {
+            return;
+        }
+
+        _refreshRunning = true;
         IsRefreshing = true;
-        await LoadComicsAsync();
-        IsRefreshing = false;
+        try
+        {
+            while (_refreshRequested)
+            {
+                _refreshRequested = false;
+                await LoadComicsAsync();
+            }
+        }
+        finally
+        {
+            _refreshRunning = false;
+            IsRefreshing = false;
+        }
     }
 
     [RelayCommand]
@@ -904,18 +942,18 @@ public partial class LibraryViewModel : ViewModelBase
 
         try
         {
-            var folders = await _cloudLibraryService.GetBookmarkedFoldersAsync(storageProvider);
-            if (folders.Count == 0)
+            var bookmarkedFolders = await _cloudLibraryService.GetBookmarkedFoldersAsync(storageProvider);
+            if (bookmarkedFolders.Count == 0)
             {
                 return;
             }
 
-            foreach (var folder in folders)
+            foreach (var (bookmark, folder) in bookmarkedFolders)
             {
                 try
                 {
-                    var files = new List<IStorageFile>();
-                    await foreach (var file in _cloudLibraryService.EnumerateComicFilesAsync(folder))
+                    var files = new List<ComicStorageFile>();
+                    await foreach (var file in _cloudLibraryService.EnumerateComicFilesWithRelativePathAsync(folder))
                     {
                         files.Add(file);
                     }
@@ -925,9 +963,20 @@ public partial class LibraryViewModel : ViewModelBase
                         continue;
                     }
 
+                    // Source files which were imported before are skipped, even if the comic is no longer in the
+                    // library: previously a comic the user deleted was copied and imported again by the next scan.
+                    // Like before, a changed source file (same path, other size/date) is not imported again.
+                    var bookmarkKey = CloudLibraryService.GetBookmarkKey(bookmark);
+                    var importedFiles = await _databaseService.GetImportedBookmarkedFilesAsync(bookmarkKey);
+
                     using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
-                    foreach (var file in files)
+                    foreach (var (file, relativePath) in files)
                     {
+                        if (importedFiles.Contains(relativePath))
+                        {
+                            continue;
+                        }
+
                         var sanitizedName = LibraryService.SanitizeFileName(file.Name);
                         var targetPath = Path.Combine(_libraryService.ComicsDirectory, sanitizedName);
 
@@ -938,6 +987,7 @@ public partial class LibraryViewModel : ViewModelBase
                             {
                                 var fallback = LibraryService.GetSuggestedSeriesNameFromDirectoryName(folder.Name);
                                 var comic = await _libraryService.ImportLocalComicAsync(copiedPath, seriesNameFallback: fallback);
+                                await MarkBookmarkedFileImportedAsync(bookmarkKey, file, relativePath);
                                 
                                 Dispatcher.UIThread.Post(() =>
                                 {
@@ -964,6 +1014,10 @@ public partial class LibraryViewModel : ViewModelBase
                                     }
                                 });
                             }
+
+                            // Also covers comics imported before this tracking existed: remember them, so deleting
+                            // them later doesn't bring them back
+                            await MarkBookmarkedFileImportedAsync(bookmarkKey, file, relativePath);
                         }
                     }
 
@@ -983,6 +1037,25 @@ public partial class LibraryViewModel : ViewModelBase
         {
             _scanSemaphore.Release();
         }
+    }
+
+    private async Task MarkBookmarkedFileImportedAsync(string bookmarkKey, IStorageFile file, string relativePath)
+    {
+        long? size = null;
+        DateTimeOffset? modified = null;
+        try
+        {
+            var properties = await file.GetBasicPropertiesAsync();
+            size = properties.Size is { } fileSize ? (long)fileSize : null;
+            modified = properties.DateModified;
+        }
+        catch (Exception ex)
+        {
+            // Size and date are informational only
+            System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Failed to read properties of '{relativePath}': {ex.Message}");
+        }
+
+        await _databaseService.MarkBookmarkedFileImportedAsync(bookmarkKey, relativePath, size, modified);
     }
 
     private async Task ImportFilesCoreAsync(

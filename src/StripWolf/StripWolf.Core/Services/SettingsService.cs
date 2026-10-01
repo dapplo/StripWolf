@@ -54,19 +54,20 @@ public class SettingsService
 
     public event EventHandler<AppSettings>? SettingsChanged;
 
-    public SettingsService()
+    public SettingsService() : this(AppPaths.DefaultAppDataDirectory)
     {
-        _settingsDir = GetAppDataDirectory();
+    }
+
+    /// <summary>
+    /// Use a specific settings directory (used by the tests)
+    /// </summary>
+    internal SettingsService(string settingsDirectory)
+    {
+        _settingsDir = settingsDirectory;
         Directory.CreateDirectory(_settingsDir);
         _settingsPath = Path.Combine(_settingsDir, SettingsFileName);
         _passwordsPath = Path.Combine(_settingsDir, PasswordsFileName);
         _encryptionKey = GetOrCreateEncryptionKey();
-    }
-
-    private static string GetAppDataDirectory()
-    {
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(baseDir, "StripWolf");
     }
 
     /// <summary>
@@ -134,6 +135,10 @@ public class SettingsService
         }
     }
 
+    /// <summary>
+    /// Change only the fields the caller owns, on top of the current settings, and save them.
+    /// The action runs synchronously under a lock (don't await or call back into this service from it).
+    /// </summary>
     public Task UpdateSettingsAsync(Action<AppSettings> updateAction)
     {
         AppSettings snapshot;
@@ -145,26 +150,15 @@ public class SettingsService
             updateAction(snapshot);
             NormalizeSectionPreferences(snapshot);
             _cachedSettings = snapshot.Clone();
-        }
 
-        return QueueSettingsSave(snapshot);
+            // Queue while still holding the lock: queued outside of it, two concurrent updates could be queued in the
+            // opposite order, and the older snapshot was written last (the newer change was missing on disk).
+            return QueueSettingsSave(snapshot);
+        }
     }
 
-    /// <summary>
-    /// Save settings to disk
-    /// </summary>
-    public async Task SaveSettingsAsync(AppSettings settings)
-    {
-        var snapshot = settings.Clone();
-        NormalizeSectionPreferences(snapshot);
-
-        lock (_settingsLock)
-        {
-            _cachedSettings = snapshot.Clone();
-        }
-
-        await QueueSettingsSave(snapshot);
-    }
+    // Note: SaveSettingsAsync(AppSettings) was removed. Saving a whole (stale) snapshot overwrote changes which were made
+    // elsewhere in the meantime (trial unlock, viewed comics, folder bookmarks, section layout...).
 
     /// <summary>
     /// Encrypts and saves passwords to a separate file
@@ -182,7 +176,18 @@ public class SettingsService
 
         var json = JsonSerializer.Serialize(sensitiveData, StripWolfJsonContext.Default.DictionaryIntSensitiveServerData);
         var encrypted = Encrypt(json);
-        await File.WriteAllBytesAsync(_passwordsPath, encrypted);
+        await WriteFileAtomicallyAsync(_passwordsPath, encrypted);
+    }
+
+    /// <summary>
+    /// Write to a temporary file and move it over the target, so a crash or power loss while writing
+    /// can never leave a truncated settings/credentials file behind (File.WriteAll* truncates first).
+    /// </summary>
+    private static async Task WriteFileAtomicallyAsync(string path, byte[] content)
+    {
+        var tempPath = path + ".tmp";
+        await File.WriteAllBytesAsync(tempPath, content);
+        File.Move(tempPath, path, overwrite: true);
     }
 
     /// <summary>
@@ -244,6 +249,11 @@ public class SettingsService
         {
             // If decryption fails (key changed), passwords will need to be re-entered
         }
+        catch (Exception ex)
+        {
+            // Anything else (e.g. a truncated file) must not prevent the settings from loading
+            System.Diagnostics.Debug.WriteLine($"SettingsService: Failed to load credentials: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -275,6 +285,11 @@ public class SettingsService
     {
         var nonceSize = AesGcm.NonceByteSizes.MaxSize;
         var tagSize = AesGcm.TagByteSizes.MaxSize;
+
+        if (encrypted.Length < nonceSize + tagSize)
+        {
+            throw new CryptographicException("Encrypted data is too short");
+        }
 
         var nonce = new byte[nonceSize];
         var tag = new byte[tagSize];
@@ -350,7 +365,8 @@ public class SettingsService
             _isProcessingSaveQueue = true;
         }
 
-        _ = ProcessSaveQueueAsync();
+        // Write on the thread pool: QueueSettingsSave is called while holding the settings lock
+        _ = Task.Run(ProcessSaveQueueAsync);
         return completion.Task;
     }
 
@@ -404,7 +420,7 @@ public class SettingsService
         }
 
         var json = JsonSerializer.Serialize(settingsToSave, StripWolfJsonContext.Default.AppSettings);
-        await File.WriteAllTextAsync(_settingsPath, json);
+        await WriteFileAtomicallyAsync(_settingsPath, Encoding.UTF8.GetBytes(json));
         await SavePasswordsAsync(snapshot);
     }
 }

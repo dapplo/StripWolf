@@ -21,6 +21,15 @@ using Avalonia.Threading;
 
 namespace StripWolf.Core.Services;
 
+/// <summary>
+/// Progress reporters which limit how often the UI is updated.
+/// </summary>
+/// <remarks>
+/// This used to wrap <see cref="Progress{T}"/>: that posts *every* Report call to the captured (UI) synchronization
+/// context first, and only then the throttling ran, so the UI thread still received every single report.
+/// Now the throttling happens synchronously in Report, on the reporting thread, and only the reports which pass are
+/// posted to the UI thread. A skipped report is delivered later (trailing), so the final value is never lost.
+/// </remarks>
 internal static class UiProgressThrottle
 {
     public static IProgress<double> Create(
@@ -30,44 +39,16 @@ internal static class UiProgressThrottle
     {
         ArgumentNullException.ThrowIfNull(apply);
 
-        var gate = new object();
-        var lastValue = double.NaN;
-        long lastTick = 0;
-
-        return new Progress<double>(value =>
-        {
-            value = Math.Clamp(value, 0, 1);
-
-            lock (gate)
+        return new ThrottledProgress<double>(
+            value => apply(Math.Clamp(value, 0, 1)),
+            minIntervalMilliseconds,
+            (value, lastReported) =>
             {
-                var now = Environment.TickCount64;
-                var delta = double.IsNaN(lastValue) ? double.MaxValue : Math.Abs(value - lastValue);
-                var elapsed = now - lastTick;
-
-                var shouldReport = double.IsNaN(lastValue) ||
-                                   value <= 0 ||
-                                   value >= 1 ||
-                                   delta >= minDelta ||
-                                   elapsed >= minIntervalMilliseconds;
-
-                if (!shouldReport)
-                {
-                    return;
-                }
-
-                lastValue = value;
-                lastTick = now;
-            }
-
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                apply(value);
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(() => apply(value), DispatcherPriority.Background);
-            }
-        });
+                value = Math.Clamp(value, 0, 1);
+                return value <= 0 ||
+                       value >= 1 ||
+                       Math.Abs(value - Math.Clamp(lastReported, 0, 1)) >= minDelta;
+            });
     }
 
     public static IProgress<T> Create<T>(
@@ -75,33 +56,125 @@ internal static class UiProgressThrottle
         int minIntervalMilliseconds = 125)
     {
         ArgumentNullException.ThrowIfNull(apply);
+        return new ThrottledProgress<T>(apply, minIntervalMilliseconds, null);
+    }
 
-        var gate = new object();
-        long lastTick = 0;
+    private sealed class ThrottledProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _apply;
+        private readonly int _minIntervalMilliseconds;
+        private readonly Func<T, T, bool>? _reportImmediately;
+        private readonly Lock _gate = new();
 
-        return new Progress<T>(value =>
+        private bool _hasReported;
+        private T _lastReported = default!;
+        private long _lastTick;
+        private bool _hasPending;
+        private T _pending = default!;
+        private bool _flushScheduled;
+        // Orders the dispatched values: a delayed (trailing) flush can race with an immediate report on another
+        // thread, the UI must never apply an older value after a newer one (e.g. 0.98 after the final 1.0).
+        private long _sequence;
+        // Only accessed on the UI thread
+        private long _appliedSequence;
+
+        public ThrottledProgress(Action<T> apply, int minIntervalMilliseconds, Func<T, T, bool>? reportImmediately)
         {
-            lock (gate)
+            _apply = apply;
+            _minIntervalMilliseconds = Math.Max(0, minIntervalMilliseconds);
+            _reportImmediately = reportImmediately;
+        }
+
+        public void Report(T value)
+        {
+            var reportNow = false;
+            var flushDelay = 0;
+            long sequence = 0;
+            lock (_gate)
             {
                 var now = Environment.TickCount64;
-                var elapsed = now - lastTick;
-                var shouldReport = lastTick == 0 || elapsed >= minIntervalMilliseconds;
-                if (!shouldReport)
+                var elapsed = now - _lastTick;
+                reportNow = !_hasReported ||
+                            elapsed >= _minIntervalMilliseconds ||
+                            (_reportImmediately?.Invoke(value, _lastReported) ?? false);
+
+                if (reportNow)
+                {
+                    _hasReported = true;
+                    _lastReported = value;
+                    _lastTick = now;
+                    _hasPending = false;
+                    sequence = ++_sequence;
+                }
+                else
+                {
+                    // Remember the latest value and make sure it is delivered once the interval has passed
+                    _pending = value;
+                    _hasPending = true;
+                    if (!_flushScheduled)
+                    {
+                        _flushScheduled = true;
+                        flushDelay = (int)Math.Max(1, _minIntervalMilliseconds - elapsed);
+                    }
+                }
+            }
+
+            if (reportNow)
+            {
+                Dispatch(value, sequence);
+            }
+            else if (flushDelay > 0)
+            {
+                _ = FlushLaterAsync(flushDelay);
+            }
+        }
+
+        private async Task FlushLaterAsync(int delayMilliseconds)
+        {
+            await Task.Delay(delayMilliseconds).ConfigureAwait(false);
+
+            T value;
+            long sequence;
+            lock (_gate)
+            {
+                _flushScheduled = false;
+                if (!_hasPending)
                 {
                     return;
                 }
 
-                lastTick = now;
+                value = _pending;
+                _hasPending = false;
+                _hasReported = true;
+                _lastReported = value;
+                _lastTick = Environment.TickCount64;
+                sequence = ++_sequence;
             }
 
+            Dispatch(value, sequence);
+        }
+
+        private void Dispatch(T value, long sequence)
+        {
             if (Dispatcher.UIThread.CheckAccess())
             {
-                apply(value);
+                ApplyIfLatest(value, sequence);
             }
             else
             {
-                Dispatcher.UIThread.Post(() => apply(value), DispatcherPriority.Background);
+                Dispatcher.UIThread.Post(() => ApplyIfLatest(value, sequence), DispatcherPriority.Background);
             }
-        });
+        }
+
+        private void ApplyIfLatest(T value, long sequence)
+        {
+            if (sequence <= _appliedSequence)
+            {
+                return;
+            }
+
+            _appliedSequence = sequence;
+            _apply(value);
+        }
     }
 }

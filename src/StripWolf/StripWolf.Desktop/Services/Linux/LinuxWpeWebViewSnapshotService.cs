@@ -28,10 +28,12 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using StripWolf.Data;
-using StripWolf.Services;
+using StripWolf.Core.Data;
+using StripWolf.Core.Services;
 
-namespace StripWolf.Desktop.Services.Linux;
+// Note: the namespace and usings were still the old StripWolf.* ones, so this file didn't compile
+// (it is only included in non-RID Linux builds). Program.cs expects StripWolf.Core.Desktop.Services.Linux.
+namespace StripWolf.Core.Desktop.Services.Linux;
 
 /// <summary>
 /// Linux off-screen snapshot service backed by Avalonia.Controls.WebView (WPE WebKit).
@@ -86,7 +88,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
     private sealed class PaginationSession : IWebViewPaginationSession
     {
         private readonly LinuxWpeWebViewSnapshotService _owner;
-        private readonly WebView _webView;
+        private readonly NativeWebView _webView;
         private readonly Window _offscreenWindow;
         private readonly int _viewportWidth;
         private readonly int _viewportHeight;
@@ -96,7 +98,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
 
         private PaginationSession(
             LinuxWpeWebViewSnapshotService owner,
-            WebView webView,
+            NativeWebView webView,
             Window offscreenWindow,
             int viewportWidth,
             int viewportHeight)
@@ -107,7 +109,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
             _viewportWidth = viewportWidth;
             _viewportHeight = viewportHeight;
 
-            _webView.MessageReceived += OnWebViewMessageReceived;
+            _webView.WebMessageReceived += OnWebViewMessageReceived;
         }
 
         public static Task<PaginationSession> CreateAsync(
@@ -116,7 +118,8 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
             int viewportHeight,
             double renderScale)
         {
-            var webView = new WebView
+            // Avalonia.Controls.WebView 12 names the control NativeWebView (the old WebView API names were used here)
+            var webView = new NativeWebView
             {
                 Width = viewportWidth,
                 Height = viewportHeight
@@ -128,7 +131,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
                 {
                     Width = viewportWidth,
                     Height = viewportHeight,
-                    SystemDecorations = SystemDecorations.None,
+                    WindowDecorations = WindowDecorations.None,
                     ShowInTaskbar = false,
                     CanResize = false,
                     Opacity = 0,
@@ -172,7 +175,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
         {
             ThrowIfDisposed();
             var pageCountJson = await Dispatcher.UIThread.InvokeAsync(() => 
-                _webView.ExecuteScriptAsync("window.__stripWolfPageCount ?? 1"));
+                _webView.InvokeScript("window.__stripWolfPageCount ?? 1"));
             
             if (string.IsNullOrEmpty(pageCountJson)) return 1;
             
@@ -193,7 +196,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
             return await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var readyTask = PrepareReadyAwaiter();
-                await _webView.ExecuteScriptAsync($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
+                await _webView.InvokeScript($"window.__stripWolfSetPage({Math.Max(0, pageIndex)})");
                 await WaitForReadyAsync(readyTask, "Timed out waiting for Linux WebView EPUB pagination to finish paging.");
 
                 // Use Avalonia's RenderTargetBitmap to capture the WebView
@@ -221,7 +224,7 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _webView.MessageReceived -= OnWebViewMessageReceived;
+                _webView.WebMessageReceived -= OnWebViewMessageReceived;
                 _offscreenWindow.Close();
             });
 
@@ -254,9 +257,9 @@ public sealed class LinuxWpeWebViewSnapshotService : IWebViewPaginationService
             }
         }
 
-        private void OnWebViewMessageReceived(object? sender, WebViewMessageReceivedEventArgs args)
+        private void OnWebViewMessageReceived(object? sender, WebMessageReceivedEventArgs args)
         {
-            if (args.Message == "stripwolf-ready")
+            if (args.Body == "stripwolf-ready")
             {
                 var completionSource = _readyCompletionSource;
                 _readyCompletionSource = null;

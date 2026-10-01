@@ -85,31 +85,40 @@ public class ComicConverterService
     }
 
     /// <summary>
-    /// Checks if the file needs to be converted to CBZ for optimal reading
+    /// Checks if the file is a solid 7z archive that requires sequential reading
     /// </summary>
-    public static bool NeedsConversion(string filePath)
+    public static bool IsSolidSevenZip(string filePath)
     {
-        var archiveType = GetArchiveType(filePath);
-        
-        // Zip/CBZ is the target format - no conversion needed
-        if (archiveType == ComicArchiveType.Zip)
+        if (GetArchiveType(filePath) != ComicArchiveType.SevenZip)
         {
             return false;
         }
 
-        // Check if it's a supported format that can be converted
-        if (archiveType == ComicArchiveType.SevenZip || archiveType == ComicArchiveType.Tar)
+        try
         {
-            return true;
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var archive = SevenZipArchive.OpenArchive(stream);
+            return archive.IsSolid;
         }
-
-        // For RAR, only solid archives need conversion (for performance)
-        if (archiveType == ComicArchiveType.Rar)
+        catch
         {
-            return IsSolidRar(filePath);
+            return false;
         }
+    }
 
-        return false;
+    /// <summary>
+    /// Checks if the file needs to be converted to CBZ for reading.
+    /// Only solid archives (RAR, 7z) are converted: to read a page, everything before it has to be decompressed.
+    /// Non-solid RAR/7z support random access and TAR is uncompressed, those are read as they are.
+    /// </summary>
+    public static bool NeedsConversion(string filePath)
+    {
+        return GetArchiveType(filePath) switch
+        {
+            ComicArchiveType.Rar => IsSolidRar(filePath),
+            ComicArchiveType.SevenZip => IsSolidSevenZip(filePath),
+            _ => false
+        };
     }
 
     /// <summary>
@@ -481,11 +490,18 @@ public class ComicConverterService
             inputStream.Position = 0;
         }
 
-        using var reader = ReaderFactory.OpenReader(inputStream, new ReaderOptions
-        {
-            LeaveStreamOpen = true,
-            ExtensionHint = GetExtensionHint(archiveType)
-        });
+        // SharpCompress has no forward-only reader for 7z (ReaderFactory throws "Cannot determine compressed stream type"),
+        // 7z is read through the archive API, which also handles solid archives sequentially via ExtractAllEntries.
+        using var sevenZipArchive = archiveType == ComicArchiveType.SevenZip
+            ? SevenZipArchive.OpenArchive(inputStream, new ReaderOptions { LeaveStreamOpen = true })
+            : null;
+        using var reader = sevenZipArchive is not null
+            ? sevenZipArchive.ExtractAllEntries()
+            : ReaderFactory.OpenReader(inputStream, new ReaderOptions
+            {
+                LeaveStreamOpen = true,
+                ExtensionHint = GetExtensionHint(archiveType)
+            });
         using var comicImportCapture = new ComicImportCapture();
         while (reader.MoveToNextEntry())
         {
@@ -526,9 +542,24 @@ public class ComicConverterService
 
     private static void CopyEntryToZip(Stream entryStream, ZipArchive outputArchive, string safeEntryName)
     {
-        var zipEntry = outputArchive.CreateEntry(safeEntryName, CompressionLevel.Optimal);
+        var zipEntry = outputArchive.CreateEntry(safeEntryName, GetCompressionLevel(safeEntryName));
         using var zipEntryStream = zipEntry.Open();
         entryStream.CopyTo(zipEntryStream);
+    }
+
+    /// <summary>
+    /// JPEG/PNG/WebP/GIF/AVIF/JXL are already compressed: deflating them again costs a lot of CPU (noticeable on mobile)
+    /// for ~1% smaller files, and makes reading slower. Only uncompressed formats (BMP/TIFF) and ComicInfo.xml are deflated.
+    /// </summary>
+    private static CompressionLevel GetCompressionLevel(string entryName)
+    {
+        var extension = Path.GetExtension(entryName);
+        return extension.ToLowerInvariant() switch
+        {
+            ".bmp" or ".tif" or ".tiff" or ".xml" => CompressionLevel.Optimal,
+            _ when ComicConstants.IsImageFile(entryName) => CompressionLevel.NoCompression,
+            _ => CompressionLevel.Optimal
+        };
     }
 
     private static void ReportStreamingProgress(IProgress<double>? progress, Stream inputStream)

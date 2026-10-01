@@ -31,7 +31,26 @@ public class PanelDetectionService
     private readonly Dictionary<string, Dictionary<int, PagePanelInfo>> _cache = new();
     private readonly object _cacheLock = new();
 
-    public bool IsAvailable => true;
+    /// <summary>
+    /// Guided reading needs the native OpenCV library. It is referenced by default, also on platforms where no
+    /// native runtime is shipped (e.g. iOS), so check once whether it can actually be loaded instead of
+    /// always returning true (guided mode then silently found no panels on those platforms).
+    /// </summary>
+    public bool IsAvailable => NativeOpenCvAvailable.Value;
+
+    private static readonly Lazy<bool> NativeOpenCvAvailable = new(() =>
+    {
+        try
+        {
+            using var probe = new Mat(1, 1, MatType.CV_8UC1);
+            return !probe.Empty();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"PanelDetectionService: OpenCV is not available: {ex.Message}");
+            return false;
+        }
+    });
     
     private const double MinPanelSizeRatio = 0.04;
     private const double MinPanelAreaRatio = 0.015;

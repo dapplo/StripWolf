@@ -29,7 +29,7 @@ namespace StripWolf.Core.Services;
 /// </summary>
 public static class Logger
 {
-    private static readonly string LogFilePath;
+    private static string LogFilePath;
     private static readonly Lock LockObj = new();
     private const long MaxLogSize = 5 * 1024 * 1024; // 5 MB
 
@@ -54,6 +54,23 @@ public static class Logger
                 // Fallback if everything fails
                 LogFilePath = "stripwolf.log";
             }
+        }
+    }
+
+    /// <summary>
+    /// Write the log somewhere else (used by the tests, so they never write into the real user data directory).
+    /// </summary>
+    internal static void RedirectTo(string logFilePath)
+    {
+        var directory = Path.GetDirectoryName(logFilePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        lock (LockObj)
+        {
+            LogFilePath = logFilePath;
         }
     }
 

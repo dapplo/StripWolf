@@ -52,6 +52,13 @@ public static class FileAssociationHelper
                 return;
             }
 
+            var targetPath = exePath;
+            var gatekeeperPath = Path.Combine(Path.GetDirectoryName(exePath)!, "StripWolf.Gatekeeper.exe");
+            if (File.Exists(gatekeeperPath))
+            {
+                targetPath = gatekeeperPath;
+            }
+
             var extensions = new[] { ".cbz", ".cbr", ".cb7", ".cbt", ".pdf", ".epub" };
             bool anyChanged = false;
 
@@ -74,14 +81,14 @@ public static class FileAssociationHelper
                 }
 
                 // Write/update ProgID details
-                var openCommand = $"\"{exePath}\" \"%1\"";
+                var openCommand = $"\"{targetPath}\" \"%1\"";
                 using (var progKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{progId}\shell\open\command"))
                 {
                     var existingCommand = progKey?.GetValue("") as string;
                     if (existingCommand != openCommand)
                     {
                         Registry.SetValue($@"HKEY_CURRENT_USER\Software\Classes\{progId}", "", desc);
-                        Registry.SetValue($@"HKEY_CURRENT_USER\Software\Classes\{progId}\DefaultIcon", "", $"\"{exePath}\",0");
+                        Registry.SetValue($@"HKEY_CURRENT_USER\Software\Classes\{progId}\DefaultIcon", "", $"\"{targetPath}\",0");
                         Registry.SetValue($@"HKEY_CURRENT_USER\Software\Classes\{progId}\shell\open\command", "", openCommand);
                         anyChanged = true;
                     }

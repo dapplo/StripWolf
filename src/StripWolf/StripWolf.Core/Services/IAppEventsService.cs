@@ -7,7 +7,7 @@ public class ComicOpenedEventArgs : EventArgs
 {
     public int ComicId { get; }
     public ComicSource Source { get; }
-    public string Identifier { get; } // FilePath for local, BookId for Komga
+    public string Identifier { get; } // FilePath for local, TrialService.GetKomgaViewKey(serverId, bookId) for Komga
 
     public ComicOpenedEventArgs(int comicId, ComicSource source, string identifier)
     {

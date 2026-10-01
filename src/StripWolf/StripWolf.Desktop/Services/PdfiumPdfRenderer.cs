@@ -39,6 +39,18 @@ public class PdfiumPdfRenderer : IPdfRenderer
     private static readonly object InitLock = new();
 
     /// <summary>
+    /// PDFium is not thread-safe. Imports (page count/metadata), conversions and the reader can call into it at the
+    /// same time from different threads, so every FPDF_* call has to be serialized through this lock.
+    /// </summary>
+    private static readonly System.Threading.Lock PdfiumLock = new();
+
+    /// <summary>
+    /// Upper bound for the rendered page size (per side), protects against int overflow and huge allocations
+    /// for poster-sized PDF pages.
+    /// </summary>
+    private const int MaxRenderDimension = 8192;
+
+    /// <summary>
     /// White background color in ARGB format (opaque white)
     /// </summary>
     private const uint WhiteBackgroundColor = 0xFFFFFFFF;
@@ -53,16 +65,19 @@ public class PdfiumPdfRenderer : IPdfRenderer
     {
         EnsurePdfiumInitialized();
 
-        var document = OpenDocument(pdfFilePath);
-        try
+        lock (PdfiumLock)
         {
-            var pageCount = fpdfview.FPDF_GetPageCount(document);
-            var metadata = CreateMetadata(document);
-            return Task.FromResult<IPdfRenderSession>(new PdfiumRenderSession(pdfFilePath, pageCount, metadata, RenderDpi, JpegQuality));
-        }
-        finally
-        {
-            fpdfview.FPDF_CloseDocument(document);
+            var document = OpenDocument(pdfFilePath);
+            try
+            {
+                var pageCount = fpdfview.FPDF_GetPageCount(document);
+                var metadata = CreateMetadata(document);
+                return Task.FromResult<IPdfRenderSession>(new PdfiumRenderSession(pdfFilePath, pageCount, metadata, RenderDpi, JpegQuality));
+            }
+            finally
+            {
+                fpdfview.FPDF_CloseDocument(document);
+            }
         }
     }
 
@@ -87,20 +102,23 @@ public class PdfiumPdfRenderer : IPdfRenderer
     {
         EnsurePdfiumInitialized();
 
-        var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
-        if (document == null)
+        lock (PdfiumLock)
         {
-            var fileName = Path.GetFileName(pdfFilePath);
-            throw new InvalidOperationException($"Failed to open PDF file: {fileName}");
-        }
+            var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
+            if (document == null)
+            {
+                var fileName = Path.GetFileName(pdfFilePath);
+                throw new InvalidOperationException($"Failed to open PDF file: {fileName}");
+            }
 
-        try
-        {
-            return fpdfview.FPDF_GetPageCount(document);
-        }
-        finally
-        {
-            fpdfview.FPDF_CloseDocument(document);
+            try
+            {
+                return fpdfview.FPDF_GetPageCount(document);
+            }
+            finally
+            {
+                fpdfview.FPDF_CloseDocument(document);
+            }
         }
     }
 
@@ -109,31 +127,22 @@ public class PdfiumPdfRenderer : IPdfRenderer
     {
         EnsurePdfiumInitialized();
 
-        var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
-        if (document == null)
+        lock (PdfiumLock)
         {
-            return null;
-        }
-
-        try
-        {
-            var metadata = new PdfMetadata
+            var document = fpdfview.FPDF_LoadDocument(pdfFilePath, null);
+            if (document == null)
             {
-                Title = GetMetaText(document, "Title"),
-                Author = GetMetaText(document, "Author"),
-                Subject = GetMetaText(document, "Subject"),
-                Keywords = GetMetaText(document, "Keywords"),
-                Creator = GetMetaText(document, "Creator"),
-                Producer = GetMetaText(document, "Producer"),
-                CreationDate = ParsePdfDate(GetMetaText(document, "CreationDate")),
-                ModificationDate = ParsePdfDate(GetMetaText(document, "ModDate"))
-            };
+                return null;
+            }
 
-            return metadata.HasAnyMetadata ? metadata : null;
-        }
-        finally
-        {
-            fpdfview.FPDF_CloseDocument(document);
+            try
+            {
+                return CreateMetadata(document);
+            }
+            finally
+            {
+                fpdfview.FPDF_CloseDocument(document);
+            }
         }
     }
 
@@ -326,62 +335,81 @@ public class PdfiumPdfRenderer : IPdfRenderer
 
         private void RenderPageToJpeg(int pageIndex, Stream outputStream)
         {
-            var document = OpenDocument(pdfFilePath);
-            var page = fpdfview.FPDF_LoadPage(document, pageIndex);
-            if (page == null)
+            int widthInPixels;
+            int heightInPixels;
+            PinnedBgra32Buffer pixelBuffer;
+
+            // Only the PDFium part is done under the global lock, the JPEG encoding runs outside of it
+            lock (PdfiumLock)
             {
-                throw new InvalidOperationException($"Failed to load page {pageIndex}");
-            }
-
-            FpdfBitmapT? bitmap = null;
-            try
-            {
-                var widthInPoints = fpdfview.FPDF_GetPageWidthF(page);
-                var heightInPoints = fpdfview.FPDF_GetPageHeightF(page);
-                var widthInPixels = (int)(widthInPoints * renderDpi / 72.0);
-                var heightInPixels = (int)(heightInPoints * renderDpi / 72.0);
-                var stride = widthInPixels * Marshal.SizeOf<Bgra32>();
-                var pixelBuffer = EnsurePageBufferCapacity(stride * heightInPixels);
-
-                bitmap = fpdfview.FPDFBitmapCreateEx(
-                    widthInPixels,
-                    heightInPixels,
-                    (int)FPDFBitmapFormat.BGRA,
-                    pixelBuffer.Pointer,
-                    stride);
-
-                if (bitmap == null)
+                var document = OpenDocument(pdfFilePath);
+                FpdfPageT? page = null;
+                FpdfBitmapT? bitmap = null;
+                try
                 {
-                    throw new InvalidOperationException($"Failed to create bitmap for page {pageIndex}");
-                }
+                    page = fpdfview.FPDF_LoadPage(document, pageIndex);
+                    if (page == null)
+                    {
+                        // Note: the document used to leak in this case, the throw happened before the try/finally
+                        throw new InvalidOperationException($"Failed to load page {pageIndex}");
+                    }
 
-                fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, widthInPixels, heightInPixels, WhiteBackgroundColor);
-                fpdfview.FPDF_RenderPageBitmap(
-                    bitmap,
-                    page,
-                    0, 0,
-                    widthInPixels,
-                    heightInPixels,
-                    0,
-                    (int)(RenderFlags.RenderAnnotations | RenderFlags.LimitedImageCache));
-                using var image = Image.WrapMemory<Bgra32>(
-                    Configuration.Default,
-                    pixelBuffer.GetMemory(widthInPixels * heightInPixels),
-                    widthInPixels,
-                    heightInPixels);
-                var encoder = new JpegEncoder { Quality = jpegQuality };
-                image.Save(outputStream, encoder);
-                Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
-            }
-            finally
-            {
-                if (bitmap != null)
-                {
-                    fpdfview.FPDFBitmapDestroy(bitmap);
+                    var widthInPoints = fpdfview.FPDF_GetPageWidthF(page);
+                    var heightInPoints = fpdfview.FPDF_GetPageHeightF(page);
+                    var scale = renderDpi / 72.0;
+                    var maxPoints = Math.Max(widthInPoints, heightInPoints);
+                    if (maxPoints * scale > MaxRenderDimension)
+                    {
+                        scale = MaxRenderDimension / maxPoints;
+                    }
+                    widthInPixels = Math.Max(1, (int)(widthInPoints * scale));
+                    heightInPixels = Math.Max(1, (int)(heightInPoints * scale));
+                    var stride = widthInPixels * 4; // BGRA, 4 bytes per pixel
+                    pixelBuffer = EnsurePageBufferCapacity(stride * heightInPixels);
+
+                    bitmap = fpdfview.FPDFBitmapCreateEx(
+                        widthInPixels,
+                        heightInPixels,
+                        (int)FPDFBitmapFormat.BGRA,
+                        pixelBuffer.Pointer,
+                        stride);
+
+                    if (bitmap == null)
+                    {
+                        throw new InvalidOperationException($"Failed to create bitmap for page {pageIndex}");
+                    }
+
+                    fpdfview.FPDFBitmapFillRect(bitmap, 0, 0, widthInPixels, heightInPixels, WhiteBackgroundColor);
+                    fpdfview.FPDF_RenderPageBitmap(
+                        bitmap,
+                        page,
+                        0, 0,
+                        widthInPixels,
+                        heightInPixels,
+                        0,
+                        (int)(RenderFlags.RenderAnnotations | RenderFlags.LimitedImageCache));
                 }
-                fpdfview.FPDF_ClosePage(page);
-                fpdfview.FPDF_CloseDocument(document);
+                finally
+                {
+                    if (bitmap != null)
+                    {
+                        fpdfview.FPDFBitmapDestroy(bitmap);
+                    }
+                    if (page != null)
+                    {
+                        fpdfview.FPDF_ClosePage(page);
+                    }
+                    fpdfview.FPDF_CloseDocument(document);
+                }
             }
+
+            using var image = Image.WrapMemory<Bgra32>(
+                Configuration.Default,
+                pixelBuffer.GetMemory(widthInPixels * heightInPixels),
+                widthInPixels,
+                heightInPixels);
+            var encoder = new JpegEncoder { Quality = jpegQuality };
+            image.Save(outputStream, encoder);
         }
 
         private PinnedBgra32Buffer EnsurePageBufferCapacity(int requiredByteLength)

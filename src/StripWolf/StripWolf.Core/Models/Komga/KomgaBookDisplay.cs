@@ -17,26 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
-/// Display model for a Komga book with pre-loaded thumbnail and download status
+/// Display model for a Komga book with a lazily loaded thumbnail and download status
 /// </summary>
-public partial class KomgaBookDisplay : ObservableObject
+public partial class KomgaBookDisplay : KomgaThumbnailDisplay
 {
     /// <summary>
     /// The underlying Komga book data
     /// </summary>
     public KomgaBook Book { get; set; } = new();
-
-    [ObservableProperty]
-    private Bitmap? _thumbnail;
-
-    [ObservableProperty]
-    private bool _isThumbnailResolved;
 
     [ObservableProperty]
     private bool _isQueued;

@@ -24,6 +24,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StripWolf.Core.Controls;
 using StripWolf.Core.Data;
 using StripWolf.Core.Models;
 using StripWolf.Core.Models.Komga;
@@ -253,6 +254,22 @@ public partial class KomgaViewModel : ViewModelBase
     private bool _hasMoreReadLists = true;
 
     private int _currentPage;
+    // Token of the navigation for which a series / read list books page request is in flight, prevents duplicate
+    // page requests when the view asks for more items on every scroll event
+    private CancellationToken? _seriesPageLoadingFor;
+    private CancellationToken? _readListBooksPageLoadingFor;
+    private Task? _initializeTask;
+
+    // Thumbnails are displayed ~150-200 DIP wide, 300 pixels is sharp enough for HiDPI screens
+    private const int ThumbnailDecodeWidth = 300;
+    // Limits parallel thumbnail requests and decodes, a fast scroll realizes a lot of cards at once
+    private readonly SemaphoreSlim _thumbnailLoadSemaphore = new(4, 4);
+
+    /// <summary>
+    /// True while a further page is loaded because the user scrolled near the end of the list
+    /// </summary>
+    [ObservableProperty]
+    private bool _isLoadingMore;
     
     [ObservableProperty]
     private bool _hasMoreSeries = true;
@@ -290,7 +307,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             _currentPage = 0;
             HasMoreSeries = true;
-            Series.Clear();
+            ClearAndReleaseThumbnails(Series);
             await LoadSeriesAsync();
         }
     }
@@ -715,22 +732,32 @@ public partial class KomgaViewModel : ViewModelBase
         {
             Dispatcher.UIThread.Post(async () =>
             {
-                ApplySectionLayout(settings);
-                ApplyDownloadSettings(settings);
-                RefreshLocalization();
-                
-                RefreshConfiguredServers(settings);
-                
-                if (_activeServer is not null)
+                // async void (posted async lambda): exceptions must not escape, they would crash the app
+                try
                 {
-                    var updatedServer = settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id);
-                    if (updatedServer is not null)
+                    ApplySectionLayout(settings);
+                    ApplyDownloadSettings(settings);
+                    RefreshLocalization();
+                    
+                    RefreshConfiguredServers(settings);
+                    
+                    if (_activeServer is not null)
                     {
-                        await ApplyServerAsync(updatedServer, useCache: true, persistSelection: false);
+                        var updatedServer = settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id);
+                        // Settings are saved for many unrelated reasons (tab switch, opening a comic, ...).
+                        // Only reconnect (a network round trip) when the connection settings actually changed.
+                        if (updatedServer is not null && !HasSameConnectionSettings(_activeServer, updatedServer))
+                        {
+                            await ApplyServerAsync(updatedServer, useCache: true, persistSelection: false);
+                        }
                     }
+                    
+                    await LoadVisibleAndExpandedSectionsAsync(useCache: true);
                 }
-                
-                await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"KomgaViewModel: Failed to apply changed settings: {ex.Message}");
+                }
             });
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
@@ -972,8 +999,8 @@ public partial class KomgaViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText) || !_komgaApiService.IsConfigured)
         {
             IsSearching = false;
-            SearchSeriesResults.Clear();
-            SearchBookResults.Clear();
+            ClearAndReleaseThumbnails(SearchSeriesResults);
+            ClearAndReleaseThumbnails(SearchBookResults);
             return;
         }
 
@@ -984,7 +1011,7 @@ public partial class KomgaViewModel : ViewModelBase
         {
             // Search series
             var seriesResults = await _komgaApiService.SearchSeriesAsync(SearchText, 0, _searchLimit);
-            SearchSeriesResults.Clear();
+            ClearAndReleaseThumbnails(SearchSeriesResults);
             var newSeries = new List<KomgaSeriesDisplay>();
             foreach (var s in seriesResults.Content)
             {
@@ -997,18 +1024,10 @@ public partial class KomgaViewModel : ViewModelBase
                     SearchSeriesResults.Add(display);
                 }
             }
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newSeries)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadSeriesDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
 
             // Search books
             var bookResults = await _komgaApiService.SearchBooksAsync(SearchText, 0, _searchLimit);
-            SearchBookResults.Clear();
+            ClearAndReleaseThumbnails(SearchBookResults);
             var newBooks = new List<KomgaBookDisplay>();
             foreach (var b in bookResults.Content)
             {
@@ -1022,14 +1041,7 @@ public partial class KomgaViewModel : ViewModelBase
                 }
             }
             
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newBooks)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newBooks, ct), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1066,8 +1078,32 @@ public partial class KomgaViewModel : ViewModelBase
     {
         SearchText = string.Empty;
         IsSearching = false;
-        SearchSeriesResults.Clear();
-        SearchBookResults.Clear();
+        ClearAndReleaseThumbnails(SearchSeriesResults);
+        ClearAndReleaseThumbnails(SearchBookResults);
+    }
+
+    /// <summary>
+    /// Initializes once per view model, called every time the Komga view is shown.
+    /// The initialization (connection test, libraries, lists) is only repeated while not connected,
+    /// e.g. when no server was configured yet or the server was offline.
+    /// </summary>
+    public async Task EnsureInitializedAsync()
+    {
+        if (_initializeTask is { IsCompleted: false })
+        {
+            await _initializeTask;
+            return;
+        }
+
+        if (_initializeTask is not null && IsConnected)
+        {
+            // Reading progress changes while reading, refresh the smart lists when their cache expired
+            await LoadSmartListsAsync(useCache: true);
+            return;
+        }
+
+        _initializeTask = InitializeAsync();
+        await _initializeTask;
     }
 
     [RelayCommand]
@@ -1125,7 +1161,7 @@ public partial class KomgaViewModel : ViewModelBase
         _readListsCacheTime = DateTime.MinValue;
         _currentReadListPage = 0;
         HasMoreReadLists = true;
-        ReadLists.Clear();
+        ClearAndReleaseThumbnails(ReadLists);
         await LoadReadListsAsync(useCache: false);
     }
 
@@ -1171,7 +1207,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         try
         {
-            KeepReadingBooks.Clear();
+            ClearAndReleaseThumbnails(KeepReadingBooks);
             var keepReading = await _komgaApiService.GetBooksInProgressAsync(0, _smartListSize);
             HasKeepReading = keepReading.Content.Count > 0;
             
@@ -1191,14 +1227,7 @@ public partial class KomgaViewModel : ViewModelBase
                 RefreshHomeSectionVisibilityState();
             }
 
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newDisplays, ct), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1215,7 +1244,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         try
         {
-            OnDeckBooks.Clear();
+            ClearAndReleaseThumbnails(OnDeckBooks);
             var onDeck = await _komgaApiService.GetBooksOnDeckAsync(0, _smartListSize);
             HasOnDeck = onDeck.Content.Count > 0;
             
@@ -1235,14 +1264,7 @@ public partial class KomgaViewModel : ViewModelBase
                 RefreshHomeSectionVisibilityState();
             }
 
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newDisplays, ct), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1259,7 +1281,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         try
         {
-            RecentlyAddedBooks.Clear();
+            ClearAndReleaseThumbnails(RecentlyAddedBooks);
             var recentBooks = await _komgaApiService.GetBooksLatestAsync(0, _smartListSize);
             HasRecentBooks = recentBooks.Content.Count > 0;
             
@@ -1279,14 +1301,7 @@ public partial class KomgaViewModel : ViewModelBase
                 RefreshHomeSectionVisibilityState();
             }
 
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newDisplays, ct), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1303,7 +1318,7 @@ public partial class KomgaViewModel : ViewModelBase
 
         try
         {
-            RecentlyAddedSeries.Clear();
+            ClearAndReleaseThumbnails(RecentlyAddedSeries);
             var recentSeries = await _komgaApiService.GetSeriesLatestAsync(0, _smartListSize);
             HasRecentSeries = recentSeries.Content.Count > 0;
             
@@ -1322,15 +1337,6 @@ public partial class KomgaViewModel : ViewModelBase
                 _recentSeriesCacheTime = DateTime.UtcNow;
                 RefreshHomeSectionVisibilityState();
             }
-
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadSeriesDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1396,8 +1402,8 @@ public partial class KomgaViewModel : ViewModelBase
             SelectedLibrary = null;
             SelectedSeries = null;
             _currentPage = 0;
-            Series.Clear();
-            Books.Clear();
+            ClearAndReleaseThumbnails(Series);
+            ClearAndReleaseThumbnails(Books);
 
             var series = await _komgaApiService.GetSeriesAsync(seriesId);
             if (series != null)
@@ -1433,8 +1439,8 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedSeries = null;
         _currentPage = 0;
         HasMoreSeries = true;
-        Series.Clear();
-        Books.Clear();
+        ClearAndReleaseThumbnails(Series);
+        ClearAndReleaseThumbnails(Books);
         
         if (library is not null)
         {
@@ -1454,6 +1460,20 @@ public partial class KomgaViewModel : ViewModelBase
         {
             await ApplyServerAsync(server, useCache: false, persistSelection: true);
         }, "Failed to switch Komga server");
+    }
+
+    private static bool HasSameConnectionSettings(KomgaServer current, KomgaServer updated)
+    {
+        return string.Equals(current.Name, updated.Name, StringComparison.Ordinal) &&
+               string.Equals(current.BaseUrl, updated.BaseUrl, StringComparison.Ordinal) &&
+               string.Equals(current.Username, updated.Username, StringComparison.Ordinal) &&
+               string.Equals(current.Password, updated.Password, StringComparison.Ordinal) &&
+               string.Equals(current.ApiKey, updated.ApiKey, StringComparison.Ordinal) &&
+               current.BypassSslValidation == updated.BypassSslValidation &&
+               current.CustomHeaders.Count == updated.CustomHeaders.Count &&
+               current.CustomHeaders.Zip(updated.CustomHeaders).All(pair =>
+                   string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.Value, pair.Second.Value, StringComparison.Ordinal));
     }
 
     private async Task ApplyServerAsync(KomgaServer? server, bool useCache, bool persistSelection)
@@ -1607,11 +1627,11 @@ public partial class KomgaViewModel : ViewModelBase
         SeriesPendingDownloadSelection = null;
         GoBackToLibraries();
         Libraries.Clear();
-        ReadLists.Clear();
-        KeepReadingBooks.Clear();
-        OnDeckBooks.Clear();
-        RecentlyAddedBooks.Clear();
-        RecentlyAddedSeries.Clear();
+        ClearAndReleaseThumbnails(ReadLists);
+        ClearAndReleaseThumbnails(KeepReadingBooks);
+        ClearAndReleaseThumbnails(OnDeckBooks);
+        ClearAndReleaseThumbnails(RecentlyAddedBooks);
+        ClearAndReleaseThumbnails(RecentlyAddedSeries);
         HasKeepReading = false;
         HasOnDeck = false;
         HasRecentBooks = false;
@@ -1619,11 +1639,10 @@ public partial class KomgaViewModel : ViewModelBase
         RefreshHomeSectionVisibilityState();
     }
 
-    private async Task PersistActiveServerSelectionAsync(int serverId)
+    private Task PersistActiveServerSelectionAsync(int serverId)
     {
-        var settings = _settingsService.LoadSettings();
-        settings.ActiveServerId = serverId;
-        await _settingsService.SaveSettingsAsync(settings);
+        // Only change the active server, a full SaveSettingsAsync could overwrite concurrent changes made elsewhere
+        return _settingsService.UpdateSettingsAsync(settings => settings.ActiveServerId = serverId);
     }
 
     [RelayCommand]
@@ -1634,10 +1653,29 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
+        // Capture the token before awaiting: a navigation during the request replaces _loadingCts and the result
+        // of this request must then be dropped (reading the token after the await would accept it).
+        var ct = _loadingCts?.Token ?? CancellationToken.None;
+        if (_seriesPageLoadingFor == ct)
+        {
+            // A page for the current navigation is already on its way
+            return;
+        }
+        _seriesPageLoadingFor = ct;
+
+        // Only the first page blocks the view, following pages are loaded while the user scrolls (LoadNextPageIfNeeded)
+        var isFirstPage = _currentPage == 0;
         try
         {
-            IsBusy = true;
-            
+            if (isFirstPage)
+            {
+                IsBusy = true;
+            }
+            else
+            {
+                IsLoadingMore = true;
+            }
+
             var prefix = SelectedSeriesPrefix;
             var pageSize = Math.Max(1, _settingsService.LoadSettings().KomgaSeriesPageSize);
             
@@ -1647,39 +1685,21 @@ public partial class KomgaViewModel : ViewModelBase
                 libraryId: SelectedLibrary?.Id,
                 searchPrefix: prefix);
 
-            var ct = _loadingCts?.Token ?? CancellationToken.None;
-            var newDisplays = new List<KomgaSeriesDisplay>();
-            foreach (var s in result.Content)
-            {
-                newDisplays.Add(CreateSeriesDisplay(s, null));
-            }
-
             if (!ct.IsCancellationRequested)
             {
                 HasMoreSeries = !result.Last;
                 _currentPage++;
-                
-                foreach (var display in newDisplays)
+
+                // Thumbnails are loaded when the cards get realized, see OnThumbnailElementPrepared
+                foreach (var s in result.Content)
                 {
-                    Series.Add(display);
+                    Series.Add(CreateSeriesDisplay(s, null));
                 }
             }
-
-            // Load thumbnails in background
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadSeriesDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
-
-            // Auto-load remaining pages in the background without showing the busy overlay
-            if (HasMoreSeries && !ct.IsCancellationRequested)
-            {
-                _ = AutoLoadRemainingSeriesAsync(SelectedLibrary?.Id, prefix, ct);
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation replaced this request
         }
         catch (Exception ex)
         {
@@ -1688,70 +1708,56 @@ public partial class KomgaViewModel : ViewModelBase
         }
         finally
         {
-            IsBusy = false;
+            if (_seriesPageLoadingFor == ct)
+            {
+                _seriesPageLoadingFor = null;
+            }
+
+            if (isFirstPage)
+            {
+                IsBusy = false;
+            }
+            else
+            {
+                IsLoadingMore = false;
+            }
         }
     }
 
     /// <summary>
-    /// Continues loading all remaining series pages in the background without showing the busy overlay.
+    /// Called by the view when the user scrolled near the end of the loaded items (or the items don't fill the view):
+    /// loads the next page of the list that is currently shown.
     /// </summary>
-    private async Task AutoLoadRemainingSeriesAsync(string? libraryId, string? prefix, CancellationToken ct)
+    public void LoadNextPageIfNeeded()
     {
-        while (!ct.IsCancellationRequested && HasMoreSeries)
+        if (!IsConnected || IsSearching || IsBusy)
         {
-            try
+            return;
+        }
+
+        if (SelectedReadList is not null)
+        {
+            if (HasMoreBooks)
             {
-                var pageSize = Math.Max(1, _settingsService.LoadSettings().KomgaSeriesPageSize);
-                var page = _currentPage;
-                var result = await _komgaApiService.GetSeriesAsync(page, pageSize, libraryId, prefix);
-
-                if (ct.IsCancellationRequested)
-                    break;
-
-                var newDisplays = new List<KomgaSeriesDisplay>();
-                foreach (var s in result.Content)
-                {
-                    newDisplays.Add(CreateSeriesDisplay(s, null));
-                }
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!ct.IsCancellationRequested)
-                    {
-                        HasMoreSeries = !result.Last;
-                        _currentPage++;
-                        foreach (var display in newDisplays)
-                        {
-                            Series.Add(display);
-                        }
-                    }
-                });
-
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadSeriesDetailsAsync(display, ct);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error auto-loading remaining series: {ex.Message}");
-                break;
+                _ = LoadBooksForReadListAsync();
             }
         }
+        else if (SelectedLibrary is not null && SelectedSeries is null)
+        {
+            if (HasMoreSeries)
+            {
+                _ = LoadSeriesAsync();
+            }
+        }
+        // The books of a series are always loaded completely (see LoadBooksAsync)
     }
 
     /// <summary>
-    /// Returns the path for a cached thumbnail. The path includes the current server ID so that
+    /// Returns the path for a cached thumbnail. The path includes the server ID so that
     /// thumbnails from different servers do not overlap.
     /// </summary>
-    private string GetThumbnailCachePath(string type, string itemId)
+    private static string GetThumbnailCachePath(int serverId, string type, string itemId)
     {
-        var serverId = _activeServer?.Id ?? 0;
         var cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "StripWolf", "thumbnails", serverId.ToString(), type);
@@ -1760,86 +1766,179 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Returns cached series thumbnail bytes, fetching and caching from the server if not found on disk.
+    /// Returns cached thumbnail bytes, fetching and caching them from the server if not found on disk.
     /// </summary>
-    private async Task<byte[]?> GetOrFetchSeriesThumbnailAsync(string seriesId, CancellationToken ct)
+    private static async Task<byte[]?> GetOrFetchCachedThumbnailAsync(int serverId, string type, string itemId,
+        Func<CancellationToken, Task<byte[]?>> fetch, CancellationToken ct)
     {
-        var cachePath = GetThumbnailCachePath("series", seriesId);
+        var cachePath = GetThumbnailCachePath(serverId, type, itemId);
         if (File.Exists(cachePath))
             return await File.ReadAllBytesAsync(cachePath, ct);
-        var bytes = await _komgaApiService.GetSeriesThumbnailAsync(seriesId, ct);
+        var bytes = await fetch(ct);
         if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
             await File.WriteAllBytesAsync(cachePath, bytes, ct);
         return bytes;
     }
 
     /// <summary>
-    /// Returns cached book thumbnail bytes, fetching and caching from the server if not found on disk.
+    /// Called by the view when an ItemsRepeater realized a card: loads the thumbnail of the item.
+    /// Only realized (≈ visible) cards hold a decoded thumbnail, so big libraries don't decode thousands of covers.
     /// </summary>
-    private async Task<byte[]?> GetOrFetchBookThumbnailAsync(string bookId, CancellationToken ct)
+    public void OnThumbnailElementPrepared(object? item)
     {
-        var cachePath = GetThumbnailCachePath("books", bookId);
-        if (File.Exists(cachePath))
-            return await File.ReadAllBytesAsync(cachePath, ct);
-        var bytes = await _komgaApiService.GetBookThumbnailAsync(bookId, ct);
-        if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
-            await File.WriteAllBytesAsync(cachePath, bytes, ct);
-        return bytes;
+        if (item is not KomgaThumbnailDisplay display)
+        {
+            return;
+        }
+
+        display.RealizedElementCount++;
+        RequestThumbnail(display);
     }
 
     /// <summary>
-    /// Loads a series thumbnail in the background and updates the display model in-place.
+    /// Called by the view when an ItemsRepeater recycles a card: releases the thumbnail of the item.
+    /// It is reloaded from the disk cache when the card is realized again.
     /// </summary>
-    private async Task LoadSeriesDetailsAsync(KomgaSeriesDisplay display, CancellationToken ct)
+    public void OnThumbnailElementClearing(object? item)
     {
+        if (item is not KomgaThumbnailDisplay display)
+        {
+            return;
+        }
+
+        display.RealizedElementCount = Math.Max(0, display.RealizedElementCount - 1);
+        if (display.RealizedElementCount > 0)
+        {
+            return;
+        }
+
+        // Deferred: a Move in the collection (local sorting) clears the element and realizes it again in the same
+        // layout pass, releasing right away would make the thumbnail flicker and decode it again.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (display.RealizedElementCount == 0 && !IsThumbnailDisplayInUse(display))
+            {
+                display.ReleaseThumbnail();
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// True when the display is bound by an overlay (book info, pickers) outside of the card grids
+    /// </summary>
+    private bool IsThumbnailDisplayInUse(KomgaThumbnailDisplay display)
+    {
+        return ReferenceEquals(display, SelectedInfoBookDisplay) ||
+               ReferenceEquals(display, BookPendingReadListSelection) ||
+               ReferenceEquals(display, SeriesPendingDownloadSelection);
+    }
+
+    /// <summary>
+    /// Clears a display collection and releases the thumbnails of the removed items.
+    /// The collection is cleared first: that unbinds the cards, only then the bitmaps can be disposed
+    /// (KomgaThumbnailDisplay.ReleaseThumbnail additionally defers the dispose until after the next render pass).
+    /// </summary>
+    private void ClearAndReleaseThumbnails<T>(ObservableCollection<T> collection) where T : KomgaThumbnailDisplay
+    {
+        if (collection.Count == 0)
+        {
+            return;
+        }
+
+        var removedDisplays = collection.ToList();
+        collection.Clear();
+        foreach (var display in removedDisplays)
+        {
+            // Still shown by an overlay: leave it to the GC, disposing it would break the overlay
+            if (IsThumbnailDisplayInUse(display))
+            {
+                continue;
+            }
+
+            display.Detach();
+        }
+    }
+
+    private void RequestThumbnail(KomgaThumbnailDisplay display)
+    {
+        if (!display.TryBeginThumbnailLoad(out var version))
+        {
+            return;
+        }
+
+        // Capture the server state now, it can change while the request waits for a free slot
+        var komgaApiService = _komgaApiService;
+        var serverId = _activeServer?.Id ?? 0;
+        Func<CancellationToken, Task<byte[]?>> fetch;
+        if (display is KomgaSeriesDisplay seriesDisplay)
+        {
+            var seriesId = seriesDisplay.Id;
+            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "series", seriesId,
+                token => komgaApiService.GetSeriesThumbnailAsync(seriesId, token), ct);
+        }
+        else if (display is KomgaBookDisplay bookDisplay)
+        {
+            var bookId = bookDisplay.Id;
+            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "books", bookId,
+                token => komgaApiService.GetBookThumbnailAsync(bookId, token), ct);
+        }
+        else if (display is KomgaReadListDisplay readListDisplay)
+        {
+            // Read list thumbnails are composed from their books and change with the list, they are not cached on disk
+            var readListId = readListDisplay.Id;
+            fetch = ct => komgaApiService.GetReadListThumbnailAsync(readListId, ct);
+        }
+        else
+        {
+            display.CompleteThumbnailLoad(version, null);
+            return;
+        }
+
+        _ = Task.Run(() => LoadThumbnailAsync(display, version, fetch));
+    }
+
+    /// <summary>
+    /// Fetches (disk cache or server) and decodes a thumbnail on a background thread, then applies it on the UI thread.
+    /// </summary>
+    private async Task LoadThumbnailAsync(KomgaThumbnailDisplay display, int version, Func<CancellationToken, Task<byte[]?>> fetch)
+    {
+        Bitmap? thumbnail = null;
+        var failed = false;
         try
         {
-            Bitmap? thumbnail = null;
-            
-            // Try to load the thumbnail (using disk cache)
-            var thumbnailBytes = await GetOrFetchSeriesThumbnailAsync(display.Series.Id, ct);
-            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
+            await _thumbnailLoadSemaphore.WaitAsync();
+            try
             {
-                using var stream = new MemoryStream(thumbnailBytes);
-                thumbnail = new Bitmap(stream);
-            }
-            
-            if (ct.IsCancellationRequested)
-            {
-                thumbnail?.Dispose();
-                return;
-            }
-            
-            // Update the display model on UI thread
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (!ct.IsCancellationRequested)
+                // The card may have been recycled while this request waited for a slot
+                if (display.IsThumbnailLoadCurrent(version))
                 {
-                    if (thumbnail is not null)
+                    var thumbnailBytes = await fetch(CancellationToken.None);
+                    if (thumbnailBytes is { Length: > 0 } && display.IsThumbnailLoadCurrent(version))
                     {
-                        display.Thumbnail = thumbnail;
+                        thumbnail = ThumbnailDecoder.Decode(thumbnailBytes, ThumbnailDecodeWidth);
                     }
-                    display.IsThumbnailResolved = true;
                 }
-                else
-                {
-                    thumbnail?.Dispose();
-                }
-            });
+            }
+            finally
+            {
+                _thumbnailLoadSemaphore.Release();
+            }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading details for series '{display.Series.Name}': {ex.Message}");
-            if (!ct.IsCancellationRequested)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!ct.IsCancellationRequested)
-                    {
-                        display.IsThumbnailResolved = true;
-                    }
-                });
-            }
+            // Transient (e.g. network) errors must not mark the thumbnail as unavailable for good
+            failed = true;
+            System.Diagnostics.Debug.WriteLine($"Error loading Komga thumbnail: {ex.Message}");
+        }
+
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => display.CompleteThumbnailLoad(version, thumbnail, isUnavailable: !failed));
+        }
+        catch (Exception ex)
+        {
+            thumbnail?.Dispose();
+            System.Diagnostics.Debug.WriteLine($"Error applying Komga thumbnail: {ex.Message}");
         }
     }
 
@@ -1871,15 +1970,15 @@ public partial class KomgaViewModel : ViewModelBase
         _savedSeriesPage = _currentPage;
         _currentPage = 0;
         HasMoreBooks = true;
-        Books.Clear();
+        ClearAndReleaseThumbnails(Books);
         
         // Clear search state when navigating to a series
         if (IsSearching)
         {
             IsSearching = false;
             SearchText = string.Empty;
-            SearchSeriesResults.Clear();
-            SearchBookResults.Clear();
+            ClearAndReleaseThumbnails(SearchSeriesResults);
+            ClearAndReleaseThumbnails(SearchBookResults);
         }
         
         if (SelectedSeries is not null)
@@ -1919,6 +2018,8 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
+        // Capture the token before awaiting, so a navigation during the request drops its result
+        var ct = _loadingCts?.Token ?? CancellationToken.None;
         try
         {
             IsBusy = true;
@@ -1928,7 +2029,6 @@ public partial class KomgaViewModel : ViewModelBase
                 page: _currentPage,
                 size: pageSize);
 
-            var ct = _loadingCts?.Token ?? CancellationToken.None;
             var newDisplays = new List<KomgaBookDisplay>();
             foreach (var b in result.Content)
             {
@@ -1947,18 +2047,14 @@ public partial class KomgaViewModel : ViewModelBase
                 ApplyLocalSorting();
             }
             
-            // Load thumbnails and download status sequentially in background
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
+            // Load the download status in background, thumbnails are loaded when the cards get realized
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newDisplays, ct), CancellationToken.None);
             
-            // Auto-load remaining pages in the background without showing the busy overlay
-            if (HasMoreBooks && !ct.IsCancellationRequested)
+            // Auto-load remaining pages in the background without showing the busy overlay.
+            // Unlike the series list (paged while scrolling), the books of a series are loaded completely:
+            // the sorting (number/title, ascending/descending) is done locally and needs all books.
+            // Only the book metadata is loaded, the thumbnails are loaded on demand for the visible cards.
+            if (HasMoreBooks && !ct.IsCancellationRequested && SelectedSeries is not null)
             {
                 _ = AutoLoadRemainingBooksAsync(SelectedSeries.Id, ct);
             }
@@ -2010,11 +2106,7 @@ public partial class KomgaViewModel : ViewModelBase
                     }
                 });
 
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadBookDetailsAsync(display, ct);
-                }
+                await LoadBooksDownloadStateAsync(newDisplays, ct);
             }
             catch (OperationCanceledException)
             {
@@ -2041,82 +2133,36 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Loads a book's download status and thumbnail in the background and updates the display model in-place.
+    /// Determines whether the books are already downloaded (in the background) and updates the display models in one go.
     /// </summary>
-    private async Task LoadBookDetailsAsync(KomgaBookDisplay display, CancellationToken ct)
+    private async Task LoadBooksDownloadStateAsync(IReadOnlyList<KomgaBookDisplay> displays, CancellationToken ct)
     {
+        if (displays.Count == 0)
+        {
+            return;
+        }
+
         try
         {
-            var isDownloaded = await CheckIfDownloadedAsync(display.Book);
-            if (ct.IsCancellationRequested) return;
+            var downloadStates = new List<(KomgaBookDisplay Display, bool IsDownloaded)>(displays.Count);
+            foreach (var display in displays)
+            {
+                if (ct.IsCancellationRequested) return;
+                downloadStates.Add((display, await CheckIfDownloadedAsync(display.Book)));
+            }
 
-            Bitmap? thumbnail = null;
-            
-            // Try to load the thumbnail (using disk cache)
-            var thumbnailBytes = await GetOrFetchBookThumbnailAsync(display.Book.Id, ct);
-            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
-            {
-                using var stream = new MemoryStream(thumbnailBytes);
-                thumbnail = new Bitmap(stream);
-            }
-            
-            if (ct.IsCancellationRequested)
-            {
-                thumbnail?.Dispose();
-                return;
-            }
-            
-            // Update the display model on UI thread
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (!ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested) return;
+                foreach (var (display, isDownloaded) in downloadStates)
                 {
                     display.IsDownloaded = isDownloaded;
-                    if (thumbnail is not null)
-                    {
-                        display.Thumbnail = thumbnail;
-                    }
-                    display.IsThumbnailResolved = true;
-                }
-                else
-                {
-                    thumbnail?.Dispose();
                 }
             });
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading details for book '{display.Book.Name}': {ex.Message}");
-            if (!ct.IsCancellationRequested)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!ct.IsCancellationRequested)
-                    {
-                        display.IsThumbnailResolved = true;
-                    }
-                });
-            }
-            
-            // Fallback: check if downloaded and update display model
-            if (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    var isDownloaded = await CheckIfDownloadedAsync(display.Book);
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        if (!ct.IsCancellationRequested)
-                        {
-                            display.IsDownloaded = isDownloaded;
-                        }
-                    });
-                }
-                catch
-                {
-                    // Ignore fallback errors
-                }
-            }
+            System.Diagnostics.Debug.WriteLine($"Error loading the download state of books: {ex.Message}");
         }
     }
 
@@ -3237,8 +3283,8 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedSeries = null;
         SelectedLibrary = null;
         SelectedReadList = null;
-        Books.Clear();
-        Series.Clear();
+        ClearAndReleaseThumbnails(Books);
+        ClearAndReleaseThumbnails(Series);
         // ReadLists and smart lists are cached with 5-minute expiration and only refreshed via explicit refresh button.
         // Don't clear them here to avoid unnecessary API calls when navigating.
         _currentPage = 0;
@@ -3252,8 +3298,10 @@ public partial class KomgaViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackToSeriesAsync()
     {
+        // Stop the background loading of the remaining books, it would keep adding books and advancing _currentPage
+        ResetLoadingCancellation();
         SelectedSeries = null;
-        Books.Clear();
+        ClearAndReleaseThumbnails(Books);
         HasMoreBooks = true;
         // Restore series pagination position saved when we entered the books view
         _currentPage = _savedSeriesPage;
@@ -3262,6 +3310,8 @@ public partial class KomgaViewModel : ViewModelBase
         // reload it from the server so the user has something to navigate.
         if (Series.Count == 0 && SelectedLibrary != null)
         {
+            // Nothing loaded: start at the first page, not at the saved position
+            _currentPage = 0;
             HasMoreSeries = true;
             await LoadSeriesAsync();
         }
@@ -3271,7 +3321,7 @@ public partial class KomgaViewModel : ViewModelBase
     private void GoBackToReadLists()
     {
         SelectedReadList = null;
-        Books.Clear();
+        ClearAndReleaseThumbnails(Books);
         _currentPage = 0;
         HasMoreBooks = true;
     }
@@ -3334,15 +3384,6 @@ public partial class KomgaViewModel : ViewModelBase
                 }
                 RefreshHomeSectionVisibilityState();
             }
-
-            _ = Task.Run(async () =>
-            {
-                foreach (var display in newDisplays)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    await LoadReadListDetailsAsync(display, ct);
-                }
-            }, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -3358,62 +3399,6 @@ public partial class KomgaViewModel : ViewModelBase
     private static bool ShouldRefreshCachedCollection(bool useCache, DateTime cacheTime, int itemCount)
     {
         return !useCache || itemCount == 0 || DateTime.UtcNow - cacheTime > CacheExpiration;
-    }
-
-    /// <summary>
-    /// Loads a read list thumbnail in the background and updates the display model in-place.
-    /// </summary>
-    private async Task LoadReadListDetailsAsync(KomgaReadListDisplay display, CancellationToken ct)
-    {
-        try
-        {
-            Bitmap? thumbnail = null;
-            
-            // Try to load the thumbnail
-            var thumbnailBytes = await _komgaApiService.GetReadListThumbnailAsync(display.ReadList.Id, ct);
-            if (thumbnailBytes is not null && thumbnailBytes.Length > 0 && !ct.IsCancellationRequested)
-            {
-                using var stream = new MemoryStream(thumbnailBytes);
-                thumbnail = new Bitmap(stream);
-            }
-            
-            if (ct.IsCancellationRequested)
-            {
-                thumbnail?.Dispose();
-                return;
-            }
-            
-            // Update the display model on UI thread
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (!ct.IsCancellationRequested)
-                {
-                    if (thumbnail is not null)
-                    {
-                        display.Thumbnail = thumbnail;
-                    }
-                    display.IsThumbnailResolved = true;
-                }
-                else
-                {
-                    thumbnail?.Dispose();
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error loading details for read list '{display.ReadList.Name}': {ex.Message}");
-            if (!ct.IsCancellationRequested)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!ct.IsCancellationRequested)
-                    {
-                        display.IsThumbnailResolved = true;
-                    }
-                });
-            }
-        }
     }
 
     [RelayCommand]
@@ -3433,7 +3418,7 @@ public partial class KomgaViewModel : ViewModelBase
         SelectedSeries = null;
         _currentPage = 0;
         HasMoreBooks = true;
-        Books.Clear();
+        ClearAndReleaseThumbnails(Books);
         
         if (SelectedReadList is not null)
         {
@@ -3449,15 +3434,31 @@ public partial class KomgaViewModel : ViewModelBase
             return;
         }
 
+        // Same as LoadSeriesAsync: capture the token before awaiting and don't request a page twice
+        var ct = _loadingCts?.Token ?? CancellationToken.None;
+        if (_readListBooksPageLoadingFor == ct)
+        {
+            return;
+        }
+        _readListBooksPageLoadingFor = ct;
+
+        var isFirstPage = _currentPage == 0;
         try
         {
-            IsBusy = true;
+            if (isFirstPage)
+            {
+                IsBusy = true;
+            }
+            else
+            {
+                IsLoadingMore = true;
+            }
+
             var result = await _komgaApiService.GetBooksForReadListAsync(
                 SelectedReadList.Id,
                 page: _currentPage,
                 size: 20);
 
-            var ct = _loadingCts?.Token ?? CancellationToken.None;
             var newDisplays = new List<KomgaBookDisplay>();
             foreach (var b in result.Content)
             {
@@ -3475,11 +3476,7 @@ public partial class KomgaViewModel : ViewModelBase
                 ApplyLocalSorting();
             }
 
-            foreach (var display in newDisplays)
-            {
-                if (ct.IsCancellationRequested) break;
-                _ = LoadBookDetailsAsync(display, ct);
-            }
+            _ = Task.Run(() => LoadBooksDownloadStateAsync(newDisplays, ct), CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -3488,7 +3485,19 @@ public partial class KomgaViewModel : ViewModelBase
         }
         finally
         {
-            IsBusy = false;
+            if (_readListBooksPageLoadingFor == ct)
+            {
+                _readListBooksPageLoadingFor = null;
+            }
+
+            if (isFirstPage)
+            {
+                IsBusy = false;
+            }
+            else
+            {
+                IsLoadingMore = false;
+            }
         }
     }
 

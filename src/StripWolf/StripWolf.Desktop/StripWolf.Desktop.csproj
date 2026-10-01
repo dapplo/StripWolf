@@ -8,12 +8,39 @@
     <AssemblyName>StripWolf</AssemblyName>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <PublishAot>true</PublishAot>
-    <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">true</UseOpenCvPanelDetection>
-    <UseOpenCvPanelDetection Condition="$([MSBuild]::IsOSPlatform('Linux'))">false</UseOpenCvPanelDetection>
-    <UseOpenCvPanelDetection Condition="$([MSBuild]::IsOSPlatform('OSX'))">false</UseOpenCvPanelDetection>
-    <UseOpenCvPanelDetection Condition="'$(RuntimeIdentifier)' != ''">false</UseOpenCvPanelDetection>
-    <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">true</UseEpubSupport>
-    <UseEpubSupport Condition="'$(RuntimeIdentifier)' != ''">false</UseEpubSupport>
+  </PropertyGroup>
+
+  <!--
+    Target platform: taken from the RuntimeIdentifier when one is given (publish, possibly cross-platform),
+    otherwise from the build machine. Before, the conditions below used IsOSPlatform (= the build machine) only.
+  -->
+  <PropertyGroup>
+    <StripWolfTargetWindows Condition="'$(RuntimeIdentifier)' != '' and $(RuntimeIdentifier.StartsWith('win'))">true</StripWolfTargetWindows>
+    <StripWolfTargetLinux Condition="'$(RuntimeIdentifier)' != '' and $(RuntimeIdentifier.StartsWith('linux'))">true</StripWolfTargetLinux>
+    <StripWolfTargetWindows Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">true</StripWolfTargetWindows>
+    <StripWolfTargetLinux Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">true</StripWolfTargetLinux>
+  </PropertyGroup>
+
+  <!--
+    Features which depend on the platform (both can still be forced with -p:UseOpenCvPanelDetection=... / -p:UseEpubSupport=...):
+    - Panel detection (guided reading) needs the native OpenCV runtime, which is only shipped for Windows
+      (Android has its own runtime in the Android head). Previously it was also switched off for every build with a
+      RuntimeIdentifier, so the published Windows release had no guided reading.
+      If OpenCV cannot be loaded at runtime, PanelDetectionService.IsAvailable returns false and guided reading is hidden.
+    - EPUB conversion renders pages in an off-screen browser: WebView2 on Windows, WPE WebKit on Linux, nothing on macOS.
+      The WebView2 .NET wrapper uses built-in COM interop, which Native AOT does not support, so it stays disabled for
+      published (RuntimeIdentifier + PublishAot) Windows builds. The Linux WPE service has not been verified with
+      Native AOT yet, so it is also kept for non-RID (dotnet run / debug) builds only, as before.
+  -->
+  <PropertyGroup>
+    <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == '' and '$(StripWolfTargetWindows)' == 'true'">true</UseOpenCvPanelDetection>
+    <UseOpenCvPanelDetection Condition="'$(UseOpenCvPanelDetection)' == ''">false</UseOpenCvPanelDetection>
+    <UseEpubSupport Condition="'$(UseEpubSupport)' == '' and '$(RuntimeIdentifier)' != '' and '$(PublishAot)' == 'true'">false</UseEpubSupport>
+    <UseEpubSupport Condition="'$(UseEpubSupport)' == '' and ('$(StripWolfTargetWindows)' == 'true' or '$(StripWolfTargetLinux)' == 'true')">true</UseEpubSupport>
+    <UseEpubSupport Condition="'$(UseEpubSupport)' == ''">false</UseEpubSupport>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
     <AllowedReferenceRelatedFileExtensions Condition="'$(Configuration)' == 'Release'">none</AllowedReferenceRelatedFileExtensions>
@@ -24,7 +51,7 @@
     <TrimmerRootAssembly Include="SQLite-net" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(UseEpubSupport)' == 'true'">
+  <ItemGroup Condition="'$(UseEpubSupport)' == 'true' and '$(StripWolfTargetWindows)' == 'true'">
     <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
   </ItemGroup>
 
@@ -32,11 +59,11 @@
     <TrimmerRootAssembly Include="OpenCvSharp" />
   </ItemGroup>
 
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <PropertyGroup Condition="'$(StripWolfTargetWindows)' == 'true'">
     <DefineConstants>$(DefineConstants);Windows</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+  <PropertyGroup Condition="'$(StripWolfTargetLinux)' == 'true'">
     <DefineConstants>$(DefineConstants);Linux</DefineConstants>
   </PropertyGroup>
 
@@ -50,12 +77,8 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Controls.WebView" Condition="$([MSBuild]::IsOSPlatform('Linux')) and '$(UseEpubSupport)' == 'true'" />
-    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-    <PackageReference Include="Avalonia.Diagnostics">
-      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="Avalonia.Controls.WebView" Condition="'$(StripWolfTargetLinux)' == 'true' and '$(UseEpubSupport)' == 'true'" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
     <PackageReference Include="Tmds.DBus.Protocol" />
     <PackageReference Include="PDFiumCore" />
     <PackageReference Include="GitVersion.MsBuild">
@@ -71,21 +94,18 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseEpubSupport)' == 'true'">
-    <PackageReference Include="Microsoft.Web.WebView2" GeneratePathProperty="true" ExcludeAssets="all" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <PackageReference Include="Microsoft.Web.WebView2" GeneratePathProperty="true" ExcludeAssets="all" Condition="'$(StripWolfTargetWindows)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">
-    <PackageReference Include="OpenCvSharp4.runtime.win" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
-    <PackageReference Include="OpenCvSharp4.runtime.ubuntu.22.04-x64" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
-    <PackageReference Include="OpenCvSharp4.runtime.osx-arm64" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
-    <PackageReference Include="OpenCvSharp4.runtime.osx-x64" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Condition="'$(StripWolfTargetWindows)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" AdditionalProperties="UseOpenCvPanelDetection=$(UseOpenCvPanelDetection);UseEpubSupport=$(UseEpubSupport)" UndefineProperties="RuntimeIdentifier" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+  <ItemGroup Condition="'$(StripWolfTargetWindows)' != 'true'">
     <Compile Remove="Services\Windows\**" />
   </ItemGroup>
 
@@ -94,17 +114,17 @@
     <Compile Remove="Services\Linux\LinuxWpeWebViewSnapshotService.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Linux'))">
+  <ItemGroup Condition="'$(StripWolfTargetLinux)' != 'true'">
     <Compile Remove="Services\Linux\**" />
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(UseEpubSupport)' == 'true'">
+  <ItemGroup Condition="'$(StripWolfTargetWindows)' == 'true' and '$(UseEpubSupport)' == 'true'">
     <Reference Include="Microsoft.Web.WebView2.Core">
       <HintPath>$(PkgMicrosoft_Web_WebView2)\lib_manual\netcoreapp3.0\Microsoft.Web.WebView2.Core.dll</HintPath>
     </Reference>
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(UseEpubSupport)' == 'true'">
+  <ItemGroup Condition="'$(StripWolfTargetWindows)' == 'true' and '$(UseEpubSupport)' == 'true'">
     <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll">
       <Link>runtimes\win-x86\native\WebView2Loader.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

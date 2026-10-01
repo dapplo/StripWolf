@@ -21,6 +21,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -75,6 +76,28 @@ public class LibraryService
         ComicConverterService comicConverter,
         TrialService trialService,
         IAppEventsService appEventsService)
+        : this(databaseService, comicReaderService, komgaApiServiceFactory, settingsService, networkConnectionService,
+            pdfConverter, epubConverter, epubShadowConversionService, comicConverter, trialService, appEventsService,
+            AppPaths.DefaultAppDataDirectory)
+    {
+    }
+
+    /// <summary>
+    /// Use a specific application data directory (used by the tests)
+    /// </summary>
+    internal LibraryService(
+        DatabaseService databaseService,
+        ComicReaderService comicReaderService,
+        KomgaApiServiceFactory komgaApiServiceFactory,
+        SettingsService settingsService,
+        INetworkConnectionService networkConnectionService,
+        PdfToCbzConverterService pdfConverter,
+        EpubToCbzConverterService epubConverter,
+        EpubShadowConversionService epubShadowConversionService,
+        ComicConverterService comicConverter,
+        TrialService trialService,
+        IAppEventsService appEventsService,
+        string appDataDirectory)
     {
         _databaseService = databaseService;
         _comicReaderService = comicReaderService;
@@ -88,7 +111,7 @@ public class LibraryService
         _trialService = trialService;
         _appEventsService = appEventsService;
 
-        _appDataDirectory = GetAppDataDirectory();
+        _appDataDirectory = appDataDirectory;
         _comicsDirectory = Path.Combine(_appDataDirectory, "Comics");
         _coversDirectory = Path.Combine(_appDataDirectory, "Covers");
 
@@ -115,13 +138,6 @@ public class LibraryService
         }
 
         return new DeferredLibraryChangedScope(this);
-    }
-
-    private static string GetAppDataDirectory()
-    {
-        // Cross-platform app data directory
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(baseDir, "StripWolf");
     }
 
     private bool IsAppOwnedSourcePath(string filePath)
@@ -415,7 +431,8 @@ public class LibraryService
             ? comicInfo.Series
             : NormalizeSeriesName(seriesNameFallback);
         float? number = null;
-        if (!string.IsNullOrEmpty(comicInfo?.Number) && float.TryParse(comicInfo.Number, out var parsedNumber))
+        // Invariant culture: ComicInfo numbers use a dot ("1.5"), with a German UI the current culture turned it into 15
+        if (!string.IsNullOrEmpty(comicInfo?.Number) && float.TryParse(comicInfo.Number, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedNumber))
         {
             number = parsedNumber;
         }
@@ -520,12 +537,15 @@ public class LibraryService
         var filePath = GetKomgaDownloadFilePath(book);
         CleanupPartialFile(filePath);
         CleanupPartialFile(filePath + ".partial");
+        CleanupPartialFile(filePath + ".partial.validator");
     }
 
     private string GetKomgaDownloadFilePath(KomgaBook book)
     {
         var extension = GetKomgaDownloadExtension(book);
-        var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name}{extension}");
+        // The book id makes the name unique: two books with the same series and name (different libraries or
+        // servers) used to overwrite each other's download.
+        var fileName = SanitizeFileName($"{book.SeriesTitle} - {book.Name} [{book.Id}]{extension}");
         return Path.Combine(_comicsDirectory, fileName);
     }
 
@@ -767,7 +787,7 @@ public class LibraryService
         comic.Title = !string.IsNullOrWhiteSpace(comicInfo.Title) ? comicInfo.Title : comic.Title;
         comic.SeriesName = !string.IsNullOrWhiteSpace(comicInfo.Series) ? comicInfo.Series : comic.SeriesName;
 
-        if (!string.IsNullOrEmpty(comicInfo.Number) && float.TryParse(comicInfo.Number, out var parsedNumber))
+        if (!string.IsNullOrEmpty(comicInfo.Number) && float.TryParse(comicInfo.Number, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedNumber))
         {
             comic.Number = parsedNumber;
         }
@@ -792,7 +812,7 @@ public class LibraryService
     {
         await Task.Run(() =>
         {
-            var tempFile = Path.GetTempFileName();
+            // (A Path.GetTempFileName() which was never used nor deleted was removed here: it left a file behind per edit)
             try
             {
                 using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
@@ -825,7 +845,11 @@ public class LibraryService
         });
     }
 
-    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage, DateTime? lastModified = null, bool? isCompletedOverride = null)
+    /// <param name="notifyLibraryChanged">
+    /// The reader passes false: it saves the progress on every page turn, and a LibraryChanged event makes the
+    /// library reload all its sections each time. The library is refreshed when the reader is closed.
+    /// </param>
+    public async Task UpdateReadingProgressAsync(Comic comic, int currentPage, DateTime? lastModified = null, bool? isCompletedOverride = null, bool notifyLibraryChanged = true)
     {
         if (comic.PageCount <= 0)
         {
@@ -863,7 +887,10 @@ public class LibraryService
             comic.KomgaSyncStatus = "Pending sync";
         }
 
-        OnLibraryChanged();
+        if (notifyLibraryChanged)
+        {
+            OnLibraryChanged();
+        }
     }
 
     public Task<EpubConversionState?> GetEpubConversionStateAsync(int comicId)
@@ -1102,9 +1129,11 @@ public class LibraryService
     /// </summary>
     private async Task<ComicImportData> PrepareLocalImportAsync(string filePath, ComicFormat format, IProgress<double>? progress)
     {
+        // Solid CBR/CB7 archives are converted (ComicConverterService.NeedsConversion): reading a page from a solid archive
+        // means decompressing everything before it. Non-solid archives and CBT are read as they are.
         var needsConversion = format == ComicFormat.Pdf ||
                                format == ComicFormat.Epub ||
-                               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
+                               ((format is ComicFormat.Cbr or ComicFormat.Cb7) && ComicConverterService.NeedsConversion(filePath));
 
         if (needsConversion)
         {
@@ -1176,7 +1205,11 @@ public class LibraryService
                 imageStream.Position = 0;
             }
 
-            using var sourceImage = Image.Load<Rgba32>(imageStream);
+            // Let the decoder scale down while decoding (JPEG uses scaled IDCT), instead of decoding the full page
+            // (a 4000x6000 scan is ~96MB as Rgba32) and resizing afterwards. A square box so EXIF rotation can't make it too small.
+            var maxSide = Math.Max(CoverThumbnailMaxWidth, CoverThumbnailMaxHeight);
+            var decoderOptions = new DecoderOptions { TargetSize = new Size(maxSide, maxSide) };
+            using var sourceImage = Image.Load<Rgba32>(decoderOptions, imageStream);
             sourceImage.Mutate(context => context.AutoOrient());
 
             var resizeOptions = new ResizeOptions
@@ -1196,8 +1229,8 @@ public class LibraryService
                 Quality = CoverThumbnailJpegQuality
             });
 
-            // Return pooled memory to the system
-            Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
+            // Note: no MemoryAllocator.ReleaseRetainedResources() per cover anymore, that threw away ImageSharp's buffer pool
+            // for every cover during a batch import. The pool is trimmed when the reader is closed.
         });
 
         return coverPath;
@@ -1281,7 +1314,7 @@ public class LibraryService
         {
             Title = metadata?.Title ?? book.Name,
             Series = book.SeriesTitle,
-            Number = book.Number.ToString(),
+            Number = book.Number.ToString(CultureInfo.InvariantCulture),
             Summary = metadata?.Summary,
             Tags = metadata?.Tags != null ? string.Join(", ", metadata.Tags) : null,
             Writer = metadata?.Authors?.FirstOrDefault(a => a.Role?.Equals("writer", StringComparison.OrdinalIgnoreCase) == true)?.Name,
@@ -1330,80 +1363,9 @@ public class LibraryService
 
     private static void WriteComicInfo(System.Xml.XmlWriter writer, ComicInfo info)
     {
-        writer.WriteStartElement("ComicInfo");
-
-        if (!string.IsNullOrEmpty(info.Title)) writer.WriteElementString("Title", info.Title);
-        if (!string.IsNullOrEmpty(info.Series)) writer.WriteElementString("Series", info.Series);
-        if (!string.IsNullOrEmpty(info.Number)) writer.WriteElementString("Number", info.Number);
-        if (info.Count.HasValue) writer.WriteElementString("Count", info.Count.Value.ToString());
-        if (info.Volume.HasValue) writer.WriteElementString("Volume", info.Volume.Value.ToString());
-        if (!string.IsNullOrEmpty(info.AlternateSeries)) writer.WriteElementString("AlternateSeries", info.AlternateSeries);
-        if (!string.IsNullOrEmpty(info.AlternateNumber)) writer.WriteElementString("AlternateNumber", info.AlternateNumber);
-        if (info.AlternateCount.HasValue) writer.WriteElementString("AlternateCount", info.AlternateCount.Value.ToString());
-        if (!string.IsNullOrEmpty(info.Summary)) writer.WriteElementString("Summary", info.Summary);
-        if (!string.IsNullOrEmpty(info.Notes)) writer.WriteElementString("Notes", info.Notes);
-        if (info.Year.HasValue) writer.WriteElementString("Year", info.Year.Value.ToString());
-        if (info.Month.HasValue) writer.WriteElementString("Month", info.Month.Value.ToString());
-        if (info.Day.HasValue) writer.WriteElementString("Day", info.Day.Value.ToString());
-        if (!string.IsNullOrEmpty(info.Writer)) writer.WriteElementString("Writer", info.Writer);
-        if (!string.IsNullOrEmpty(info.Penciller)) writer.WriteElementString("Penciller", info.Penciller);
-        if (!string.IsNullOrEmpty(info.Inker)) writer.WriteElementString("Inker", info.Inker);
-        if (!string.IsNullOrEmpty(info.Colorist)) writer.WriteElementString("Colorist", info.Colorist);
-        if (!string.IsNullOrEmpty(info.Letterer)) writer.WriteElementString("Letterer", info.Letterer);
-        if (!string.IsNullOrEmpty(info.CoverArtist)) writer.WriteElementString("CoverArtist", info.CoverArtist);
-        if (!string.IsNullOrEmpty(info.Editor)) writer.WriteElementString("Editor", info.Editor);
-        if (!string.IsNullOrEmpty(info.Publisher)) writer.WriteElementString("Publisher", info.Publisher);
-        if (!string.IsNullOrEmpty(info.Imprint)) writer.WriteElementString("Imprint", info.Imprint);
-        if (!string.IsNullOrEmpty(info.Genre)) writer.WriteElementString("Genre", info.Genre);
-        if (!string.IsNullOrEmpty(info.Tags)) writer.WriteElementString("Tags", info.Tags);
-        if (!string.IsNullOrEmpty(info.Web)) writer.WriteElementString("Web", info.Web);
-        if (info.PageCount.HasValue) writer.WriteElementString("PageCount", info.PageCount.Value.ToString());
-        if (!string.IsNullOrEmpty(info.LanguageISO)) writer.WriteElementString("LanguageISO", info.LanguageISO);
-        if (!string.IsNullOrEmpty(info.Format)) writer.WriteElementString("Format", info.Format);
-        if (info.BlackAndWhite.HasValue) writer.WriteElementString("BlackAndWhite", info.BlackAndWhite.Value.ToString());
-        if (info.Manga.HasValue) writer.WriteElementString("Manga", info.Manga.Value.ToString());
-        if (!string.IsNullOrEmpty(info.PageProgressionDirection)) writer.WriteElementString("PageProgressionDirection", info.PageProgressionDirection);
-        if (!string.IsNullOrEmpty(info.Characters)) writer.WriteElementString("Characters", info.Characters);
-        if (!string.IsNullOrEmpty(info.Teams)) writer.WriteElementString("Teams", info.Teams);
-        if (!string.IsNullOrEmpty(info.Locations)) writer.WriteElementString("Locations", info.Locations);
-        if (!string.IsNullOrEmpty(info.StoryArc)) writer.WriteElementString("StoryArc", info.StoryArc);
-        if (!string.IsNullOrEmpty(info.StoryArcNumber)) writer.WriteElementString("StoryArcNumber", info.StoryArcNumber);
-        if (!string.IsNullOrEmpty(info.SeriesGroup)) writer.WriteElementString("SeriesGroup", info.SeriesGroup);
-        if (info.AgeRating.HasValue) writer.WriteElementString("AgeRating", GetAgeRatingString(info.AgeRating.Value));
-        if (info.CommunityRating.HasValue) writer.WriteElementString("CommunityRating", info.CommunityRating.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        if (!string.IsNullOrEmpty(info.ScanInformation)) writer.WriteElementString("ScanInformation", info.ScanInformation);
-
-        if (info.Pages is { Count: > 0 })
-        {
-            writer.WriteStartElement("Pages");
-            foreach (var page in info.Pages)
-            {
-                writer.WriteStartElement("Page");
-                writer.WriteAttributeString("Image", page.Image.ToString());
-                if (!string.IsNullOrEmpty(page.TypeString)) writer.WriteAttributeString("Type", page.TypeString);
-                if (page.DoublePage) writer.WriteAttributeString("DoublePage", "Yes");
-                if (page.ImageWidth > 0) writer.WriteAttributeString("ImageWidth", page.ImageWidth.ToString());
-                if (page.ImageHeight > 0) writer.WriteAttributeString("ImageHeight", page.ImageHeight.ToString());
-                if (page.ImageSize > 0) writer.WriteAttributeString("ImageSize", page.ImageSize.ToString());
-                if (!string.IsNullOrEmpty(page.Bookmark)) writer.WriteAttributeString("Bookmark", page.Bookmark);
-                writer.WriteEndElement();
-            }
-            writer.WriteEndElement();
-        }
-
-        writer.WriteEndElement();
+        // This used to be a copy of ComicInfoXmlService.Write (with the same AgeRating bug), use the single implementation
+        ComicInfoXmlService.Write(writer, info);
     }
-
-    private static string GetAgeRatingString(AgeRating rating) => rating switch
-    {
-        AgeRating.AdultsOnly18Plus => "Adults Only 18+",
-        AgeRating.EarlyChildhood => "Early Childhood",
-        AgeRating.Everyone10Plus => "Everyone 10+",
-        AgeRating.KidsToAdults => "Kids to Adults",
-        AgeRating.Mature17Plus => "Mature 17+",
-        AgeRating.RatingPending => "Rating Pending",
-        _ => rating.ToString()
-    };
 
     internal static string SanitizeFileName(string fileName)
     {
@@ -1430,7 +1392,7 @@ public class LibraryService
     {
         return format == ComicFormat.Pdf ||
                format == ComicFormat.Epub ||
-               (format == ComicFormat.Cbr && ComicConverterService.IsSolidRar(filePath));
+               ((format is ComicFormat.Cbr or ComicFormat.Cb7) && ComicConverterService.NeedsConversion(filePath));
     }
 
     private static void CleanupPartialFile(string? path)

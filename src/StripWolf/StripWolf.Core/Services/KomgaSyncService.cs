@@ -64,9 +64,26 @@ public class KomgaSyncService
             comic.KomgaServerId,
             comic.CurrentPage,
             comic.IsCompleted,
-            comic.ReadProgressLastModified?.ToUniversalTime() ?? DateTime.UtcNow);
+            AsUtc(comic.ReadProgressLastModified) ?? DateTime.UtcNow);
 
         comic.KomgaSyncStatus = "Pending sync";
+    }
+
+    /// <summary>
+    /// Timestamps are written as UTC, but sqlite-net reads DateTime values back with DateTimeKind.Unspecified.
+    /// ToUniversalTime() treats Unspecified as local time, which shifted the local timestamp by the UTC offset and
+    /// broke the "which side is newer" comparison with Komga outside of UTC.
+    /// </summary>
+    private static DateTime? AsUtc(DateTime? value)
+    {
+        if (value is not { } dateTime)
+        {
+            return null;
+        }
+
+        return dateTime.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            : dateTime.ToUniversalTime();
     }
 
     private async Task<bool> TryPushPendingReadProgressAsync(Comic comic, KomgaServer? configuredServer = null, KomgaApiService? configuredApiService = null)
@@ -91,10 +108,18 @@ public class KomgaSyncService
         }
 
         var komgaApiService = configuredApiService ?? _komgaApiServiceFactory.GetForServer(server);
-        await komgaApiService.UpdateReadProgressAsync(
+        var pushed = await komgaApiService.UpdateReadProgressAsync(
             pendingReadProgress.BookId,
             pendingReadProgress.Page + 1,
             pendingReadProgress.IsCompleted);
+
+        if (!pushed)
+        {
+            // Keep the pending progress so it is retried later. Before, the result was ignored: the pending entry
+            // was deleted and "Synced to Komga" was shown even for a 401/403/500 response.
+            comic.KomgaSyncStatus = "Sync failed";
+            return false;
+        }
 
         await _databaseService.DeletePendingKomgaReadProgressAsync(comic.Id);
         comic.KomgaSyncStatus = "Synced to Komga";
@@ -156,7 +181,7 @@ public class KomgaSyncService
 
             var komgaProgress = book.ReadProgress;
             var komgaLastModified = komgaProgress.LastModified.ToUniversalTime();
-            var localLastModified = comic.ReadProgressLastModified?.ToUniversalTime() ?? DateTime.MinValue;
+            var localLastModified = AsUtc(comic.ReadProgressLastModified) ?? DateTime.MinValue;
 
             // Use a small epsilon for comparison to avoid issues with precision or clock skew
             var diff = komgaLastModified - localLastModified;
@@ -299,7 +324,7 @@ public class KomgaSyncService
 
             var komgaProgress = book.ReadProgress;
             var komgaLastModified = komgaProgress.LastModified.ToUniversalTime();
-            var localLastModified = comic.ReadProgressLastModified?.ToUniversalTime() ?? DateTime.MinValue;
+            var localLastModified = AsUtc(comic.ReadProgressLastModified) ?? DateTime.MinValue;
 
             var diff = komgaLastModified - localLastModified;
             if (diff.TotalSeconds > 2)

@@ -29,7 +29,7 @@
             <!-- Zoom Area if Left-Handed -->
             <Border IsVisible="{Binding !IsOverviewOnLeft}" Background="#0A0A0A" Margin="4" ClipToBounds="True">
                 <Viewbox x:Name="ZoomedViewboxLeft" Stretch="Fill">
-                    <Canvas x:Name="ZoomedCanvasLeft">
+                    <Canvas x:Name="ZoomedCanvasLeft" Background="Transparent">
                         <Image x:Name="ZoomedAreaImageLeft" 
                                Source="{Binding CurrentPageImage}"
                                Stretch="Fill"
@@ -46,7 +46,7 @@
             <!-- Zoom Area if Right-Handed -->
             <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#0A0A0A" Margin="4" ClipToBounds="True">
                 <Viewbox x:Name="ZoomedViewboxRight" Stretch="Fill">
-                    <Canvas x:Name="ZoomedCanvasRight">
+                    <Canvas x:Name="ZoomedCanvasRight" Background="Transparent">
                         <Image x:Name="ZoomedAreaImageRight" 
                                Source="{Binding CurrentPageImage}"
                                Stretch="Fill"

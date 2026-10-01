@@ -40,8 +40,19 @@ public class KomgaApiService : IDisposable
     private KomgaServer? _currentServer;
     private static readonly TimeSpan ConnectionTestTimeout = TimeSpan.FromSeconds(8);
 
+    private readonly Func<HttpMessageHandler>? _handlerFactory;
+
     public KomgaApiService()
     {
+    }
+
+    /// <summary>
+    /// Use a custom HTTP handler instead of the network (used by the tests to mock a Komga server).
+    /// The factory is called on every <see cref="Configure"/>, because the previous client (and handler) is disposed.
+    /// </summary>
+    internal KomgaApiService(Func<HttpMessageHandler> handlerFactory)
+    {
+        _handlerFactory = handlerFactory;
     }
 
     /// <summary>
@@ -82,25 +93,38 @@ public class KomgaApiService : IDisposable
     {
         _currentServer = server;
         
-        var handler = new HttpClientHandler
+        HttpMessageHandler messageHandler;
+        if (_handlerFactory is not null)
         {
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-            UseCookies = true,
-            CookieContainer = new CookieContainer()
-        };
+            messageHandler = _handlerFactory();
+        }
+        else
+        {
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                UseCookies = true,
+                CookieContainer = new CookieContainer()
+            };
 
-        if (server.BypassSslValidation)
-        {
-            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            if (server.BypassSslValidation)
+            {
+                handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+            }
+
+            // The extra thread hop is only needed for Android's native handler (NetworkOnMainThreadException),
+            // on the other platforms it just costs a thread pool hop per request.
+            messageHandler = OperatingSystem.IsAndroid() ? new BackgroundHttpHandler(handler) : handler;
         }
         
-        var backgroundHandler = new BackgroundHttpHandler(handler);
-        
         _httpClient?.Dispose();
-        _httpClient = new HttpClient(backgroundHandler)
+        _httpClient = new HttpClient(messageHandler)
         {
             BaseAddress = new Uri(NormalizeServerBaseUrl(server.BaseUrl).TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromMinutes(20)
+            // Was 20 minutes, which made every call against an unreachable server hang for that long.
+            // Book downloads use HttpCompletionOption.ResponseHeadersRead, the timeout then only covers the time
+            // until the response headers arrive, not the download of the body.
+            Timeout = TimeSpan.FromMinutes(2)
         };
         
         _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -194,7 +218,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync("api/v1/libraries", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -227,13 +251,14 @@ public class KomgaApiService : IDisposable
             }
             else
             {
-                regex = "^" + searchPrefix + ".*";
+                // Escape the prefix: characters like "(", "[", "+" or "." are regex syntax (Komga evaluates a Java regex)
+                regex = "^" + System.Text.RegularExpressions.Regex.Escape(searchPrefix) + ".*";
             }
             // Komga expects search_regex format: regex,field
             url += $"&search_regex={Uri.EscapeDataString(regex + ",TITLE")}";
         }
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -250,7 +275,7 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/series?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -267,7 +292,7 @@ public class KomgaApiService : IDisposable
         var encodedQuery = Uri.EscapeDataString(searchQuery);
         var url = $"api/v1/books?page={page}&size={size}&search={encodedQuery}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -281,7 +306,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -302,7 +327,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/series/{seriesId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -322,7 +347,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/series/{seriesId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -368,7 +393,7 @@ public class KomgaApiService : IDisposable
             url += $"&library_id={libraryId}";
         }
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -382,7 +407,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -403,7 +428,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -419,7 +444,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -433,7 +458,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/books/{bookId}/pages/{pageNumber}", HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -452,19 +477,114 @@ public class KomgaApiService : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         
+        // The response is not disposed on success: the caller owns the returned content stream
         var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode)
         {
+            response.Dispose();
             return null;
         }
         
         return await response.Content.ReadAsStreamAsync();
     }
 
+    private static string GetDownloadValidatorPath(string partialPath) => partialPath + ".validator";
+
+    /// <summary>
+    /// Reads the If-Range validator stored next to a .partial download, or null when there is none.
+    /// </summary>
+    private static RangeConditionHeaderValue? ReadDownloadValidator(string partialPath)
+    {
+        try
+        {
+            var validatorPath = GetDownloadValidatorPath(partialPath);
+            if (!File.Exists(validatorPath))
+            {
+                return null;
+            }
+
+            var value = File.ReadAllText(validatorPath).Trim();
+            if (value.StartsWith("etag:", StringComparison.Ordinal) &&
+                EntityTagHeaderValue.TryParse(value["etag:".Length..], out var entityTag) &&
+                !entityTag.IsWeak)
+            {
+                return new RangeConditionHeaderValue(entityTag);
+            }
+
+            if (value.StartsWith("date:", StringComparison.Ordinal) &&
+                DateTimeOffset.TryParse(value["date:".Length..], System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var lastModified))
+            {
+                return new RangeConditionHeaderValue(lastModified);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Stores the strong ETag (or Last-Modified) of the first response, so a later resume can use If-Range.
+    /// </summary>
+    private static RangeConditionHeaderValue? WriteDownloadValidator(string partialPath, HttpResponseMessage response)
+    {
+        var validatorPath = GetDownloadValidatorPath(partialPath);
+        try
+        {
+            // If-Range only allows strong entity tags
+            if (response.Headers.ETag is { IsWeak: false } entityTag)
+            {
+                File.WriteAllText(validatorPath, "etag:" + entityTag.Tag);
+                return new RangeConditionHeaderValue(entityTag);
+            }
+
+            if (response.Content.Headers.LastModified is { } lastModified)
+            {
+                File.WriteAllText(validatorPath, "date:" + lastModified.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+                return new RangeConditionHeaderValue(lastModified);
+            }
+
+            // No validator: the download can still continue in this session, but a .partial is not resumed later
+            DeleteDownloadValidator(partialPath);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return null;
+    }
+
+    private static void DeleteDownloadValidator(string partialPath)
+    {
+        try
+        {
+            File.Delete(GetDownloadValidatorPath(partialPath));
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
     /// <summary>
     /// Downloads a book file to a local path using System.IO.Pipelines for maximum performance.
     /// </summary>
-    public async Task<KomgaDownloadResult> DownloadBookToFileAsync(
+    /// <remarks>
+    /// The download runs on the thread pool: it is started from the UI, and without this every read of the response
+    /// stream continued on the UI thread. Those continuations are dispatched with a low priority, roughly one per
+    /// rendered frame, which limited the download to a network packet per frame (around 100 KB/s).
+    /// </remarks>
+    public Task<KomgaDownloadResult> DownloadBookToFileAsync(
         string bookId,
         string outputPath,
         IProgress<double>? progress = null,
@@ -472,7 +592,16 @@ public class KomgaApiService : IDisposable
         CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
+        return Task.Run(() => DownloadBookToFileCoreAsync(bookId, outputPath, progress, detailedProgress, cancellationToken), cancellationToken);
+    }
 
+    private async Task<KomgaDownloadResult> DownloadBookToFileCoreAsync(
+        string bookId,
+        string outputPath,
+        IProgress<double>? progress,
+        IProgress<KomgaDownloadProgress>? detailedProgress,
+        CancellationToken cancellationToken)
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         var partialPath = outputPath + ".partial";
         const int maxAttempts = 4;
@@ -481,6 +610,17 @@ public class KomgaApiService : IDisposable
         var downloadedBytes = File.Exists(partialPath)
             ? new FileInfo(partialPath).Length
             : 0L;
+
+        // Resuming a .partial file is only safe when we can ask the server to confirm the file didn't change in the
+        // meantime (If-Range with the ETag/Last-Modified of the first response). Before, any existing .partial was
+        // resumed blindly, which produces a corrupt archive when the book was replaced on the server.
+        var downloadValidator = ReadDownloadValidator(partialPath);
+        if (downloadedBytes > 0 && downloadValidator is null)
+        {
+            File.Delete(partialPath);
+            downloadedBytes = 0;
+        }
+
         long? totalBytes = null;
         double lastReportedProgress = -1;
 
@@ -491,6 +631,7 @@ public class KomgaApiService : IDisposable
             if (totalBytes.HasValue && downloadedBytes >= totalBytes.Value)
             {
                 File.Move(partialPath, outputPath, true);
+                DeleteDownloadValidator(partialPath);
                 progress?.Report(1.0);
                 detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, totalBytes));
                 return new KomgaDownloadResult(true);
@@ -499,11 +640,25 @@ public class KomgaApiService : IDisposable
             var currentChunkStart = downloadedBytes;
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
+                if (attempt > 1)
+                {
+                    // A failed attempt can have written part of the chunk: continue after the bytes on disk,
+                    // requesting the old range again appended those bytes a second time
+                    downloadedBytes = File.Exists(partialPath) ? new FileInfo(partialPath).Length : 0;
+                    currentChunkStart = downloadedBytes;
+                }
+
                 try
                 {
                     using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/books/{bookId}/file");
                     request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
                     request.Headers.Range = new RangeHeaderValue(currentChunkStart, currentChunkStart + chunkSize - 1);
+                    if (currentChunkStart > 0 && downloadValidator is not null)
+                    {
+                        // The server answers with the complete file (200) instead of the range when it changed,
+                        // which is handled below by restarting the download
+                        request.Headers.IfRange = downloadValidator;
+                    }
 
                     using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                     if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
@@ -512,6 +667,7 @@ public class KomgaApiService : IDisposable
                         if (completeLength.HasValue && downloadedBytes >= completeLength.Value)
                         {
                             File.Move(partialPath, outputPath, true);
+                            DeleteDownloadValidator(partialPath);
                             progress?.Report(1.0);
                             detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, completeLength));
                             return new KomgaDownloadResult(true);
@@ -521,6 +677,7 @@ public class KomgaApiService : IDisposable
                         totalBytes = null;
                         lastReportedProgress = -1;
                         File.Delete(partialPath);
+                        DeleteDownloadValidator(partialPath);
                         break;
                     }
 
@@ -537,13 +694,20 @@ public class KomgaApiService : IDisposable
                     }
 
                     var responseIsPartial = response.StatusCode == HttpStatusCode.PartialContent;
-                    if (!responseIsPartial && currentChunkStart > 0)
+                    if (!responseIsPartial)
                     {
+                        // A 200 is always the complete file: the server doesn't support ranges (Komga streams the
+                        // file and ignores Range), or the file changed (If-Range). Write it from the start; before,
+                        // a retry after a broken connection appended the complete file to the bytes already written,
+                        // and a changed file threw away this response only to request it again.
                         downloadedBytes = 0;
+                        currentChunkStart = 0;
                         totalBytes = null;
                         lastReportedProgress = -1;
-                        File.Delete(partialPath);
-                        break;
+                    }
+                    if (currentChunkStart == 0)
+                    {
+                        downloadValidator = WriteDownloadValidator(partialPath, response);
                     }
 
                     var serverTotalBytes = response.Content.Headers.ContentRange?.Length;
@@ -637,6 +801,7 @@ public class KomgaApiService : IDisposable
                     if (!responseIsPartial || (totalBytes.HasValue && downloadedBytes >= totalBytes.Value))
                     {
                         File.Move(partialPath, outputPath, true);
+                        DeleteDownloadValidator(partialPath);
                         progress?.Report(1.0);
                         detailedProgress?.Report(new KomgaDownloadProgress(downloadedBytes, totalBytes));
                         return new KomgaDownloadResult(true);
@@ -722,6 +887,8 @@ public class KomgaApiService : IDisposable
         }
 
         File.Move(partialPath, outputPath, true);
+
+        DeleteDownloadValidator(partialPath);
         progress?.Report(1.0);
         detailedProgress?.Report(new KomgaDownloadProgress(partialLength, totalBytes));
         return true;
@@ -756,7 +923,7 @@ public class KomgaApiService : IDisposable
         var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadProgressUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         
-        var response = await _httpClient!.PatchAsync($"api/v1/books/{bookId}/read-progress", content);
+        using var response = await _httpClient!.PatchAsync($"api/v1/books/{bookId}/read-progress", content);
         return response.IsSuccessStatusCode;
     }
 
@@ -777,7 +944,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.DeleteAsync($"api/v1/books/{bookId}/read-progress");
+        using var response = await _httpClient!.DeleteAsync($"api/v1/books/{bookId}/read-progress");
         return response.IsSuccessStatusCode;
     }
 
@@ -794,7 +961,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/readlists?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -834,7 +1001,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}", HttpCompletionOption.ResponseHeadersRead);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -864,7 +1031,7 @@ public class KomgaApiService : IDisposable
         var json = JsonSerializer.Serialize(payload, StripWolfJsonContext.Default.KomgaReadListUpdate);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
+        using var response = await _httpClient!.PatchAsync($"api/v1/readlists/{readListId}", content);
         return response.IsSuccessStatusCode;
         }
 
@@ -877,7 +1044,7 @@ public class KomgaApiService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/v1/readlists/{readListId}/thumbnail");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-        var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -893,7 +1060,7 @@ public class KomgaApiService : IDisposable
     {
         EnsureConfigured();
         
-        var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync($"api/v1/readlists/{readListId}/books?page={page}&size={size}", HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -921,7 +1088,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books?page={page}&size={size}&read_status=IN_PROGRESS&sort=readProgress.lastModified,desc";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -937,7 +1104,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/ondeck?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -953,7 +1120,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/books/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -969,7 +1136,7 @@ public class KomgaApiService : IDisposable
         
         var url = $"api/v1/series/latest?page={page}&size={size}";
         
-        var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await _httpClient!.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         
         using var stream = await response.Content.ReadAsStreamAsync();
