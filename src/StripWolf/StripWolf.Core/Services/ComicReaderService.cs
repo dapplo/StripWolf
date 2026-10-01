@@ -301,7 +301,28 @@ public class ComicReaderService
         }
     }
 
+    /// <summary>
+    /// Clears the page caches and closes the PDF/EPUB sessions in the background.
+    /// </summary>
     public void ClearCache()
+    {
+        var disposeTask = ClearCacheAsync();
+        if (!disposeTask.IsCompleted)
+        {
+            // Observe failures of the background disposal
+            _ = disposeTask.ContinueWith(
+                t => System.Diagnostics.Debug.WriteLine($"ComicReaderService: Failed to close a session: {t.Exception?.GetBaseException().Message}"),
+                TaskContinuationOptions.OnlyOnFaulted);
+        }
+    }
+
+    /// <summary>
+    /// Clears the page caches and closes the PDF/EPUB sessions. A session is only disposed after the page render that
+    /// is currently running in it has finished: before, sessions were disposed immediately, while a (prefetch) render
+    /// could still be writing into its native buffers. Sessions still being created are awaited and disposed as well
+    /// (previously they were dropped without being disposed).
+    /// </summary>
+    public async Task ClearCacheAsync()
     {
         Task<PdfReaderSession>[] pdfSessions;
         Task<EpubToCbzConverterService.EpubReaderSession>[] epubSessions;
@@ -318,14 +339,35 @@ public class ComicReaderService
             _epubSessions.Clear();
         }
 
-        foreach (var pdfSession in pdfSessions.Where(task => task.IsCompletedSuccessfully))
+        foreach (var pdfSessionTask in pdfSessions)
         {
-            pdfSession.Result.Dispose();
+            PdfReaderSession pdfSession;
+            try
+            {
+                pdfSession = await pdfSessionTask;
+            }
+            catch
+            {
+                // Creating the session failed, nothing to dispose
+                continue;
+            }
+
+            await pdfSession.DisposeAsync();
         }
 
-        foreach (var epubSession in epubSessions.Where(task => task.IsCompletedSuccessfully))
+        foreach (var epubSessionTask in epubSessions)
         {
-            epubSession.Result.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            EpubToCbzConverterService.EpubReaderSession epubSession;
+            try
+            {
+                epubSession = await epubSessionTask;
+            }
+            catch
+            {
+                continue;
+            }
+
+            await epubSession.DisposeAsync();
         }
     }
 
@@ -420,18 +462,11 @@ public class ComicReaderService
 
     private static bool ShouldCachePageData(string filePath, int dataLength)
     {
-        if (dataLength > MaxCachedPageBytes / 2)
-        {
-            return false;
-        }
-
-        var format = GetComicFormat(filePath);
-        if (OperatingSystem.IsWindows() && (format == ComicFormat.Pdf || format == ComicFormat.Epub))
-        {
-            return false;
-        }
-
-        return true;
+        // Note: rendered PDF/EPUB pages used to be excluded from the cache on Windows (memory optimization of 2026-05-12).
+        // The cache is bounded (MaxCachedPageEntries / MaxCachedPageBytes) and rendering is by far the most expensive
+        // way to get a page: guided mode requests the same page several times (display, panel detection, prefetch),
+        // which re-rendered it every time.
+        return dataLength <= MaxCachedPageBytes / 2;
     }
 
     private void TrimPageCache()
@@ -587,9 +622,12 @@ public class ComicReaderService
         await session.RenderPageToStreamAsync(pageIndex, outputStream);
     }
 
-    private sealed class PdfReaderSession(IPdfRenderSession session, long fileSize) : IDisposable
+    private sealed class PdfReaderSession(IPdfRenderSession session, long fileSize) : IAsyncDisposable
     {
+        // Serializes renders within the session and protects the native session against being disposed mid-render.
+        // Note: the semaphore itself is not disposed, a render waiting on it would otherwise get an ObjectDisposedException.
         private readonly SemaphoreSlim _gate = new(1, 1);
+        private bool _disposed;
 
         public int PageCount { get; } = session.GetPageCount();
 
@@ -600,6 +638,7 @@ public class ComicReaderService
             await _gate.WaitAsync();
             try
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 await session.RenderPageToJpegAsync(pageIndex, outputStream);
             }
             finally
@@ -608,10 +647,24 @@ public class ComicReaderService
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _gate.Dispose();
-            session.Dispose();
+            // Wait for a running render to finish before releasing the native resources
+            await _gate.WaitAsync();
+            try
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                session.Dispose();
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
     }
 

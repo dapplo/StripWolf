@@ -35,6 +35,13 @@ public class ActivationManager
     private Task? _pipeServerTask;
 
     /// <summary>
+    /// Name of the activation pipe. It contains the Windows session id, matching the session-local single instance
+    /// mutex (Local\StripWolf_Mutex): with a machine-global name the instance in a second session (fast user switching,
+    /// terminal server) could not create its server and looped, or files were forwarded to another user's instance.
+    /// </summary>
+    public static string PipeName { get; } = $"StripWolf_Activation_Pipe_{Process.GetCurrentProcess().SessionId}";
+
+    /// <summary>
     /// Event raised when a file path is received via the named pipe.
     /// </summary>
     public event Action<string>? PathReceived;
@@ -82,11 +89,12 @@ public class ActivationManager
             try
             {
                 using var pipeServer = new NamedPipeServerStream(
-                    "StripWolf_Activation_Pipe",
+                    PipeName,
                     PipeDirection.In,
                     1,
                     PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                    // CurrentUserOnly: other users can't connect and make this instance open arbitrary paths
+                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
                 // Wait for a client connection
                 await pipeServer.WaitForConnectionAsync(cancellationToken);

@@ -67,9 +67,14 @@ public class AppSettings
     public bool IsUnlimitedUnlocked { get; set; } = false;
 
     /// <summary>
-    /// Book IDs of Komga comics that have been opened (Max 2 in trial).
+    /// Komga books that have been opened (max TrialService.MaxTrialLimit in trial), as "{serverId}:{bookId}"
+    /// (see TrialService.GetKomgaViewKey): Komga book ids are alphanumeric strings and two servers can share one.
+    /// This replaces the former "permanentViewedKomgaBookIds" (List&lt;int&gt;), which could never be filled because
+    /// int.TryParse failed for every real Komga id. It got a new name on purpose: deserializing the old int array
+    /// into a string list would throw and reset all settings, an unknown property is simply ignored by the
+    /// deserializer (and dropped with the next save).
     /// </summary>
-    public List<int> PermanentViewedKomgaBookIds { get; set; } = [];
+    public List<string> PermanentViewedKomgaBooks { get; set; } = [];
 
     /// <summary>
     /// Local comic paths/filenames that have been opened (Max 2 per format in trial).
@@ -212,7 +217,7 @@ public class AppSettings
             LastTabIndex = LastTabIndex,
             HasCompletedWelcomeExperience = HasCompletedWelcomeExperience,
             IsUnlimitedUnlocked = IsUnlimitedUnlocked,
-            PermanentViewedKomgaBookIds = PermanentViewedKomgaBookIds.ToList(),
+            PermanentViewedKomgaBooks = PermanentViewedKomgaBooks.ToList(),
             PermanentViewedLocalPaths = PermanentViewedLocalPaths.ToList(),
             CloudFolderBookmarks = CloudFolderBookmarks.ToList(),
             AppTheme = AppTheme,

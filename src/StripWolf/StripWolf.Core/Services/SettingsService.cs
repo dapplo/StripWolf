@@ -54,19 +54,20 @@ public class SettingsService
 
     public event EventHandler<AppSettings>? SettingsChanged;
 
-    public SettingsService()
+    public SettingsService() : this(AppPaths.DefaultAppDataDirectory)
     {
-        _settingsDir = GetAppDataDirectory();
+    }
+
+    /// <summary>
+    /// Use a specific settings directory (used by the tests)
+    /// </summary>
+    internal SettingsService(string settingsDirectory)
+    {
+        _settingsDir = settingsDirectory;
         Directory.CreateDirectory(_settingsDir);
         _settingsPath = Path.Combine(_settingsDir, SettingsFileName);
         _passwordsPath = Path.Combine(_settingsDir, PasswordsFileName);
         _encryptionKey = GetOrCreateEncryptionKey();
-    }
-
-    private static string GetAppDataDirectory()
-    {
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(baseDir, "StripWolf");
     }
 
     /// <summary>
@@ -134,6 +135,10 @@ public class SettingsService
         }
     }
 
+    /// <summary>
+    /// Change only the fields the caller owns, on top of the current settings, and save them.
+    /// The action runs synchronously under a lock (don't await or call back into this service from it).
+    /// </summary>
     public Task UpdateSettingsAsync(Action<AppSettings> updateAction)
     {
         AppSettings snapshot;
@@ -145,26 +150,15 @@ public class SettingsService
             updateAction(snapshot);
             NormalizeSectionPreferences(snapshot);
             _cachedSettings = snapshot.Clone();
-        }
 
-        return QueueSettingsSave(snapshot);
+            // Queue while still holding the lock: queued outside of it, two concurrent updates could be queued in the
+            // opposite order, and the older snapshot was written last (the newer change was missing on disk).
+            return QueueSettingsSave(snapshot);
+        }
     }
 
-    /// <summary>
-    /// Save settings to disk
-    /// </summary>
-    public async Task SaveSettingsAsync(AppSettings settings)
-    {
-        var snapshot = settings.Clone();
-        NormalizeSectionPreferences(snapshot);
-
-        lock (_settingsLock)
-        {
-            _cachedSettings = snapshot.Clone();
-        }
-
-        await QueueSettingsSave(snapshot);
-    }
+    // Note: SaveSettingsAsync(AppSettings) was removed. Saving a whole (stale) snapshot overwrote changes which were made
+    // elsewhere in the meantime (trial unlock, viewed comics, folder bookmarks, section layout...).
 
     /// <summary>
     /// Encrypts and saves passwords to a separate file
@@ -371,7 +365,8 @@ public class SettingsService
             _isProcessingSaveQueue = true;
         }
 
-        _ = ProcessSaveQueueAsync();
+        // Write on the thread pool: QueueSettingsSave is called while holding the settings lock
+        _ = Task.Run(ProcessSaveQueueAsync);
         return completion.Task;
     }
 

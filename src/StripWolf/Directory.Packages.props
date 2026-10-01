@@ -7,20 +7,18 @@
     <!-- Avalonia packages -->
     <!-- Important: keep version in sync! -->
     <PackageVersion Include="Avalonia" Version="12.1.1" />
+    <!-- ItemsRepeater is released separately, 12.0.0 is the latest 12.x version -->
     <PackageVersion Include="Avalonia.Controls.ItemsRepeater" Version="12.0.0" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.1" />
-    <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.19" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageVersion Include="Avalonia.iOS" Version="12.1.1" />
-    <PackageVersion Include="Avalonia.Browser" Version="11.3.9" />
     <PackageVersion Include="Avalonia.Android" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Controls.WebView" Version="12.0.1" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
-    <PackageVersion Include="Microsoft.XmlSerializer.Generator" Version="10.0.8" />
     <PackageVersion Include="PDFiumCore" Version="152.0.7961" />
     <PackageVersion Include="SkiaSharp" Version="3.119.4" />
     <PackageVersion Include="SkiaSharp.NativeAssets.iOS" Version="3.119.4" />
@@ -43,17 +41,21 @@
     <PackageVersion Include="Xamarin.AndroidX.Lifecycle.ViewModelSavedState.Android" Version="2.11.0.1" />
     <!-- For SQLite local storage -->
     <PackageVersion Include="sqlite-net-pcl" Version="1.11.285" />
-    <PackageVersion Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <!-- For CBR (RAR) file support -->
     <PackageVersion Include="SharpCompress" Version="0.50.4" />
     <!-- OpenCV for panel detection -->
     <PackageVersion Include="OpenCvSharp4" Version="4.13.0.20260627" />
     <PackageVersion Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
-    <PackageVersion Include="OpenCvSharp4.runtime.ubuntu.22.04-x64" Version="4.6.0.20220608" />
-    <PackageVersion Include="OpenCvSharp4.runtime.osx-arm64" Version="4.6.0.20230105" />
-    <PackageVersion Include="OpenCvSharp4.runtime.osx-x64" Version="4.6.0.20230105" />
+    <!-- No Linux/macOS native runtimes: panel detection is only enabled for Windows and Android (see StripWolf.Desktop.csproj).
+         The 4.6 runtimes which were listed here didn't match the 4.13 managed package. -->
     <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-arm64" Version="4.13.0.45" />
     <PackageVersion Include="Sdcb.OpenCvSharp4.mini.runtime.android-x64" Version="4.13.0.45" />
     <PackageVersion Include="GitVersion.MsBuild" Version="6.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Test packages (StripWolf.Core.Tests) -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 </Project>

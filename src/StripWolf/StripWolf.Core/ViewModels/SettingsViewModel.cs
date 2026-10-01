@@ -602,8 +602,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         if (_appSettings.PreferredReadingMode != readingMode)
         {
-            _appSettings.PreferredReadingMode = readingMode;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.PreferredReadingMode = readingMode);
         }
 
         ReplaceSectionCollection(LibrarySections, _appSettings.LibrarySections);
@@ -611,12 +610,28 @@ public partial class SettingsViewModel : ViewModelBase
         _ = LoadTrialStatusAndStatsAsync();
     }
 
+    /// <summary>
+    /// Persist only the field(s) changed by the caller. The update is applied to the settings service's current
+    /// settings instead of saving our whole (possibly stale) _appSettings copy, which used to overwrite changes made
+    /// elsewhere in the meantime (trial unlock, viewed comics, folder bookmarks, section layout...).
+    /// The same update is applied to _appSettings so this view model keeps reading consistent values.
+    /// </summary>
+    private void UpdateSetting(Action<AppSettings> update)
+    {
+        if (_appSettings is null)
+        {
+            return;
+        }
+
+        update(_appSettings);
+        _ = _settingsService.UpdateSettingsAsync(update);
+    }
+
     partial void OnSyncReadProgressChanged(bool value)
     {
         if (_appSettings is not null)
         {
-            _appSettings.SyncReadProgress = value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.SyncReadProgress = value);
         }
     }
 
@@ -627,8 +642,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         if (_appSettings is not null)
         {
-            _appSettings.AppTheme = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.AppTheme = value.Value);
         }
     }
 
@@ -637,8 +651,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.CompactOverview = value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.CompactOverview = value);
         }
     }
 
@@ -647,8 +660,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.UseFullScreenWhenReading = value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.UseFullScreenWhenReading = value);
         }
     }
 
@@ -687,9 +699,11 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.LanguageCode = value.CultureCode;
-            _appSettings.UseSystemLanguage = value.CultureCode is null;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s =>
+            {
+                s.LanguageCode = value.CultureCode;
+                s.UseSystemLanguage = value.CultureCode is null;
+            });
         }
     }
     
@@ -706,8 +720,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.PreferredReadingMode = normalized;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.PreferredReadingMode = normalized);
         }
     }
 
@@ -716,8 +729,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (value is null) return;
         if (_appSettings is not null)
         {
-            _appSettings.PreferredReadingDirectionMode = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.PreferredReadingDirectionMode = value.Value);
         }
     }
     
@@ -727,8 +739,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (_appSettings is not null)
         {
-            _appSettings.Handedness = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.Handedness = value.Value);
         }
     }
 
@@ -737,8 +748,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Save to settings
         if (value is not null && _appSettings is not null)
         {
-            _appSettings.StartupBehavior = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.StartupBehavior = value.Value);
         }
     }
 
@@ -746,8 +756,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (value is not null && _appSettings is not null)
         {
-            _appSettings.EpubConversionTheme = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.EpubConversionTheme = value.Value);
         }
     }
 
@@ -755,8 +764,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (value is not null && _appSettings is not null)
         {
-            _appSettings.EpubOutputResolution = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.EpubOutputResolution = value.Value);
         }
     }
 
@@ -764,8 +772,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.KomgaParallelDownloads = Math.Max(1, value);
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.KomgaParallelDownloads = Math.Max(1, value));
         }
     }
 
@@ -773,8 +780,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.KomgaSeriesPageSize = Math.Max(1, value);
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.KomgaSeriesPageSize = Math.Max(1, value));
         }
     }
 
@@ -782,8 +788,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.KomgaSearchLimit = Math.Max(1, value);
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.KomgaSearchLimit = Math.Max(1, value));
         }
     }
 
@@ -791,8 +796,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.KomgaSmartListSize = Math.Max(1, value);
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.KomgaSmartListSize = Math.Max(1, value));
         }
     }
 
@@ -800,8 +804,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.AllowMeteredKomgaDownloads = value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.AllowMeteredKomgaDownloads = value);
         }
     }
 
@@ -809,8 +812,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (value is not null && _appSettings is not null)
         {
-            _appSettings.UnsupportedFormatHandlingMode = value.Value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.UnsupportedFormatHandlingMode = value.Value);
         }
     }
 
@@ -818,9 +820,24 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (_appSettings is not null)
         {
-            _appSettings.SkipExternalDeleteConfirmation = value;
-            _ = _settingsService.SaveSettingsAsync(_appSettings);
+            UpdateSetting(s => s.SkipExternalDeleteConfirmation = value);
         }
+    }
+
+    private static KomgaServer CopyServer(KomgaServer server)
+    {
+        return new KomgaServer
+        {
+            Id = server.Id,
+            Name = server.Name,
+            BaseUrl = server.BaseUrl,
+            Username = server.Username,
+            Password = server.Password,
+            ApiKey = server.ApiKey,
+            CustomHeaders = server.CustomHeaders.Select(h => new KomgaHeader { Name = h.Name, Value = h.Value }).ToList(),
+            LastConnected = server.LastConnected,
+            BypassSslValidation = server.BypassSslValidation
+        };
     }
 
     private static void ApplyAppTheme(AppThemePreference theme)
@@ -970,36 +987,59 @@ public partial class SettingsViewModel : ViewModelBase
             server.ApiKey = ApiKey;
             server.BypassSslValidation = BypassSslValidation;
             server.CustomHeaders = CustomHeaders.Where(h => !string.IsNullOrWhiteSpace(h.Name)).ToList();
-            
-            // Ensure we have a browsing server ID set if this is the only server
-            if (_appSettings.ActiveServerId == null || _appSettings.Servers.Count == 0)
+
+            var isNewServer = _editingServer is null;
+            var isIdResolved = false;
+            // Only the edited server (and, if needed, the active server id) is written, on top of the current settings.
+            // The server (including Password/ApiKey) is stored in the settings cache, the service writes the secrets
+            // to the encrypted credentials file and strips them from settings.json.
+            var applyServer = (AppSettings settings) =>
             {
-                _appSettings.ActiveServerId = server.Id;
-            }
-            
-            if (_editingServer is null)
+                if (isNewServer && !isIdResolved && settings.Servers.Any(s => s.Id == server.Id))
+                {
+                    // Make sure a new server never collides with an id which was added elsewhere in the meantime
+                    server.Id = settings.Servers.Max(s => s.Id) + 1;
+                    _nextServerId = Math.Max(_nextServerId, server.Id + 1);
+                }
+                isIdResolved = true;
+
+                // Ensure we have a browsing server ID set if this is the only server
+                if (settings.ActiveServerId == null || settings.Servers.Count == 0)
+                {
+                    settings.ActiveServerId = server.Id;
+                }
+
+                var settingsIndex = settings.Servers.FindIndex(s => s.Id == server.Id);
+                var serverCopy = CopyServer(server);
+                if (settingsIndex >= 0)
+                {
+                    settings.Servers[settingsIndex] = serverCopy;
+                }
+                else
+                {
+                    settings.Servers.Add(serverCopy);
+                }
+            };
+
+            var saveTask = _settingsService.UpdateSettingsAsync(applyServer);
+            // The update action ran synchronously above, so server.Id is final now
+            applyServer(_appSettings);
+
+            if (isNewServer)
             {
-                _appSettings.Servers.Add(server);
                 Servers.Add(server);
             }
             else
             {
-                var index = Servers.IndexOf(_editingServer);
+                var index = Servers.IndexOf(_editingServer!);
                 if (index >= 0)
                 {
                     Servers[index] = server;
                 }
-                
-                // Update in settings list
-                var settingsIndex = _appSettings.Servers.FindIndex(s => s.Id == server.Id);
-                if (settingsIndex >= 0)
-                {
-                    _appSettings.Servers[settingsIndex] = server;
-                }
             }
 
             // Persist settings with encrypted password
-            await _settingsService.SaveSettingsAsync(_appSettings);
+            await saveTask;
 
             IsEditing = false;
             _editingServer = null;
@@ -1052,19 +1092,25 @@ public partial class SettingsViewModel : ViewModelBase
     {
         await ExecuteAsync(async () =>
         {
-            _appSettings?.Servers.RemoveAll(s => s.Id == server.Id);
             Servers.Remove(server);
-            
-            // If the deleted server was the browsing server, reset it
-            if (_appSettings?.ActiveServerId == server.Id)
+
+            var removeServer = (AppSettings settings) =>
             {
-                _appSettings.ActiveServerId = _appSettings.Servers.FirstOrDefault()?.Id;
-            }
+                settings.Servers.RemoveAll(s => s.Id == server.Id);
+
+                // If the deleted server was the browsing server, reset it
+                if (settings.ActiveServerId == server.Id)
+                {
+                    settings.ActiveServerId = settings.Servers.FirstOrDefault()?.Id;
+                }
+            };
 
             if (_appSettings is not null)
             {
-                await _settingsService.SaveSettingsAsync(_appSettings);
+                removeServer(_appSettings);
             }
+
+            await _settingsService.UpdateSettingsAsync(removeServer);
         }, "Failed to delete server");
     }
 
@@ -1078,10 +1124,8 @@ public partial class SettingsViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            _appSettings.ActiveServerId = server.Id;
-
-            // Persist the change
-            await _settingsService.SaveSettingsAsync(_appSettings);
+            // Persist only the active server id
+            await _settingsService.UpdateSettingsAsync(settings => settings.ActiveServerId = server.Id);
 
             // Refresh the list
             LoadServers();
@@ -1249,7 +1293,7 @@ public partial class SettingsViewModel : ViewModelBase
             var comics = await _databaseService.GetComicsAsync();
 
             KomgaDownloadsUsed = comics.Count(c => c.Source == ComicSource.Komga);
-            KomgaViewsUsed = settings.PermanentViewedKomgaBookIds.Count;
+            KomgaViewsUsed = settings.PermanentViewedKomgaBooks.Count;
 
             var formats = TrialService.AllowedFormats;
             var formatList = new List<FormatTrialStatus>();

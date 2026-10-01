@@ -62,46 +62,46 @@ public static class ComicInfoXmlService
                 var name = subReader.Name;
                 switch (name)
                 {
-                    case "Title": info.Title = subReader.ReadElementContentAsString(); break;
-                    case "Series": info.Series = subReader.ReadElementContentAsString(); break;
-                    case "Number": info.Number = subReader.ReadElementContentAsString(); break;
-                    case "Count": if (int.TryParse(subReader.ReadElementContentAsString(), out var count)) info.Count = count; break;
-                    case "Volume": if (int.TryParse(subReader.ReadElementContentAsString(), out var vol)) info.Volume = vol; break;
-                    case "AlternateSeries": info.AlternateSeries = subReader.ReadElementContentAsString(); break;
-                    case "AlternateNumber": info.AlternateNumber = subReader.ReadElementContentAsString(); break;
-                    case "AlternateCount": if (int.TryParse(subReader.ReadElementContentAsString(), out var acount)) info.AlternateCount = acount; break;
-                    case "Summary": info.Summary = subReader.ReadElementContentAsString(); break;
-                    case "Notes": info.Notes = subReader.ReadElementContentAsString(); break;
-                    case "Year": if (int.TryParse(subReader.ReadElementContentAsString(), out var year)) info.Year = year; break;
-                    case "Month": if (int.TryParse(subReader.ReadElementContentAsString(), out var month)) info.Month = month; break;
-                    case "Day": if (int.TryParse(subReader.ReadElementContentAsString(), out var day)) info.Day = day; break;
-                    case "Writer": info.Writer = subReader.ReadElementContentAsString(); break;
-                    case "Penciller": info.Penciller = subReader.ReadElementContentAsString(); break;
-                    case "Inker": info.Inker = subReader.ReadElementContentAsString(); break;
-                    case "Colorist": info.Colorist = subReader.ReadElementContentAsString(); break;
-                    case "Letterer": info.Letterer = subReader.ReadElementContentAsString(); break;
-                    case "CoverArtist": info.CoverArtist = subReader.ReadElementContentAsString(); break;
-                    case "Editor": info.Editor = subReader.ReadElementContentAsString(); break;
-                    case "Publisher": info.Publisher = subReader.ReadElementContentAsString(); break;
-                    case "Imprint": info.Imprint = subReader.ReadElementContentAsString(); break;
-                    case "Genre": info.Genre = subReader.ReadElementContentAsString(); break;
-                    case "Tags": info.Tags = subReader.ReadElementContentAsString(); break;
-                    case "Web": info.Web = subReader.ReadElementContentAsString(); break;
-                    case "PageCount": if (int.TryParse(subReader.ReadElementContentAsString(), out var pc)) info.PageCount = pc; break;
-                    case "LanguageISO": info.LanguageISO = subReader.ReadElementContentAsString(); break;
-                    case "Format": info.Format = subReader.ReadElementContentAsString(); break;
-                    case "BlackAndWhite": if (Enum.TryParse<YesNo>(subReader.ReadElementContentAsString(), out var bw)) info.BlackAndWhite = bw; break;
-                    case "Manga": if (Enum.TryParse<YesNo>(subReader.ReadElementContentAsString(), out var m)) info.Manga = m; break;
-                    case "PageProgressionDirection": info.PageProgressionDirection = subReader.ReadElementContentAsString(); break;
-                    case "Characters": info.Characters = subReader.ReadElementContentAsString(); break;
-                    case "Teams": info.Teams = subReader.ReadElementContentAsString(); break;
-                    case "Locations": info.Locations = subReader.ReadElementContentAsString(); break;
-                    case "StoryArc": info.StoryArc = subReader.ReadElementContentAsString(); break;
-                    case "StoryArcNumber": info.StoryArcNumber = subReader.ReadElementContentAsString(); break;
-                    case "SeriesGroup": info.SeriesGroup = subReader.ReadElementContentAsString(); break;
-                    case "AgeRating": if (Enum.TryParse<AgeRating>(subReader.ReadElementContentAsString().Replace(" ", ""), out var ar)) info.AgeRating = ar; break;
-                    case "CommunityRating": if (decimal.TryParse(subReader.ReadElementContentAsString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cr)) info.CommunityRating = cr; break;
-                    case "ScanInformation": info.ScanInformation = subReader.ReadElementContentAsString(); break;
+                    case "Title": info.Title = ReadElementText(subReader); break;
+                    case "Series": info.Series = ReadElementText(subReader); break;
+                    case "Number": info.Number = ReadElementText(subReader); break;
+                    case "Count": if (int.TryParse(ReadElementText(subReader), out var count)) info.Count = count; break;
+                    case "Volume": if (int.TryParse(ReadElementText(subReader), out var vol)) info.Volume = vol; break;
+                    case "AlternateSeries": info.AlternateSeries = ReadElementText(subReader); break;
+                    case "AlternateNumber": info.AlternateNumber = ReadElementText(subReader); break;
+                    case "AlternateCount": if (int.TryParse(ReadElementText(subReader), out var acount)) info.AlternateCount = acount; break;
+                    case "Summary": info.Summary = ReadElementText(subReader); break;
+                    case "Notes": info.Notes = ReadElementText(subReader); break;
+                    case "Year": if (int.TryParse(ReadElementText(subReader), out var year)) info.Year = year; break;
+                    case "Month": if (int.TryParse(ReadElementText(subReader), out var month)) info.Month = month; break;
+                    case "Day": if (int.TryParse(ReadElementText(subReader), out var day)) info.Day = day; break;
+                    case "Writer": info.Writer = ReadElementText(subReader); break;
+                    case "Penciller": info.Penciller = ReadElementText(subReader); break;
+                    case "Inker": info.Inker = ReadElementText(subReader); break;
+                    case "Colorist": info.Colorist = ReadElementText(subReader); break;
+                    case "Letterer": info.Letterer = ReadElementText(subReader); break;
+                    case "CoverArtist": info.CoverArtist = ReadElementText(subReader); break;
+                    case "Editor": info.Editor = ReadElementText(subReader); break;
+                    case "Publisher": info.Publisher = ReadElementText(subReader); break;
+                    case "Imprint": info.Imprint = ReadElementText(subReader); break;
+                    case "Genre": info.Genre = ReadElementText(subReader); break;
+                    case "Tags": info.Tags = ReadElementText(subReader); break;
+                    case "Web": info.Web = ReadElementText(subReader); break;
+                    case "PageCount": if (int.TryParse(ReadElementText(subReader), out var pc)) info.PageCount = pc; break;
+                    case "LanguageISO": info.LanguageISO = ReadElementText(subReader); break;
+                    case "Format": info.Format = ReadElementText(subReader); break;
+                    case "BlackAndWhite": if (Enum.TryParse<YesNo>(ReadElementText(subReader), out var bw)) info.BlackAndWhite = bw; break;
+                    case "Manga": if (Enum.TryParse<YesNo>(ReadElementText(subReader), out var m)) info.Manga = m; break;
+                    case "PageProgressionDirection": info.PageProgressionDirection = ReadElementText(subReader); break;
+                    case "Characters": info.Characters = ReadElementText(subReader); break;
+                    case "Teams": info.Teams = ReadElementText(subReader); break;
+                    case "Locations": info.Locations = ReadElementText(subReader); break;
+                    case "StoryArc": info.StoryArc = ReadElementText(subReader); break;
+                    case "StoryArcNumber": info.StoryArcNumber = ReadElementText(subReader); break;
+                    case "SeriesGroup": info.SeriesGroup = ReadElementText(subReader); break;
+                    case "AgeRating": if (TryParseAgeRating(ReadElementText(subReader), out var ar)) info.AgeRating = ar; break;
+                    case "CommunityRating": if (decimal.TryParse(ReadElementText(subReader), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cr)) info.CommunityRating = cr; break;
+                    case "ScanInformation": info.ScanInformation = ReadElementText(subReader); break;
                     case "Pages":
                         info.Pages = ReadPages(subReader);
                         // ReadSubtree leaves the reader on the (end) element of Pages, move past it
@@ -120,6 +120,37 @@ public static class ComicInfoXmlService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Reads the text of the current element and moves past its end tag, like ReadElementContentAsString.
+    /// Unlike ReadElementContentAsString it tolerates child markup (e.g. HTML in a Summary: "a&lt;b&gt;x&lt;/b&gt;" written
+    /// unescaped), which used to throw and made the whole ComicInfo unreadable. The text of child elements is kept.
+    /// </summary>
+    private static string ReadElementText(XmlReader reader)
+    {
+        if (reader.IsEmptyElement)
+        {
+            reader.Read();
+            return string.Empty;
+        }
+
+        var depth = reader.Depth;
+        var text = new System.Text.StringBuilder();
+        reader.Read();
+        while (!reader.EOF && !(reader.NodeType == XmlNodeType.EndElement && reader.Depth == depth))
+        {
+            if (reader.NodeType is XmlNodeType.Text or XmlNodeType.CDATA or XmlNodeType.SignificantWhitespace or XmlNodeType.Whitespace)
+            {
+                text.Append(reader.Value);
+            }
+
+            reader.Read();
+        }
+
+        // Move past the end tag
+        reader.Read();
+        return text.ToString();
     }
 
     private static List<ComicPageInfo> ReadPages(XmlReader reader)
@@ -229,14 +260,65 @@ public static class ComicInfoXmlService
         writer.WriteEndElement();
     }
 
-    private static string GetAgeRatingString(AgeRating rating) => rating switch
+    /// <summary>
+    /// The AgeRating values as written in ComicInfo.xml (ComicInfo schema v2.0).
+    /// </summary>
+    private static readonly (AgeRating Rating, string SchemaValue)[] AgeRatingSchemaValues =
+    [
+        (AgeRating.Unknown, "Unknown"),
+        (AgeRating.AdultsOnly18Plus, "Adults Only 18+"),
+        (AgeRating.EarlyChildhood, "Early Childhood"),
+        (AgeRating.Everyone, "Everyone"),
+        (AgeRating.Everyone10Plus, "Everyone 10+"),
+        (AgeRating.G, "G"),
+        (AgeRating.KidsToAdults, "Kids to Adults"),
+        (AgeRating.M, "M"),
+        (AgeRating.MA15Plus, "MA15+"),
+        (AgeRating.Mature17Plus, "Mature 17+"),
+        (AgeRating.PG, "PG"),
+        (AgeRating.R18Plus, "R18+"),
+        (AgeRating.RatingPending, "Rating Pending"),
+        (AgeRating.Teen, "Teen"),
+        (AgeRating.X18Plus, "X18+")
+    ];
+
+    /// <summary>
+    /// Previously MA15+, R18+ and X18+ were written as "MA15Plus" etc., and reading removed the spaces and parsed the
+    /// enum case sensitively, so "Adults Only 18+", "Kids to Adults" and all "+" values were lost.
+    /// </summary>
+    internal static string GetAgeRatingString(AgeRating rating)
     {
-        AgeRating.AdultsOnly18Plus => "Adults Only 18+",
-        AgeRating.EarlyChildhood => "Early Childhood",
-        AgeRating.Everyone10Plus => "Everyone 10+",
-        AgeRating.KidsToAdults => "Kids to Adults",
-        AgeRating.Mature17Plus => "Mature 17+",
-        AgeRating.RatingPending => "Rating Pending",
-        _ => rating.ToString()
-    };
+        foreach (var (candidate, schemaValue) in AgeRatingSchemaValues)
+        {
+            if (candidate == rating)
+            {
+                return schemaValue;
+            }
+        }
+
+        return rating.ToString();
+    }
+
+    internal static bool TryParseAgeRating(string? value, out AgeRating rating)
+    {
+        rating = AgeRating.Unknown;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        foreach (var (candidate, schemaValue) in AgeRatingSchemaValues)
+        {
+            if (string.Equals(schemaValue, trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                rating = candidate;
+                return true;
+            }
+        }
+
+        // Also accept the enum names (e.g. "MA15Plus") which older StripWolf versions wrote
+        var enumName = trimmed.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("+", "Plus", StringComparison.Ordinal);
+        return Enum.TryParse(enumName, ignoreCase: true, out rating) && Enum.IsDefined(rating);
+    }
 }

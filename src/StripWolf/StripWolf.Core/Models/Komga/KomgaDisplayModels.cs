@@ -17,26 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace StripWolf.Core.Models.Komga;
 
 /// <summary>
-/// Display model for a Komga series with pre-loaded thumbnail
+/// Display model for a Komga series with a lazily loaded thumbnail
 /// </summary>
-public partial class KomgaSeriesDisplay : ObservableObject
+public partial class KomgaSeriesDisplay : KomgaThumbnailDisplay
 {
     /// <summary>
     /// The underlying Komga series data
     /// </summary>
     public KomgaSeries Series { get; set; } = new();
-
-    [ObservableProperty]
-    private Bitmap? _thumbnail;
-
-    [ObservableProperty]
-    private bool _isThumbnailResolved;
 
     // Convenience properties for binding
     public string Id => Series.Id;

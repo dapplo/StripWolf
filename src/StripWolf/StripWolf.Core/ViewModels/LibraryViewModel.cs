@@ -942,18 +942,18 @@ public partial class LibraryViewModel : ViewModelBase
 
         try
         {
-            var folders = await _cloudLibraryService.GetBookmarkedFoldersAsync(storageProvider);
-            if (folders.Count == 0)
+            var bookmarkedFolders = await _cloudLibraryService.GetBookmarkedFoldersAsync(storageProvider);
+            if (bookmarkedFolders.Count == 0)
             {
                 return;
             }
 
-            foreach (var folder in folders)
+            foreach (var (bookmark, folder) in bookmarkedFolders)
             {
                 try
                 {
-                    var files = new List<IStorageFile>();
-                    await foreach (var file in _cloudLibraryService.EnumerateComicFilesAsync(folder))
+                    var files = new List<ComicStorageFile>();
+                    await foreach (var file in _cloudLibraryService.EnumerateComicFilesWithRelativePathAsync(folder))
                     {
                         files.Add(file);
                     }
@@ -963,9 +963,20 @@ public partial class LibraryViewModel : ViewModelBase
                         continue;
                     }
 
+                    // Source files which were imported before are skipped, even if the comic is no longer in the
+                    // library: previously a comic the user deleted was copied and imported again by the next scan.
+                    // Like before, a changed source file (same path, other size/date) is not imported again.
+                    var bookmarkKey = CloudLibraryService.GetBookmarkKey(bookmark);
+                    var importedFiles = await _databaseService.GetImportedBookmarkedFilesAsync(bookmarkKey);
+
                     using var deferredLibraryChanged = _libraryService.DeferLibraryChanged();
-                    foreach (var file in files)
+                    foreach (var (file, relativePath) in files)
                     {
+                        if (importedFiles.Contains(relativePath))
+                        {
+                            continue;
+                        }
+
                         var sanitizedName = LibraryService.SanitizeFileName(file.Name);
                         var targetPath = Path.Combine(_libraryService.ComicsDirectory, sanitizedName);
 
@@ -976,6 +987,7 @@ public partial class LibraryViewModel : ViewModelBase
                             {
                                 var fallback = LibraryService.GetSuggestedSeriesNameFromDirectoryName(folder.Name);
                                 var comic = await _libraryService.ImportLocalComicAsync(copiedPath, seriesNameFallback: fallback);
+                                await MarkBookmarkedFileImportedAsync(bookmarkKey, file, relativePath);
                                 
                                 Dispatcher.UIThread.Post(() =>
                                 {
@@ -1002,6 +1014,10 @@ public partial class LibraryViewModel : ViewModelBase
                                     }
                                 });
                             }
+
+                            // Also covers comics imported before this tracking existed: remember them, so deleting
+                            // them later doesn't bring them back
+                            await MarkBookmarkedFileImportedAsync(bookmarkKey, file, relativePath);
                         }
                     }
 
@@ -1021,6 +1037,25 @@ public partial class LibraryViewModel : ViewModelBase
         {
             _scanSemaphore.Release();
         }
+    }
+
+    private async Task MarkBookmarkedFileImportedAsync(string bookmarkKey, IStorageFile file, string relativePath)
+    {
+        long? size = null;
+        DateTimeOffset? modified = null;
+        try
+        {
+            var properties = await file.GetBasicPropertiesAsync();
+            size = properties.Size is { } fileSize ? (long)fileSize : null;
+            modified = properties.DateModified;
+        }
+        catch (Exception ex)
+        {
+            // Size and date are informational only
+            System.Diagnostics.Debug.WriteLine($"[LibraryViewModel] Failed to read properties of '{relativePath}': {ex.Message}");
+        }
+
+        await _databaseService.MarkBookmarkedFileImportedAsync(bookmarkKey, relativePath, size, modified);
     }
 
     private async Task ImportFilesCoreAsync(

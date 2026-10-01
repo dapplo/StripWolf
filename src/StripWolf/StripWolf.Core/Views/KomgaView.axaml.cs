@@ -34,6 +34,7 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
     private readonly ScrollViewer? _connectedScrollViewer;
     private bool _hadSelectedSeries;
     private double _savedSeriesScrollOffsetY;
+    private bool _isLoadNextPageCheckPending;
     private event PropertyChangedEventHandler? ProxyPropertyChanged;
 
     public KomgaView()
@@ -98,18 +99,55 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
 
         RaiseProxyPropertyChanges();
         
-        // Initialize when the view is displayed
+        // Initialize when the view is displayed, the view model makes sure this only happens once
         if (DataContext is KomgaViewModel viewModel)
         {
-            try
-            {
-                await viewModel.InitializeCommand.ExecuteAsync(null);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to initialize Komga: {ex.Message}");
-            }
+            await EnsureInitializedAsync(viewModel);
         }
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        // The view is kept alive between tab switches (see MainContentHost) and only hidden,
+        // so becoming visible again is the moment a tab switch to Komga happened.
+        // Not async: this override runs for every property change of the view, EnsureInitializedAsync catches all exceptions.
+        if (change.Property == IsVisibleProperty && IsVisible && _subscribedViewModel is not null)
+        {
+            _ = EnsureInitializedAsync(_subscribedViewModel);
+            // Page checks are skipped while hidden, catch up on a list that doesn't fill the view yet
+            ScheduleLoadNextPageCheck();
+        }
+    }
+
+    private static async Task EnsureInitializedAsync(KomgaViewModel viewModel)
+    {
+        // Called from async void handlers: exceptions must not escape
+        try
+        {
+            await viewModel.EnsureInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to initialize Komga: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A card of one of the virtualized grids was realized: the view model loads its thumbnail
+    /// </summary>
+    private void OnCardElementPrepared(object? sender, ItemsRepeaterElementPreparedEventArgs e)
+    {
+        _subscribedViewModel?.OnThumbnailElementPrepared(e.Element.DataContext);
+    }
+
+    /// <summary>
+    /// A card of one of the virtualized grids is recycled: the view model releases its thumbnail
+    /// </summary>
+    private void OnCardElementClearing(object? sender, ItemsRepeaterElementClearingEventArgs e)
+    {
+        _subscribedViewModel?.OnThumbnailElementClearing(e.Element.DataContext);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -133,13 +171,43 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
                 OnPropertyChanged(nameof(BookPendingReadListSelection));
                 break;
         }
+
+        // A page check is skipped while the view model is busy, not connected yet or searching. The scroll viewer
+        // doesn't change after that (the extent change of the added page was already handled while busy), so without
+        // checking again the list stopped after the first page until the user scrolled or resized the window.
+        switch (e.PropertyName)
+        {
+            case nameof(KomgaViewModel.IsBusy):
+            case nameof(KomgaViewModel.IsLoadingMore):
+            case nameof(KomgaViewModel.IsConnected):
+            case nameof(KomgaViewModel.IsSearching):
+            case nameof(KomgaViewModel.HasMoreSeries):
+            case nameof(KomgaViewModel.HasMoreBooks):
+            case nameof(KomgaViewModel.SelectedLibrary):
+            case nameof(KomgaViewModel.SelectedSeries):
+            case nameof(KomgaViewModel.SelectedReadList):
+                ScheduleLoadNextPageCheck();
+                break;
+        }
     }
 
     private void OnConnectedScrollViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property != ScrollViewer.OffsetProperty ||
-            _connectedScrollViewer is null ||
-            _subscribedViewModel is null)
+        if (_connectedScrollViewer is null || _subscribedViewModel is null)
+        {
+            return;
+        }
+
+        // Extent and viewport changes matter too: after a page was added (extent) or when the loaded items
+        // don't fill the view yet (there is nothing to scroll), the next page must be requested as well.
+        if (e.Property == ScrollViewer.OffsetProperty ||
+            e.Property == ScrollViewer.ExtentProperty ||
+            e.Property == ScrollViewer.ViewportProperty)
+        {
+            ScheduleLoadNextPageCheck();
+        }
+
+        if (e.Property != ScrollViewer.OffsetProperty)
         {
             return;
         }
@@ -149,6 +217,44 @@ public partial class KomgaView : UserControl, INotifyPropertyChanged
             _subscribedViewModel.SelectedReadList is null)
         {
             _savedSeriesScrollOffsetY = _connectedScrollViewer.Offset.Y;
+        }
+    }
+
+    /// <summary>
+    /// Coalesces the many scroll events of a fling into one check after the layout pass
+    /// </summary>
+    private void ScheduleLoadNextPageCheck()
+    {
+        if (_isLoadNextPageCheckPending)
+        {
+            return;
+        }
+
+        _isLoadNextPageCheckPending = true;
+        Dispatcher.UIThread.Post(CheckLoadNextPage, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Requests the next page when the user scrolled to within about a screen of the end of the loaded items
+    /// </summary>
+    private void CheckLoadNextPage()
+    {
+        _isLoadNextPageCheckPending = false;
+        if (_connectedScrollViewer is null || _subscribedViewModel is null || !IsEffectivelyVisible)
+        {
+            return;
+        }
+
+        var viewportHeight = _connectedScrollViewer.Viewport.Height;
+        if (viewportHeight <= 0)
+        {
+            return;
+        }
+
+        var remaining = _connectedScrollViewer.Extent.Height - (_connectedScrollViewer.Offset.Y + viewportHeight);
+        if (remaining <= viewportHeight)
+        {
+            _subscribedViewModel.LoadNextPageIfNeeded();
         }
     }
 

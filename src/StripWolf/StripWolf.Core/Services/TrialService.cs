@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using StripWolf.Core.Data;
 using StripWolf.Core.Models;
@@ -19,7 +20,15 @@ public class TrialService
         "cbz", "cbr", "cbt", "cb7", "epub", "pdf"
     };
 
+    /// <summary>
+    /// Page turns are counted in memory and written in one go after this delay,
+    /// so reading doesn't cause a database write for every page.
+    /// </summary>
+    private static readonly TimeSpan PagesReadFlushDelay = TimeSpan.FromSeconds(5);
+
     private readonly System.Threading.SemaphoreSlim _settingsSemaphore = new(1, 1);
+    private int _pendingPagesRead;
+    private int _isPagesReadFlushScheduled;
 
     private readonly SettingsService _settingsService;
     private readonly DatabaseService _databaseService;
@@ -77,26 +86,48 @@ public class TrialService
         });
     }
 
+    // Note: the usage counters feed the "personal reading statistics" in the settings, which are shown in every
+    // build (not only in the Play Store trial), so they are always recorded. They are aggregated counters now,
+    // the database no longer grows with every event.
     private async void OnLocalComicImported(object? sender, string filePath)
     {
-        await LogUsageAsync("LocalImport", filePath);
+        await IncrementUsageAsync("LocalImport");
     }
 
     private async void OnKomgaBookDownloaded(object? sender, string bookId)
     {
-        await LogUsageAsync("KomgaDownload", bookId);
+        await IncrementUsageAsync("KomgaDownload");
     }
 
     private async void OnPageRead(object? sender, EventArgs e)
     {
-        await LogUsageAsync("PagesRead");
+        Interlocked.Increment(ref _pendingPagesRead);
+        if (Interlocked.Exchange(ref _isPagesReadFlushScheduled, 1) == 1)
+        {
+            // A flush is already pending, it will include this page
+            return;
+        }
+
+        await Task.Delay(PagesReadFlushDelay);
+
+        // Reset the flag before taking the count: a page read in between schedules a new flush (which might write 0)
+        Volatile.Write(ref _isPagesReadFlushScheduled, 0);
+        var pagesRead = Interlocked.Exchange(ref _pendingPagesRead, 0);
+        await IncrementUsageAsync("PagesRead", pagesRead);
     }
+
+    /// <summary>
+    /// The key under which an opened Komga book is remembered for the trial view limit.
+    /// Komga book ids are alphanumeric strings (e.g. "0F99E2NAQ5A4R") and two servers can use the same id,
+    /// so the id is qualified with the id of the server.
+    /// </summary>
+    public static string GetKomgaViewKey(int? serverId, string bookId) => $"{serverId ?? 0}:{bookId}";
 
     private async void OnComicOpened(object? sender, ComicOpenedEventArgs e)
     {
         try
         {
-            await LogUsageAsync("ComicOpen", e.ComicId);
+            await IncrementUsageAsync("ComicOpen");
 
             if (!IsUnlimitedUnlocked)
             {
@@ -105,13 +136,15 @@ public class TrialService
                 {
                     if (e.Source == ComicSource.Komga)
                     {
-                        if (int.TryParse(e.Identifier, out var bookId))
+                        // For Komga the identifier is the key from GetKomgaViewKey (the reader passes it)
+                        var viewKey = e.Identifier;
+                        if (!string.IsNullOrEmpty(viewKey))
                         {
                             await _settingsService.UpdateSettingsAsync(s =>
                             {
-                                if (!s.PermanentViewedKomgaBookIds.Contains(bookId))
+                                if (!s.PermanentViewedKomgaBooks.Contains(viewKey))
                                 {
-                                    s.PermanentViewedKomgaBookIds.Add(bookId);
+                                    s.PermanentViewedKomgaBooks.Add(viewKey);
                                 }
                             });
                         }
@@ -219,19 +252,20 @@ public class TrialService
     /// <summary>
     /// Checks if opening a Komga comic is allowed (permanent view limit: max MaxTrialLimit unique files).
     /// </summary>
-    public async Task<bool> CanOpenKomgaAsync(int bookId)
+    /// <param name="viewKey">Key of the book, see GetKomgaViewKey</param>
+    public Task<bool> CanOpenKomgaAsync(string viewKey)
     {
-        if (IsUnlimitedUnlocked) return true;
+        if (IsUnlimitedUnlocked) return Task.FromResult(true);
 
         var settings = _settingsService.LoadSettings();
 
         // Already viewed in trial - free to open again
-        if (settings.PermanentViewedKomgaBookIds.Contains(bookId))
+        if (settings.PermanentViewedKomgaBooks.Contains(viewKey))
         {
-            return true;
+            return Task.FromResult(true);
         }
 
-        return settings.PermanentViewedKomgaBookIds.Count < MaxTrialLimit;
+        return Task.FromResult(settings.PermanentViewedKomgaBooks.Count < MaxTrialLimit);
     }
 
     /// <summary>
@@ -246,10 +280,10 @@ public class TrialService
     }
 
     /// <summary>
-    /// Logs usage statistics to the database.
+    /// Increments a usage statistics counter in the database.
     /// </summary>
-    public async Task LogUsageAsync(string metric, object? metadata = null)
+    public async Task IncrementUsageAsync(string metric, long amount = 1)
     {
-        await _databaseService.LogUsageAsync(metric, metadata?.ToString());
+        await _databaseService.IncrementUsageAsync(metric, amount);
     }
 }

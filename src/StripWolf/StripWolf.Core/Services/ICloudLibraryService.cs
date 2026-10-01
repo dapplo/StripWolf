@@ -24,6 +24,16 @@ using Avalonia.Platform.Storage;
 namespace StripWolf.Core.Services;
 
 /// <summary>
+/// A bookmarked folder which could be opened, together with the bookmark it was opened from
+/// </summary>
+public sealed record BookmarkedFolder(string Bookmark, IStorageFolder Folder);
+
+/// <summary>
+/// A comic file found in a folder, with its path relative to that folder ('/' separated)
+/// </summary>
+public sealed record ComicStorageFile(IStorageFile File, string RelativePath);
+
+/// <summary>
 /// Service interface for cross-platform, cloud-agnostic comic library import and folder access.
 /// Handles folder picking, folder access token persistence (bookmarking), and streaming data.
 /// </summary>
@@ -38,10 +48,12 @@ public interface ICloudLibraryService
 
     /// <summary>
     /// Restores all active folders from the persisted bookmarks.
+    /// Folders which are currently not accessible (offline, unplugged) are skipped, only bookmarks whose access
+    /// was revoked are removed.
     /// </summary>
     /// <param name="storageProvider">The platform storage provider.</param>
-    /// <returns>A list of successfully restored storage folders.</returns>
-    Task<List<IStorageFolder>> GetBookmarkedFoldersAsync(IStorageProvider storageProvider);
+    /// <returns>A list of successfully restored storage folders, with their bookmark.</returns>
+    Task<List<BookmarkedFolder>> GetBookmarkedFoldersAsync(IStorageProvider storageProvider);
 
     /// <summary>
     /// Recursively enumerates all supported comic files within the specified folder.
@@ -49,6 +61,13 @@ public interface ICloudLibraryService
     /// <param name="folder">The folder to scan.</param>
     /// <returns>An async enumerable of comic storage files.</returns>
     IAsyncEnumerable<IStorageFile> EnumerateComicFilesAsync(IStorageFolder folder);
+
+    /// <summary>
+    /// Recursively enumerates all supported comic files within the specified folder, with their relative path.
+    /// </summary>
+    /// <param name="folder">The folder to scan.</param>
+    /// <returns>An async enumerable of comic storage files with their path relative to the folder.</returns>
+    IAsyncEnumerable<ComicStorageFile> EnumerateComicFilesWithRelativePathAsync(IStorageFolder folder);
 
     /// <summary>
     /// Copies the contents of a storage file to a local destination directory using stream copying (OpenReadAsync).

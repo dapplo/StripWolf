@@ -20,6 +20,7 @@
 using Avalonia.Media.Imaging;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -505,7 +506,13 @@ public partial class ReaderViewModel : ViewModelBase
 
     public bool IsGuidedReadingAvailable => _panelDetectionService.IsAvailable;
 
-    public IReadOnlyList<ReadingDirectionModeOption> AvailableReadingDirectionModes =>
+    // Cached: this used to create a new list (and new options) on every access. The display names are localized,
+    // so the list is rebuilt when the language changes (see OnLocalizationChanged).
+    private IReadOnlyList<ReadingDirectionModeOption> _availableReadingDirectionModes = CreateReadingDirectionModes();
+
+    public IReadOnlyList<ReadingDirectionModeOption> AvailableReadingDirectionModes => _availableReadingDirectionModes;
+
+    private static IReadOnlyList<ReadingDirectionModeOption> CreateReadingDirectionModes() =>
     [
         new(ReadingDirectionMode.Automatic, Loc.Instance.ReadingDirectionAutomatic),
         new(ReadingDirectionMode.LeftToRight, Loc.Instance.ReadingDirectionLeftToRight),
@@ -513,6 +520,29 @@ public partial class ReaderViewModel : ViewModelBase
         new(ReadingDirectionMode.LeftToRightReversedPages, Loc.Instance.ReadingDirectionLeftToRightReversedPages),
         new(ReadingDirectionMode.RightToLeftReversedPages, Loc.Instance.ReadingDirectionRightToLeftReversedPages)
     ];
+
+    private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Loc.RefreshLocalization (language change) raises PropertyChanged for all properties (null name)
+        if (!string.IsNullOrEmpty(e.PropertyName))
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(RefreshReadingDirectionModes);
+    }
+
+    private void RefreshReadingDirectionModes()
+    {
+        // The options are records which include the display name, so re-select the current option by its Value
+        var selectedValue = SelectedReadingDirectionModeOption?.Value;
+        _availableReadingDirectionModes = CreateReadingDirectionModes();
+        OnPropertyChanged(nameof(AvailableReadingDirectionModes));
+        if (selectedValue is { } value)
+        {
+            SelectedReadingDirectionModeOption = _availableReadingDirectionModes.FirstOrDefault(o => o.Value == value);
+        }
+    }
 
     public ReadingDirectionMode EffectiveReadingDirectionMode => SelectedReadingDirectionModeOption?.Value switch
     {
@@ -740,6 +770,8 @@ public partial class ReaderViewModel : ViewModelBase
         _trialService = trialService;
         _appEventsService = appEventsService;
         _epubShadowConversionService.ConversionStateChanged += OnEpubConversionStateChanged;
+        // ReaderViewModel is a singleton, so subscribing to the static Loc instance doesn't leak
+        Loc.Instance.PropertyChanged += OnLocalizationChanged;
 
         _periodicSyncTimer = new DispatcherTimer
         {
@@ -921,12 +953,8 @@ public partial class ReaderViewModel : ViewModelBase
 
         try
         {
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
-            var imagesDir = Path.Combine(appDir, "images");
-            if (!Directory.Exists(imagesDir))
-            {
-                Directory.CreateDirectory(imagesDir);
-            }
+            var imagesDir = GetSavedPagesDirectory();
+            Directory.CreateDirectory(imagesDir);
 
             var readPath = GetActiveReadPath();
             var pageData = await _comicReaderService.GetPageAsync(readPath, CurrentPage);
@@ -949,6 +977,25 @@ public partial class ReaderViewModel : ViewModelBase
         {
             System.Diagnostics.Debug.WriteLine($"Failed to save page: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Where SaveCurrentPage (debug) writes to. This used to be AppDomain.CurrentDomain.BaseDirectory/images,
+    /// which is read-only in macOS app bundles, Program Files, on Android and iOS.
+    /// On desktop the user's Pictures folder is used when it exists, otherwise the app data directory.
+    /// </summary>
+    private static string GetSavedPagesDirectory()
+    {
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            var picturesDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            if (!string.IsNullOrEmpty(picturesDirectory) && Directory.Exists(picturesDirectory))
+            {
+                return Path.Combine(picturesDirectory, "StripWolf");
+            }
+        }
+
+        return Path.Combine(AppPaths.DefaultAppDataDirectory, "SavedPages");
     }
 
     public async Task LoadComicAsync(int comicId)
@@ -986,12 +1033,12 @@ public partial class ReaderViewModel : ViewModelBase
             {
                 // Enforce permanent view limits in trial
                 bool allowed = true;
+                string? komgaViewKey = null;
                 if (Comic.Source == ComicSource.Komga && !string.IsNullOrEmpty(Comic.KomgaId))
                 {
-                    if (int.TryParse(Comic.KomgaId, out var komgaBookId))
-                    {
-                        allowed = await _trialService.CanOpenKomgaAsync(komgaBookId);
-                    }
+                    // Komga ids are alphanumeric, the former int.TryParse made this check never run
+                    komgaViewKey = TrialService.GetKomgaViewKey(Comic.KomgaServerId, Comic.KomgaId);
+                    allowed = await _trialService.CanOpenKomgaAsync(komgaViewKey);
                 }
                 else
                 {
@@ -1008,15 +1055,21 @@ public partial class ReaderViewModel : ViewModelBase
                     return;
                 }
 
-                // Save last opened comic info in settings
-                settings.LastOpenedComicId = Comic.Id;
-                settings.LastOpenedComicPath = Comic.FilePath;
-                settings.WasInReader = true;
-                _ = _settingsService.SaveSettingsAsync(settings);
+                // Save last opened comic info in settings, only these fields: the settings snapshot loaded above
+                // is stale by now and saving it as a whole would overwrite concurrent changes
+                var openedComicId = Comic.Id;
+                var openedComicPath = Comic.FilePath;
+                _ = _settingsService.UpdateSettingsAsync(s =>
+                {
+                    s.LastOpenedComicId = openedComicId;
+                    s.LastOpenedComicPath = openedComicPath;
+                    s.WasInReader = true;
+                });
+                // For Komga the identifier is the server qualified key, which the TrialService stores
                 _appEventsService.RaiseComicOpened(
                     Comic.Id, 
                     Comic.Source, 
-                    Comic.Source == ComicSource.Komga ? (Comic.KomgaId ?? string.Empty) : Comic.FilePath);
+                    Comic.Source == ComicSource.Komga ? (komgaViewKey ?? string.Empty) : Comic.FilePath);
 
                 Title = Comic.Title;
                 OnPropertyChanged(nameof(MaxSliderValue));

@@ -293,20 +293,16 @@ public partial class MainViewModel : ViewModelBase
     {
         if (_isInitializing) return;
 
-        // Save to settings
-        var settings = _settingsService.LoadSettings();
-        settings.WasInReader = value;
-        _ = _settingsService.SaveSettingsAsync(settings);
+        // Only update this field, saving a whole loaded snapshot could overwrite concurrent changes
+        _ = _settingsService.UpdateSettingsAsync(s => s.WasInReader = value);
     }
 
     partial void OnSelectedTabIndexChanged(int value)
     {
         if (_isInitializing) return;
 
-        // Save to settings
-        var settings = _settingsService.LoadSettings();
-        settings.LastTabIndex = value;
-        _ = _settingsService.SaveSettingsAsync(settings);
+        // Only update this field, saving a whole loaded snapshot could overwrite concurrent changes
+        _ = _settingsService.UpdateSettingsAsync(s => s.LastTabIndex = value);
 
         if (!IsInReader && !_isRestoringWelcomeState)
         {

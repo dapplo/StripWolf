@@ -279,7 +279,7 @@ public partial class App : Application
     {
         try
         {
-            using var pipeClient = new System.IO.Pipes.NamedPipeClientStream(".", "StripWolf_Activation_Pipe", System.IO.Pipes.PipeDirection.Out);
+            using var pipeClient = new System.IO.Pipes.NamedPipeClientStream(".", ActivationManager.PipeName, System.IO.Pipes.PipeDirection.Out, System.IO.Pipes.PipeOptions.CurrentUserOnly);
             pipeClient.Connect(1000); // 1-second timeout
             using var writer = new StreamWriter(pipeClient, System.Text.Encoding.UTF8);
             writer.WriteLine($"OPEN:{filePath}");

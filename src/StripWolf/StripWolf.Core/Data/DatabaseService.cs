@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using StripWolf.Core.Models;
+using StripWolf.Core.Services;
 using SQLite;
 using System.Diagnostics.CodeAnalysis;
 
@@ -33,18 +34,21 @@ public class DatabaseService : IAsyncDisposable
     private readonly SemaphoreSlim _initializationSemaphore = new(1, 1);
     private bool _isInitialized;
 
-    public DatabaseService()
+    public DatabaseService() : this(Path.Combine(AppPaths.DefaultAppDataDirectory, "StripWolf.db"))
     {
-        var appDataDir = GetAppDataDirectory();
-        Directory.CreateDirectory(appDataDir);
-        _databasePath = Path.Combine(appDataDir, "StripWolf.db");
     }
 
-    private static string GetAppDataDirectory()
+    /// <summary>
+    /// Use a specific database file (used by the tests)
+    /// </summary>
+    internal DatabaseService(string databasePath)
     {
-        // Cross-platform app data directory
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(baseDir, "StripWolf");
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+        _databasePath = databasePath;
     }
 
     [DynamicDependency(
@@ -55,16 +59,16 @@ public class DatabaseService : IAsyncDisposable
         typeof(EpubConversionState))]
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
-        typeof(KomgaServer))]
-    [DynamicDependency(
-        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
         typeof(KomgaPendingDownload))]
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
         typeof(KomgaPendingReadProgress))]
     [DynamicDependency(
         DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
-        typeof(UsageStats))]
+        typeof(UsageCounter))]
+    [DynamicDependency(
+        DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties,
+        typeof(BookmarkedFileImport))]
     private async Task<SQLiteAsyncConnection> GetDatabaseAsync()
     {
         if (_isInitialized && _database is not null)
@@ -89,10 +93,14 @@ public class DatabaseService : IAsyncDisposable
 
             await _database.CreateTableAsync<Comic>();
             await _database.CreateTableAsync<EpubConversionState>();
-            await _database.CreateTableAsync<KomgaServer>();
+            // Komga servers are stored in settings.json (credentials encrypted separately). The old, unused table
+            // still contained the passwords and API keys in plain text, remove it.
+            await _database.ExecuteAsync("DROP TABLE IF EXISTS KomgaServer");
             await _database.CreateTableAsync<KomgaPendingDownload>();
             await _database.CreateTableAsync<KomgaPendingReadProgress>();
-            await _database.CreateTableAsync<UsageStats>();
+            await _database.CreateTableAsync<UsageCounter>();
+            await MigrateUsageStatsAsync(_database);
+            await _database.CreateTableAsync<BookmarkedFileImport>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
 
@@ -321,39 +329,6 @@ public class DatabaseService : IAsyncDisposable
 
     #endregion
 
-    #region Komga Servers
-
-    public async Task<List<KomgaServer>> GetServersAsync()
-    {
-        var db = await GetDatabaseAsync();
-        return await db.Table<KomgaServer>().ToListAsync();
-    }
-
-    public async Task<KomgaServer?> GetServerAsync(int id)
-    {
-        var db = await GetDatabaseAsync();
-        return await db.Table<KomgaServer>().FirstOrDefaultAsync(s => s.Id == id);
-    }
-
-    public async Task<int> SaveServerAsync(KomgaServer server)
-    {
-        var db = await GetDatabaseAsync();
-
-        if (server.Id != 0)
-        {
-            return await db.UpdateAsync(server);
-        }
-        return await db.InsertAsync(server);
-    }
-
-    public async Task<int> DeleteServerAsync(KomgaServer server)
-    {
-        var db = await GetDatabaseAsync();
-        return await db.DeleteAsync(server);
-    }
-
-    #endregion
-
     #region Komga Read Progress Queue
 
     public async Task<KomgaPendingReadProgress?> GetPendingKomgaReadProgressAsync(int comicId)
@@ -475,18 +450,49 @@ public class DatabaseService : IAsyncDisposable
 
     #region Usage Stats
 
-    public async Task LogUsageAsync(string metric, string? metadata = null)
+    /// <summary>
+    /// The old UsageStats table had a row per event (including every page turn) and grew forever,
+    /// only the number of rows per metric was used. Fold it into the UsageCounter table once and drop it.
+    /// </summary>
+    private static async Task MigrateUsageStatsAsync(SQLiteAsyncConnection database)
     {
         try
         {
-            var db = await GetDatabaseAsync();
-            var stat = new UsageStats
+            var oldTableCount = await database.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'UsageStats'");
+            if (oldTableCount == 0)
             {
-                Metric = metric,
-                Timestamp = DateTime.UtcNow,
-                Metadata = metadata
-            };
-            await db.InsertAsync(stat);
+                return;
+            }
+
+            // INSERT OR IGNORE: if the app is killed between these statements, a rerun can't count twice
+            await database.ExecuteAsync(
+                $"INSERT OR IGNORE INTO {UsageCounter.TableName} (Metric, Amount) " +
+                "SELECT Metric, COUNT(*) FROM UsageStats WHERE Metric IS NOT NULL GROUP BY Metric");
+            await database.ExecuteAsync("DROP TABLE UsageStats");
+        }
+        catch (Exception ex)
+        {
+            // Statistics are not important enough to block the database initialization
+            System.Diagnostics.Debug.WriteLine($"DatabaseService: Failed to migrate usage stats: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Add amount to the counter of the specified metric
+    /// </summary>
+    public async Task IncrementUsageAsync(string metric, long amount = 1)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var db = await GetDatabaseAsync();
+            await db.ExecuteAsync($"INSERT OR IGNORE INTO {UsageCounter.TableName} (Metric, Amount) VALUES (?, 0)", metric);
+            await db.ExecuteAsync($"UPDATE {UsageCounter.TableName} SET Amount = Amount + ? WHERE Metric = ?", amount, metric);
         }
         catch
         {
@@ -499,12 +505,41 @@ public class DatabaseService : IAsyncDisposable
         try
         {
             var db = await GetDatabaseAsync();
-            return await db.Table<UsageStats>().Where(s => s.Metric == metric).CountAsync();
+            var amount = await db.ExecuteScalarAsync<long>($"SELECT Amount FROM {UsageCounter.TableName} WHERE Metric = ?", metric);
+            return (int)Math.Min(amount, int.MaxValue);
         }
         catch
         {
             return 0;
         }
+    }
+
+    #endregion
+
+    #region Bookmarked folder imports
+
+    /// <summary>
+    /// Relative paths of all source files of the bookmarked folder which were imported before
+    /// </summary>
+    public async Task<HashSet<string>> GetImportedBookmarkedFilesAsync(string bookmarkKey)
+    {
+        var db = await GetDatabaseAsync();
+        var imports = await db.Table<BookmarkedFileImport>().Where(i => i.BookmarkKey == bookmarkKey).ToListAsync();
+        return imports.Select(i => i.RelativePath).ToHashSet(StringComparer.Ordinal);
+    }
+
+    public async Task MarkBookmarkedFileImportedAsync(string bookmarkKey, string relativePath, long? size, DateTimeOffset? modified)
+    {
+        var db = await GetDatabaseAsync();
+        await db.InsertOrReplaceAsync(new BookmarkedFileImport
+        {
+            Key = BookmarkedFileImport.CreateKey(bookmarkKey, relativePath),
+            BookmarkKey = bookmarkKey,
+            RelativePath = relativePath,
+            Size = size,
+            ModifiedUtcTicks = modified?.UtcTicks,
+            ImportedUtcTicks = DateTime.UtcNow.Ticks
+        });
     }
 
     #endregion

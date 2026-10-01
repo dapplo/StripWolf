@@ -2,7 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-ios</TargetFramework>
-    <SupportedOSPlatformVersion>26.5</SupportedOSPlatformVersion>
+    <!-- Minimum iOS/iPadOS version (was 26.5). 16.0 covers all iPads from 2017 on; .NET 10 itself supports 12.2+. -->
+    <SupportedOSPlatformVersion>16.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
     <ProvisioningType>manual</ProvisioningType>
@@ -24,7 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" UndefineProperties="RuntimeIdentifier" />
+    <!-- No OpenCV native runtime for iOS: build Core with the no-op panel detection (guided reading hidden) -->
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" AdditionalProperties="UseOpenCvPanelDetection=false" UndefineProperties="RuntimeIdentifier" />
   </ItemGroup>
 
   <ItemGroup>

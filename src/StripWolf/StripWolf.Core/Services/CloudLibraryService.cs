@@ -20,6 +20,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 
@@ -31,11 +34,24 @@ namespace StripWolf.Core.Services;
 /// </summary>
 public class CloudLibraryService : ICloudLibraryService
 {
+    /// <summary>
+    /// Extension of files which are still being copied, it's not a supported comic extension so scans ignore them
+    /// </summary>
+    private const string PartialFileExtension = ".partial";
+
     private readonly SettingsService _settingsService;
 
     public CloudLibraryService(SettingsService settingsService)
     {
         _settingsService = settingsService;
+    }
+
+    /// <summary>
+    /// A short, stable key for a bookmark (bookmarks can be long base64 blobs), used to track imported files
+    /// </summary>
+    public static string GetBookmarkKey(string bookmark)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(bookmark)));
     }
 
     public async Task<IStorageFolder?> SelectAndBookmarkFolderAsync(IStorageProvider storageProvider)
@@ -73,12 +89,14 @@ public class CloudLibraryService : ICloudLibraryService
 
             if (!string.IsNullOrEmpty(bookmark))
             {
-                var settings = _settingsService.LoadSettings();
-                if (!settings.CloudFolderBookmarks.Contains(bookmark))
+                var newBookmark = bookmark;
+                await _settingsService.UpdateSettingsAsync(settings =>
                 {
-                    settings.CloudFolderBookmarks.Add(bookmark);
-                    await _settingsService.SaveSettingsAsync(settings);
-                }
+                    if (!settings.CloudFolderBookmarks.Contains(newBookmark))
+                    {
+                        settings.CloudFolderBookmarks.Add(newBookmark);
+                    }
+                });
             }
 
             return folder;
@@ -90,15 +108,16 @@ public class CloudLibraryService : ICloudLibraryService
         }
     }
 
-    public async Task<List<IStorageFolder>> GetBookmarkedFoldersAsync(IStorageProvider storageProvider)
+    public async Task<List<BookmarkedFolder>> GetBookmarkedFoldersAsync(IStorageProvider storageProvider)
     {
         var settings = _settingsService.LoadSettings();
-        var folders = new List<IStorageFolder>();
-        var invalidBookmarks = new List<string>();
+        var folders = new List<BookmarkedFolder>();
+        var revokedBookmarks = new List<string>();
 
         foreach (var bookmark in settings.CloudFolderBookmarks)
         {
             IStorageFolder? folder = null;
+            var isRevoked = false;
 
             try
             {
@@ -106,11 +125,12 @@ public class CloudLibraryService : ICloudLibraryService
             }
             catch (Exception ex)
             {
+                isRevoked = IsAccessRevoked(ex);
                 System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] OpenFolderBookmarkAsync failed for '{bookmark}': {ex.Message}");
             }
 
             // Fallback check if it represents a local folder path or URI
-            if (folder is null)
+            if (folder is null && !isRevoked)
             {
                 try
                 {
@@ -125,48 +145,106 @@ public class CloudLibraryService : ICloudLibraryService
                 }
                 catch (Exception ex)
                 {
+                    isRevoked = IsAccessRevoked(ex);
                     System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Fallback TryGetFolderFromPathAsync failed for '{bookmark}': {ex.Message}");
                 }
             }
 
-            if (folder is not null)
+            // Opening a bookmark doesn't check the access on every platform (e.g. Android only fails when reading),
+            // so read the first item to find out if we (still) have access.
+            if (folder is not null && !isRevoked)
             {
-                folders.Add(folder);
+                try
+                {
+                    await foreach (var item in folder.GetItemsAsync())
+                    {
+                        item.Dispose();
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    isRevoked = IsAccessRevoked(ex);
+                    System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Bookmarked folder '{bookmark}' can't be read: {ex.Message}");
+                    folder = null;
+                }
+            }
+
+            if (isRevoked)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Access to the bookmarked folder was revoked, it will be removed: {bookmark}");
+                revokedBookmarks.Add(bookmark);
+            }
+            else if (folder is not null)
+            {
+                folders.Add(new BookmarkedFolder(bookmark, folder));
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Bookmark is no longer accessible and will be cleaned up: {bookmark}");
-                invalidBookmarks.Add(bookmark);
+                // Offline NAS, unplugged USB drive, provider not ready...: keep the bookmark and just skip it this time.
+                // (Previously any failure removed the bookmark permanently.)
+                System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Bookmarked folder is currently not accessible, skipping it: {bookmark}");
             }
         }
 
-        if (invalidBookmarks.Count > 0)
+        if (revokedBookmarks.Count > 0)
         {
-            settings.CloudFolderBookmarks.RemoveAll(b => invalidBookmarks.Contains(b));
-            await _settingsService.SaveSettingsAsync(settings);
+            await _settingsService.UpdateSettingsAsync(s => s.CloudFolderBookmarks.RemoveAll(b => revokedBookmarks.Contains(b)));
         }
 
         return folders;
     }
 
+    /// <summary>
+    /// Only a denied access on Android/iOS means the bookmark is definitively unusable: there the bookmark is a
+    /// permission grant (persisted SAF tree permission / security scoped bookmark) which the user or OS revoked.
+    /// On desktop a bookmark is just a path and an access problem can be temporary (e.g. a network share which
+    /// isn't connected yet), so it's never removed automatically there.
+    /// </summary>
+    private static bool IsAccessRevoked(Exception exception)
+    {
+        if (!OperatingSystem.IsAndroid() && !OperatingSystem.IsIOS())
+        {
+            return false;
+        }
+
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            // Java.Lang.SecurityException on Android can't be referenced from here, hence the type name check
+            if (current is UnauthorizedAccessException or System.Security.SecurityException ||
+                current.GetType().Name == "SecurityException")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public async Task RemoveBookmarkAsync(string bookmark)
     {
-        var settings = _settingsService.LoadSettings();
-        if (settings.CloudFolderBookmarks.Remove(bookmark))
+        if (!_settingsService.LoadSettings().CloudFolderBookmarks.Contains(bookmark))
         {
-            await _settingsService.SaveSettingsAsync(settings);
+            return;
         }
+
+        await _settingsService.UpdateSettingsAsync(settings => settings.CloudFolderBookmarks.Remove(bookmark));
     }
 
     public async IAsyncEnumerable<IStorageFile> EnumerateComicFilesAsync(IStorageFolder folder)
     {
-        await foreach (var file in EnumerateComicFilesRecursivelyAsync(folder))
+        await foreach (var comicFile in EnumerateComicFilesRecursivelyAsync(folder, string.Empty))
         {
-            yield return file;
+            yield return comicFile.File;
         }
     }
 
-    private async IAsyncEnumerable<IStorageFile> EnumerateComicFilesRecursivelyAsync(IStorageFolder folder)
+    public IAsyncEnumerable<ComicStorageFile> EnumerateComicFilesWithRelativePathAsync(IStorageFolder folder)
+    {
+        return EnumerateComicFilesRecursivelyAsync(folder, string.Empty);
+    }
+
+    private async IAsyncEnumerable<ComicStorageFile> EnumerateComicFilesRecursivelyAsync(IStorageFolder folder, string relativeFolderPath)
     {
         IReadOnlyList<IStorageItem>? items = null;
 
@@ -195,14 +273,14 @@ public class CloudLibraryService : ICloudLibraryService
             {
                 if (ComicConstants.IsSupportedComicFile(file.Name))
                 {
-                    yield return file;
+                    yield return new ComicStorageFile(file, relativeFolderPath + file.Name);
                 }
             }
             else if (item is IStorageFolder subFolder)
             {
                 if (!ComicConstants.IsIgnoredImportPath(subFolder.Name))
                 {
-                    await foreach (var subFile in EnumerateComicFilesRecursivelyAsync(subFolder))
+                    await foreach (var subFile in EnumerateComicFilesRecursivelyAsync(subFolder, relativeFolderPath + subFolder.Name + "/"))
                     {
                         yield return subFile;
                     }
@@ -213,14 +291,25 @@ public class CloudLibraryService : ICloudLibraryService
 
     public async Task<string?> CopyToLocalDirectoryAsync(IStorageFile file, string targetDirectory)
     {
+        string? tempPath = null;
         try
         {
             Directory.CreateDirectory(targetDirectory);
 
             var sanitizedName = LibraryService.SanitizeFileName(file.Name);
-            var targetPath = Path.Combine(targetDirectory, sanitizedName);
+
+            // Copy to a temporary name first and move it into place when complete: a failed or interrupted copy
+            // (connection lost, app killed) must never leave a truncated archive which the next scan would import.
+            tempPath = Path.Combine(targetDirectory, $"{sanitizedName}.{Guid.NewGuid():N}{PartialFileExtension}");
+            await using (var sourceStream = await file.OpenReadAsync())
+            await using (var tempStream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                await sourceStream.CopyToAsync(tempStream);
+                await tempStream.FlushAsync();
+            }
 
             // Handle file collision by appending _1, _2 etc.
+            var targetPath = Path.Combine(targetDirectory, sanitizedName);
             var counter = 1;
             var baseName = Path.GetFileNameWithoutExtension(sanitizedName);
             var extension = Path.GetExtension(sanitizedName);
@@ -230,9 +319,8 @@ public class CloudLibraryService : ICloudLibraryService
                 counter++;
             }
 
-            await using var sourceStream = await file.OpenReadAsync();
-            await using var targetStream = File.Create(targetPath);
-            await sourceStream.CopyToAsync(targetStream);
+            File.Move(tempPath, targetPath, overwrite: false);
+            tempPath = null;
 
             return targetPath;
         }
@@ -240,6 +328,20 @@ public class CloudLibraryService : ICloudLibraryService
         {
             System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Failed to copy storage file '{file.Name}' locally: {ex.Message}");
             return null;
+        }
+        finally
+        {
+            if (tempPath is not null)
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CloudLibraryService] Failed to delete temporary file '{tempPath}': {ex.Message}");
+                }
+            }
         }
     }
 }

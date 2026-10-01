@@ -51,11 +51,23 @@ public sealed class EpubShadowConversionService
         DatabaseService databaseService,
         EpubToCbzConverterService epubConverter,
         SettingsService settingsService)
+        : this(databaseService, epubConverter, settingsService, AppPaths.DefaultAppDataDirectory)
+    {
+    }
+
+    /// <summary>
+    /// Use a specific application data directory (used by the tests)
+    /// </summary>
+    internal EpubShadowConversionService(
+        DatabaseService databaseService,
+        EpubToCbzConverterService epubConverter,
+        SettingsService settingsService,
+        string appDataDirectory)
     {
         _databaseService = databaseService;
         _epubConverter = epubConverter;
         _settingsService = settingsService;
-        _appDataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StripWolf");
+        _appDataDirectory = appDataDirectory;
         _comicsDirectory = Path.Combine(_appDataDirectory, "Comics");
         _shadowDirectory = Path.Combine(_appDataDirectory, "EpubShadow");
         Directory.CreateDirectory(_comicsDirectory);

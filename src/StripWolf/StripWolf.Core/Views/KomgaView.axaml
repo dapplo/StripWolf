@@ -7,6 +7,8 @@
              xmlns:models="using:StripWolf.Core.Models"
              xmlns:komga="using:StripWolf.Core.Models.Komga"
              xmlns:converters="using:StripWolf.Core.Converters"
+             xmlns:repeater="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.ItemsRepeater"
+             xmlns:layout="clr-namespace:Avalonia.Layout;assembly=Avalonia.Controls.ItemsRepeater"
              xmlns:res="using:StripWolf.Core.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="StripWolf.Core.Views.KomgaView"
@@ -105,7 +107,8 @@
                           FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
             </Grid>
           </Button>
-          <Panel Grid.Row="3" Margin="8,0,8,8">
+          <!-- Fixed height: the UniformGridLayout uses the size of the first card for all cards -->
+          <Panel Grid.Row="3" Margin="8,0,8,8" Height="26">
             <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
                     Command="{Binding DownloadSeriesCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
@@ -181,7 +184,8 @@
                        FontSize="10" Foreground="Gray" VerticalAlignment="Center"
                        IsVisible="{Binding !IsReading}"/>
           </Panel>
-          <Panel Grid.Row="3" Margin="8,0,8,4">
+          <!-- Fixed height: the UniformGridLayout uses the size of the first card for all cards -->
+          <Panel Grid.Row="3" Margin="8,0,8,4" Height="26">
             <Button Content="{Binding Download, Source={x:Static res:Loc.Instance}}" FontSize="10" Padding="8,4" HorizontalAlignment="Stretch"
                     Command="{Binding DownloadBookCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
@@ -223,6 +227,43 @@
         </Grid>
       </Border>
       </Border>
+    </DataTemplate>
+
+    <DataTemplate x:Key="ReadListCardTemplate" x:DataType="komga:KomgaReadListDisplay">
+      <Button Padding="0" Background="Transparent"
+              Command="{Binding SelectReadListCommand, ElementName=Root}"
+              CommandParameter="{Binding}">
+        <Border Classes="komga-card-entry" Classes.loaded="{Binding IsLoaded}">
+          <Border Classes="komga-card" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
+                  Width="150" ClipToBounds="True">
+            <Grid RowDefinitions="200,Auto,Auto" Width="150">
+              <Border Grid.Row="0" Height="200" Background="#111" ClipToBounds="True">
+                <Grid>
+                  <Image Source="/Assets/Logo.png"
+                         Stretch="Uniform" Opacity="0.28">
+                    <Image.IsVisible>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="IsThumbnailResolved"/>
+                        <Binding Path="Thumbnail" Converter="{x:Static ObjectConverters.IsNull}"/>
+                      </MultiBinding>
+                    </Image.IsVisible>
+                  </Image>
+                  <Image Source="{Binding Thumbnail}" Stretch="Uniform"
+                         IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"
+                         Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                </Grid>
+              </Border>
+              <Border Grid.Row="1" Height="34" Margin="8,4">
+                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
+                           TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
+                           VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
+                         FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
+            </Grid>
+          </Border>
+        </Border>
+      </Button>
     </DataTemplate>
   </UserControl.Resources>
 
@@ -454,31 +495,23 @@
               <!-- Series Search Results -->
               <StackPanel Spacing="8" IsVisible="{Binding SearchSeriesResults.Count}">
                 <TextBlock Text="{Binding SeriesResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-                <ListBox ItemsSource="{Binding SearchSeriesResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                  <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ListBox.ItemsPanel>
-                  <ListBox.ItemTemplate>
-                    <StaticResource ResourceKey="SeriesCardTemplate"/>
-                  </ListBox.ItemTemplate>
-                </ListBox>
+                <repeater:ItemsRepeater ItemsSource="{Binding SearchSeriesResults}" ItemTemplate="{StaticResource SeriesCardTemplate}"
+                                        ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                  <repeater:ItemsRepeater.Layout>
+                    <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                  </repeater:ItemsRepeater.Layout>
+                </repeater:ItemsRepeater>
               </StackPanel>
 
               <!-- Book Search Results -->
               <StackPanel Spacing="8" IsVisible="{Binding SearchBookResults.Count}">
                 <TextBlock Text="{Binding BookResults, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
-                <ListBox ItemsSource="{Binding SearchBookResults}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                  <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ListBox.ItemsPanel>
-                  <ListBox.ItemTemplate>
-                    <StaticResource ResourceKey="BookCardTemplate"/>
-                  </ListBox.ItemTemplate>
-                </ListBox>
+                <repeater:ItemsRepeater ItemsSource="{Binding SearchBookResults}" ItemTemplate="{StaticResource BookCardTemplate}"
+                                        ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                  <repeater:ItemsRepeater.Layout>
+                    <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                  </repeater:ItemsRepeater.Layout>
+                </repeater:ItemsRepeater>
               </StackPanel>
 
               <!-- No Results -->
@@ -508,16 +541,12 @@
                               Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
                     </Grid>
                   </Expander.Header>
-                  <ListBox ItemsSource="{Binding KeepReadingBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                    <ListBox.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                      </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                      <StaticResource ResourceKey="BookCardTemplate"/>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
+                  <repeater:ItemsRepeater ItemsSource="{Binding KeepReadingBooks}" ItemTemplate="{StaticResource BookCardTemplate}" Margin="0,8,0,0"
+                                          ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                    <repeater:ItemsRepeater.Layout>
+                      <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                    </repeater:ItemsRepeater.Layout>
+                  </repeater:ItemsRepeater>
                 </Expander>
                 
                 <!-- On Deck Section -->
@@ -526,16 +555,12 @@
                   <Expander.Header>
                     <TextBlock Text="{Binding SectionOnDeck, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
                   </Expander.Header>
-                  <ListBox ItemsSource="{Binding OnDeckBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                    <ListBox.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                      </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                      <StaticResource ResourceKey="BookCardTemplate"/>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
+                  <repeater:ItemsRepeater ItemsSource="{Binding OnDeckBooks}" ItemTemplate="{StaticResource BookCardTemplate}" Margin="0,8,0,0"
+                                          ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                    <repeater:ItemsRepeater.Layout>
+                      <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                    </repeater:ItemsRepeater.Layout>
+                  </repeater:ItemsRepeater>
                 </Expander>
                 
                 <!-- Recently Added Books Section -->
@@ -544,16 +569,12 @@
                   <Expander.Header>
                     <TextBlock Text="{Binding SectionRecentlyAddedBooks, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
                   </Expander.Header>
-                  <ListBox ItemsSource="{Binding RecentlyAddedBooks}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                    <ListBox.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                      </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                      <StaticResource ResourceKey="BookCardTemplate"/>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
+                  <repeater:ItemsRepeater ItemsSource="{Binding RecentlyAddedBooks}" ItemTemplate="{StaticResource BookCardTemplate}" Margin="0,8,0,0"
+                                          ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                    <repeater:ItemsRepeater.Layout>
+                      <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                    </repeater:ItemsRepeater.Layout>
+                  </repeater:ItemsRepeater>
                 </Expander>
                 
                 <!-- Recently Added Series Section -->
@@ -562,16 +583,12 @@
                   <Expander.Header>
                     <TextBlock Text="{Binding SectionRecentlyAddedSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold"/>
                   </Expander.Header>
-                  <ListBox ItemsSource="{Binding RecentlyAddedSeries}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
-                    <ListBox.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                      </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                      <StaticResource ResourceKey="SeriesCardTemplate"/>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
+                  <repeater:ItemsRepeater ItemsSource="{Binding RecentlyAddedSeries}" ItemTemplate="{StaticResource SeriesCardTemplate}" Margin="0,8,0,0"
+                                          ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                    <repeater:ItemsRepeater.Layout>
+                      <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                    </repeater:ItemsRepeater.Layout>
+                  </repeater:ItemsRepeater>
                 </Expander>
                 
                 <!-- Libraries List -->
@@ -607,51 +624,12 @@
                     </Grid>
                   </Expander.Header>
                   <StackPanel Spacing="8" Margin="0,8,0,0">
-                    <ListBox ItemsSource="{Binding ReadLists}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                      <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <WrapPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                      </ListBox.ItemsPanel>
-                      <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="komga:KomgaReadListDisplay">
-                          <Button Padding="0" Background="Transparent"
-                                  Command="{Binding SelectReadListCommand, ElementName=Root}"
-                                  CommandParameter="{Binding}">
-                            <Border Classes="komga-card-entry" Classes.loaded="{Binding IsLoaded}">
-                              <Border Classes="komga-card" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
-                                      Width="150" ClipToBounds="True">
-                                <Grid RowDefinitions="200,Auto,Auto" Width="150">
-                                  <Border Grid.Row="0" Height="200" Background="#111" ClipToBounds="True">
-                                    <Grid>
-                                      <Image Source="/Assets/Logo.png"
-                                             Stretch="Uniform" Opacity="0.28">
-                                        <Image.IsVisible>
-                                          <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                            <Binding Path="IsThumbnailResolved"/>
-                                            <Binding Path="Thumbnail" Converter="{x:Static ObjectConverters.IsNull}"/>
-                                          </MultiBinding>
-                                        </Image.IsVisible>
-                                      </Image>
-                                      <Image Source="{Binding Thumbnail}" Stretch="Uniform"
-                                             IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                             Classes.loaded="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                    </Grid>
-                                  </Border>
-                                  <Border Grid.Row="1" Height="34" Margin="8,4">
-                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold"
-                                               TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"
-                                               VerticalAlignment="Center"/>
-                                  </Border>
-                                  <TextBlock Grid.Row="2" Text="{Binding BookCount, StringFormat='{}{0} books'}"
-                                             FontSize="10" Foreground="Gray" Margin="8,0,8,8"/>
-                                </Grid>
-                              </Border>
-                            </Border>
-                          </Button>
-                        </DataTemplate>
-                      </ListBox.ItemTemplate>
-                    </ListBox>
+                    <repeater:ItemsRepeater ItemsSource="{Binding ReadLists}" ItemTemplate="{StaticResource ReadListCardTemplate}"
+                                            ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                      <repeater:ItemsRepeater.Layout>
+                        <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                      </repeater:ItemsRepeater.Layout>
+                    </repeater:ItemsRepeater>
                     <Button Content="Load More Read Lists" Command="{Binding LoadMoreReadListsCommand}" 
                             HorizontalAlignment="Center" Margin="0,8,0,0"
                             IsVisible="{Binding HasMoreReadLists}"/>
@@ -661,16 +639,12 @@
 
               <!-- Read List Books Grid -->
               <StackPanel Spacing="8" IsVisible="{Binding SelectedReadList, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                  <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ListBox.ItemsPanel>
-                  <ListBox.ItemTemplate>
-                    <StaticResource ResourceKey="BookCardTemplate"/>
-                  </ListBox.ItemTemplate>
-                </ListBox>
+                <repeater:ItemsRepeater ItemsSource="{Binding Books}" ItemTemplate="{StaticResource BookCardTemplate}"
+                                        ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                  <repeater:ItemsRepeater.Layout>
+                    <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                  </repeater:ItemsRepeater.Layout>
+                </repeater:ItemsRepeater>
               </StackPanel>
 
               <!-- Series Grid (only show when library is selected but no read list) -->
@@ -684,16 +658,14 @@
                 <StackPanel IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNull}}">
                   <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
                   
-                  <ListBox ItemsSource="{Binding Series}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                    <ListBox.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
-                      </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                      <StaticResource ResourceKey="SeriesCardTemplate"/>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
+                  <!-- Virtualized: only the cards near the viewport are realized and hold a thumbnail.
+                       No MinItemHeight on the layouts: the layout then measures the first card for the row height. -->
+                  <repeater:ItemsRepeater ItemsSource="{Binding Series}" ItemTemplate="{StaticResource SeriesCardTemplate}"
+                                          ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                    <repeater:ItemsRepeater.Layout>
+                      <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                    </repeater:ItemsRepeater.Layout>
+                  </repeater:ItemsRepeater>
                 </StackPanel>
               </StackPanel>
 
@@ -706,71 +678,31 @@
                   </MultiBinding>
                 </StackPanel.IsVisible>
                 
-                <ListBox ItemsSource="{Binding Books}" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                  <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ListBox.ItemsPanel>
-                  <ListBox.ItemTemplate>
-                    <StaticResource ResourceKey="BookCardTemplate"/>
-                  </ListBox.ItemTemplate>
-                </ListBox>
+                <repeater:ItemsRepeater ItemsSource="{Binding Books}" ItemTemplate="{StaticResource BookCardTemplate}"
+                                        ElementPrepared="OnCardElementPrepared" ElementClearing="OnCardElementClearing">
+                  <repeater:ItemsRepeater.Layout>
+                    <layout:UniformGridLayout Orientation="Horizontal" MinItemWidth="150" MinColumnSpacing="12" MinRowSpacing="12"/>
+                  </repeater:ItemsRepeater.Layout>
+                </repeater:ItemsRepeater>
               </StackPanel>
             </StackPanel> <!-- End of Main Content (hidden when searching) -->
           </StackPanel>
         </ScrollViewer>
       </Grid>
 
-      <!-- Floating Load More Button for Series - Always visible at the bottom when browsing series -->
-      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
-              Margin="0,0,0,16" Padding="4" CornerRadius="20"
+      <!-- Loading indicator for the next page, pages are requested automatically when scrolling near the end
+           (series of a library, books of a read list), see KomgaView.CheckLoadNextPage -->
+      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center"
+              Margin="0,0,0,16" Padding="16,12" CornerRadius="20" IsHitTestVisible="False"
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
         <Border.IsVisible>
           <MultiBinding Converter="{x:Static BoolConverters.And}">
             <Binding Path="IsConnected"/>
             <Binding Path="!IsSearching"/>
-            <Binding Path="HasMoreSeries"/>
-            <Binding Path="SelectedLibrary" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
-            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
+            <Binding Path="IsLoadingMore"/>
           </MultiBinding>
         </Border.IsVisible>
-        <Button Content="{Binding LoadMoreSeries, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}" Padding="16,8"
-                Command="{Binding LoadMoreSeriesCommand}"/>
-      </Border>
-
-      <!-- Floating Load More Button for Books (series) - Always visible at the bottom when browsing books in a series -->
-      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
-              Margin="0,0,0,16" Padding="4" CornerRadius="20"
-              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-        <Border.IsVisible>
-          <MultiBinding Converter="{x:Static BoolConverters.And}">
-            <Binding Path="IsConnected"/>
-            <Binding Path="!IsSearching"/>
-            <Binding Path="HasMoreBooks"/>
-            <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
-          </MultiBinding>
-        </Border.IsVisible>
-        <Button Content="{Binding LoadMoreBooks, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}" Padding="16,8"
-                Command="{Binding LoadMoreBooksCommand}"/>
-      </Border>
-
-      <!-- Floating Load More Button for Books (read list) - Always visible at the bottom when browsing books in a read list -->
-      <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" 
-              Margin="0,0,0,16" Padding="4" CornerRadius="20"
-              Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
-        <Border.IsVisible>
-          <MultiBinding Converter="{x:Static BoolConverters.And}">
-            <Binding Path="IsConnected"/>
-            <Binding Path="!IsSearching"/>
-            <Binding Path="HasMoreBooks"/>
-            <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
-          </MultiBinding>
-        </Border.IsVisible>
-        <Button Content="{Binding LoadMoreBooks, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}" Padding="16,8"
-                Command="{Binding LoadMoreBooksForReadListCommand}"/>
+        <ProgressBar IsIndeterminate="True" Width="120" Height="4"/>
       </Border>
 
       <!-- Floating Back Button -->

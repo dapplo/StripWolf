@@ -49,6 +49,7 @@ public partial class NormalReadingView : UserControl
     private bool _isPinching;
 
     private ReaderViewModel? _subscribedViewModel;
+    private readonly WheelPageTurner _wheelPageTurner = new();
 
     public NormalReadingView()
     {
@@ -287,11 +288,12 @@ public partial class NormalReadingView : UserControl
 
             e.Handled = true;
 
-            if (e.Delta.Y > 0 && vm.HasPreviousPage)
+            var direction = _wheelPageTurner.Process(e.Delta.Y);
+            if (direction > 0 && vm.HasPreviousPage)
             {
                 vm.GoToPreviousPageCommand.Execute(null);
             }
-            else if (e.Delta.Y < 0)
+            else if (direction < 0)
             {
                 // Always route "next" through the command: at the last page it shows the end-of-comic options
                 vm.GoToNextPageCommand.Execute(null);

@@ -30,6 +30,7 @@ namespace StripWolf.Core.Views;
 public partial class ReaderView : UserControl
 {
     private ReaderViewModel? _subscribedViewModel;
+    private readonly WheelPageTurner _wheelPageTurner = new();
 
     public ReaderView()
     {
@@ -98,17 +99,22 @@ public partial class ReaderView : UserControl
         // Only handle wheel if not Ctrl (zoom)
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
-            if (e.Delta.Y > 0)
+            if (e.Delta.Y == 0)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            var direction = _wheelPageTurner.Process(e.Delta.Y);
+            if (direction > 0)
             {
                 if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
                 else vm.GoToPreviousPageCommand.Execute(null);
-                e.Handled = true;
             }
-            else if (e.Delta.Y < 0)
+            else if (direction < 0)
             {
                 if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
                 else vm.GoToNextPageCommand.Execute(null);
-                e.Handled = true;
             }
         }
     }

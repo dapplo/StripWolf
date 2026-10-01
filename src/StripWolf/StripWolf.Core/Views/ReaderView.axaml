@@ -3,6 +3,7 @@
              xmlns:vm="using:StripWolf.Core.ViewModels"
              xmlns:views="using:StripWolf.Core.Views"
              xmlns:converters="using:StripWolf.Core.Converters"
+             xmlns:controls="using:StripWolf.Core.Controls"
              xmlns:res="using:StripWolf.Core.Resources"
              x:Class="StripWolf.Core.Views.ReaderView"
              x:DataType="vm:ReaderViewModel"
@@ -259,7 +260,8 @@
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Opacity="0.28"/>
-                    <Image Source="{Binding ComicCoverPath, Converter={x:Static converters:FilePathToBitmapConverter.Instance}}" Stretch="Uniform"/>
+                    <!-- AsyncImage decodes off the UI thread and shares the cover cache with the library -->
+                    <controls:AsyncImage SourceUrl="{Binding ComicCoverPath}" Stretch="Uniform" PlaceholderBrush="Transparent"/>
                   </Panel>
                 </Border>
 

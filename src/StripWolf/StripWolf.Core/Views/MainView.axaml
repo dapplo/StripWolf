@@ -3,36 +3,15 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:StripWolf.Core.ViewModels"
-             xmlns:views="using:StripWolf.Core.Views"
+             xmlns:controls="using:StripWolf.Core.Controls"
              xmlns:res="using:StripWolf.Core.Resources"
              mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
              x:Class="StripWolf.Core.Views.MainView"
              x:DataType="vm:MainViewModel">
   
   <Grid RowDefinitions="*,Auto">
-    <!-- Content Area -->
-    <TransitioningContentControl Grid.Row="0" Content="{Binding CurrentView}" Opacity="{Binding WelcomeBackgroundContentOpacity}">
-      <TransitioningContentControl.PageTransition>
-        <CrossFade Duration="0:0:0.25"/>
-      </TransitioningContentControl.PageTransition>
-      <TransitioningContentControl.DataTemplates>
-        <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
-          <views:LibraryView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:KomgaViewModel}">
-          <views:KomgaView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:ActivityViewModel}">
-          <views:ActivityView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
-          <views:SettingsView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:ReaderViewModel}">
-          <views:ReaderView />
-        </DataTemplate>
-      </TransitioningContentControl.DataTemplates>
-    </TransitioningContentControl>
+    <!-- Content Area: keeps the main tab views alive between tab switches, see MainContentHost -->
+    <controls:MainContentHost Grid.Row="0" CurrentContent="{Binding CurrentView}" Opacity="{Binding WelcomeBackgroundContentOpacity}"/>
 
     <!-- Tab Bar - Hidden when in reader -->
     <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" 
