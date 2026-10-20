@@ -321,7 +321,9 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var service = new SettingsService(SettingsDirectory);
         await service.UpdateSettingsAsync(settings => settings.Servers.Add(CreateServer(1)));
-        // A key file with the new header but a payload which can't be used (e.g. DPAPI blob from another account)
+        // A key file with the new header but a payload which can't be used (e.g. DPAPI blob from another account).
+        // Deleted first: the key file is hidden on Windows, which refuses overwriting it.
+        File.Delete(_temp.Combine(".key"));
         await File.WriteAllBytesAsync(_temp.Combine(".key"), [.. "SWK"u8, 1, 1, 42, 42, 42], TestContext.Current.CancellationToken);
 
         var server = Assert.Single(new SettingsService(SettingsDirectory).LoadSettings().Servers);
