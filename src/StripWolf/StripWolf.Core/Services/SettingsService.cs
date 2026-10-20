@@ -67,60 +67,8 @@ public class SettingsService
         Directory.CreateDirectory(_settingsDir);
         _settingsPath = Path.Combine(_settingsDir, SettingsFileName);
         _passwordsPath = Path.Combine(_settingsDir, PasswordsFileName);
-        _encryptionKey = GetOrCreateEncryptionKey();
-    }
-
-    /// <summary>
-    /// Gets or creates a machine-specific encryption key
-    /// </summary>
-    private byte[] GetOrCreateEncryptionKey()
-    {
-        var keyPath = Path.Combine(_settingsDir, ".key");
-        
-        if (File.Exists(keyPath))
-        {
-            try
-            {
-                var keyBytes = File.ReadAllBytes(keyPath);
-                if (keyBytes.Length == 32)
-                {
-                    return keyBytes;
-                }
-            }
-            catch (IOException)
-            {
-                // Fall through to generate new key
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // Fall through to generate new key
-            }
-        }
-
-        // Generate a new random 256-bit key
-        var newKey = RandomNumberGenerator.GetBytes(32);
-        
-        try
-        {
-            // Set file as hidden on Windows
-            File.WriteAllBytes(keyPath, newKey);
-            if (OperatingSystem.IsWindows())
-            {
-                File.SetAttributes(keyPath, FileAttributes.Hidden);
-            }
-        }
-        catch (IOException)
-        {
-            // If we can't persist the key, return it anyway
-            // Passwords will need to be re-entered after app restart
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // If we can't persist the key, return it anyway
-            // Passwords will need to be re-entered after app restart
-        }
-
-        return newKey;
+        _encryptionKey = CredentialKeyStore.GetOrCreateKey(Path.Combine(_settingsDir, ".key"));
+        CredentialKeyStore.RestrictToCurrentUser(_passwordsPath);
     }
 
     /// <summary>
@@ -176,12 +124,12 @@ public class SettingsService
 
         var json = JsonSerializer.Serialize(sensitiveData, StripWolfJsonContext.Default.DictionaryIntSensitiveServerData);
         var encrypted = Encrypt(json);
-        await WriteFileAtomicallyAsync(_passwordsPath, encrypted);
+        await CredentialKeyStore.WritePrivateFileAsync(_passwordsPath, encrypted);
     }
 
     /// <summary>
     /// Write to a temporary file and move it over the target, so a crash or power loss while writing
-    /// can never leave a truncated settings/credentials file behind (File.WriteAll* truncates first).
+    /// can never leave a truncated settings file behind (File.WriteAll* truncates first). credentials.dat is written with CredentialKeyStore.WritePrivateFileAsync.
     /// </summary>
     private static async Task WriteFileAtomicallyAsync(string path, byte[] content)
     {

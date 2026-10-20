@@ -23,6 +23,8 @@
     <PackageVersion Include="SkiaSharp" Version="3.119.4" />
     <PackageVersion Include="SkiaSharp.NativeAssets.iOS" Version="3.119.4" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="4.0.0" />
+    <!-- DPAPI protection of the credential key on Windows -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
     <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.2" />
     <PackageVersion Include="VersOne.Epub" Version="3.3.6" />

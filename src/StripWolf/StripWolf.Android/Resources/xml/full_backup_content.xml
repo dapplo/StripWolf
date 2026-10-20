@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Only backup settings and server credentials. Exclude DB and Covers. -->
+    <!-- Only backup the settings. Exclude DB and Covers.
+         The credentials (credentials.dat) and their key (.key) are not backed up: with both in the same backup,
+         anyone with access to it could decrypt the passwords. After a restore, server passwords are entered again. -->
     <include domain="file" path=".local/share/StripWolf/settings.json" />
-    <include domain="file" path=".local/share/StripWolf/credentials.dat" />
-    <include domain="file" path=".local/share/StripWolf/.key" />
 </full-backup-content>

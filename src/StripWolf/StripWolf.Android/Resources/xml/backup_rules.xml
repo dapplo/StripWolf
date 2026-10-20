@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!-- Only backup the settings. Exclude DB and Covers.
+         The credentials (credentials.dat) and their key (.key) are not backed up: with both in the same backup,
+         anyone with access to it could decrypt the passwords. After a restore, server passwords are entered again. -->
     <cloud-backup>
-        <!-- Only backup settings and server credentials. Exclude DB and Covers. -->
         <include domain="file" path=".local/share/StripWolf/settings.json" />
-        <include domain="file" path=".local/share/StripWolf/credentials.dat" />
-        <include domain="file" path=".local/share/StripWolf/.key" />
     </cloud-backup>
     <device-to-device-backup>
         <include domain="file" path=".local/share/StripWolf/settings.json" />
-        <include domain="file" path=".local/share/StripWolf/credentials.dat" />
-        <include domain="file" path=".local/share/StripWolf/.key" />
     </device-to-device-backup>
 </data-extraction-rules>
