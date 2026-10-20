@@ -2,13 +2,20 @@ name: Tests
 
 on:
   push:
+    # Branches only: the release workflow pushes a tag for every release, which would run the tests twice
+    branches:
+      - '**'
   pull_request:
+  # The release workflow runs the tests before it builds anything
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.ref }}
+  # github.workflow is the caller's name when called from the release workflow, so that run doesn't cancel
+  # (or get cancelled by) the Tests run of the same push
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,9 +32,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-        with:
-          # GitVersion.MsBuild (referenced by StripWolf.Core) needs the full history
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -38,12 +42,23 @@ jobs:
         run: dotnet restore src/StripWolf/StripWolf.Core.Tests/StripWolf.Core.Tests.csproj
 
       - name: Test
-        # The LocalComics tests need the developer's own comics (STRIPWOLF_TEST_COMICS) and are excluded here
-        run: dotnet test src/StripWolf/StripWolf.Core.Tests/StripWolf.Core.Tests.csproj -c Release --no-restore --filter "Category!=LocalComics" --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        # The LocalComics tests need the developer's own comics (STRIPWOLF_TEST_COMICS) and are excluded here.
+        # GitVersion.MsBuild is disabled: the tests don't need a version, and its Mainline strategy crashes on the
+        # merge commit GitHub creates for a pull request ("Operation is not valid due to the current state of the object").
+        # --blame-crash / --blame-hang-timeout: the test host on Linux sometimes crashed (exit code 139), the blame data
+        # collector then writes the sequence of executed tests and a dump into TestResults, which is uploaded below.
+        run: >-
+          dotnet test src/StripWolf/StripWolf.Core.Tests/StripWolf.Core.Tests.csproj -c Release --no-restore
+          -p:DisableGitVersionTask=true
+          --filter "Category!=LocalComics"
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+          --blame-crash --blame-crash-dump-type mini
+          --blame-hang-timeout 10m --blame-hang-dump-type mini
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults

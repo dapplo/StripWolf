@@ -9,11 +9,18 @@ permissions:
   contents: write
 
 jobs:
+  # Nothing is built or released when the tests fail
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   prepare:
+    needs: tests
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       hash: ${{ steps.version.outputs.hash }}
+      android_version_code: ${{ steps.version.outputs.android_version_code }}
+      display_version: ${{ steps.version.outputs.display_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -38,6 +45,14 @@ jobs:
           HASH=$(git rev-parse --short=7 HEAD)
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
           echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "display_version=$VERSION" >> $GITHUB_OUTPUT
+          # Android/Google Play need a versionCode which increases with every release.
+          # CommitsSinceVersionSource (used before) restarts at every release, so it is derived from the version:
+          # 1.0.63 -> 1000063 (room for 1000 minor and patch versions, Play allows up to 2100000000)
+          MAJOR="${{ steps.gitversion.outputs.major }}"
+          MINOR="${{ steps.gitversion.outputs.minor }}"
+          PATCH="${{ steps.gitversion.outputs.patch }}"
+          echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: release_notes
@@ -250,6 +265,9 @@ jobs:
   build-android:
     needs: prepare
     runs-on: ubuntu-latest
+    env:
+      # Job level: a step's own env isn't available yet in its if condition, so the Google Play upload was always skipped
+      PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -293,8 +311,8 @@ jobs:
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-arm64 -o publish/android-arm64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
             -p:RuntimeIdentifier=android-arm64 \
-            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
-            -p:GitVersion_SemVer="$GitVersion_SemVer"
+            -p:ApplicationVersion=${{ needs.prepare.outputs.android_version_code }} \
+            -p:ApplicationDisplayVersion=${{ needs.prepare.outputs.display_version }}
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -304,8 +322,8 @@ jobs:
           dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj -c Release -r android-x64 -o publish/android-x64 \
             -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none \
             -p:RuntimeIdentifier=android-x64 \
-            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
-            -p:GitVersion_SemVer="$GitVersion_SemVer"
+            -p:ApplicationVersion=${{ needs.prepare.outputs.android_version_code }} \
+            -p:ApplicationDisplayVersion=${{ needs.prepare.outputs.display_version }}
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -318,8 +336,8 @@ jobs:
             -p:AndroidCreatePackagePerAbi=false \
             -p:IsPlayStoreBuild=true \
             -p:RuntimeIdentifiers='"android-arm64;android-x64"' \
-            -p:GitVersion_CommitsSinceVersionSource="$GitVersion_CommitsSinceVersionSource" \
-            -p:GitVersion_SemVer="$GitVersion_SemVer"
+            -p:ApplicationVersion=${{ needs.prepare.outputs.android_version_code }} \
+            -p:ApplicationDisplayVersion=${{ needs.prepare.outputs.display_version }}
         env:
           ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
           ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
@@ -360,8 +378,6 @@ jobs:
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1
         if: ${{ env.PLAY_SERVICE_ACCOUNT_KEY != '' }}
-        env:
-          PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_KEY }}
         with:
           serviceAccountJsonPlainText: ${{ env.PLAY_SERVICE_ACCOUNT_KEY }}
           packageName: com.dapplo.StripWolf
