@@ -56,6 +56,13 @@ jobs:
           --blame-crash --blame-crash-dump-type mini
           --blame-hang-timeout 10m --blame-hang-dump-type mini
 
+      - name: Show the last tests before a crash
+        # The blame collector only writes a sequence file when the test host crashed or hung: show its end in the log
+        if: failure()
+        shell: bash
+        run: |
+          find TestResults -name 'Sequence_*.xml' -print -exec tail -c 4000 {} \; || true
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v5
