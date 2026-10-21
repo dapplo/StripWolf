@@ -19,7 +19,7 @@ The Application offers an optional premium unlock.
 * We do not collect, process, or store your payment details (such as credit card numbers or billing addresses).
 
 ## 3. Data Backups
-If you enable Android Auto Backup on your device, a copy of the Application's settings (server addresses, user names and preferences) may be backed up to your personal Google Drive account. Passwords and API keys are not included in the backup, so after restoring to a new device you need to enter them again. This backup data is encrypted and subject to Google's standard backup terms and privacy policies.
+If you enable Android Auto Backup on your device, a copy of the Application's settings (server addresses, user names and preferences) may be backed up to your personal Google Drive account. Passwords and API keys are only included when the backup is end-to-end encrypted (this requires a screen lock on your device) or when you transfer your data directly from one phone to another; otherwise you need to enter them again after restoring to a new device. This backup data is encrypted and subject to Google's standard backup terms and privacy policies.
 
 ## 4. Crash Logs & Issue Reporting
 If you choose to submit a bug report via the "Report an Issue" button, the Application pre-populates a template containing:

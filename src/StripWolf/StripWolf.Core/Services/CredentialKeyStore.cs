@@ -29,7 +29,7 @@ namespace StripWolf.Core.Services;
 ///   account or machine.
 /// - Other platforms: the key and the credentials are only readable by the current user (mode 0600).
 ///   On Android and iOS the app data directory is already private to the app, and the Android backup rules
-///   no longer include the key or the credentials.
+///   only include the key and the credentials in end-to-end encrypted backups and direct phone-to-phone transfers.
 /// </summary>
 internal static class CredentialKeyStore
 {
