@@ -46,7 +46,7 @@
     Del: delete selected. [ / ]: move selected earlier / later in the order.<br>
     D: copy detection. S: splash (whole page). O: sort into rows.<br>
     Enter: mark reviewed and next. N / P: next / previous page.<br>
-    Only reviewed pages are scored. Save the file next to the comic.
+    Only reviewed pages are scored, changing a page marks it reviewed. Save the file next to the comic.
   </div>
 </div>
 <div id="main">
@@ -81,7 +81,9 @@ try {
 
 let current = 0, selected = -1, dirty = false, drag = null;
 
-function persist() {
+// Any change of the panels means the page was looked at, so it is marked as reviewed
+function persist(markReviewed = true) {
+  if (markReviewed) labels[current].reviewed = true;
   dirty = true;
   try { localStorage.setItem(storageKey, JSON.stringify(labels)); } catch (e) { /* storage not available */ }
   $('status').textContent = 'unsaved changes';
@@ -270,7 +272,7 @@ $('copy').onclick = () => setPanels(BENCH.pages[current].detected);
 $('splash').onclick = () => setPanels([{ x: 0, y: 0, w: 1, h: 1 }]);
 $('order').onclick = () => setPanels(sortRows(labels[current].panels));
 $('clear').onclick = () => setPanels([]);
-$('reviewed').onchange = e => { labels[current].reviewed = e.target.checked; persist(); renderList(); };
+$('reviewed').onchange = e => { labels[current].reviewed = e.target.checked; persist(false); renderList(); };
 $('showDet').onchange = render;
 $('save').onclick = save;
 

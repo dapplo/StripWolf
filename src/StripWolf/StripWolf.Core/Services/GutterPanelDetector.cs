@@ -30,6 +30,7 @@ namespace StripWolf.Core.Services;
 /// 3. Background which is not connected to the page border (e.g. a white sky inside a bordered panel) is content too.
 /// 4. The page is cut along empty rows, then along empty columns, recursively. The order of the cuts is the reading order.
 /// 5. Only when no clean cut exists, a cut through a gutter which is partly covered (a balloon crossing it) is tried.
+/// 6. Columns whose rows are only slightly staggered are read row by row, like a reader does.
 /// </summary>
 public static class GutterPanelDetector
 {
@@ -43,6 +44,8 @@ public static class GutterPanelDetector
     private const double MinPanelAreaRatio = 0.015;
     private const double MinPanelWidthRatio = 0.06;
     private const double MinPanelHeightRatio = 0.04;
+    private const double StaggeredRowTolerance = 0.06;
+    private const double PageEdgeRatio = 0.005;
 
     /// <summary>
     /// Detects the panels in reading order, normalized to 0-1. Returns an empty list when the page has no panel
@@ -76,7 +79,9 @@ public static class GutterPanelDetector
             })
             .ToList();
 
-        return panels.Count > 1 ? panels : [];
+        // Bands from edge to edge are text or a cover without panel borders, not panels
+        bool allBands = panels.All(panel => panel.X <= PageEdgeRatio && panel.X + panel.Width >= 1 - PageEdgeRatio);
+        return panels.Count > 1 && !allBands ? panels : [];
     }
 
     private static ContentMask? CreateContentMask(byte[] pageData)
@@ -103,13 +108,14 @@ public static class GutterPanelDetector
         int w = blurred.Cols;
         int h = blurred.Rows;
 
-        byte background = MedianOfBorder(ToArray(blurred), w, h);
+        var blurredData = ToArray(blurred);
+        var (background, deviation) = MeasureBorder(blurredData, w, h);
 
         // Content: clearly different from the background, without specks of scan noise
-        using var difference = new Mat();
-        Cv2.Absdiff(blurred, new Scalar(background), difference);
+        using var differenceMat = new Mat();
+        Cv2.Absdiff(blurred, new Scalar(background), differenceMat);
         using var foreground = new Mat();
-        Cv2.Threshold(difference, foreground, ForegroundThreshold, 255, ThresholdTypes.Binary);
+        Cv2.Threshold(differenceMat, foreground, ForegroundThreshold, 255, ThresholdTypes.Binary);
         using var speckKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(2, 2));
         Cv2.MorphologyEx(foreground, foreground, MorphTypes.Open, speckKernel);
 
@@ -136,13 +142,17 @@ public static class GutterPanelDetector
         }
 
         var content = new byte[w * h];
+        var difference = new byte[w * h];
         for (int i = 0; i < content.Length; i++)
         {
             bool isOuterBackground = foregroundData[i] == 0 && outerLabels.Contains(labelData[i]);
             content[i] = isOuterBackground ? (byte)0 : (byte)1;
+            difference[i] = (byte)Math.Abs(blurredData[i] - background);
         }
 
-        return new ContentMask(content, w, h);
+        // A real gutter is as flat as the page background, a light stripe in the art is only close to it
+        double flatness = Math.Max(6.0, 2.5 * deviation + 2.0);
+        return new ContentMask(content, difference, flatness, w, h);
 
         void AddOuterLabel(int x, int y)
         {
@@ -162,11 +172,13 @@ public static class GutterPanelDetector
         return data;
     }
 
-    private static byte MedianOfBorder(byte[] gray, int w, int h)
+    /// <summary>
+    /// The background colour (median) and its noise (median absolute deviation) of the page border.
+    /// </summary>
+    private static (byte Background, double Deviation) MeasureBorder(byte[] gray, int w, int h)
     {
         int border = Math.Max(2, Math.Min(w, h) / 100);
         var histogram = new int[256];
-        int count = 0;
         for (int y = 0; y < h; y++)
         {
             bool isBorderRow = y < border || y >= h - border;
@@ -175,58 +187,126 @@ public static class GutterPanelDetector
                 if (isBorderRow || x < border || x >= w - border)
                 {
                     histogram[gray[y * w + x]]++;
-                    count++;
                 }
             }
         }
 
-        int half = count / 2;
-        int sum = 0;
+        byte background = (byte)Median(histogram);
+        var deviations = new int[256];
         for (int value = 0; value < 256; value++)
+        {
+            deviations[Math.Abs(value - background)] += histogram[value];
+        }
+
+        return (background, Median(deviations));
+    }
+
+    private static int Median(int[] histogram)
+    {
+        int half = histogram.Sum() / 2;
+        int sum = 0;
+        for (int value = 0; value < histogram.Length; value++)
         {
             sum += histogram[value];
             if (sum > half)
             {
-                return (byte)value;
+                return value;
             }
         }
 
-        return 255;
+        return histogram.Length - 1;
     }
 
     private static void Split(ContentMask mask, Region region, int depth, bool isManga, List<Region> leaves)
     {
-        var trimmed = mask.Trim(region);
-        if (trimmed is not { } bounds)
+        if (mask.Trim(region) is not { } bounds)
         {
             return;
         }
 
-        if (depth < MaxDepth)
+        var cut = depth < MaxDepth ? ChooseCut(mask, bounds) : null;
+        if (cut is not { } chosen)
         {
-            // Clean cuts first, rows before columns, then cuts through partly covered gutters
-            foreach (var (horizontal, soft) in new[] { (true, false), (false, false), (true, true), (false, true) })
+            leaves.Add(bounds);
+            return;
+        }
+
+        var parts = chosen.Parts;
+        if (!chosen.Horizontal)
+        {
+            if (isManga)
             {
-                var parts = Cut(mask, bounds, horizontal, soft);
-                if (parts is null)
-                {
-                    continue;
-                }
+                parts.Reverse();
+            }
 
-                if (!horizontal && isManga)
+            if (TryGetStaggeredRows(mask, parts) is { } rows)
+            {
+                // Row by row, in each row the columns in reading order
+                for (int row = 0; row < rows[0].Count; row++)
                 {
-                    parts.Reverse();
-                }
-
-                foreach (var part in parts)
-                {
-                    Split(mask, part, depth + 1, isManga, leaves);
+                    foreach (var column in rows)
+                    {
+                        Split(mask, column[row], depth + 2, isManga, leaves);
+                    }
                 }
                 return;
             }
         }
 
-        leaves.Add(bounds);
+        foreach (var part in parts)
+        {
+            Split(mask, part, depth + 1, isManga, leaves);
+        }
+    }
+
+    private static (bool Horizontal, List<Region> Parts)? ChooseCut(ContentMask mask, Region bounds)
+    {
+        // Clean cuts first, rows before columns, then cuts through partly covered gutters
+        foreach (var (horizontal, soft) in new[] { (true, false), (false, false), (true, true), (false, true) })
+        {
+            if (Cut(mask, bounds, horizontal, soft) is { } parts)
+            {
+                return (horizontal, parts);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// When every column is cut into the same number of rows, and the rows of the columns end at about the same
+    /// height, the gutters are only staggered and the page is read row by row. Returns the rows per column.
+    /// </summary>
+    private static List<List<Region>>? TryGetStaggeredRows(ContentMask mask, List<Region> columns)
+    {
+        var rowsPerColumn = new List<List<Region>>();
+        foreach (var column in columns)
+        {
+            if (mask.Trim(column) is not { } bounds || ChooseCut(mask, bounds) is not { } cut || !cut.Horizontal)
+            {
+                return null;
+            }
+
+            rowsPerColumn.Add(cut.Parts.Select(part => mask.Trim(part) ?? part).ToList());
+        }
+
+        int rowCount = rowsPerColumn[0].Count;
+        if (rowsPerColumn.Any(rows => rows.Count != rowCount))
+        {
+            return null;
+        }
+
+        double tolerance = mask.Height * StaggeredRowTolerance;
+        for (int row = 0; row < rowCount - 1; row++)
+        {
+            int bottom = rowsPerColumn[0][row].Y1;
+            if (rowsPerColumn.Any(rows => Math.Abs(rows[row].Y1 - bottom) > tolerance))
+            {
+                return null;
+            }
+        }
+
+        return rowsPerColumn;
     }
 
     private static List<Region>? Cut(ContentMask mask, Region region, bool horizontal, bool soft)
@@ -247,7 +327,8 @@ public static class GutterPanelDetector
                 continue;
             }
 
-            if (gutterStart is { } start && i < profile.Length && start > 0 && i - start >= MinGutterSize)
+            if (gutterStart is { } start && i < profile.Length && start > 0 && i - start >= MinGutterSize &&
+                (soft || mask.IsFlat(region, horizontal, start, i)))
             {
                 parts.Add((partStart, start));
                 partStart = i;
@@ -285,7 +366,7 @@ public static class GutterPanelDetector
         public double Area => (double)Width * Height;
     }
 
-    private sealed class ContentMask(byte[] content, int width, int height)
+    private sealed class ContentMask(byte[] content, byte[] difference, double flatness, int width, int height)
     {
         public int Width { get; } = width;
         public int Height { get; } = height;
@@ -314,6 +395,28 @@ public static class GutterPanelDetector
             }
 
             return maxX < 0 ? null : new Region(minX, minY, maxX + 1, maxY + 1);
+        }
+
+        /// <summary>
+        /// Whether the lines start to end (rows when horizontal, else columns) of the region are as flat as the page
+        /// background, the average difference to the background colour is small.
+        /// </summary>
+        public bool IsFlat(Region region, bool horizontal, int start, int end)
+        {
+            var lines = horizontal
+                ? new Region(region.X0, region.Y0 + start, region.X1, region.Y0 + end)
+                : new Region(region.X0 + start, region.Y0, region.X0 + end, region.Y1);
+            long sum = 0;
+            for (int y = lines.Y0; y < lines.Y1; y++)
+            {
+                int row = y * Width;
+                for (int x = lines.X0; x < lines.X1; x++)
+                {
+                    sum += difference[row + x];
+                }
+            }
+
+            return lines.Area == 0 || sum / lines.Area <= flatness;
         }
 
         /// <summary>
