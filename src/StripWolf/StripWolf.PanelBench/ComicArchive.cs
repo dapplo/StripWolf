@@ -68,7 +68,25 @@ public static class ComicArchive
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var archive = RarArchive.OpenArchive(stream);
-        // Reading sequentially works for solid and non solid archives
+        if (!archive.IsSolid)
+        {
+            // ExtractAllEntries only works on solid archives, non solid archives are read entry by entry
+            foreach (var entry in archive.Entries)
+            {
+                var entryKey = entry.Key ?? string.Empty;
+                if (entry.IsDirectory || !IsPage(entryKey))
+                {
+                    continue;
+                }
+
+                using var entryStream = entry.OpenEntryStream();
+                yield return new ComicPage(entryKey, ReadAll(entryStream));
+            }
+
+            yield break;
+        }
+
+        // Solid archives can only be read sequentially
         using var reader = archive.ExtractAllEntries();
         while (reader.MoveToNextEntry())
         {
