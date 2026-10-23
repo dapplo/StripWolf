@@ -69,6 +69,9 @@ public static class GutterPanelDetector
     private const double VerticalFrameLineRatio = 0.03;
     private const double FrameSegmentRatio = 0.04;
     private const int FrameLineThickness = 31;
+    private static readonly bool DiagnoseFrames = true;
+    private const double ClearFrameMargin = 0.02;
+    private const double AmbiguousFrameRange = 0.05;
 
     /// <summary>
     /// Detects the panels in reading order, normalized to 0-1. Returns an empty list when the page has no panel
@@ -536,6 +539,7 @@ public static class GutterPanelDetector
             .Select(line => line.Position));
 
         var frames = new List<(Region Frame, double Coverage, bool Covered)>();
+        var nearFrames = new List<Region>();
         for (int i = 0; i < rows.Count; i++)
         {
             for (int j = i + 1; j < rows.Count; j++)
@@ -570,12 +574,45 @@ public static class GutterPanelDetector
                         {
                             frames.Add((new Region(left, top, right, bottom), coverage.Average(), coverage.Min() < FrameSide));
                         }
+                        else if (coverage.Min() >= FrameSide - AmbiguousFrameRange && coverage.Average() >= MeanFrameCoverage - AmbiguousFrameRange)
+                        {
+                            nearFrames.Add(new Region(left, top, right, bottom));
+                            if (DiagnoseFrames)
+                            {
+                                log($"near frame px x {left}-{right} y {top}-{bottom} coverage {string.Join("/", coverage.Select(c => c.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)))}");
+                            }
+                        }
                     }
                 }
             }
         }
 
         var insets = SelectInsets(frames, region, log);
+        foreach (var inset in insets.Where(_ => DiagnoseFrames))
+        {
+            double[] coverage =
+            [
+                lines.HorizontalCoverage(inset.Y0, inset.X0, inset.X1), lines.HorizontalCoverage(inset.Y1, inset.X0, inset.X1),
+                lines.VerticalCoverage(inset.X0, inset.Y0, inset.Y1), lines.VerticalCoverage(inset.X1, inset.Y0, inset.Y1)
+            ];
+            log($"inset px x {inset.X0}-{inset.X1} y {inset.Y0}-{inset.Y1} coverage {string.Join("/", coverage.Select(c => c.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)))}");
+        }
+        // All or nothing: a frame close to the thresholds comes and goes with a slightly changed page, then the region
+        // stays one panel
+        double MinCoverage(Region frame) => new[]
+        {
+            lines.HorizontalCoverage(frame.Y0, frame.X0, frame.X1), lines.HorizontalCoverage(frame.Y1, frame.X0, frame.X1),
+            lines.VerticalCoverage(frame.X0, frame.Y0, frame.Y1), lines.VerticalCoverage(frame.X1, frame.Y0, frame.Y1)
+        }.Min();
+        bool IsOpenCandidate(Region frame) =>
+            frame.IntersectionOverUnion(region) <= 0.8 && frame.Area <= 0.85 * region.Area &&
+            !insets.Any(inset => frame.IntersectionOverUnion(inset) > 0.5 || frame.Intersection(inset) >= 0.5 * inset.Area);
+        if (insets.Count > 0 && (insets.Any(inset => MinCoverage(inset) < FrameSide + ClearFrameMargin) || nearFrames.Any(IsOpenCandidate)))
+        {
+            log($"ambiguous: {insets.Count(inset => MinCoverage(inset) < FrameSide + ClearFrameMargin)} insets close to the thresholds, {nearFrames.Count(IsOpenCandidate)} frames just below them");
+            insets = [];
+        }
+
         log($"{rows.Count} row lines, {columns.Count} column lines (columns {string.Join(" ", columns)}), {frames.Count} closed frames, {insets.Count} insets");
         return insets;
     }
