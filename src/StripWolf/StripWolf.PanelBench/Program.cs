@@ -164,7 +164,7 @@ string BuildReport()
         builder.AppendLine();
         builder.AppendLine("| Metric | Value |");
         builder.AppendLine("|---|---|");
-        builder.AppendLine(CultureInfo.InvariantCulture, $"| Pages correct (all panels, IoU >= {PageScore.GoodIou}) | {Percent(scores.Count(score => score.IsCorrect), scores.Count)} |");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"| Pages correct (right number of panels, all found) | {Percent(scores.Count(score => score.IsCorrect), scores.Count)} |");
         builder.AppendLine(CultureInfo.InvariantCulture, $"| Pages correct and in reading order | {Percent(scores.Count(score => score.IsCorrectInOrder), scores.Count)} |");
         builder.AppendLine(CultureInfo.InvariantCulture, $"| Panel recall (IoU >= {PageScore.MatchIou}) | {Percent(found, expected)} |");
         builder.AppendLine(CultureInfo.InvariantCulture, $"| Panel precision | {Percent(found, detected)} |");

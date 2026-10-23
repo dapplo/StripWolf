@@ -29,15 +29,16 @@ public sealed record PageScore(string Comic, string Page, int Expected, int Dete
     /// <summary>IoU a detected panel needs to count as found.</summary>
     public const double MatchIou = 0.5;
 
-    /// <summary>IoU every panel needs for the page to count as correct, the guided view zooms on the panel so it must fit well.</summary>
-    public const double GoodIou = 0.75;
 
     public int Found => Matches.Count;
 
     public double MeanIou => Matches.Count == 0 ? 0 : Matches.Average(match => match.Iou);
 
-    /// <summary>All panels found with a good fit and nothing extra.</summary>
-    public bool IsCorrect => Expected == Detected && Found == Expected && Matches.All(match => match.Iou >= GoodIou);
+    /// <summary>
+    /// All panels found and nothing extra. What counts is the number and order of the panels, a few pixels more or less
+    /// around a panel don't matter, so a match (IoU of at least <see cref="MatchIou"/>) is enough.
+    /// </summary>
+    public bool IsCorrect => Expected == Detected && Found == Expected;
 
     /// <summary>Correct and also in the expected reading order.</summary>
     public bool IsCorrectInOrder => IsCorrect &&

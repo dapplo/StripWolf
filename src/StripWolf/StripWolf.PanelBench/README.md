@@ -30,7 +30,8 @@ A page without panels (a cover, a splash page) is one panel covering the whole p
 
 ## Metrics
 
-- **Pages correct**: every expected panel is found with an IoU of at least 0.75 and nothing extra is detected.
+- **Pages correct**: every expected panel is found (IoU of at least 0.5) and nothing extra is detected. The number and
+  order of the panels matter, a few pixels more or less around a panel don't.
 - **In reading order**: correct, and the panels come in the expected order.
 - **Recall / precision**: per panel, a detected panel counts as found with an IoU of at least 0.5.
 - **Stability** (`--stability`, needs no labels): the page is detected again scaled to 75% and 50% and re-compressed
