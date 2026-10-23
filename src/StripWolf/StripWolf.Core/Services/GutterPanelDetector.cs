@@ -59,14 +59,16 @@ public static class GutterPanelDetector
     private const double BackgroundCoveredRatio = 0.7;
     private const int InsetClearance = 3;
     private const int FrameLineTolerance = 3;
-    private const double FrameSide = 0.85;
-    private const double MeanFrameCoverage = 0.92;
+    private const double FrameSide = 0.75;
+    private const double MeanFrameCoverage = 0.85;
     private const double CoveredFrameSide = 0.5;
     private const double CompleteFrameSide = 0.97;
     private const int CannyLowThreshold = 40;
     private const int CannyHighThreshold = 120;
     private const double HorizontalFrameLineRatio = 0.04;
     private const double VerticalFrameLineRatio = 0.03;
+    private const double FrameSegmentRatio = 0.04;
+    private const int FrameLineThickness = 31;
 
     /// <summary>
     /// Detects the panels in reading order, normalized to 0-1. Returns an empty list when the page has no panel
@@ -523,11 +525,14 @@ public static class GutterPanelDetector
     /// </summary>
     private static List<Region> FindInsets(FrameLines lines, Region region, double minArea, double minWidth, double minHeight, Action<string> log)
     {
+        // Only lines which could be a good part of a frame side, the short lines of the art would chain all clusters
         var rows = Cluster(lines.Horizontal
-            .Where(line => line.Position >= region.Y0 && line.Position < region.Y1 && line.End > region.X0 && line.Start < region.X1)
+            .Where(line => line.Position >= region.Y0 && line.Position < region.Y1 &&
+                           Math.Min(line.End, region.X1) - Math.Max(line.Start, region.X0) >= lines.PageWidth * FrameSegmentRatio)
             .Select(line => line.Position));
         var columns = Cluster(lines.Vertical
-            .Where(line => line.Position >= region.X0 && line.Position < region.X1 && line.End > region.Y0 && line.Start < region.Y1)
+            .Where(line => line.Position >= region.X0 && line.Position < region.X1 &&
+                           Math.Min(line.End, region.Y1) - Math.Max(line.Start, region.Y0) >= lines.PageHeight * FrameSegmentRatio)
             .Select(line => line.Position));
 
         var frames = new List<(Region Frame, double Coverage, bool Covered)>();
@@ -570,8 +575,8 @@ public static class GutterPanelDetector
             }
         }
 
-        var insets = SelectInsets(frames, region);
-        log($"{rows.Count} row lines, {columns.Count} column lines, {frames.Count} closed frames, {insets.Count} insets");
+        var insets = SelectInsets(frames, region, log);
+        log($"{rows.Count} row lines, {columns.Count} column lines (columns {string.Join(" ", columns)}), {frames.Count} closed frames, {insets.Count} insets");
         return insets;
     }
 
@@ -587,7 +592,7 @@ public static class GutterPanelDetector
             : sorted[0] >= CoveredFrameSide && sorted[1] >= CompleteFrameSide;
     }
 
-    private static List<Region> SelectInsets(List<(Region Frame, double Coverage, bool Covered)> frames, Region region)
+    private static List<Region> SelectInsets(List<(Region Frame, double Coverage, bool Covered)> frames, Region region, Action<string> log)
     {
         int tolerance = FrameLineTolerance * 2;
         int SidesOnRegion(Region frame) =>
@@ -595,11 +600,21 @@ public static class GutterPanelDetector
             (Math.Abs(frame.X1 - region.X1) <= tolerance ? 1 : 0) + (Math.Abs(frame.Y1 - region.Y1) <= tolerance ? 1 : 0);
 
         // Not the frame of the region itself, nor a strip along its edges closed by a line which is partly art
-        var candidates = frames
-            .Where(frame => frame.Frame.IntersectionOverUnion(region) <= 0.8 && frame.Frame.Area <= 0.85 * region.Area &&
-                            SidesOnRegion(frame.Frame) < (frame.Covered ? 1 : 2))
-            .OrderByDescending(frame => frame.Coverage)
-            .ThenByDescending(frame => frame.Frame.Area);
+        var candidates = new List<(Region Frame, double Coverage, bool Covered)>();
+        foreach (var frame in frames.OrderByDescending(frame => frame.Coverage).ThenByDescending(frame => frame.Frame.Area))
+        {
+            string? reason = frame.Frame.IntersectionOverUnion(region) > 0.8 || frame.Frame.Area > 0.85 * region.Area ? "region frame"
+                : SidesOnRegion(frame.Frame) >= (frame.Covered ? 1 : 2) ? $"{SidesOnRegion(frame.Frame)} sides on the region"
+                : null;
+            if (reason is null)
+            {
+                candidates.Add(frame);
+            }
+            else
+            {
+                log($"frame {Describe(frame.Frame)} dropped: {reason}");
+            }
+        }
 
         // A double frame (a white border and a black line) or a line close by: the best drawn one
         var kept = new List<Region>();
@@ -609,15 +624,36 @@ public static class GutterPanelDetector
             {
                 kept.Add(frame);
             }
+            else
+            {
+                log($"frame {Describe(frame)} dropped: double frame");
+            }
         }
 
         // A frame made of the sides of the frames inside it is two neighbouring panels, not a panel
-        kept = kept.Where(frame => !IsUnion(frame)).ToList();
+        foreach (var frame in kept.Where(IsUnion).ToList())
+        {
+            log($"frame {Describe(frame)} dropped: union");
+            kept.Remove(frame);
+        }
 
         // A frame with other frames (mostly) over it is a background panel
-        return kept
-            .Where(frame => !kept.Any(other => other != frame && frame.Intersection(other) >= 0.5 * other.Area))
-            .ToList();
+        var insets = new List<Region>();
+        foreach (var frame in kept)
+        {
+            if (kept.Any(other => other != frame && frame.Intersection(other) >= 0.5 * other.Area))
+            {
+                log($"frame {Describe(frame)} dropped: frames over it");
+            }
+            else
+            {
+                insets.Add(frame);
+            }
+        }
+
+        return insets;
+
+        static string Describe(Region frame) => $"px x {frame.X0}-{frame.X1} y {frame.Y0}-{frame.Y1}";
 
         bool IsUnion(Region frame)
         {
@@ -632,13 +668,14 @@ public static class GutterPanelDetector
 
     /// <summary>
     /// Line positions close to each other are one line (an edge on both sides of a frame line), the middle one.
+    /// A cluster is never wider than the tolerance, so the frames of neighbouring panels stay apart.
     /// </summary>
     private static List<int> Cluster(IEnumerable<int> positions)
     {
         var clusters = new List<List<int>>();
         foreach (int position in positions.Distinct().Order())
         {
-            if (clusters.Count > 0 && position - clusters[^1][^1] <= FrameLineTolerance * 2)
+            if (clusters.Count > 0 && position - clusters[^1][0] <= FrameLineTolerance * 2)
             {
                 clusters[^1].Add(position);
             }
@@ -689,6 +726,8 @@ public static class GutterPanelDetector
         {
             _width = width;
             _height = height;
+            PageWidth = pageWidth;
+            PageHeight = pageHeight;
             using var source = new Mat(height, width, MatType.CV_8UC1);
             Marshal.Copy(gray, 0, source.Data, gray.Length);
             using var edges = new Mat();
@@ -696,8 +735,13 @@ public static class GutterPanelDetector
             using var joinKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
             Cv2.Dilate(edges, edges, joinKernel);
 
-            using var horizontal = KeepLines(edges, new Size(Math.Max(20, (int)(pageWidth * HorizontalFrameLineRatio)), 1));
-            using var vertical = KeepLines(edges, new Size(1, Math.Max(20, (int)(pageHeight * VerticalFrameLineRatio))));
+            // Thin lines only: dense hatching would close frames everywhere
+            var (horizontal, horizontalThin) = KeepLines(edges, new Size(Math.Max(20, (int)(pageWidth * HorizontalFrameLineRatio)), 1));
+            var (vertical, verticalThin) = KeepLines(edges, new Size(1, Math.Max(20, (int)(pageHeight * VerticalFrameLineRatio))));
+            horizontal.Dispose();
+            vertical.Dispose();
+            horizontal = horizontalThin;
+            vertical = verticalThin;
             Horizontal = Segments(horizontal, true);
             Vertical = Segments(vertical, false);
 
@@ -707,6 +751,8 @@ public static class GutterPanelDetector
             using var verticalTolerant = new Mat();
             using var acrossColumns = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(2 * FrameLineTolerance + 1, 1));
             Cv2.Dilate(vertical, verticalTolerant, acrossColumns);
+            horizontal.Dispose();
+            vertical.Dispose();
 
             var rowsData = ToArray(horizontalTolerant);
             _rowSums = new ushort[(width + 1) * height];
@@ -733,6 +779,10 @@ public static class GutterPanelDetector
             }
         }
 
+        /// <summary>The size of the page without the margin.</summary>
+        public int PageWidth { get; }
+        public int PageHeight { get; }
+
         /// <summary>The horizontal line segments: the row, and the columns from start to end.</summary>
         public List<(int Position, int Start, int End)> Horizontal { get; }
 
@@ -753,12 +803,20 @@ public static class GutterPanelDetector
             return (double)(_columnSums[column + y1] - _columnSums[column + y0]) / Math.Max(1, y1 - y0);
         }
 
-        private static Mat KeepLines(Mat edges, Size length)
+        private static (Mat Lines, Mat Thin) KeepLines(Mat edges, Size length)
         {
             var lines = new Mat();
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, length);
             Cv2.MorphologyEx(edges, lines, MorphTypes.Open, kernel);
-            return lines;
+
+            // Dense hatching survives the long opening as a solid block, a line is thin across its direction
+            using var solid = new Mat();
+            using var across = Cv2.GetStructuringElement(MorphShapes.Rect,
+                length.Width > length.Height ? new Size(1, FrameLineThickness) : new Size(FrameLineThickness, 1));
+            Cv2.MorphologyEx(edges, solid, MorphTypes.Open, across);
+            var thin = new Mat();
+            Cv2.Subtract(lines, solid, thin);
+            return (lines, thin);
         }
 
         private static List<(int Position, int Start, int End)> Segments(Mat lines, bool horizontal)
