@@ -31,7 +31,8 @@ public interface IPanelDetector
     /// <summary>
     /// Detects the panels of a page in reading order, normalized to 0-1. A splash page is one panel covering the page.
     /// </summary>
-    Task<List<Box>> DetectAsync(byte[] pageData, bool isManga);
+    /// <param name="log">Optional, receives the decisions of detectors which support it</param>
+    Task<List<Box>> DetectAsync(byte[] pageData, bool isManga, Action<string>? log = null);
 }
 
 /// <summary>
@@ -43,7 +44,7 @@ public sealed class ServicePanelDetector : IPanelDetector
 
     public string Name => "service";
 
-    public async Task<List<Box>> DetectAsync(byte[] pageData, bool isManga)
+    public async Task<List<Box>> DetectAsync(byte[] pageData, bool isManga, Action<string>? log = null)
     {
         // A unique key, the service caches per comic and page
         var result = await _service.DetectPanelsAsync(Guid.NewGuid().ToString("N"), 0, pageData, isManga);
@@ -61,9 +62,9 @@ public sealed class GutterPanelDetectorAdapter : IPanelDetector
 {
     public string Name => "gutter";
 
-    public Task<List<Box>> DetectAsync(byte[] pageData, bool isManga) => Task.Run(() =>
+    public Task<List<Box>> DetectAsync(byte[] pageData, bool isManga, Action<string>? log = null) => Task.Run(() =>
     {
-        var panels = GutterPanelDetector.Detect(0, pageData, isManga);
+        var panels = GutterPanelDetector.Detect(0, pageData, isManga, log);
         return panels.Count == 0
             ? [new Box(0, 0, 1, 1)]
             : panels.Select(panel => new Box(panel.X, panel.Y, panel.Width, panel.Height)).ToList();

@@ -31,6 +31,8 @@ namespace StripWolf.Core.Services;
 /// 4. The page is cut along empty rows, then along empty columns, recursively. The order of the cuts is the reading order.
 /// 5. Only when no clean cut exists, a cut through a gutter which is partly covered (a balloon crossing it) is tried.
 /// 6. Columns whose rows are only slightly staggered are read row by row, like a reader does.
+/// 7. When the gutters of a page have panel frames on both sides, the page is cut again using only gutters with
+///    frames, so a light stripe in the art is not taken for a gutter.
 /// </summary>
 public static class GutterPanelDetector
 {
@@ -46,12 +48,17 @@ public static class GutterPanelDetector
     private const double MinPanelHeightRatio = 0.04;
     private const double StaggeredRowTolerance = 0.06;
     private const double PageEdgeRatio = 0.005;
+    private const int StrongDifference = 60;
+    private const int FrameSearchLines = 4;
+    private const double FramedPageEvidence = 0.85;
+    private const double MinFrameEvidence = 0.5;
 
     /// <summary>
     /// Detects the panels in reading order, normalized to 0-1. Returns an empty list when the page has no panel
     /// structure (a splash page or a cover).
     /// </summary>
-    public static List<ComicPanel> Detect(int pageIndex, byte[] pageData, bool isManga)
+    /// <param name="log">Optional, receives the decisions for tuning the detection</param>
+    public static List<ComicPanel> Detect(int pageIndex, byte[] pageData, bool isManga, Action<string>? log = null)
     {
         var mask = CreateContentMask(pageData);
         if (mask is null)
@@ -59,8 +66,19 @@ public static class GutterPanelDetector
             return [];
         }
 
+        mask.Log = log;
+        var page = new Region(0, 0, mask.Width, mask.Height);
         var leaves = new List<Region>();
-        Split(mask, new Region(0, 0, mask.Width, mask.Height), 0, isManga, leaves);
+        Split(mask, page, 0, isManga, leaves);
+
+        // A page with panel frames: cut again, only along gutters with a frame on both sides
+        if (mask.FrameEvidence.Count >= 2 && Median(mask.FrameEvidence) is var evidence && evidence >= FramedPageEvidence)
+        {
+            log?.Invoke($"framed page (median frame evidence {evidence:0.00}), cutting again with frames required");
+            mask.RequireFrames = true;
+            leaves.Clear();
+            Split(mask, page, 0, isManga, leaves);
+        }
 
         double pageArea = (double)mask.Width * mask.Height;
         var panels = leaves
@@ -80,8 +98,10 @@ public static class GutterPanelDetector
             .ToList();
 
         // Bands from edge to edge are text or a cover without panel borders, not panels
-        bool allBands = panels.All(panel => panel.X <= PageEdgeRatio && panel.X + panel.Width >= 1 - PageEdgeRatio);
-        return panels.Count > 1 && !allBands ? panels : [];
+        int bands = panels.Count(panel => panel.X <= PageEdgeRatio && panel.X + panel.Width >= 1 - PageEdgeRatio);
+        bool isBandPage = bands == panels.Count || (bands >= 2 && bands >= panels.Count - 1);
+        log?.Invoke($"{panels.Count} panels, {bands} edge to edge bands{(isBandPage ? ", band page: splash" : string.Empty)}");
+        return panels.Count > 1 && !isBandPage ? panels : [];
     }
 
     private static ContentMask? CreateContentMask(byte[] pageData)
@@ -201,6 +221,12 @@ public static class GutterPanelDetector
         return (background, Median(deviations));
     }
 
+    private static double Median(List<double> values)
+    {
+        var sorted = values.Order().ToList();
+        return sorted[sorted.Count / 2];
+    }
+
     private static int Median(int[] histogram)
     {
         int half = histogram.Sum() / 2;
@@ -231,6 +257,7 @@ public static class GutterPanelDetector
             return;
         }
 
+        mask.Record(chosen);
         var parts = chosen.Parts;
         if (!chosen.Horizontal)
         {
@@ -259,14 +286,14 @@ public static class GutterPanelDetector
         }
     }
 
-    private static (bool Horizontal, List<Region> Parts)? ChooseCut(ContentMask mask, Region bounds)
+    private static CutResult? ChooseCut(ContentMask mask, Region bounds)
     {
         // Clean cuts first, rows before columns, then cuts through partly covered gutters
         foreach (var (horizontal, soft) in new[] { (true, false), (false, false), (true, true), (false, true) })
         {
-            if (Cut(mask, bounds, horizontal, soft) is { } parts)
+            if (Cut(mask, bounds, horizontal, soft) is { } cut)
             {
-                return (horizontal, parts);
+                return cut;
             }
         }
 
@@ -309,13 +336,14 @@ public static class GutterPanelDetector
         return rowsPerColumn;
     }
 
-    private static List<Region>? Cut(ContentMask mask, Region region, bool horizontal, bool soft)
+    private static CutResult? Cut(ContentMask mask, Region region, bool horizontal, bool soft)
     {
         var profile = mask.Profile(region, horizontal);
         int lineLength = horizontal ? region.Width : region.Height;
         double tolerance = lineLength * (soft ? SoftGutterTolerance : StrictGutterTolerance);
 
         var parts = new List<(int Start, int End)>();
+        var gutters = new List<(int Start, int End)>();
         int partStart = 0;
         int? gutterStart = null;
         for (int i = 0; i <= profile.Length; i++)
@@ -328,9 +356,10 @@ public static class GutterPanelDetector
             }
 
             if (gutterStart is { } start && i < profile.Length && start > 0 && i - start >= MinGutterSize &&
-                (soft || mask.IsFlat(region, horizontal, start, i)))
+                (soft || mask.IsCleanGutter(region, horizontal, start, i)))
             {
                 parts.Add((partStart, start));
+                gutters.Add((start, i));
                 partStart = i;
             }
             gutterStart = null;
@@ -352,12 +381,17 @@ public static class GutterPanelDetector
             }
         }
 
-        return parts
+        var regions = parts
             .Select(part => horizontal
                 ? new Region(region.X0, region.Y0 + part.Start, region.X1, region.Y0 + part.End)
                 : new Region(region.X0 + part.Start, region.Y0, region.X0 + part.End, region.Y1))
             .ToList();
+
+        return new CutResult(region, horizontal, soft, regions, gutters);
     }
+
+    /// <param name="Gutters">The gutters of the cut, relative to the region (rows when horizontal, else columns)</param>
+    private sealed record CutResult(Region Region, bool Horizontal, bool Soft, List<Region> Parts, List<(int Start, int End)> Gutters);
 
     private readonly record struct Region(int X0, int Y0, int X1, int Y1)
     {
@@ -370,6 +404,81 @@ public static class GutterPanelDetector
     {
         public int Width { get; } = width;
         public int Height { get; } = height;
+
+        /// <summary>Only accept clean gutters with a panel frame on both sides.</summary>
+        public bool RequireFrames { get; set; }
+
+        /// <summary>The frame evidence of the clean gutters which were cut along.</summary>
+        public List<double> FrameEvidence { get; } = [];
+
+        public Action<string>? Log { get; set; }
+
+        public bool IsCleanGutter(Region region, bool horizontal, int start, int end) =>
+            IsFlat(region, horizontal, start, end) &&
+            (!RequireFrames || MeasureFrames(region, horizontal, start, end) >= MinFrameEvidence);
+
+        /// <summary>
+        /// Remembers the frame evidence of the gutters which are cut along, and logs the cut.
+        /// </summary>
+        public void Record(CutResult cut)
+        {
+            foreach (var (start, end) in cut.Gutters)
+            {
+                double frames = MeasureFrames(cut.Region, cut.Horizontal, start, end);
+                if (!cut.Soft && !RequireFrames)
+                {
+                    FrameEvidence.Add(frames);
+                }
+
+                if (Log is not null)
+                {
+                    int offset = cut.Horizontal ? cut.Region.Y0 : cut.Region.X0;
+                    int size = cut.Horizontal ? Height : Width;
+                    Log($"{(RequireFrames ? "pass 2 " : string.Empty)}{(cut.Horizontal ? "row" : "column")} gutter{(cut.Soft ? " (soft)" : string.Empty)} " +
+                        $"at {(double)(offset + start) / size:0.000}-{(double)(offset + end) / size:0.000}, thickness {(double)(end - start) / Height:0.0000} of the page height, " +
+                        $"frame evidence {frames:0.00}, in region x {(double)cut.Region.X0 / Width:0.000}-{(double)cut.Region.X1 / Width:0.000} y {(double)cut.Region.Y0 / Height:0.000}-{(double)cut.Region.Y1 / Height:0.000}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// How much of the lines next to the gutter, on the side with the least, is clearly different from the
+        /// background: about 1 for a panel frame, less for the edge of art.
+        /// </summary>
+        public double MeasureFrames(Region region, bool horizontal, int start, int end)
+        {
+            double before = 0;
+            double after = 0;
+            for (int offset = 1; offset <= FrameSearchLines; offset++)
+            {
+                before = Math.Max(before, StrongFraction(region, horizontal, start - offset));
+                after = Math.Max(after, StrongFraction(region, horizontal, end - 1 + offset));
+            }
+
+            return Math.Min(before, after);
+        }
+
+        private double StrongFraction(Region region, bool horizontal, int line)
+        {
+            if (line < 0 || line >= (horizontal ? region.Height : region.Width))
+            {
+                return 0;
+            }
+
+            int length = horizontal ? region.Width : region.Height;
+            int strong = 0;
+            for (int i = 0; i < length; i++)
+            {
+                int x = horizontal ? region.X0 + i : region.X0 + line;
+                int y = horizontal ? region.Y0 + line : region.Y0 + i;
+                if (difference[y * Width + x] > StrongDifference)
+                {
+                    strong++;
+                }
+            }
+
+            return (double)strong / length;
+        }
 
         /// <summary>
         /// The region shrunk to its content, null when it has none.

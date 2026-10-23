@@ -32,6 +32,7 @@ string? outDir = null;
 string detectorName = "service";
 bool runStability = false;
 bool isManga = false;
+bool debug = false;
 int maxPages = int.MaxValue;
 
 for (int i = 0; i < args.Length; i++)
@@ -42,6 +43,7 @@ for (int i = 0; i < args.Length; i++)
         case "--detector": detectorName = args[++i]; break;
         case "--stability": runStability = true; break;
         case "--manga": isManga = true; break;
+        case "--debug": debug = true; break;
         case "--max-pages": maxPages = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
         case "-h" or "--help": PrintUsage(); return 0;
         default: folder = args[i]; break;
@@ -86,13 +88,15 @@ foreach (var comicPath in comics)
     var pagesOut = Path.Combine(comicOut, "pages");
     Directory.CreateDirectory(pagesOut);
 
+    var debugLog = debug ? new StringBuilder() : null;
     var editorPages = new List<object>();
     var detectedPages = new List<PageLabel>();
     for (int pageIndex = 0; pageIndex < pages.Count; pageIndex++)
     {
         var page = pages[pageIndex];
+        debugLog?.AppendLine(CultureInfo.InvariantCulture, $"## {page.Name}");
         var stopwatch = Stopwatch.StartNew();
-        var detected = await detector.DetectAsync(page.Data, isManga);
+        var detected = await detector.DetectAsync(page.Data, isManga, debugLog is null ? null : line => debugLog.AppendLine(line));
         detectionTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
 
         totalPages++;
@@ -137,6 +141,10 @@ foreach (var comicPath in comics)
     await File.WriteAllTextAsync(Path.Combine(comicOut, $"detected-{detector.Name}.json"),
         JsonSerializer.Serialize(detectedFile, LabelFile.JsonOptions));
     await WriteEditorAsync(Path.Combine(comicOut, "labels.html"), comicName, detector.Name, editorPages);
+    if (debugLog is not null)
+    {
+        await File.WriteAllTextAsync(Path.Combine(comicOut, $"debug-{detector.Name}.log"), debugLog.ToString());
+    }
     Console.WriteLine($"  {pages.Count} pages, {labelsByName.Values.Count(label => label.Reviewed)} reviewed labels, editor: {Path.Combine(comicOut, "labels.html")}");
 }
 
@@ -282,11 +290,12 @@ static double Average(IReadOnlyCollection<double> values) => values.Count == 0 ?
 static void PrintUsage()
 {
     Console.WriteLine("""
-        Usage: StripWolf.PanelBench [folder] [--out <dir>] [--detector service] [--stability] [--manga] [--max-pages <n>]
+        Usage: StripWolf.PanelBench [folder] [--out <dir>] [--detector service] [--stability] [--manga] [--max-pages <n>] [--debug]
 
           folder        Folder with .cbz/.cbr files, defaults to %STRIPWOLF_PANEL_TESTDATA%.
                         Expected panels are read from "<comic>.panels.json" next to each comic.
           --out         Output folder, defaults to "<folder>/_panelbench".
           --stability   Also detect slightly changed pages (scaled, re-compressed) and report how often the result changes.
+          --debug       Write the decisions of the detector per page to "debug-<detector>.log" (gutter detector).
         """);
 }
