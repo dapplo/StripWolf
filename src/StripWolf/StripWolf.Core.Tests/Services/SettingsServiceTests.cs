@@ -259,6 +259,79 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task KeyFile_IsNotTheRawKey_AndOnlyReadableByTheUser()
+    {
+        var service = new SettingsService(SettingsDirectory);
+        await service.UpdateSettingsAsync(settings => settings.Servers.Add(CreateServer(1)));
+
+        var keyFile = File.ReadAllBytes(_temp.Combine(".key"));
+        Assert.Equal("SWK"u8.ToArray(), keyFile[..3]);
+        if (OperatingSystem.IsWindows())
+        {
+            // DPAPI protected
+            Assert.Equal((byte)CredentialKeyStore.Protection.WindowsDpapi, keyFile[4]);
+            Assert.NotEqual(CredentialKeyStore.KeySize + 5, keyFile.Length);
+        }
+        else
+        {
+            const UnixFileMode userOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            Assert.Equal(userOnly, File.GetUnixFileMode(_temp.Combine(".key")));
+            Assert.Equal(userOnly, File.GetUnixFileMode(CredentialsFile));
+        }
+
+        Assert.Equal(Password, new SettingsService(SettingsDirectory).LoadSettings().Servers.Single().Password);
+    }
+
+    /// <summary>
+    /// Older versions wrote the raw 32 byte key. It is converted to the new (protected) format and keeps working,
+    /// so the stored passwords survive the update.
+    /// </summary>
+    [Fact]
+    public async Task LegacyRawKey_IsMigrated_AndStillDecryptsTheCredentials()
+    {
+        var legacyKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(CredentialKeyStore.KeySize);
+        await File.WriteAllBytesAsync(_temp.Combine(".key"), legacyKey, TestContext.Current.CancellationToken);
+        if (OperatingSystem.IsWindows())
+        {
+            // Older versions hid the key file
+            File.SetAttributes(_temp.Combine(".key"), FileAttributes.Hidden);
+        }
+
+        var service = new SettingsService(SettingsDirectory);
+        await service.UpdateSettingsAsync(settings => settings.Servers.Add(CreateServer(1)));
+
+        Assert.Equal("SWK"u8.ToArray(), File.ReadAllBytes(_temp.Combine(".key"))[..3]);
+
+        // The credentials are still encrypted with the legacy key (nonce + tag + cipher, see SettingsService.Encrypt)
+        var encrypted = File.ReadAllBytes(CredentialsFile);
+        const int nonceSize = 12;
+        const int tagSize = 16;
+        var plain = new byte[encrypted.Length - nonceSize - tagSize];
+        using (var aes = new System.Security.Cryptography.AesGcm(legacyKey, tagSize))
+        {
+            aes.Decrypt(encrypted.AsSpan(0, nonceSize), encrypted.AsSpan(nonceSize + tagSize), encrypted.AsSpan(nonceSize, tagSize), plain);
+        }
+        Assert.Contains(Password, Encoding.UTF8.GetString(plain));
+
+        Assert.Equal(Password, new SettingsService(SettingsDirectory).LoadSettings().Servers.Single().Password);
+    }
+
+    [Fact]
+    public async Task UnusableKeyFile_CredentialsAreDropped_SettingsRemain()
+    {
+        var service = new SettingsService(SettingsDirectory);
+        await service.UpdateSettingsAsync(settings => settings.Servers.Add(CreateServer(1)));
+        // A key file with the new header but a payload which can't be used (e.g. DPAPI blob from another account).
+        // Deleted first: the key file is hidden on Windows, which refuses overwriting it.
+        File.Delete(_temp.Combine(".key"));
+        await File.WriteAllBytesAsync(_temp.Combine(".key"), [.. "SWK"u8, 1, 1, 42, 42, 42], TestContext.Current.CancellationToken);
+
+        var server = Assert.Single(new SettingsService(SettingsDirectory).LoadSettings().Servers);
+        Assert.Equal("Server 1", server.Name);
+        Assert.Equal(string.Empty, server.Password);
+    }
+
+    [Fact]
     public async Task UpdateSettingsAsync_IsVisibleImmediately_AndPersisted()
     {
         var service = new SettingsService(SettingsDirectory);

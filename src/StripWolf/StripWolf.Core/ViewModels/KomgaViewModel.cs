@@ -1755,6 +1755,7 @@ public partial class KomgaViewModel : ViewModelBase
     /// <summary>
     /// Returns the path for a cached thumbnail. The path includes the server ID so that
     /// thumbnails from different servers do not overlap.
+    /// The item id comes from the server, it is sanitized so a malicious server can't write outside the cache.
     /// </summary>
     private static string GetThumbnailCachePath(int serverId, string type, string itemId)
     {
@@ -1762,7 +1763,7 @@ public partial class KomgaViewModel : ViewModelBase
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "StripWolf", "thumbnails", serverId.ToString(), type);
         Directory.CreateDirectory(cacheDir);
-        return Path.Combine(cacheDir, $"{itemId}.jpg");
+        return Path.Combine(cacheDir, $"{LibraryService.SanitizeFileName(itemId)}.jpg");
     }
 
     /// <summary>

@@ -48,6 +48,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="VersOne.Epub" />
     <!-- For SQLite local storage -->
     <PackageReference Include="sqlite-net-pcl" />

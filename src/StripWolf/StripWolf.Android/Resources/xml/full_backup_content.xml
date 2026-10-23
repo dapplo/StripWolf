@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier. The DB and covers are never backed up, they are rebuilt from the library. -->
 <full-backup-content>
-    <!-- Only backup settings and server credentials. Exclude DB and Covers. -->
     <include domain="file" path=".local/share/StripWolf/settings.json" />
-    <include domain="file" path=".local/share/StripWolf/credentials.dat" />
-    <include domain="file" path=".local/share/StripWolf/.key" />
+    <!-- The credentials (credentials.dat) and their key (.key) are only backed up together, and only when the backup is
+         end-to-end encrypted or a direct transfer to a new phone. A plain backup holding both is as good as the plain
+         passwords, so there they are left out and need to be entered again after a restore. -->
+    <include domain="file" path=".local/share/StripWolf/credentials.dat" requireFlags="clientSideEncryption|deviceToDeviceTransfer" />
+    <include domain="file" path=".local/share/StripWolf/.key" requireFlags="clientSideEncryption|deviceToDeviceTransfer" />
 </full-backup-content>
