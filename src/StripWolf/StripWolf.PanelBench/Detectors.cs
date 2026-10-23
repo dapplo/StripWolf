@@ -58,13 +58,14 @@ public sealed class ServicePanelDetector : IPanelDetector
 /// <summary>
 /// The gutter split (XY-cut) detection, a splash page when it finds no panel structure.
 /// </summary>
-public sealed class GutterPanelDetectorAdapter : IPanelDetector
+/// <param name="findInsets">Also search panels drawn over a background panel (experimental)</param>
+public sealed class GutterPanelDetectorAdapter(bool findInsets = false) : IPanelDetector
 {
-    public string Name => "gutter";
+    public string Name => findInsets ? "gutter-insets" : "gutter";
 
     public Task<List<Box>> DetectAsync(byte[] pageData, bool isManga, Action<string>? log = null) => Task.Run(() =>
     {
-        var panels = GutterPanelDetector.Detect(0, pageData, isManga, log);
+        var panels = GutterPanelDetector.Detect(0, pageData, isManga, log, findInsets);
         return panels.Count == 0
             ? [new Box(0, 0, 1, 1)]
             : panels.Select(panel => new Box(panel.X, panel.Y, panel.Width, panel.Height)).ToList();
@@ -73,12 +74,13 @@ public sealed class GutterPanelDetectorAdapter : IPanelDetector
 
 public static class Detectors
 {
-    public static readonly string[] Names = ["service", "gutter"];
+    public static readonly string[] Names = ["service", "gutter", "gutter-insets"];
 
     public static IPanelDetector Create(string name) => name.ToLowerInvariant() switch
     {
         "service" => new ServicePanelDetector(),
         "gutter" => new GutterPanelDetectorAdapter(),
+        "gutter-insets" => new GutterPanelDetectorAdapter(findInsets: true),
         _ => throw new ArgumentException($"Unknown detector '{name}', available: {string.Join(", ", Names)}")
     };
 }
