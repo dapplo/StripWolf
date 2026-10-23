@@ -68,6 +68,7 @@
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
     <Compile Remove="Services\PanelDetectionService.cs" />
+    <Compile Remove="Services\GutterPanelDetector.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' != 'false'">

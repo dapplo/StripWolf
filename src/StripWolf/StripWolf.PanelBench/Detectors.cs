@@ -54,11 +54,30 @@ public sealed class ServicePanelDetector : IPanelDetector
     }
 }
 
+/// <summary>
+/// The gutter split (XY-cut) detection, a splash page when it finds no panel structure.
+/// </summary>
+public sealed class GutterPanelDetectorAdapter : IPanelDetector
+{
+    public string Name => "gutter";
+
+    public Task<List<Box>> DetectAsync(byte[] pageData, bool isManga) => Task.Run(() =>
+    {
+        var panels = GutterPanelDetector.Detect(0, pageData, isManga);
+        return panels.Count == 0
+            ? [new Box(0, 0, 1, 1)]
+            : panels.Select(panel => new Box(panel.X, panel.Y, panel.Width, panel.Height)).ToList();
+    });
+}
+
 public static class Detectors
 {
+    public static readonly string[] Names = ["service", "gutter"];
+
     public static IPanelDetector Create(string name) => name.ToLowerInvariant() switch
     {
         "service" => new ServicePanelDetector(),
-        _ => throw new ArgumentException($"Unknown detector '{name}', available: service")
+        "gutter" => new GutterPanelDetectorAdapter(),
+        _ => throw new ArgumentException($"Unknown detector '{name}', available: {string.Join(", ", Names)}")
     };
 }

@@ -38,5 +38,9 @@ A page without panels (a cover, a splash page) is one panel covering the whole p
 
 ## Comparing detectors
 
-`--detector <name>` selects the implementation, see `Detectors.cs`. A new implementation is added there, so it can be
-compared with the current one on the same comics before it replaces it.
+`--detector <name>` selects the implementation, see `Detectors.cs`:
+
+- `service` (default): the current `PanelDetectionService` as used by the app.
+- `gutter`: `GutterPanelDetector`, splits the page along its gutters (recursive XY-cut).
+
+Each detector writes its own `report-<detector>.md`, `history.csv` has a line per run.
