@@ -74,12 +74,20 @@ public sealed class LabelFile
 
     public static string PathFor(string comicPath) => comicPath + ".panels.json";
 
-    public static LabelFile? TryLoad(string comicPath)
+    /// <summary>
+    /// Loads the labels next to the comic, or else from the folder of the label editor (where the browser saves them
+    /// by default).
+    /// </summary>
+    public static LabelFile? TryLoad(string comicPath, string editorFolder)
     {
         var path = PathFor(comicPath);
         if (!File.Exists(path))
         {
-            return null;
+            path = Path.Combine(editorFolder, Path.GetFileName(path));
+            if (!File.Exists(path))
+            {
+                return null;
+            }
         }
 
         return JsonSerializer.Deserialize<LabelFile>(File.ReadAllText(path), JsonOptions);

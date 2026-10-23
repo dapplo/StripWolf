@@ -24,7 +24,7 @@ For every `.cbz` / `.cbr` in the folder the tool:
 
 Open `labels.html` in Edge or Chrome, correct the panels of a page, put them in reading order and press Enter to mark
 the page as reviewed. Only reviewed pages are scored. "Save labels" writes `<comic>.panels.json`, save it next to the
-comic. The editor keeps a draft in the browser in case the page is closed before saving.
+comic (preferred, it survives deleting `_panelbench`) or next to `labels.html`. The editor keeps a draft in the browser in case the page is closed before saving.
 
 A page without panels (a cover, a splash page) is one panel covering the whole page (S).
 

@@ -79,10 +79,10 @@ foreach (var comicPath in comics)
     var comicName = Path.GetFileName(comicPath);
     Console.WriteLine($"- {comicName}");
     var pages = ComicArchive.ReadPages(comicPath).Take(maxPages).ToList();
-    var labels = LabelFile.TryLoad(comicPath);
+    var comicOut = Path.Combine(outDir, SafeName(Path.GetFileNameWithoutExtension(comicPath)));
+    var labels = LabelFile.TryLoad(comicPath, comicOut);
     var labelsByName = labels?.Pages.ToDictionary(page => page.Name) ?? new Dictionary<string, PageLabel>();
 
-    var comicOut = Path.Combine(outDir, SafeName(Path.GetFileNameWithoutExtension(comicPath)));
     var pagesOut = Path.Combine(comicOut, "pages");
     Directory.CreateDirectory(pagesOut);
 
