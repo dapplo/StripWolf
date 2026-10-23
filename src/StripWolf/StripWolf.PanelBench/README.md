@@ -41,7 +41,11 @@ A page without panels (a cover, a splash page) is one panel covering the whole p
 
 `--detector <name>` selects the implementation, see `Detectors.cs`:
 
-- `service` (default): the current `PanelDetectionService` as used by the app.
-- `gutter`: `GutterPanelDetector`, splits the page along its gutters (recursive XY-cut).
+- `service` (default): `PanelDetectionService` as used by the app, with its caching.
+- `gutter`: `GutterPanelDetector` directly, the detection the service uses. A new implementation is added next to
+  it, so it can be compared before the service switches to it.
+
+The service used a different detection up to October 2026: 11.1% of the pages of the first labelled album were
+correct and in reading order, against 94.4% with the gutter detection.
 
 Each detector writes its own `report-<detector>.md`, `history.csv` has a line per run.
