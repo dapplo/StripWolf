@@ -32,7 +32,7 @@ namespace StripWolf.Core.Services;
 /// 5. Only when no clean cut exists, a cut through a gutter which is partly covered (a balloon crossing it) is tried.
 /// 6. Columns whose rows are only slightly staggered are read row by row, like a reader does.
 /// 7. A page which only splits into bands from edge to edge, without any frame along its gutters, is text or a cover.
-/// 8. Optional, still experimental: in a big region on the page edge which can't be cut, closed panel frames are
+/// 8. Optional: in a big region on the page edge which can't be cut, closed panel frames are
 ///    searched, panels drawn over a background panel. The page gets a margin in the page colour first, so art
 ///    bleeding off the page has an edge too.
 /// </summary>
@@ -78,7 +78,7 @@ public static class GutterPanelDetector
     /// structure (a splash page or a cover).
     /// </summary>
     /// <param name="log">Optional, receives the decisions for tuning the detection</param>
-    /// <param name="findInsets">Search panels drawn over a background panel, experimental</param>
+    /// <param name="findInsets">Also search panels drawn over a background panel</param>
     public static List<ComicPanel> Detect(int pageIndex, byte[] pageData, bool isManga, Action<string>? log = null, bool findInsets = false)
     {
         var mask = CreateContentMask(pageData, findInsets);

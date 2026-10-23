@@ -102,7 +102,7 @@ public class PanelDetectionService
     {
         try
         {
-            var panels = GutterPanelDetector.Detect(pageIndex, pageData, isManga);
+            var panels = GutterPanelDetector.Detect(pageIndex, pageData, isManga, findInsets: true);
             if (panels.Count == 0)
             {
                 return CreateSplashPageResult(pageIndex);

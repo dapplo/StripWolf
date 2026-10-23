@@ -58,7 +58,7 @@ public sealed class ServicePanelDetector : IPanelDetector
 /// <summary>
 /// The gutter split (XY-cut) detection, a splash page when it finds no panel structure.
 /// </summary>
-/// <param name="findInsets">Also search panels drawn over a background panel (experimental)</param>
+/// <param name="findInsets">Also search panels drawn over a background panel, as the app does</param>
 public sealed class GutterPanelDetectorAdapter(bool findInsets = false) : IPanelDetector
 {
     public string Name => findInsets ? "gutter-insets" : "gutter";
