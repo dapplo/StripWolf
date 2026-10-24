@@ -146,9 +146,9 @@ es.ChooseDefaultApp=Elegir StripWolf como aplicación predeterminada para cómic
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 ; An installer may not change the default application once the user chose one (UserChoice, e.g. Directory Opus or
 ; another reader): only the user can, this opens the Default apps page of StripWolf (Windows 11, Windows 10 shows the
-; Default apps overview). Only offered when another application is the default for .cbz.
-Filename: "ms-settings:defaultapps?registeredAppUser={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: not IsAdminInstallMode and OtherDefaultForCbz
-Filename: "ms-settings:defaultapps?registeredAppMachine={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: IsAdminInstallMode and OtherDefaultForCbz
+; Default apps overview). Only offered when another application is the default for one of the comic book types.
+Filename: "ms-settings:defaultapps?registeredAppUser={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: not IsAdminInstallMode and OtherDefaultForComics
+Filename: "ms-settings:defaultapps?registeredAppMachine={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: IsAdminInstallMode and OtherDefaultForComics
 
 [Code]
 // Versions before the installer registered the file types themselves, on every start, under HKCU with the ProgIDs
@@ -168,14 +168,19 @@ begin
   RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\Classes\' + ProgId);
 end;
 
-// True when the user chose another application for .cbz in Explorer ("Open with > Always"), which Windows keeps
-function OtherDefaultForCbz: Boolean;
+// True when the user chose another application for the extension in Explorer ("Open with > Always"), which Windows keeps
+function OtherDefaultFor(Extension: String): Boolean;
 var
   ProgId: String;
 begin
   Result := RegQueryStringValue(HKEY_CURRENT_USER,
-    'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.cbz\UserChoice', 'ProgId', ProgId)
-    and (CompareText(ProgId, 'StripWolf.cbz') <> 0);
+    'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.' + Extension + '\UserChoice', 'ProgId', ProgId)
+    and (CompareText(ProgId, 'StripWolf.' + Extension) <> 0);
+end;
+
+function OtherDefaultForComics: Boolean;
+begin
+  Result := OtherDefaultFor('cbz') or OtherDefaultFor('cbr') or OtherDefaultFor('cb7') or OtherDefaultFor('cbt');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
