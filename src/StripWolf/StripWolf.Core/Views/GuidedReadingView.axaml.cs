@@ -119,6 +119,9 @@ public partial class GuidedReadingView : ZoomViewBase
     // Room kept around the outermost panels, so their frames stay visible
     private const double OverviewCropPadding = 0.01;
 
+    // A page with a single panel (e.g. a cover) is shown completely in the zoomed area, the overview would only repeat it
+    protected override bool ShowOverview(ReaderViewModel vm) => vm.CurrentPagePanels?.Panels.Count != 1;
+
     protected override Rect GetOverviewCrop(ReaderViewModel vm)
     {
         var panels = vm.CurrentPagePanels?.Panels;
