@@ -70,6 +70,12 @@ public static class GutterPanelDetector
     private const double FrameSegmentRatio = 0.04;
     private const int FrameLineThickness = 31;
     private const int FlatLineEnds = 4;
+    private const double EdgeBarUniformity = 0.98;
+    private const double EdgeBarPageShare = 0.6;
+    private const int EdgeBarBlur = 3;
+    private const double FramedOutline = 0.85;
+    private const double UnframedOutline = 0.1;
+    private const double SiblingSizeTolerance = 0.25;
     private static readonly bool DiagnoseFrames = true;
     private const double ClearFrameMargin = 0.02;
     private const double AmbiguousFrameRange = 0.05;
@@ -148,7 +154,17 @@ public static class GutterPanelDetector
         Cv2.GaussianBlur(gray, unpadded, new Size(3, 3), 0);
         int pageWidth = unpadded.Cols;
         int pageHeight = unpadded.Rows;
-        var (background, deviation) = MeasureBorder(ToArray(unpadded), pageWidth, pageHeight, findInsets);
+        var unpaddedData = ToArray(unpadded);
+        var (background, deviation) = MeasureBorder(unpaddedData, pageWidth, pageHeight, findInsets);
+
+        // Bars along the page edges (e.g. black bars left and right of a white page) are no part of the page: the
+        // page colour is the one just inside them, the bars count as background
+        var bars = FindEdgeBars(unpaddedData, pageWidth, pageHeight);
+        if (bars is { } edges)
+        {
+            background = edges.PageColour;
+            deviation = edges.Deviation;
+        }
 
         // A margin in the page colour all around, so art bleeding off the page has an edge like a panel frame
         int padding = findInsets ? Math.Max(4, (int)Math.Round(pageHeight * PaddingRatio)) : 0;
@@ -165,6 +181,11 @@ public static class GutterPanelDetector
         Cv2.Threshold(differenceMat, foreground, ForegroundThreshold, 255, ThresholdTypes.Binary);
         using var speckKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(2, 2));
         Cv2.MorphologyEx(foreground, foreground, MorphTypes.Open, speckKernel);
+        var barRegions = bars is { } found ? found.Regions.Select(bar => new Region(bar.X0 + padding, bar.Y0 + padding, bar.X1 + padding, bar.Y1 + padding)).ToList() : [];
+        foreach (var bar in barRegions)
+        {
+            Cv2.Rectangle(foreground, new Rect(bar.X0, bar.Y0, bar.Width, bar.Height), Scalar.All(0), -1);
+        }
 
         // Background connected to the page border: the margins and gutters
         using var backgroundMask = new Mat();
@@ -195,6 +216,14 @@ public static class GutterPanelDetector
             bool isOuterBackground = foregroundData[i] == 0 && outerLabels.Contains(labelData[i]);
             content[i] = isOuterBackground ? (byte)0 : (byte)1;
             difference[i] = (byte)Math.Abs(blurredData[i] - background);
+        }
+
+        foreach (var bar in barRegions)
+        {
+            for (int y = bar.Y0; y < bar.Y1; y++)
+            {
+                Array.Clear(difference, y * w + bar.X0, bar.Width);
+            }
         }
 
         // A real gutter is as flat as the page background, a light stripe in the art is only close to it
@@ -267,6 +296,112 @@ public static class GutterPanelDetector
         return ((byte)background, Median(deviations));
     }
 
+    /// <summary>
+    /// Bars of one flat colour along opposite page edges, with a page of another colour inside them: the bars, the
+    /// page colour just inside them and its noise. Null for a page without such bars.
+    /// </summary>
+    private static (List<Region> Regions, byte PageColour, double Deviation)? FindEdgeBars(byte[] gray, int w, int h)
+    {
+        int maxBar = Math.Min(w, h) / 5;
+        // The number of lines from an edge which are (nearly) all one colour, the colour of the first one
+        (int Size, int Colour) Measure(bool vertical, bool fromEnd)
+        {
+            int count = vertical ? w : h;
+            int length = vertical ? h : w;
+            int colour = -1;
+            int size = 0;
+            for (; size < Math.Min(maxBar, count); size++)
+            {
+                int line = fromEnd ? count - 1 - size : size;
+                var histogram = new int[256];
+                for (int i = 0; i < length; i++)
+                {
+                    histogram[vertical ? gray[i * w + line] : gray[line * w + i]]++;
+                }
+
+                int median = Median(histogram);
+                colour = colour < 0 ? median : colour;
+                int near = 0;
+                for (int value = Math.Max(0, colour - ForegroundThreshold); value <= Math.Min(255, colour + ForegroundThreshold); value++)
+                {
+                    near += histogram[value];
+                }
+
+                if (near < length * EdgeBarUniformity)
+                {
+                    break;
+                }
+            }
+
+            return (size, colour);
+        }
+
+        var left = Measure(true, false);
+        var right = Measure(true, true);
+        var top = Measure(false, false);
+        var bottom = Measure(false, true);
+        int minBar = Math.Max(2, Math.Min(w, h) / 200);
+        bool SameBars((int Size, int Colour) a, (int Size, int Colour) b) =>
+            a.Size >= minBar && b.Size >= minBar && Math.Abs(a.Colour - b.Colour) <= ForegroundThreshold;
+        bool sides = SameBars(left, right);
+        bool ends = SameBars(top, bottom);
+        if (!sides && !ends)
+        {
+            return null;
+        }
+
+        // The page inside the bars of that colour; bars of the other colour (e.g. white margins) are part of it
+        int barColour = sides ? left.Colour : top.Colour;
+        bool IsBar((int Size, int Colour) bar) => bar.Size >= minBar && Math.Abs(bar.Colour - barColour) <= ForegroundThreshold;
+        int x0 = IsBar(left) ? left.Size : 0, x1 = IsBar(right) ? w - right.Size : w;
+        int y0 = IsBar(top) ? top.Size : 0, y1 = IsBar(bottom) ? h - bottom.Size : h;
+        if (x1 - x0 < w / 2 || y1 - y0 < h / 2)
+        {
+            return null;
+        }
+
+        var inside = new byte[(x1 - x0) * (y1 - y0)];
+        for (int y = y0; y < y1; y++)
+        {
+            Array.Copy(gray, y * w + x0, inside, (y - y0) * (x1 - x0), x1 - x0);
+        }
+
+        var (pageColour, deviation) = MeasureBorder(inside, x1 - x0, y1 - y0, true);
+        // Only a page clearly of another colour, mostly that colour along its border
+        if (Math.Abs(pageColour - barColour) <= ForegroundThreshold || BorderShare(inside, x1 - x0, y1 - y0, pageColour) < EdgeBarPageShare)
+        {
+            return null;
+        }
+
+        // With the blurred edge between a bar and the page
+        var regions = new List<Region>();
+        if (x0 > 0) regions.Add(new Region(0, 0, Math.Min(w, x0 + EdgeBarBlur), h));
+        if (x1 < w) regions.Add(new Region(Math.Max(0, x1 - EdgeBarBlur), 0, w, h));
+        if (y0 > 0) regions.Add(new Region(0, 0, w, Math.Min(h, y0 + EdgeBarBlur)));
+        if (y1 < h) regions.Add(new Region(0, Math.Max(0, y1 - EdgeBarBlur), w, h));
+        return (regions, pageColour, deviation);
+    }
+
+    /// <summary>The share of the border pixels within the foreground threshold of the colour.</summary>
+    private static double BorderShare(byte[] gray, int w, int h, int colour)
+    {
+        int border = Math.Max(2, Math.Min(w, h) / 100);
+        int near = 0, total = 0;
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                if (y < border || y >= h - border || x < border || x >= w - border)
+                {
+                    total++;
+                    near += Math.Abs(gray[y * w + x] - colour) <= ForegroundThreshold ? 1 : 0;
+                }
+            }
+        }
+
+        return total == 0 ? 0 : (double)near / total;
+    }
+
     private static int Median(int[] histogram)
     {
         int half = histogram.Sum() / 2;
@@ -284,7 +419,8 @@ public static class GutterPanelDetector
     }
 
     /// <param name="strictOnly">Only cut along clean gutters, used when cleared insets leave holes in the content</param>
-    private static void Split(ContentMask mask, Region region, int depth, bool isManga, bool strictOnly, List<Region> leaves)
+    /// <param name="keepWhole">A panel without a frame next to a framed one of its size: no soft cuts through its light areas</param>
+    private static void Split(ContentMask mask, Region region, int depth, bool isManga, bool strictOnly, List<Region> leaves, bool keepWhole = false)
     {
         if (mask.Trim(region) is not { } bounds)
         {
@@ -292,6 +428,12 @@ public static class GutterPanelDetector
         }
 
         var cut = depth < MaxDepth ? ChooseCut(mask, bounds, strictOnly) : null;
+        if (cut is { Soft: true } && keepWhole)
+        {
+            mask.Log?.Invoke($"kept whole (no frame, framed sibling of its size): {mask.Describe(bounds)} outline {mask.OutlineFrame(bounds):0.00}");
+            cut = null;
+        }
+
         if (cut is not { } chosen)
         {
             leaves.Add(bounds);
@@ -321,10 +463,35 @@ public static class GutterPanelDetector
             }
         }
 
-        foreach (var part in parts)
+        var unframed = UnframedBesideFramed(mask, parts);
+        for (int i = 0; i < parts.Count; i++)
         {
-            Split(mask, part, depth + 1, isManga, strictOnly, leaves);
+            Split(mask, parts[i], depth + 1, isManga, strictOnly, leaves, unframed[i]);
         }
+    }
+
+    /// <summary>
+    /// The parts of a cut without a frame which have a framed sibling of about the same size: such a part is a panel
+    /// drawn without a frame (e.g. art on the white page), light areas in it are no gutters.
+    /// </summary>
+    private static bool[] UnframedBesideFramed(ContentMask mask, List<Region> parts)
+    {
+        var bounds = parts.Select(part => mask.Trim(part)).ToList();
+        var scores = bounds.Select(region => region is { } b ? mask.OutlineFrame(b) : 0).ToList();
+        var result = new bool[parts.Count];
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (bounds[i] is not { } part || scores[i] >= UnframedOutline)
+            {
+                continue;
+            }
+
+            result[i] = Enumerable.Range(0, parts.Count).Any(j => j != i && bounds[j] is { } sibling && scores[j] >= FramedOutline &&
+                Math.Abs(sibling.Width - part.Width) <= SiblingSizeTolerance * sibling.Width &&
+                Math.Abs(sibling.Height - part.Height) <= SiblingSizeTolerance * sibling.Height);
+        }
+
+        return result;
     }
 
     private static CutResult? ChooseCut(ContentMask mask, Region bounds, bool strictOnly)
@@ -373,6 +540,10 @@ public static class GutterPanelDetector
             start = begins || (i < lines.Length && lines[i] >= 0) ? i : null;
         }
 
+        // A run at the ends of the region is a margin, not a gutter
+        double minPart = (horizontal ? mask.PageHeight : mask.PageWidth) * SoftCutMinPartRatio;
+        runs = runs.Where(run => run.Start >= minPart && lines.Length - run.End >= minPart).ToList();
+
         int? colour = mask.GutterColour;
         runs = runs.Where(run => colour is not { } known || Math.Abs(run.Colour - known) <= ForegroundThreshold).ToList();
         if (colour is null)
@@ -391,7 +562,6 @@ public static class GutterPanelDetector
         }
 
         // Only between parts which are big enough to be panels
-        double minPart = (horizontal ? mask.PageHeight : mask.PageWidth) * SoftCutMinPartRatio;
         var parts = new List<(int Start, int End)>();
         int partStart = 0;
         foreach (var run in runs)
@@ -1067,6 +1237,29 @@ public static class GutterPanelDetector
             }
 
             return (double)strong / length;
+        }
+
+        /// <summary>
+        /// How much of the outline of the region is a frame: per side the best of the first lines inside it, the
+        /// weakest side. About 1 for a framed panel, low for art without a frame.
+        /// </summary>
+        public double OutlineFrame(Region region)
+        {
+            double weakest = 1;
+            foreach (bool horizontal in new[] { true, false })
+            {
+                int size = horizontal ? region.Height : region.Width;
+                double first = 0, last = 0;
+                for (int offset = 0; offset < Math.Min(FrameSearchLines, size); offset++)
+                {
+                    first = Math.Max(first, StrongFraction(region, horizontal, offset));
+                    last = Math.Max(last, StrongFraction(region, horizontal, size - 1 - offset));
+                }
+
+                weakest = Math.Min(weakest, Math.Min(first, last));
+            }
+
+            return weakest;
         }
 
         /// <summary>
