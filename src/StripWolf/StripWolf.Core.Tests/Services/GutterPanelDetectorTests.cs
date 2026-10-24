@@ -102,8 +102,12 @@ public sealed class GutterPanelDetectorTests
             (X0: 0.092, Y0: 0.606, X1: 0.496, Y1: 0.955),
             (X0: 0.502, Y0: 0.606, X1: 0.906, Y1: 0.955)
         };
-        // The unframed panel: art which doesn't fill the whole panel, on the white page
-        var unframedArt = (X0: 0.53, Y0: 0.06, X1: 0.90, Y1: 0.35);
+        // The unframed panel, the size of the framed one next to it: two pieces of art on the white page with a wide
+        // white area between them, which a figure partly crosses
+        var unframedArt = new[]
+        {
+            (X0: 0.502, Y0: 0.041, X1: 0.906, Y1: 0.15), (X0: 0.502, Y0: 0.21, X1: 0.906, Y1: 0.369), (X0: 0.70, Y0: 0.14, X1: 0.74, Y1: 0.22)
+        };
         var random = new Random(7);
         using var image = new Image<L8>(width, height, new L8(White));
         image.ProcessPixelRows(accessor =>
@@ -130,9 +134,10 @@ public sealed class GutterPanelDetectorTests
                         }
                     }
 
-                    if (x >= Px(unframedArt.X0, width) && x < Px(unframedArt.X1, width) && y >= Px(unframedArt.Y0, height) && y < Px(unframedArt.Y1, height))
+                    // Art without a frame: light colours with a few dark strokes
+                    if (unframedArt.Any(piece => x >= Px(piece.X0, width) && x < Px(piece.X1, width) && y >= Px(piece.Y0, height) && y < Px(piece.Y1, height)))
                     {
-                        row[x] = new L8(art);
+                        row[x] = new L8((x + y) % 60 < 2 ? (byte)40 : (byte)(215 + random.Next(15)));
                     }
                 }
             }
@@ -163,6 +168,10 @@ public sealed class GutterPanelDetectorTests
                 Assert.InRange(centres[i].X, panels[i].X, panels[i].X + panels[i].Width);
                 Assert.InRange(centres[i].Y, panels[i].Y, panels[i].Y + panels[i].Height);
             }
+
+            // The unframed panel stays whole across the white area in it
+            Assert.InRange(panels[1].Y, 0.03, 0.06);
+            Assert.InRange(panels[1].Y + panels[1].Height, 0.35, 0.38);
         }
     }
 }

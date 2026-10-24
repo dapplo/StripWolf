@@ -73,6 +73,9 @@ public static class GutterPanelDetector
     private const double EdgeBarUniformity = 0.98;
     private const double EdgeBarPageShare = 0.6;
     private const int EdgeBarBlur = 3;
+    private const double FramedOutline = 0.85;
+    private const double UnframedOutline = 0.1;
+    private const double SiblingSizeTolerance = 0.25;
     private static readonly bool DiagnoseFrames = true;
     private const double ClearFrameMargin = 0.02;
     private const double AmbiguousFrameRange = 0.05;
@@ -416,7 +419,8 @@ public static class GutterPanelDetector
     }
 
     /// <param name="strictOnly">Only cut along clean gutters, used when cleared insets leave holes in the content</param>
-    private static void Split(ContentMask mask, Region region, int depth, bool isManga, bool strictOnly, List<Region> leaves)
+    /// <param name="keepWhole">A panel without a frame next to a framed one of its size: no soft cuts through its light areas</param>
+    private static void Split(ContentMask mask, Region region, int depth, bool isManga, bool strictOnly, List<Region> leaves, bool keepWhole = false)
     {
         if (mask.Trim(region) is not { } bounds)
         {
@@ -424,6 +428,12 @@ public static class GutterPanelDetector
         }
 
         var cut = depth < MaxDepth ? ChooseCut(mask, bounds, strictOnly) : null;
+        if (cut is { Soft: true } && keepWhole)
+        {
+            mask.Log?.Invoke($"kept whole (no frame, framed sibling of its size): {mask.Describe(bounds)} outline {mask.OutlineFrame(bounds):0.00}");
+            cut = null;
+        }
+
         if (cut is not { } chosen)
         {
             leaves.Add(bounds);
@@ -453,10 +463,35 @@ public static class GutterPanelDetector
             }
         }
 
-        foreach (var part in parts)
+        var unframed = UnframedBesideFramed(mask, parts);
+        for (int i = 0; i < parts.Count; i++)
         {
-            Split(mask, part, depth + 1, isManga, strictOnly, leaves);
+            Split(mask, parts[i], depth + 1, isManga, strictOnly, leaves, unframed[i]);
         }
+    }
+
+    /// <summary>
+    /// The parts of a cut without a frame which have a framed sibling of about the same size: such a part is a panel
+    /// drawn without a frame (e.g. art on the white page), light areas in it are no gutters.
+    /// </summary>
+    private static bool[] UnframedBesideFramed(ContentMask mask, List<Region> parts)
+    {
+        var bounds = parts.Select(part => mask.Trim(part)).ToList();
+        var scores = bounds.Select(region => region is { } b ? mask.OutlineFrame(b) : 0).ToList();
+        var result = new bool[parts.Count];
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (bounds[i] is not { } part || scores[i] >= UnframedOutline)
+            {
+                continue;
+            }
+
+            result[i] = Enumerable.Range(0, parts.Count).Any(j => j != i && bounds[j] is { } sibling && scores[j] >= FramedOutline &&
+                Math.Abs(sibling.Width - part.Width) <= SiblingSizeTolerance * sibling.Width &&
+                Math.Abs(sibling.Height - part.Height) <= SiblingSizeTolerance * sibling.Height);
+        }
+
+        return result;
     }
 
     private static CutResult? ChooseCut(ContentMask mask, Region bounds, bool strictOnly)
@@ -1202,6 +1237,29 @@ public static class GutterPanelDetector
             }
 
             return (double)strong / length;
+        }
+
+        /// <summary>
+        /// How much of the outline of the region is a frame: per side the best of the first lines inside it, the
+        /// weakest side. About 1 for a framed panel, low for art without a frame.
+        /// </summary>
+        public double OutlineFrame(Region region)
+        {
+            double weakest = 1;
+            foreach (bool horizontal in new[] { true, false })
+            {
+                int size = horizontal ? region.Height : region.Width;
+                double first = 0, last = 0;
+                for (int offset = 0; offset < Math.Min(FrameSearchLines, size); offset++)
+                {
+                    first = Math.Max(first, StrongFraction(region, horizontal, offset));
+                    last = Math.Max(last, StrongFraction(region, horizontal, size - 1 - offset));
+                }
+
+                weakest = Math.Min(weakest, Math.Min(first, last));
+            }
+
+            return weakest;
         }
 
         /// <summary>
