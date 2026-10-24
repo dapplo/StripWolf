@@ -116,6 +116,23 @@ public partial class GuidedReadingView : ZoomViewBase
         Canvas.SetTop(_zoomRect, (region.CenterY - _actualDisplayHeightNormalized / 2) * canvas.Height);
     }
 
+    // Room kept around the outermost panels, so their frames stay visible
+    private const double OverviewCropPadding = 0.01;
+
+    protected override Rect GetOverviewCrop(ReaderViewModel vm)
+    {
+        var panels = vm.CurrentPagePanels?.Panels;
+        if (panels == null || panels.Count == 0) return base.GetOverviewCrop(vm);
+
+        // The panels cover the page content, everything outside them is page margin
+        double left = Math.Max(0, panels.Min(p => p.X) - OverviewCropPadding);
+        double top = Math.Max(0, panels.Min(p => p.Y) - OverviewCropPadding);
+        double right = Math.Min(1, panels.Max(p => p.X + p.Width) + OverviewCropPadding);
+        double bottom = Math.Min(1, panels.Max(p => p.Y + p.Height) + OverviewCropPadding);
+        if (right - left <= 0 || bottom - top <= 0) return base.GetOverviewCrop(vm);
+        return new Rect(left, top, right - left, bottom - top);
+    }
+
     protected override bool HandleOverviewClick(ReaderViewModel vm, double x, double y)
     {
         if (vm.CurrentPagePanels == null) return false;

@@ -281,19 +281,42 @@ public abstract class ZoomViewBase : UserControl
         var image = vm.CurrentPageImage;
         if (image == null || image.Size.Width <= 0) return;
 
-        // 1. Size the overview to the page, the zoomed area gets the rest
-        LayoutPanes(vm, image.Size);
+        // 1. The overview shows only the page content, without the empty page margins
+        var crop = GetOverviewCrop(vm);
+        var cropSize = new Size(crop.Width * image.Size.Width, crop.Height * image.Size.Height);
 
-        // 2. Set Canvas sizes to image pixels
+        // 2. Size the overview to the (cropped) page, the zoomed area gets the rest
+        LayoutPanes(vm, cropSize);
+
+        // 3. Set Canvas sizes to image pixels, the image and the overlay keep full page coordinates and are shifted by the crop
         var overviewContainers = new[] { OverviewContainerLeftControl, OverviewContainerRightControl };
+        var overviewImages = new[] { OverviewImageLeftControl, OverviewImageRightControl };
         var overviewCanvases = new[] { OverviewCanvasLeftControl, OverviewCanvasRightControl };
+        double cropLeft = -crop.X * image.Size.Width;
+        double cropTop = -crop.Y * image.Size.Height;
         for (int i = 0; i < 2; i++)
         {
-            if (overviewContainers[i] != null) { overviewContainers[i]!.Width = image.Size.Width; overviewContainers[i]!.Height = image.Size.Height; }
-            if (overviewCanvases[i] != null) { overviewCanvases[i]!.Width = image.Size.Width; overviewCanvases[i]!.Height = image.Size.Height; }
+            if (overviewContainers[i] != null)
+            {
+                overviewContainers[i]!.Width = cropSize.Width;
+                overviewContainers[i]!.Height = cropSize.Height;
+                overviewContainers[i]!.ClipToBounds = true;
+            }
+            if (overviewImages[i] != null)
+            {
+                Canvas.SetLeft(overviewImages[i]!, cropLeft);
+                Canvas.SetTop(overviewImages[i]!, cropTop);
+            }
+            if (overviewCanvases[i] != null)
+            {
+                overviewCanvases[i]!.Width = image.Size.Width;
+                overviewCanvases[i]!.Height = image.Size.Height;
+                Canvas.SetLeft(overviewCanvases[i]!, cropLeft);
+                Canvas.SetTop(overviewCanvases[i]!, cropTop);
+            }
         }
 
-        // 3. Robust Zoom Math using Fixed Virtual Viewport
+        // 4. Robust Zoom Math using Fixed Virtual Viewport
         var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
         var canvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
         var areaImage = vm.IsOverviewOnLeft ? ZoomedAreaImageRightControl : ZoomedAreaImageLeftControl;
@@ -397,6 +420,11 @@ public abstract class ZoomViewBase : UserControl
             overviewPane.Width = Math.Min(fitWidth, Bounds.Width * MaxOverviewWidthFraction);
         }
     }
+
+    /// <summary>
+    /// The part of the page (normalized) the overview shows, the whole page unless a view knows where the content is.
+    /// </summary>
+    protected virtual Rect GetOverviewCrop(ReaderViewModel vm) => new Rect(0, 0, 1, 1);
 
     protected abstract void RedrawOverview();
 
@@ -660,7 +688,30 @@ public abstract class ZoomViewBase : UserControl
 
         if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < TapMaxMovement && Math.Abs(deltaY) < TapMaxMovement)
         {
-            vm.ToggleControlsCommand.Execute(null);
+            // Like the normal reading view: a tap on the outer quarters of the zoomed area goes back or forward
+            // (a panel in guided mode, a page in zoomed mode), a tap in the middle toggles the controls
+            var zoomArea = sender as Control ?? this;
+            double tapX = e.GetPosition(zoomArea).X;
+            double zoomAreaWidth = zoomArea.Bounds.Width;
+            if (tapX < zoomAreaWidth * 0.25 || tapX > zoomAreaWidth * 0.75)
+            {
+                bool forward = tapX > zoomAreaWidth * 0.75;
+                if (vm.IsRightToLeftNavigation) forward = !forward;
+                if (forward)
+                {
+                    if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
+                    else vm.GoToNextPageCommand.Execute(null);
+                }
+                else
+                {
+                    if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
+                    else vm.GoToPreviousPageCommand.Execute(null);
+                }
+            }
+            else
+            {
+                vm.ToggleControlsCommand.Execute(null);
+            }
             e.Handled = true;
             return;
         }
