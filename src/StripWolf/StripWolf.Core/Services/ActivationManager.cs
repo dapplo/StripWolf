@@ -27,7 +27,7 @@ using System.Threading.Tasks;
 namespace StripWolf.Core.Services;
 
 /// <summary>
-/// Service to listen to activation paths forwarded from the Gatekeeper stub.
+/// Service to listen to activation paths forwarded by a second StripWolf process (see <see cref="SingleInstance"/>).
 /// </summary>
 public class ActivationManager
 {
@@ -45,6 +45,11 @@ public class ActivationManager
     /// Event raised when a file path is received via the named pipe.
     /// </summary>
     public event Action<string>? PathReceived;
+
+    /// <summary>
+    /// Event raised when StripWolf was started again without a file, the running instance should show itself.
+    /// </summary>
+    public event Action? ShowRequested;
 
     /// <summary>
     /// Starts the background Named Pipe server.
@@ -102,13 +107,17 @@ public class ActivationManager
                 using var reader = new StreamReader(pipeServer, System.Text.Encoding.UTF8);
                 var message = await reader.ReadLineAsync(cancellationToken);
                 
-                if (message != null && message.StartsWith("OPEN:", StringComparison.Ordinal))
+                if (message != null && message.StartsWith(SingleInstance.OpenMessagePrefix, StringComparison.Ordinal))
                 {
-                    var path = message.Substring(5);
+                    var path = message.Substring(SingleInstance.OpenMessagePrefix.Length);
                     if (!string.IsNullOrWhiteSpace(path))
                     {
                         PathReceived?.Invoke(path);
                     }
+                }
+                else if (message == SingleInstance.ShowMessage)
+                {
+                    ShowRequested?.Invoke();
                 }
             }
             catch (OperationCanceledException)

@@ -38,11 +38,12 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        if (OperatingSystem.IsWindows())
+        // When StripWolf is already running (e.g. a comic was double-clicked in the file manager), only pass the file on.
+        // This is done before Avalonia starts, so the second process exits right away. File types are registered by the
+        // Windows installer, the Linux install.sh and the macOS Info.plist, StripWolf doesn't register itself anymore.
+        if (!SingleInstance.TryClaimOrForward(args))
         {
-#if Windows
-            Services.Windows.FileAssociationHelper.RegisterAssociations();
-#endif
+            return;
         }
 
         BuildAvaloniaApp()

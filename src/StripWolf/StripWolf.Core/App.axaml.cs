@@ -34,8 +34,6 @@ namespace StripWolf;
 
 public partial class App : Application
 {
-    private Mutex? _stripWolfMutex;
-
     public static IServiceProvider? Services { get; private set; }
 
     /// <summary>
@@ -82,46 +80,14 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // Check for a running instance *before* building the service provider and cleaning up temp directories:
-        // a second instance only forwards its argument and exits, it should not pay the startup cost, and must not
-        // delete temporary directories which the running instance is using.
-        if (OperatingSystem.IsWindows())
-        {
-            _stripWolfMutex = new Mutex(true, @"Local\StripWolf_Mutex", out var createdNew);
-            if (!createdNew)
-            {
-                // Another instance of StripWolf is running.
-                // If launched with command-line arguments, forward it to the running instance and exit.
-                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopArgs && desktopArgs.Args is { Length: > 0 })
-                {
-                    var filePath = desktopArgs.Args[0];
-                    if (!string.IsNullOrWhiteSpace(filePath))
-                    {
-                        try
-                        {
-                            filePath = Path.GetFullPath(filePath);
-                        }
-                        catch { }
-
-                        ForwardPathToRunningInstance(filePath);
-                    }
-                }
-
-                // Close this duplicate instance
-                _stripWolfMutex.Dispose();
-                _stripWolfMutex = null;
-                Environment.Exit(0);
-                return;
-            }
-        }
-
         // Set up dependency injection
         var services = new ServiceCollection();
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
 
-        // Only the first instance cleans up (see the mutex check above). This must finish before a comic can be
-        // opened, otherwise it could delete the temporary directory of an EPUB reading session.
+        // Only the first instance cleans up (a second desktop instance already exited in Program.Main, see SingleInstance).
+        // This must finish before a comic can be opened, otherwise it could delete the temporary directory of an EPUB
+        // reading session.
         EpubToCbzConverterService.CleanupTemporaryDirectories();
         
         // Apply saved language settings before creating any UI
@@ -130,16 +96,26 @@ public partial class App : Application
 
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
 
-        if (OperatingSystem.IsWindows())
+        if (SingleInstance.IsPrimary)
         {
             var activationManager = Services.GetRequiredService<ActivationManager>();
             activationManager.PathReceived += (path) =>
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                 {
-                    await mainViewModel.OpenFileAsync(path);
+                    BringMainWindowToFront();
+                    try
+                    {
+                        await _initializationTask;
+                        await mainViewModel.OpenFileAsync(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"App: Failed to open forwarded '{path}': {ex.Message}");
+                    }
                 });
             };
+            activationManager.ShowRequested += () => Avalonia.Threading.Dispatcher.UIThread.Post(BringMainWindowToFront);
             activationManager.StartServer();
         }
 
@@ -175,11 +151,10 @@ public partial class App : Application
                 }
                 finally
                 {
-                    if (OperatingSystem.IsWindows())
+                    if (SingleInstance.IsPrimary)
                     {
                         Services?.GetService<ActivationManager>()?.StopServer();
-                        _stripWolfMutex?.Dispose();
-                        _stripWolfMutex = null;
+                        SingleInstance.Release();
                     }
 
                     shutdownCleanupDone = true;
@@ -275,20 +250,21 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
     
-    private void ForwardPathToRunningInstance(string filePath)
+    /// <summary>
+    /// Shows the main window in front of the other windows, when a file was opened while StripWolf was already running.
+    /// </summary>
+    private void BringMainWindowToFront()
     {
-        try
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } mainWindow })
         {
-            using var pipeClient = new System.IO.Pipes.NamedPipeClientStream(".", ActivationManager.PipeName, System.IO.Pipes.PipeDirection.Out, System.IO.Pipes.PipeOptions.CurrentUserOnly);
-            pipeClient.Connect(1000); // 1-second timeout
-            using var writer = new StreamWriter(pipeClient, System.Text.Encoding.UTF8);
-            writer.WriteLine($"OPEN:{filePath}");
-            writer.Flush();
+            return;
         }
-        catch
+
+        if (mainWindow.WindowState == Avalonia.Controls.WindowState.Minimized)
         {
-            // Ignore
+            mainWindow.WindowState = Avalonia.Controls.WindowState.Normal;
         }
+        mainWindow.Activate();
     }
 
     /// <summary>

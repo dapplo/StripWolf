@@ -58,20 +58,57 @@ namespace StripWolf.Core.Android;
     DataSchemes = new[] { "file", "content" },
     DataHost = "*",
     DataMimeType = "application/x-cbr")]
+// The registered (IANA) types of CBZ and CBR, which most file managers and download providers use
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/vnd.comicbook+zip")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/vnd.comicbook-rar")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/x-cb7")]
+[IntentFilter(
+    new[] { Intent.ActionView },
+    Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
+    DataSchemes = new[] { "file", "content" },
+    DataHost = "*",
+    DataMimeType = "application/x-cbt")]
+// Files offered with a generic MIME type, recognized by their extension. Android's path pattern matching is not greedy:
+// ".*\\.cbz" doesn't match a path with another dot before the extension, the patterns with more dots cover those.
 [IntentFilter(
     new[] { Intent.ActionView },
     Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
     DataSchemes = new[] { "file", "content" },
     DataHost = "*",
     DataMimeType = "application/octet-stream",
-    DataPathPatterns = new[] { ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub" })]
+    DataPathPatterns = new[]
+    {
+        ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub",
+        ".*\\..*\\.cbz", ".*\\..*\\.cbr", ".*\\..*\\.cb7", ".*\\..*\\.cbt", ".*\\..*\\.pdf", ".*\\..*\\.epub",
+        ".*\\..*\\..*\\.cbz", ".*\\..*\\..*\\.cbr", ".*\\..*\\..*\\.cb7", ".*\\..*\\..*\\.cbt", ".*\\..*\\..*\\.pdf", ".*\\..*\\..*\\.epub"
+    })]
 [IntentFilter(
     new[] { Intent.ActionView },
     Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
     DataSchemes = new[] { "file", "content" },
     DataHost = "*",
     DataMimeType = "*/*",
-    DataPathPatterns = new[] { ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub" })]
+    DataPathPatterns = new[]
+    {
+        ".*\\.cbz", ".*\\.cbr", ".*\\.cb7", ".*\\.cbt", ".*\\.pdf", ".*\\.epub",
+        ".*\\..*\\.cbz", ".*\\..*\\.cbr", ".*\\..*\\.cb7", ".*\\..*\\.cbt", ".*\\..*\\.pdf", ".*\\..*\\.epub",
+        ".*\\..*\\..*\\.cbz", ".*\\..*\\..*\\.cbr", ".*\\..*\\..*\\.cb7", ".*\\..*\\..*\\.cbt", ".*\\..*\\..*\\.pdf", ".*\\..*\\..*\\.epub"
+    })]
 public class MainActivity : AvaloniaMainActivity
 {
     /// <summary>

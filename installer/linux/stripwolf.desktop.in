@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=StripWolf
+GenericName=Comic Book Reader
+Comment=Read comic books (CBZ, CBR, CB7, CBT and PDF)
+Exec="@EXEC@" %f
+Icon=stripwolf
+Terminal=false
+Categories=Graphics;Viewer;
+Keywords=comic;comics;manga;cbz;cbr;reader;
+MimeType=application/vnd.comicbook+zip;application/x-cbz;application/vnd.comicbook-rar;application/x-cbr;application/x-cb7;application/x-cbt;application/pdf;
