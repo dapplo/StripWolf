@@ -48,7 +48,7 @@
                           Padding="4,0"
                           ToolTip.Tip="{Binding CheckForUpdates, Source={x:Static res:Loc.Instance}}"
                           VerticalAlignment="Center">
-                    <TextBlock Text="↻" FontSize="12"/>
+                    <Image Source="{StaticResource Icon.Refresh}" Width="16" Height="16"/>
                   </Button>
                   <TextBlock Text="{Binding UpdateService.UpdateStatus}" Foreground="Gray" FontSize="12" VerticalAlignment="Center"
                              IsVisible="{Binding UpdateService.UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
@@ -69,7 +69,7 @@
                 <Expander.Header>
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding SupportMe, Source={x:Static res:Loc.Instance}}"/>
-                    <TextBlock Text="❤" Foreground="Red"/>
+                    <Image Source="{StaticResource Icon.Heart}" Width="20" Height="20"/>
                   </StackPanel>
                 </Expander.Header>
                 <StackPanel Spacing="8" Margin="0,8,0,0">
@@ -164,7 +164,7 @@
                   </LinearGradientBrush>
                 </Button.Background>
                 <Grid ColumnDefinitions="Auto,*">
-                  <TextBlock Text="⭐" FontSize="16" VerticalAlignment="Center"/>
+                  <Image Source="{StaticResource Icon.Favorite}" Width="20" Height="20" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="1" Text="{Binding TrialUnlockButton, Source={x:Static res:Loc.Instance}}" FontSize="14" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
               </Button>
@@ -199,7 +199,7 @@
                 <!-- Total Pages Read -->
                 <Border Grid.Row="0" Grid.Column="0" Background="#22FFFFFF" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Book}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialPagesRead, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -207,7 +207,7 @@
                 <!-- Comics Opened -->
                 <Border Grid.Row="0" Grid.Column="1" Background="#22FFFFFF" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Library}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialComicsOpened, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -215,7 +215,7 @@
                 <!-- Local Imports -->
                 <Border Grid.Row="1" Grid.Column="0" Background="#22FFFFFF" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Activity}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialLocalImports, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -223,7 +223,7 @@
                 <!-- Komga Downloads -->
                 <Border Grid.Row="1" Grid.Column="1" Background="#22FFFFFF" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Komga}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialKomgaDownloads, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="#FFE0E0E0" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -242,7 +242,7 @@
                 <!-- Total Pages Read -->
                 <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📖" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Book}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalPagesRead}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialPagesRead, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -250,7 +250,7 @@
                 <!-- Comics Opened -->
                 <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📚" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Library}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalComicsOpened}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialComicsOpened, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -258,7 +258,7 @@
                 <!-- Local Imports -->
                 <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="📥" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Activity}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalLocalImports}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialLocalImports, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -266,7 +266,7 @@
                 <!-- Komga Downloads -->
                 <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundChromeLowBrush}" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="4" HorizontalAlignment="Center">
-                    <TextBlock Text="☁" FontSize="20" HorizontalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Komga}" Width="24" Height="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TotalKomgaDownloads}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding TrialKomgaDownloads, Source={x:Static res:Loc.Instance}}" FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
                   </StackPanel>
@@ -737,9 +737,11 @@
                 <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
                   <TextBox Text="{Binding Name}" PlaceholderText="{Binding HeaderName, Source={x:Static res:Loc.Instance}}"/>
                   <TextBox Grid.Column="1" Text="{Binding Value}" PlaceholderText="{Binding Value, Source={x:Static res:Loc.Instance}}"/>
-                  <Button Grid.Column="2" Content="🗑️" 
+                  <Button Grid.Column="2" 
                           Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).RemoveHeaderCommand}"
-                          CommandParameter="{Binding}" Background="Transparent"/>
+                          CommandParameter="{Binding}" Background="Transparent">
+                    <Image Source="{StaticResource Icon.Delete}" Width="20" Height="20"/>
+                  </Button>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

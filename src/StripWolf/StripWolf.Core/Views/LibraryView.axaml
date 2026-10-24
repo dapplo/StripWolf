@@ -109,15 +109,15 @@
               <Button Grid.Column="0" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ShowComicInfoCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}">
-                <TextBlock Text="ⓘ" FontSize="18" VerticalAlignment="Center"/>
+                <Image Source="{StaticResource Icon.Info}" Width="20" Height="20" VerticalAlignment="Center"/>
               </Button>
               <!-- Favorite -->
               <Button Grid.Column="1" Grid.Row="0" Classes="icon-btn"
                       Command="{Binding ToggleFavoriteCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="{Binding Favorite, Source={x:Static res:Loc.Instance}}">
                 <Panel>
-                  <TextBlock Text="☆" IsVisible="{Binding !IsFavorite}" FontSize="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="★" IsVisible="{Binding IsFavorite}" Foreground="Gold" FontSize="18" VerticalAlignment="Center"/>
+                  <Image Source="{StaticResource Icon.FavoriteOff}" Width="20" Height="20" IsVisible="{Binding !IsFavorite}" VerticalAlignment="Center"/>
+                  <Image Source="{StaticResource Icon.Favorite}" Width="20" Height="20" IsVisible="{Binding IsFavorite}" VerticalAlignment="Center"/>
                 </Panel>
               </Button>
               <!-- Mark Read -->
@@ -125,15 +125,15 @@
                       Command="{Binding ToggleReadStatusCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="{Binding MarkRead, Source={x:Static res:Loc.Instance}}">
                  <Panel>
-                    <TextBlock Text="✓" IsVisible="{Binding !IsCompleted}" FontSize="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="☑" IsVisible="{Binding IsCompleted}" Foreground="{DynamicResource SystemAccentColor}" FontSize="18" VerticalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.ReadOff}" Width="20" Height="20" IsVisible="{Binding !IsCompleted}" VerticalAlignment="Center"/>
+                    <Image Source="{StaticResource Icon.Read}" Width="20" Height="20" IsVisible="{Binding IsCompleted}" VerticalAlignment="Center"/>
                  </Panel>
               </Button>
               <!-- Delete -->
               <Button Grid.Column="1" Grid.Row="1" Classes="icon-btn"
                       Command="{Binding DeleteComicCommand, ElementName=Root}"
                       CommandParameter="{Binding}" ToolTip.Tip="{Binding DeleteComic, Source={x:Static res:Loc.Instance}}">
-                <TextBlock Text="✕" FontSize="18" VerticalAlignment="Center"/>
+                <Image Source="{StaticResource Icon.Delete}" Width="20" Height="20" VerticalAlignment="Center"/>
               </Button>
             </Grid>
             
@@ -144,7 +144,10 @@
                     Command="{Binding UndoComicDeleteCommand, ElementName=Root}"
                     CommandParameter="{Binding}">
               <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="{Binding Undo, Source={x:Static res:Loc.Instance}, StringFormat='{}↩ {0}'}" FontWeight="Bold"/>
+                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                  <Image Source="{StaticResource Icon.Undo}" Width="14" Height="14" VerticalAlignment="Center"/>
+                  <TextBlock Text="{Binding Undo, Source={x:Static res:Loc.Instance}}" FontWeight="Bold" VerticalAlignment="Center"/>
+                </StackPanel>
                 <TextBlock Text="{Binding DeletionSecondsRemaining, StringFormat='{}{0}s'}" FontSize="9"/>
               </StackPanel>
             </Button>
@@ -258,8 +261,13 @@
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto">
         <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="{Binding OpenFolder, Source={x:Static res:Loc.Instance}, StringFormat='{}📁 {0}'}" Command="{Binding OpenComicsDirectoryCommand}" 
-                Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}"/>
+        <Button Grid.Column="1" Command="{Binding OpenComicsDirectoryCommand}" 
+                Padding="16,8" Margin="0,0,8,0" IsVisible="{Binding IsDesktop}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Image Source="{StaticResource Icon.Folder}" Width="18" Height="18" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding OpenFolder, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
         <Button Grid.Column="2" Content="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" Click="OnImportFolderClicked" Padding="16,8" Margin="0,0,8,0"/>
         <Button Grid.Column="3" Content="{Binding ImportComic, Source={x:Static res:Loc.Instance}}" Click="OnImportClicked" Padding="16,8"/>
       </Grid>
@@ -277,9 +285,11 @@
         <Grid ColumnDefinitions="*,Auto">
           <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="{Binding SearchPlaceholder, Source={x:Static res:Loc.Instance}}"
                    VerticalContentAlignment="Center"/>
-          <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
+          <Button Grid.Column="1" Command="{Binding ClearSearchCommand}" 
                   Padding="8,6" Margin="4,0,0,0"
-                  IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                  IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+          </Button>
         </Grid>
 
         <!-- Search Results Section -->
@@ -317,14 +327,16 @@
                     <Border Grid.Column="0" Grid.RowSpan="3" Width="48" Height="48" 
                             CornerRadius="8" Background="Black" Margin="0,0,12,0"
                             VerticalAlignment="Center">
-                      <TextBlock Text="📄" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      <Image Source="{StaticResource Icon.Document}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding FileName}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Status}" FontSize="12" Foreground="Gray"/>
                     <ProgressBar Grid.Column="1" Grid.Row="2" Minimum="0" Maximum="1" Value="{Binding Progress}" Height="6" Margin="0,4,0,0" IsVisible="{Binding IsProcessing}"/>
                     <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding ErrorMessage}" FontSize="10" Foreground="#C62828" Margin="0,4,0,0" IsVisible="{Binding IsFailed}" TextWrapping="Wrap"/>
-                    <Button Grid.Column="2" Grid.RowSpan="3" Content="✕" FontSize="12" Padding="8,4" VerticalAlignment="Center" IsVisible="{Binding IsFailed}" Command="{Binding RemovePendingImportCommand, ElementName=Root}" CommandParameter="{Binding}"/>
-                    <TextBlock Grid.Column="2" Grid.RowSpan="3" Text="✓" FontSize="20" Foreground="Green" VerticalAlignment="Center" IsVisible="{Binding IsCompleted}"/>
+                    <Button Grid.Column="2" Grid.RowSpan="3" FontSize="12" Padding="8,4" VerticalAlignment="Center" IsVisible="{Binding IsFailed}" Command="{Binding RemovePendingImportCommand, ElementName=Root}" CommandParameter="{Binding}">
+                      <Image Source="{StaticResource Icon.Close}" Width="16" Height="16"/>
+                    </Button>
+                    <Image Source="{StaticResource Icon.Read}" Width="24" Height="24" Grid.Column="2" Grid.RowSpan="3" VerticalAlignment="Center" IsVisible="{Binding IsCompleted}"/>
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -364,7 +376,7 @@
             </Expander.Header>
             <StackPanel Spacing="8" Margin="0,8,0,0" HorizontalAlignment="Stretch">
               <StackPanel Spacing="16" HorizontalAlignment="Center" Margin="32" IsVisible="{Binding !NewComics.Count}">
-                <TextBlock Text="▤" FontSize="56" HorizontalAlignment="Center"/>
+                <Image Source="{StaticResource Icon.Library}" Width="64" Height="64" HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding NoNewComics, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding NoNewComicsHint, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
@@ -392,7 +404,10 @@
                     IsVisible="{Binding ShowFavoritesSection}"
                     IsExpanded="{Binding FavoritesSection.IsExpanded}">
             <Expander.Header>
-              <TextBlock Text="{Binding SectionFavorites, Source={x:Static res:Loc.Instance}, StringFormat='{}⭐ {0}'}" FontSize="18" FontWeight="Bold"/>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Image Source="{StaticResource Icon.Favorite}" Width="20" Height="20" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding SectionFavorites, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+              </StackPanel>
             </Expander.Header>
             <repeater:ItemsRepeater ItemsSource="{Binding FavoriteComics}" ItemTemplate="{StaticResource ComicTemplate}" Margin="0,8,0,0">
               <repeater:ItemsRepeater.Layout>
@@ -486,7 +501,9 @@
           <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="16" CornerRadius="8,8,0,0">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-              <Button Grid.Column="1" Content="✕" Command="{Binding CloseComicInfoCommand, ElementName=Root}" Background="Transparent" Foreground="White" FontSize="18" Padding="8,4"/>
+              <Button Grid.Column="1" Command="{Binding CloseComicInfoCommand, ElementName=Root}" Background="Transparent" Foreground="White" FontSize="18" Padding="8,4">
+                <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+              </Button>
             </Grid>
           </Border>
           <ScrollViewer Grid.Row="1" MaxHeight="600">
@@ -527,7 +544,11 @@
                          <TextBlock Text="{Binding Format, Source={x:Static res:Loc.Instance}}" FontSize="12" Foreground="Gray"/>
                          <TextBlock Text="{Binding FormatDisplay}" FontSize="16"/>
                        </StackPanel>
-                       <Button Content="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}" Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                       <Button Click="OnViewSeriesOnKomgaClicked" HorizontalAlignment="Stretch" Padding="12,8" Margin="0,8,0,0">
+                         <StackPanel Orientation="Horizontal" Spacing="6">
+                           <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                           <TextBlock Text="{Binding ViewSeriesOnKomga, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                         </StackPanel>
                         <Button.IsVisible>
                            <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                         </Button.IsVisible>
@@ -539,14 +560,22 @@
                              <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                            </MultiBinding>
                          </Grid.IsVisible>
-                         <Button Grid.Column="0" Content="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                         <Button Grid.Column="0"
                                  Click="OnOpenBookOnlineClicked" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                           <StackPanel Orientation="Horizontal" Spacing="6">
+                             <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                             <TextBlock Text="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                           </StackPanel>
                            <Button.IsVisible>
                              <Binding Path="KomgaId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                            </Button.IsVisible>
                          </Button>
-                         <Button Grid.Column="1" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                         <Button Grid.Column="1"
                                  Click="OnOpenSeriesOnlineClicked" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                           <StackPanel Orientation="Horizontal" Spacing="6">
+                             <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                             <TextBlock Text="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                           </StackPanel>
                            <Button.IsVisible>
                              <Binding Path="KomgaSeriesId" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
                            </Button.IsVisible>
@@ -600,31 +629,56 @@
                             DataContext="{Binding SelectedInfoComic, ElementName=Root}"
                             x:DataType="models:Comic"
                             IsVisible="{Binding !IsEditingMetadata, ElementName=Root, FallbackValue=True}">
-                  <Button Content="{Binding ReadNow, Source={x:Static res:Loc.Instance}, StringFormat='{}📖 {0}'}" Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen, FallbackValue=False}"/>
-                  <Button Content="{Binding ConvertNow, Source={x:Static res:Loc.Instance}, StringFormat='{}⚙ {0}'}" Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow, FallbackValue=False}"/>
+                  <Button Command="{Binding OpenComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center" IsEnabled="{Binding CanOpen, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Source="{StaticResource Icon.Book}" Width="18" Height="18" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding ReadNow, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Command="{Binding ConvertComicNowCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center" IsVisible="{Binding CanConvertNow, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Source="{StaticResource Icon.Convert}" Width="18" Height="18" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding ConvertNow, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
                   <TextBlock Text="{Binding Converting, Source={x:Static res:Loc.Instance}}" Foreground="Gray" HorizontalAlignment="Center" IsVisible="{Binding IsConverting, FallbackValue=False}"/>
                   <Grid ColumnDefinitions="*,*">
                     <Button Grid.Column="0" Margin="0,0,4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleFavoriteCommand, ElementName=Root}" CommandParameter="{Binding}">
                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <TextBlock Text="⭐" IsVisible="{Binding IsFavorite, FallbackValue=False}"/>
-                          <TextBlock Text="☆" IsVisible="{Binding !IsFavorite, FallbackValue=True}"/>
+                          <Image Source="{StaticResource Icon.Favorite}" Width="20" Height="20" IsVisible="{Binding IsFavorite, FallbackValue=False}"/>
+                          <Image Source="{StaticResource Icon.FavoriteOff}" Width="20" Height="20" IsVisible="{Binding !IsFavorite, FallbackValue=True}"/>
                           <TextBlock Text="{Binding Favorite, Source={x:Static res:Loc.Instance}}" />
                        </StackPanel>
                     </Button>
                     <Button Grid.Column="1" Margin="4,0,0,0" Content="{Binding MarkRead, Source={x:Static res:Loc.Instance}}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ToggleReadStatusCommand, ElementName=Root}" CommandParameter="{Binding}"/>
                   </Grid>
                   <Grid ColumnDefinitions="*,*">
-                    <Button Grid.Column="0" Content="{Binding EditMetadata, Source={x:Static res:Loc.Instance}, StringFormat='{}✏️ {0}'}" Margin="0,0,4,0" Command="{Binding EditMetadataCommand, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="{Binding DeleteComic, Source={x:Static res:Loc.Instance}, StringFormat='{}🗑️ {0}'}" Margin="4,0,0,0" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="0" Margin="0,0,4,0" Command="{Binding EditMetadataCommand, ElementName=Root}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Edit}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding EditMetadata, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Margin="4,0,0,0" Background="#D32F2F" Foreground="White" Command="{Binding DeleteComicCommand, ElementName=Root}" CommandParameter="{Binding}" HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Delete}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding DeleteComic, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
                 </StackPanel>
 
                 <!-- Action Buttons (Edit Mode) -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" 
                             IsVisible="{Binding IsEditingMetadata, ElementName=Root, FallbackValue=False}">
-                   <Button Content="{Binding SaveChanges, Source={x:Static res:Loc.Instance}, StringFormat='{}💾 {0}'}" Background="{DynamicResource SystemAccentColor}" Foreground="White"
+                   <Button Background="{DynamicResource SystemAccentColor}" Foreground="White"
                            Command="{Binding SaveMetadataCommand, ElementName=Root}"
-                           HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center"/>
+                           HorizontalAlignment="Stretch" Padding="16,12" HorizontalContentAlignment="Center">
+                     <StackPanel Orientation="Horizontal" Spacing="6">
+                       <Image Source="{StaticResource Icon.Save}" Width="18" Height="18" VerticalAlignment="Center"/>
+                       <TextBlock Text="{Binding SaveChanges, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                     </StackPanel>
+                   </Button>
                    <Button Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" Command="{Binding CancelMetadataEditCommand, ElementName=Root}"
                            HorizontalAlignment="Stretch" Padding="12,8" HorizontalContentAlignment="Center"/>
                 </StackPanel>

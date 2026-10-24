@@ -213,16 +213,22 @@
             </Border>
           </Panel>
           <Grid Grid.Row="4" ColumnDefinitions="*,*,*" Margin="4,0,4,4" Height="32">
-            <Button Grid.Column="0" Classes="icon-btn" Content="ⓘ"
+            <Button Grid.Column="0" Classes="icon-btn"
                     Command="{Binding ShowBookInfoCommand, ElementName=Root}"
-                    CommandParameter="{Binding}" ToolTip.Tip="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}"/>
-            <Button Grid.Column="1" Classes="icon-btn" Content="≣"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}">
+              <Image Source="{StaticResource Icon.Info}" Width="20" Height="20"/>
+            </Button>
+            <Button Grid.Column="1" Classes="icon-btn"
                     Command="{Binding ShowReadListPickerCommand, ElementName=Root}"
-                    CommandParameter="{Binding}" ToolTip.Tip="{Binding AddToReadList, Source={x:Static res:Loc.Instance}}"/>
-            <Button Grid.Column="2" Classes="icon-btn" Content="✓"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding AddToReadList, Source={x:Static res:Loc.Instance}}">
+              <Image Source="{StaticResource Icon.ReadlistAdd}" Width="20" Height="20"/>
+            </Button>
+            <Button Grid.Column="2" Classes="icon-btn"
                     Command="{Binding MarkBookAsReadCommand, ElementName=Root}"
                     CommandParameter="{Binding}" ToolTip.Tip="{Binding MarkRead, Source={x:Static res:Loc.Instance}}"
-                    IsEnabled="{Binding !IsRead}"/>
+                    IsEnabled="{Binding !IsRead}">
+              <Image Source="{StaticResource Icon.Read}" Width="20" Height="20"/>
+            </Button>
           </Grid>
         </Grid>
       </Border>
@@ -297,7 +303,7 @@
       <!-- Not Connected State -->
       <StackPanel Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32"
                   IsVisible="{Binding !IsConnected}">
-        <TextBlock Text="🌐" FontSize="64" HorizontalAlignment="Center"/>
+        <Image Source="{StaticResource Icon.Online}" Width="64" Height="64" HorizontalAlignment="Center"/>
         <TextBlock Text="{Binding NotConnected, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
         <TextBlock Text="{Binding ConfigureServer, Source={x:Static res:Loc.Instance}}"
                    Foreground="Gray" HorizontalAlignment="Center" TextAlignment="Center"/>
@@ -316,9 +322,11 @@
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="{Binding SearchPlaceholder, Source={x:Static res:Loc.Instance}}"
                      VerticalContentAlignment="Center"/>
-            <Button Grid.Column="1" Content="✕" Command="{Binding ClearSearchCommand}" 
+            <Button Grid.Column="1" Command="{Binding ClearSearchCommand}" 
                     Padding="8,6" Margin="4,0,0,0"
-                    IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+            </Button>
           </Grid>
 
           <!-- Error Message -->
@@ -424,8 +432,13 @@
                 <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNotNull}"/>
               </MultiBinding>
             </Grid.IsVisible>
-            <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToLibrariesCommand}"
-                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+            <Button Grid.Column="0" Command="{Binding GoBackToLibrariesCommand}"
+                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Back}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Back, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
             <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
           </Grid>
 
@@ -438,21 +451,34 @@
                 <Binding Path="SelectedReadList" Converter="{x:Static ObjectConverters.IsNull}"/>
               </MultiBinding>
             </Grid.IsVisible>
-            <Button Grid.Column="0" Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}" Command="{Binding GoBackToSeriesCommand}"
-                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center"/>
+            <Button Grid.Column="0" Command="{Binding GoBackToSeriesCommand}"
+                    Background="Transparent" Padding="0,4,12,4" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Back}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Back, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
             <TextBlock Grid.Column="1" Text="Books" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
 
-            <Button Grid.Column="2" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+            <Button Grid.Column="2"
                     Command="{Binding OpenSelectedSeriesOnlineCommand}"
                     Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              </StackPanel>
               <Button.IsVisible>
                 <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
               </Button.IsVisible>
             </Button>
 
-            <Button Grid.Column="3" Content="{Binding Download, Source={x:Static res:Loc.Instance}, StringFormat='{}📥 {0}'}"
+            <Button Grid.Column="3"
                     Command="{Binding DownloadSelectedSeriesCommand}"
                     Background="Transparent" Padding="8,4" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Download}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Download, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+              </StackPanel>
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                   <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNotNull}"/>
@@ -537,8 +563,10 @@
                   <Expander.Header>
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Text="{Binding SectionKeepReading, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                      <Button Grid.Column="1" Content="↻" Command="{Binding RefreshSmartListsCommand}" 
-                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
+                      <Button Grid.Column="1" Command="{Binding RefreshSmartListsCommand}" 
+                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}">
+                        <Image Source="{StaticResource Icon.Refresh}" Width="20" Height="20"/>
+                      </Button>
                     </Grid>
                   </Expander.Header>
                   <repeater:ItemsRepeater ItemsSource="{Binding KeepReadingBooks}" ItemTemplate="{StaticResource BookCardTemplate}" Margin="0,8,0,0"
@@ -604,7 +632,7 @@
                                 Command="{Binding SelectLibraryCommand, ElementName=Root}"
                                 CommandParameter="{Binding}">
                           <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="📚" FontSize="24" VerticalAlignment="Center"/>
+                            <Image Source="{StaticResource Icon.Library}" Width="24" Height="24" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding Name}" FontSize="16" VerticalAlignment="Center"/>
                           </StackPanel>
                         </Button>
@@ -619,8 +647,10 @@
                   <Expander.Header>
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Text="{Binding SectionReadLists, Source={x:Static res:Loc.Instance}}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                      <Button Grid.Column="1" Content="↻" Command="{Binding RefreshReadListsCommand}" 
-                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}"/>
+                      <Button Grid.Column="1" Command="{Binding RefreshReadListsCommand}" 
+                              Background="Transparent" FontSize="16" Padding="8,4" ToolTip.Tip="{Binding Refresh, Source={x:Static res:Loc.Instance}}">
+                        <Image Source="{StaticResource Icon.Refresh}" Width="20" Height="20"/>
+                      </Button>
                     </Grid>
                   </Expander.Header>
                   <StackPanel Spacing="8" Margin="0,8,0,0">
@@ -721,13 +751,22 @@
           </MultiBinding>
         </Border.IsVisible>
         <Grid>
-          <Button Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
+          <Button
                   Padding="16,8"
                   Command="{Binding GoBackToSeriesCommand}"
-                  IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-          <Button Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
+                  IsVisible="{Binding SelectedSeries, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Image Source="{StaticResource Icon.Back}" Width="18" Height="18" VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding Back, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button
                   Padding="16,8"
                   Command="{Binding GoBackToLibrariesCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Image Source="{StaticResource Icon.Back}" Width="18" Height="18" VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding Back, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+            </StackPanel>
             <Button.IsVisible>
               <MultiBinding Converter="{x:Static BoolConverters.And}">
                 <Binding Path="SelectedSeries" Converter="{x:Static ObjectConverters.IsNull}"/>
@@ -753,18 +792,30 @@
           <StackPanel Spacing="16">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="{Binding DownloadSeries, Source={x:Static res:Loc.Instance}}" FontSize="20" FontWeight="Bold"/>
-              <Button Grid.Column="1" Content="✕" Command="{Binding CancelSeriesDownloadSelectionCommand}"
-                      Background="Transparent" Padding="8,4"/>
+              <Button Grid.Column="1" Command="{Binding CancelSeriesDownloadSelectionCommand}"
+                      Background="Transparent" Padding="8,4">
+                <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+              </Button>
             </Grid>
             <TextBlock x:DataType="komga:KomgaSeriesDisplay" DataContext="{Binding SeriesPendingDownloadSelection, ElementName=Root}"
                        Text="{Binding Name, StringFormat='Choose what to download for {0}'}"
                        TextWrapping="Wrap" Foreground="Gray"
                        IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"/>
             <TextBlock Text="Already-downloaded books are skipped automatically." Foreground="Gray" FontSize="12"/>
-            <Button Content="📥 All missing books" Command="{Binding ConfirmSeriesDownloadAllCommand}"
-                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-            <Button Content="📖 Unread missing books" Command="{Binding ConfirmSeriesDownloadUnreadCommand}"
-                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+            <Button Command="{Binding ConfirmSeriesDownloadAllCommand}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Download}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="All missing books" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
+            <Button Command="{Binding ConfirmSeriesDownloadUnreadCommand}"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Image Source="{StaticResource Icon.Book}" Width="18" Height="18" VerticalAlignment="Center"/>
+                <TextBlock Text="Unread missing books" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
           </StackPanel>
         </Border>
       </Panel>
@@ -788,10 +839,13 @@
       <!-- Floating back button – rendered above the busy overlay so it is always accessible -->
       <Button HorizontalAlignment="Left" VerticalAlignment="Top"
               Margin="16,16"
-              Content="{Binding Back, Source={x:Static res:Loc.Instance}, StringFormat='{}← {0}'}"
               Command="{Binding GoBackToSeriesCommand}"
               Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
               Padding="12,6" CornerRadius="4">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Image Source="{StaticResource Icon.Back}" Width="18" Height="18" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding Back, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+        </StackPanel>
         <Button.IsVisible>
           <MultiBinding Converter="{x:Static BoolConverters.And}">
             <Binding Path="IsBusy"/>
@@ -812,8 +866,10 @@
           <StackPanel Spacing="16">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="Add to Read List" FontSize="20" FontWeight="Bold"/>
-              <Button Grid.Column="1" Content="✕" Command="{Binding CancelReadListSelectionCommand}"
-                      Background="Transparent" Padding="8,4"/>
+              <Button Grid.Column="1" Command="{Binding CancelReadListSelectionCommand}"
+                      Background="Transparent" Padding="8,4">
+                <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+              </Button>
             </Grid>
             <TextBlock x:DataType="komga:KomgaBookDisplay" DataContext="{Binding BookPendingReadListSelection}"
                        Text="{Binding Name, StringFormat='Choose a read list for {0}'}"
@@ -859,8 +915,10 @@
             <Border Grid.Row="0" Background="{DynamicResource SystemAccentColor}" Padding="16" CornerRadius="8,8,0,0">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Text="{Binding ComicInformation, Source={x:Static res:Loc.Instance}}" Foreground="White" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Content="✕" Command="{Binding CloseBookInfoCommand}"
-                        Background="Transparent" Foreground="White" Padding="8,4"/>
+                <Button Grid.Column="1" Command="{Binding CloseBookInfoCommand}"
+                        Background="Transparent" Foreground="White" Padding="8,4">
+                  <Image Source="{StaticResource Icon.Close}" Width="20" Height="20"/>
+                </Button>
               </Grid>
             </Border>
             <ScrollViewer Grid.Row="1" MaxHeight="640">
@@ -923,26 +981,51 @@
                     <Button Grid.Column="0" Content="{Binding Download, Source={x:Static res:Loc.Instance}}"
                             Command="{Binding DownloadBookCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="{Binding MarkRead, Source={x:Static res:Loc.Instance}, StringFormat='{}✓ {0}'}"
+                    <Button Grid.Column="1"
                             Command="{Binding MarkBookAsReadCommand, ElementName=Root}"
                             CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                            IsEnabled="{Binding !IsRead}"/>
+                            IsEnabled="{Binding !IsRead}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Read}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding MarkRead, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <Button Grid.Column="0" Content="📝 Add to Read List"
+                    <Button Grid.Column="0"
                             Command="{Binding ShowReadListPickerCommand, ElementName=Root}"
-                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="{Binding SectionSeries, Source={x:Static res:Loc.Instance}, StringFormat='{}📚 {0}'}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.ReadlistAdd}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="Add to Read List" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
                             Command="{Binding ViewSelectedBookSeriesCommand, ElementName=Root}"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Library}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding SectionSeries, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <Button Grid.Column="0" Content="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                    <Button Grid.Column="0"
                             Command="{Binding OpenBookOnlineCommand, ElementName=Root}"
-                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}, StringFormat='{}🌐 {0}'}"
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding OpenBookOnline, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1"
                             Command="{Binding OpenBookSeriesOnlineCommand, ElementName=Root}"
-                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            CommandParameter="{Binding}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Image Source="{StaticResource Icon.Online}" Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding OpenSeriesOnline, Source={x:Static res:Loc.Instance}}" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
                   </Grid>
                 </StackPanel>
               </Border>

@@ -125,7 +125,7 @@ public partial class ReaderViewModel : ViewModelBase
     private bool _isFullScreen;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StretchModeIcon))]
+    [NotifyPropertyChangedFor(nameof(StretchModeIconKey))]
     private StretchMode _stretchMode = StretchMode.FitPage;
 
     partial void OnStretchModeChanged(StretchMode value)
@@ -145,7 +145,6 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TwoPageModeIcon))]
     [NotifyPropertyChangedFor(nameof(PageDisplay))]
     [NotifyPropertyChangedFor(nameof(MaxSliderValue))]
     private bool _isTwoPageMode;
@@ -303,8 +302,8 @@ public partial class ReaderViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsLastPage));
         OnPropertyChanged(nameof(EffectiveReadingDirectionMode));
         OnPropertyChanged(nameof(IsRightToLeftNavigation));
-        OnPropertyChanged(nameof(PreviousPageButtonGlyph));
-        OnPropertyChanged(nameof(NextPageButtonGlyph));
+        OnPropertyChanged(nameof(PreviousPageButtonIconKey));
+        OnPropertyChanged(nameof(NextPageButtonIconKey));
         if (value?.Value == ReadingDirectionMode.Automatic && Comic is not null)
         {
             _ = ResolveAutomaticReadingDirectionAsync();
@@ -327,8 +326,8 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsLastPage))]
     [NotifyPropertyChangedFor(nameof(EffectiveReadingDirectionMode))]
     [NotifyPropertyChangedFor(nameof(IsRightToLeftNavigation))]
-    [NotifyPropertyChangedFor(nameof(PreviousPageButtonGlyph))]
-    [NotifyPropertyChangedFor(nameof(NextPageButtonGlyph))]
+    [NotifyPropertyChangedFor(nameof(PreviousPageButtonIconKey))]
+    [NotifyPropertyChangedFor(nameof(NextPageButtonIconKey))]
     private ReadingDirectionModeOption? _selectedReadingDirectionModeOption;
 
     private ReadingDirectionMode? _detectedReadingDirectionMode;
@@ -476,16 +475,16 @@ public partial class ReaderViewModel : ViewModelBase
 
     public string ZoomDisplay => $"{ZoomLevel:P0}";
 
-    public string StretchModeIcon => StretchMode switch
+    /// <summary>
+    /// Resource key of the icon (see Resources/Icons.axaml) that shows the current fit mode.
+    /// </summary>
+    public string StretchModeIconKey => StretchMode switch
     {
-        StretchMode.FitPage => "⤢",
-        StretchMode.FitWidth => "↔",
-        StretchMode.FitHeight => "↕",
-        StretchMode.Original => "1:1",
-        _ => "1:1"
+        StretchMode.FitPage => "Icon.FitPage",
+        StretchMode.FitWidth => "Icon.FitWidth",
+        StretchMode.FitHeight => "Icon.FitHeight",
+        _ => "Icon.FitOriginal"
     };
-
-    public string TwoPageModeIcon => IsTwoPageMode ? "▭" : "◫";
 
     public int MaxSliderValue => Math.Max(0, Comic?.PageCount - 1 ?? 0);
 
@@ -537,8 +536,8 @@ public partial class ReaderViewModel : ViewModelBase
     };
 
     public bool IsRightToLeftNavigation => GetNavigationDirectionSign() < 0;
-    public string PreviousPageButtonGlyph => IsRightToLeftNavigation ? "❯" : "❮";
-    public string NextPageButtonGlyph => IsRightToLeftNavigation ? "❮" : "❯";
+    public string PreviousPageButtonIconKey => IsRightToLeftNavigation ? "Icon.Next" : "Icon.Prev";
+    public string NextPageButtonIconKey => IsRightToLeftNavigation ? "Icon.Prev" : "Icon.Next";
     public int ReadingStartPageIndex => GetReadingStartPageIndex();
     public int ReadingEndPageIndex => GetReadingEndPageIndex();
 
@@ -722,8 +721,8 @@ public partial class ReaderViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(EffectiveReadingDirectionMode));
         OnPropertyChanged(nameof(IsRightToLeftNavigation));
-        OnPropertyChanged(nameof(PreviousPageButtonGlyph));
-        OnPropertyChanged(nameof(NextPageButtonGlyph));
+        OnPropertyChanged(nameof(PreviousPageButtonIconKey));
+        OnPropertyChanged(nameof(NextPageButtonIconKey));
     }
 
     /// <summary>
