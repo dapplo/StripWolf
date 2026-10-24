@@ -196,9 +196,6 @@ public partial class SettingsViewModel : ViewModelBase
     private HandednessOption? _selectedHandednessOption;
 
     [ObservableProperty]
-    private bool _compactOverview;
-
-    [ObservableProperty]
     private bool _useFullScreenWhenReading;
 
     [ObservableProperty]
@@ -587,7 +584,6 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == _appSettings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
         SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness) ?? AvailableHandednessOptions[0];
         SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior) ?? AvailableStartupBehaviors[0];
-        CompactOverview = _appSettings.CompactOverview;
         UseFullScreenWhenReading = _appSettings.UseFullScreenWhenReading;
         SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme) ?? AvailableEpubConversionThemes[0];
         SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
@@ -643,15 +639,6 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             UpdateSetting(s => s.AppTheme = value.Value);
-        }
-    }
-
-    partial void OnCompactOverviewChanged(bool value)
-    {
-        // Save to settings
-        if (_appSettings is not null)
-        {
-            UpdateSetting(s => s.CompactOverview = value);
         }
     }
 

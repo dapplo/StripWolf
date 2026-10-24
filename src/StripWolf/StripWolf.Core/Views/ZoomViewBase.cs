@@ -81,6 +81,13 @@ public abstract class ZoomViewBase : UserControl
     protected double _actualDisplayWidthNormalized = 0.4;
     protected double _actualDisplayHeightNormalized = 0.4;
 
+    // The overview never takes more than this share of the view, the zoomed area always keeps the rest
+    private const double MaxOverviewWidthFraction = 0.5;
+    private const double MaxOverviewHeightFraction = 0.4;
+    // Must match the Margin of the pane borders in the XAML
+    private const double PaneMargin = 4;
+    private (bool Stacked, bool OverviewOnLeft)? _paneArrangement;
+
     public ZoomViewBase()
     {
         SizeChanged += (s, e) => UpdateZoomRegion();
@@ -111,6 +118,11 @@ public abstract class ZoomViewBase : UserControl
                 viewbox.PointerReleased += OnZoomedAreaPointerReleased;
                 viewbox.PointerCaptureLost += OnPointerCaptureLost;
                 viewbox.AddHandler(PointerWheelChangedEvent, OnPointerWheelChanged, RoutingStrategies.Tunnel);
+                // The zoom math depends on the size of the zoomed area, which changes after the panes are laid out
+                if (viewbox.Parent is Control zoomBorder)
+                {
+                    zoomBorder.SizeChanged += (s, e) => ScheduleZoomRegionUpdate();
+                }
             }
         }
     }
@@ -211,8 +223,7 @@ public abstract class ZoomViewBase : UserControl
             e.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
             e.PropertyName == nameof(ReaderViewModel.CurrentPanel) ||
             e.PropertyName == nameof(ReaderViewModel.CurrentPagePanels) ||
-            e.PropertyName == nameof(ReaderViewModel.Handedness) ||
-            e.PropertyName == nameof(ReaderViewModel.CompactOverview))
+            e.PropertyName == nameof(ReaderViewModel.Handedness))
         {
             ScheduleZoomRegionUpdate();
         }
@@ -270,38 +281,42 @@ public abstract class ZoomViewBase : UserControl
         var image = vm.CurrentPageImage;
         if (image == null || image.Size.Width <= 0) return;
 
-        // 1. Manage Overview Column Layout
-        var overviewCanvas = vm.IsOverviewOnLeft ? OverviewContainerLeftControl : OverviewContainerRightControl;
-        var overviewBorder = overviewCanvas?.Parent?.Parent as Control;
-        var columnWrapper = overviewBorder?.Parent as Control;
+        // 1. The overview shows only the page content, without the empty page margins
+        var crop = GetOverviewCrop(vm);
+        var cropSize = new Size(crop.Width * image.Size.Width, crop.Height * image.Size.Height);
 
-        if (columnWrapper != null)
-        {
-            if (vm.CompactOverview)
-            {
-                double aspect = image.Size.Width / image.Size.Height;
-                double availableHeight = Bounds.Height;
-                if (availableHeight > 0)
-                {
-                    columnWrapper.Width = availableHeight * aspect;
-                }
-            }
-            else
-            {
-                columnWrapper.ClearValue(WidthProperty);
-            }
-        }
+        // 2. Size the overview to the (cropped) page, the zoomed area gets the rest
+        LayoutPanes(vm, cropSize);
 
-        // 2. Set Canvas sizes to image pixels
+        // 3. Set Canvas sizes to image pixels, the image and the overlay keep full page coordinates and are shifted by the crop
         var overviewContainers = new[] { OverviewContainerLeftControl, OverviewContainerRightControl };
+        var overviewImages = new[] { OverviewImageLeftControl, OverviewImageRightControl };
         var overviewCanvases = new[] { OverviewCanvasLeftControl, OverviewCanvasRightControl };
+        double cropLeft = -crop.X * image.Size.Width;
+        double cropTop = -crop.Y * image.Size.Height;
         for (int i = 0; i < 2; i++)
         {
-            if (overviewContainers[i] != null) { overviewContainers[i]!.Width = image.Size.Width; overviewContainers[i]!.Height = image.Size.Height; }
-            if (overviewCanvases[i] != null) { overviewCanvases[i]!.Width = image.Size.Width; overviewCanvases[i]!.Height = image.Size.Height; }
+            if (overviewContainers[i] != null)
+            {
+                overviewContainers[i]!.Width = cropSize.Width;
+                overviewContainers[i]!.Height = cropSize.Height;
+                overviewContainers[i]!.ClipToBounds = true;
+            }
+            if (overviewImages[i] != null)
+            {
+                Canvas.SetLeft(overviewImages[i]!, cropLeft);
+                Canvas.SetTop(overviewImages[i]!, cropTop);
+            }
+            if (overviewCanvases[i] != null)
+            {
+                overviewCanvases[i]!.Width = image.Size.Width;
+                overviewCanvases[i]!.Height = image.Size.Height;
+                Canvas.SetLeft(overviewCanvases[i]!, cropLeft);
+                Canvas.SetTop(overviewCanvases[i]!, cropTop);
+            }
         }
 
-        // 3. Robust Zoom Math using Fixed Virtual Viewport
+        // 4. Robust Zoom Math using Fixed Virtual Viewport
         var viewbox = vm.IsOverviewOnLeft ? ZoomedViewboxRightControl : ZoomedViewboxLeftControl;
         var canvas = vm.IsOverviewOnLeft ? ZoomedCanvasRightControl : ZoomedCanvasLeftControl;
         var areaImage = vm.IsOverviewOnLeft ? ZoomedAreaImageRightControl : ZoomedAreaImageLeftControl;
@@ -347,6 +362,69 @@ public abstract class ZoomViewBase : UserControl
         
         RedrawOverview();
     }
+
+    /// <summary>
+    /// Give the overview exactly the room the page needs and the zoomed area the rest.
+    /// Landscape views show the panes side by side, portrait views stack the overview above the zoomed area:
+    /// side by side, a portrait page would leave empty space above and below it and squeeze the zoomed area into a narrow strip.
+    /// </summary>
+    private void LayoutPanes(ReaderViewModel vm, Size pageSize)
+    {
+        var root = this.FindControl<Grid>("PaneLayoutRoot");
+        var leftPane = this.FindControl<Grid>("LeftPane");
+        var rightPane = this.FindControl<Grid>("RightPane");
+        if (root == null || leftPane == null || rightPane == null || Bounds.Width <= 0 || Bounds.Height <= 0 || pageSize.Height <= 0) return;
+
+        var overviewPane = vm.IsOverviewOnLeft ? leftPane : rightPane;
+        var zoomPane = vm.IsOverviewOnLeft ? rightPane : leftPane;
+        bool stacked = Bounds.Height > Bounds.Width;
+
+        // Only rebuild the grid when the arrangement changes, this runs for every pan step
+        if (_paneArrangement != (stacked, vm.IsOverviewOnLeft))
+        {
+            _paneArrangement = (stacked, vm.IsOverviewOnLeft);
+            if (stacked)
+            {
+                root.ColumnDefinitions = new ColumnDefinitions("*");
+                root.RowDefinitions = new RowDefinitions("Auto,*");
+                Grid.SetColumn(leftPane, 0);
+                Grid.SetColumn(rightPane, 0);
+                Grid.SetRow(overviewPane, 0);
+                Grid.SetRow(zoomPane, 1);
+            }
+            else
+            {
+                root.RowDefinitions = new RowDefinitions("*");
+                root.ColumnDefinitions = new ColumnDefinitions(vm.IsOverviewOnLeft ? "Auto,*" : "*,Auto");
+                Grid.SetRow(leftPane, 0);
+                Grid.SetRow(rightPane, 0);
+                Grid.SetColumn(leftPane, 0);
+                Grid.SetColumn(rightPane, 1);
+            }
+            // After a handedness switch this pane may still carry the size of the former overview
+            zoomPane.ClearValue(WidthProperty);
+            zoomPane.ClearValue(HeightProperty);
+        }
+
+        double aspect = pageSize.Width / pageSize.Height;
+        if (stacked)
+        {
+            overviewPane.ClearValue(WidthProperty);
+            double fitHeight = (Bounds.Width - 2 * PaneMargin) / aspect + 2 * PaneMargin;
+            overviewPane.Height = Math.Min(fitHeight, Bounds.Height * MaxOverviewHeightFraction);
+        }
+        else
+        {
+            overviewPane.ClearValue(HeightProperty);
+            double fitWidth = (Bounds.Height - 2 * PaneMargin) * aspect + 2 * PaneMargin;
+            overviewPane.Width = Math.Min(fitWidth, Bounds.Width * MaxOverviewWidthFraction);
+        }
+    }
+
+    /// <summary>
+    /// The part of the page (normalized) the overview shows, the whole page unless a view knows where the content is.
+    /// </summary>
+    protected virtual Rect GetOverviewCrop(ReaderViewModel vm) => new Rect(0, 0, 1, 1);
 
     protected abstract void RedrawOverview();
 
@@ -610,7 +688,30 @@ public abstract class ZoomViewBase : UserControl
 
         if (elapsed < SwipeMaxTimeMs && Math.Abs(deltaX) < TapMaxMovement && Math.Abs(deltaY) < TapMaxMovement)
         {
-            vm.ToggleControlsCommand.Execute(null);
+            // Like the normal reading view: a tap on the outer quarters of the zoomed area goes back or forward
+            // (a panel in guided mode, a page in zoomed mode), a tap in the middle toggles the controls
+            var zoomArea = sender as Control ?? this;
+            double tapX = e.GetPosition(zoomArea).X;
+            double zoomAreaWidth = zoomArea.Bounds.Width;
+            if (tapX < zoomAreaWidth * 0.25 || tapX > zoomAreaWidth * 0.75)
+            {
+                bool forward = tapX > zoomAreaWidth * 0.75;
+                if (vm.IsRightToLeftNavigation) forward = !forward;
+                if (forward)
+                {
+                    if (vm.IsGuidedMode) vm.GoToNextPanelCommand.Execute(null);
+                    else vm.GoToNextPageCommand.Execute(null);
+                }
+                else
+                {
+                    if (vm.IsGuidedMode) vm.GoToPreviousPanelCommand.Execute(null);
+                    else vm.GoToPreviousPageCommand.Execute(null);
+                }
+            }
+            else
+            {
+                vm.ToggleControlsCommand.Execute(null);
+            }
             e.Handled = true;
             return;
         }

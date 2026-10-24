@@ -106,8 +106,6 @@ public partial class ReaderViewModel : ViewModelBase
     private string? _readerStatusMessage;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
-    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Bitmap? _currentPageImage;
 
     [ObservableProperty]
@@ -319,8 +317,6 @@ public partial class ReaderViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewOnLeft))]
-    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
-    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
     private Handedness _handedness = Handedness.RightHanded;
 
     [ObservableProperty]
@@ -362,11 +358,6 @@ public partial class ReaderViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isDetectingPanels;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LeftColumnWidth))]
-    [NotifyPropertyChangedFor(nameof(RightColumnWidth))]
-    private bool _compactOverview;
 
     [ObservableProperty]
     private int _decodeWidth;
@@ -424,12 +415,6 @@ public partial class ReaderViewModel : ViewModelBase
 
         await ReloadCurrentPageAsync(target);
     }
-
-    public GridLength LeftColumnWidth => IsOverviewOnLeft ? OverviewGridLength : ZoomGridLength;
-    public GridLength RightColumnWidth => IsOverviewOnLeft ? ZoomGridLength : OverviewGridLength;
-
-    private GridLength OverviewGridLength => CompactOverview ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
-    private GridLength ZoomGridLength => new GridLength(1, GridUnitType.Star);
 
     public bool IsNormalMode => ReadingMode == ReadingMode.Normal;
     public bool IsZoomedMode => ReadingMode == ReadingMode.Zoomed;
@@ -1024,7 +1009,6 @@ public partial class ReaderViewModel : ViewModelBase
             ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
             SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == settings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
-            CompactOverview = settings.CompactOverview;
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
             IsFullScreen = settings.UseFullScreenWhenReading;
 
