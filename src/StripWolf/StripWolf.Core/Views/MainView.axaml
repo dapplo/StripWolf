@@ -27,7 +27,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="▤" FontSize="20" HorizontalAlignment="Center"/>
+            <Image Source="{StaticResource Icon.Library}" Width="24" Height="24" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding Library, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
@@ -39,7 +39,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="K" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+            <Image Source="{StaticResource Icon.Komga}" Width="24" Height="24" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding Komga, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
@@ -51,7 +51,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="↻" FontSize="20" HorizontalAlignment="Center"/>
+            <Image Source="{StaticResource Icon.Activity}" Width="24" Height="24" HorizontalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
               <TextBlock Text="{Binding Activity, Source={x:Static res:Loc.Instance}}" FontSize="12" VerticalAlignment="Center"/>
               <Border Background="{DynamicResource SystemAccentColor}" CornerRadius="8" Padding="4,1"
@@ -69,7 +69,7 @@
                 Background="Transparent" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
           <StackPanel Spacing="4">
-            <TextBlock Text="⚙" FontSize="20" HorizontalAlignment="Center"/>
+            <Image Source="{StaticResource Icon.Settings}" Width="24" Height="24" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding Settings, Source={x:Static res:Loc.Instance}}" FontSize="12" HorizontalAlignment="Center"/>
           </StackPanel>
         </Button>
@@ -248,19 +248,19 @@
           <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
             <StackPanel Spacing="10">
               <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <Image Source="{StaticResource Icon.Read}" Width="20" Height="20"/>
                 <TextBlock Text="{Binding TrialUnlimitedLocalImports, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <Image Source="{StaticResource Icon.Read}" Width="20" Height="20"/>
                 <TextBlock Text="{Binding TrialUnlimitedKomga, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <Image Source="{StaticResource Icon.Read}" Width="20" Height="20"/>
                 <TextBlock Text="{Binding TrialStatsDashboard, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="✔" Foreground="Green" FontWeight="Bold"/>
+                <Image Source="{StaticResource Icon.Read}" Width="20" Height="20"/>
                 <TextBlock Text="{Binding TrialSupportsDevelopment, Source={x:Static res:Loc.Instance}}"/>
               </StackPanel>
             </StackPanel>
