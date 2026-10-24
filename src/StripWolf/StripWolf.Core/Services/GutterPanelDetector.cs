@@ -453,7 +453,7 @@ public static class GutterPanelDetector
             }
 
             double minArea = Math.Max(pageArea * MinPanelAreaRatio, leaf.Area * MinInsetRegionRatio);
-            var insets = FindInsets(mask.FrameLines, leaf, minArea, mask.PageWidth * MinPanelWidthRatio, mask.PageHeight * MinPanelHeightRatio,
+            var insets = FindInsets(mask.FrameLines, leaf, mask.PageEdgeSides(leaf), minArea, mask.PageWidth * MinPanelWidthRatio, mask.PageHeight * MinPanelHeightRatio,
                 message => mask.Log?.Invoke($"region {mask.Describe(leaf)}: {message}"));
             if (insets.Count == 0)
             {
@@ -526,7 +526,7 @@ public static class GutterPanelDetector
     /// The closed panel frames in the region, without the frame of the region itself. A frame with other frames over
     /// it is the background panel, it is left out.
     /// </summary>
-    private static List<Region> FindInsets(FrameLines lines, Region region, double minArea, double minWidth, double minHeight, Action<string> log)
+    private static List<Region> FindInsets(FrameLines lines, Region region, (bool Left, bool Top, bool Right, bool Bottom) pageEdges, double minArea, double minWidth, double minHeight, Action<string> log)
     {
         // Only lines which could be a good part of a frame side, the short lines of the art would chain all clusters
         var rows = Cluster(lines.Horizontal
@@ -587,7 +587,7 @@ public static class GutterPanelDetector
             }
         }
 
-        var insets = SelectInsets(frames, region, log);
+        var insets = SelectInsets(frames, region, pageEdges, log);
         foreach (var inset in insets.Where(_ => DiagnoseFrames))
         {
             double[] coverage =
@@ -629,12 +629,16 @@ public static class GutterPanelDetector
             : sorted[0] >= CoveredFrameSide && sorted[1] >= CompleteFrameSide;
     }
 
-    private static List<Region> SelectInsets(List<(Region Frame, double Coverage, bool Covered)> frames, Region region, Action<string> log)
+    private static List<Region> SelectInsets(List<(Region Frame, double Coverage, bool Covered)> frames, Region region,
+        (bool Left, bool Top, bool Right, bool Bottom) pageEdges, Action<string> log)
     {
         int tolerance = FrameLineTolerance * 2;
+        // A side on a gutter cut is a real panel border, only the sides on the page edge (where art bleeds off) count
         int SidesOnRegion(Region frame) =>
-            (Math.Abs(frame.X0 - region.X0) <= tolerance ? 1 : 0) + (Math.Abs(frame.Y0 - region.Y0) <= tolerance ? 1 : 0) +
-            (Math.Abs(frame.X1 - region.X1) <= tolerance ? 1 : 0) + (Math.Abs(frame.Y1 - region.Y1) <= tolerance ? 1 : 0);
+            (Math.Abs(frame.X0 - region.X0) <= tolerance && pageEdges.Left ? 1 : 0) +
+            (Math.Abs(frame.Y0 - region.Y0) <= tolerance && pageEdges.Top ? 1 : 0) +
+            (Math.Abs(frame.X1 - region.X1) <= tolerance && pageEdges.Right ? 1 : 0) +
+            (Math.Abs(frame.Y1 - region.Y1) <= tolerance && pageEdges.Bottom ? 1 : 0);
 
         // Not the frame of the region itself, nor a strip along its edges closed by a line which is partly art
         var candidates = new List<(Region Frame, double Coverage, bool Covered)>();
@@ -890,6 +894,15 @@ public static class GutterPanelDetector
         public Region ToPage(Region region) => new(
             Math.Clamp(region.X0 - padding, 0, PageWidth), Math.Clamp(region.Y0 - padding, 0, PageHeight),
             Math.Clamp(region.X1 - padding, 0, PageWidth), Math.Clamp(region.Y1 - padding, 0, PageHeight));
+
+        /// <summary>Which sides of the region are on the page edge.</summary>
+        public (bool Left, bool Top, bool Right, bool Bottom) PageEdgeSides(Region region)
+        {
+            var page = ToPage(region);
+            int marginX = (int)Math.Ceiling(PageWidth * PageEdgeRatio);
+            int marginY = (int)Math.Ceiling(PageHeight * PageEdgeRatio);
+            return (page.X0 <= marginX, page.Y0 <= marginY, page.X1 >= PageWidth - marginX, page.Y1 >= PageHeight - marginY);
+        }
 
         public bool IsOnPageEdge(Region region)
         {
