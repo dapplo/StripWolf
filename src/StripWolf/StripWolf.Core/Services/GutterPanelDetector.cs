@@ -69,6 +69,7 @@ public static class GutterPanelDetector
     private const double VerticalFrameLineRatio = 0.03;
     private const double FrameSegmentRatio = 0.04;
     private const int FrameLineThickness = 31;
+    private const int FlatLineEnds = 4;
     private static readonly bool DiagnoseFrames = true;
     private const double ClearFrameMargin = 0.02;
     private const double AmbiguousFrameRange = 0.05;
@@ -198,7 +199,7 @@ public static class GutterPanelDetector
 
         // A real gutter is as flat as the page background, a light stripe in the art is only close to it
         double flatness = Math.Max(6.0, 2.5 * deviation + 2.0);
-        return new ContentMask(content, difference, flatness, w, h, padding, pageWidth, pageHeight, blurredData);
+        return new ContentMask(content, difference, flatness, w, h, padding, pageWidth, pageHeight, blurredData, background);
 
         void AddOuterLabel(int x, int y)
         {
@@ -342,7 +343,76 @@ public static class GutterPanelDetector
             }
         }
 
-        return null;
+        // Gutters in their own colour, e.g. white gutters on a page with black margins
+        return ColourCut(mask, bounds, true) ?? ColourCut(mask, bounds, false);
+    }
+
+    /// <summary>
+    /// Cuts along bands which cross the whole region in one flat colour different from the page background. The first
+    /// such cut on a page needs two bands of the same colour, that colour is then the gutter colour of the page.
+    /// </summary>
+    private static CutResult? ColourCut(ContentMask mask, Region region, bool horizontal)
+    {
+        var lines = mask.FlatLineColours(region, horizontal);
+        var runs = new List<(int Start, int End, int Colour)>();
+        int? start = null;
+        for (int i = 0; i <= lines.Length; i++)
+        {
+            bool continues = i < lines.Length && lines[i] >= 0 && start is { } s && Math.Abs(lines[i] - lines[s]) <= ForegroundThreshold;
+            bool begins = i < lines.Length && lines[i] >= 0 && start is null;
+            if (continues)
+            {
+                continue;
+            }
+
+            if (start is { } runStart && i - runStart >= MinGutterSize && runStart > 0 && i < lines.Length)
+            {
+                runs.Add((runStart, i, lines[runStart]));
+            }
+
+            start = begins || (i < lines.Length && lines[i] >= 0) ? i : null;
+        }
+
+        int? colour = mask.GutterColour;
+        runs = runs.Where(run => colour is not { } known || Math.Abs(run.Colour - known) <= ForegroundThreshold).ToList();
+        if (colour is null)
+        {
+            var first = runs.FirstOrDefault();
+            runs = runs.Where(run => Math.Abs(run.Colour - first.Colour) <= ForegroundThreshold).ToList();
+            if (runs.Count < 2)
+            {
+                return null;
+            }
+        }
+
+        if (runs.Count == 0)
+        {
+            return null;
+        }
+
+        // Only between parts which are big enough to be panels
+        double minPart = (horizontal ? mask.PageHeight : mask.PageWidth) * SoftCutMinPartRatio;
+        var parts = new List<(int Start, int End)>();
+        int partStart = 0;
+        foreach (var run in runs)
+        {
+            parts.Add((partStart, run.Start));
+            partStart = run.End;
+        }
+
+        parts.Add((partStart, lines.Length));
+        if (parts.Any(part => part.End - part.Start < minPart))
+        {
+            return null;
+        }
+
+        mask.GutterColour ??= runs[0].Colour;
+        var regions = parts
+            .Select(part => horizontal
+                ? new Region(region.X0, region.Y0 + part.Start, region.X1, region.Y0 + part.End)
+                : new Region(region.X0 + part.Start, region.Y0, region.X0 + part.End, region.Y1))
+            .ToList();
+        return new CutResult(region, horizontal, false, regions, runs.Select(run => (run.Start, run.End)).ToList());
     }
 
     /// <summary>
@@ -875,7 +945,7 @@ public static class GutterPanelDetector
     /// <param name="padding">The margin added around the page</param>
     /// <param name="gray">The (blurred) page, for the frame lines</param>
     private sealed class ContentMask(byte[] content, byte[] difference, double flatness, int width, int height,
-        int padding, int pageWidth, int pageHeight, byte[] gray)
+        int padding, int pageWidth, int pageHeight, byte[] gray, byte background)
     {
         private FrameLines? _frameLines;
 
@@ -1045,6 +1115,49 @@ public static class GutterPanelDetector
             }
 
             return lines.Area == 0 || sum / lines.Area <= flatness;
+        }
+
+        /// <summary>The colour of the gutters when it differs from the page background, once found.</summary>
+        public int? GutterColour { get; set; }
+
+        /// <summary>
+        /// Per line of the region (rows when horizontal, else columns): its colour when the whole line is flat in a
+        /// colour clearly different from the background, else -1. The last pixels at both ends may differ (a blurred
+        /// edge), nothing in between.
+        /// </summary>
+        public int[] FlatLineColours(Region region, bool horizontal)
+        {
+            int count = horizontal ? region.Height : region.Width;
+            int length = horizontal ? region.Width : region.Height;
+            var colours = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                colours[i] = -1;
+                if (length <= 2 * FlatLineEnds)
+                {
+                    continue;
+                }
+
+                // Most lines cross art, stop at the first pixel which makes the line too uneven
+                long sum = 0;
+                int min = 255, max = 0;
+                int j = FlatLineEnds;
+                for (; j < length - FlatLineEnds && max - min <= 2 * flatness; j++)
+                {
+                    int value = horizontal ? gray[(region.Y0 + i) * Width + region.X0 + j] : gray[(region.Y0 + j) * Width + region.X0 + i];
+                    sum += value;
+                    min = Math.Min(min, value);
+                    max = Math.Max(max, value);
+                }
+
+                int mean = (int)(sum / Math.Max(1, j - FlatLineEnds));
+                if (j == length - FlatLineEnds && max - min <= 2 * flatness && Math.Abs(mean - background) > ForegroundThreshold)
+                {
+                    colours[i] = mean;
+                }
+            }
+
+            return colours;
         }
 
         /// <summary>

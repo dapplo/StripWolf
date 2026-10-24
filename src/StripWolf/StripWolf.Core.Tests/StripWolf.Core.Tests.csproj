@@ -40,6 +40,16 @@
     <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" AdditionalProperties="UseOpenCvPanelDetection=$(UseOpenCvPanelDetection);UseEpubSupport=true" UndefineProperties="RuntimeIdentifier" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'true'">
+    <!-- The native OpenCV runtime for the panel detection tests, like the panel bench -->
+    <PackageReference Include="OpenCvSharp4.runtime.win" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
+    <!-- The panel detection is only built with OpenCV -->
+    <Compile Remove="Services\GutterPanelDetectorTests.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Synthetic comic fixtures, see TestData/generate_fixtures.py -->
     <None Remove="TestData\**\*" />
