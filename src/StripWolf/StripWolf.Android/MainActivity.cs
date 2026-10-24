@@ -21,6 +21,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Android.Views;
 using Avalonia.Android;
 using Microsoft.Extensions.DependencyInjection;
 using StripWolf.Core.ViewModels;
@@ -126,6 +127,46 @@ public class MainActivity : AvaloniaMainActivity
         AndroidX.Core.SplashScreen.SplashScreen.InstallSplashScreen(this);
         
         base.OnCreate(savedInstanceState);
+    }
+
+    public override bool DispatchTouchEvent(MotionEvent? ev)
+    {
+        // Android cancels a gesture with a single ACTION_CANCEL carrying every finger that is still down (e.g. when
+        // the system takes over the touch). Avalonia only cancels the first of those pointers, the others stay "down"
+        // in its TouchDevice forever. From then on no touch is primary anymore, and the reader views took every
+        // single-finger touch for the second finger of a pinch: one finger zoomed, taps and swipes did nothing.
+        // Cancel the other pointers one by one, so Avalonia forgets all of them.
+        if (ev is { ActionMasked: MotionEventActions.Cancel, PointerCount: > 1 } && FindAvaloniaView(Window?.DecorView) is { } avaloniaView)
+        {
+            for (int index = 1; index < ev.PointerCount; index++)
+            {
+                using var cancel = ObtainSinglePointerCancel(ev, index);
+                avaloniaView.DispatchTouchEvent(cancel);
+            }
+        }
+        return base.DispatchTouchEvent(ev);
+    }
+
+    private static MotionEvent ObtainSinglePointerCancel(MotionEvent ev, int index)
+    {
+        var properties = new MotionEvent.PointerProperties();
+        ev.GetPointerProperties(index, properties);
+        var coords = new MotionEvent.PointerCoords();
+        ev.GetPointerCoords(index, coords);
+        return MotionEvent.Obtain(ev.DownTime, ev.EventTime, MotionEventActions.Cancel, 1,
+            new[] { properties }, new[] { coords }, ev.MetaState, ev.ButtonState, ev.XPrecision, ev.YPrecision,
+            ev.DeviceId, (Edge)ev.EdgeFlags, ev.Source, ev.Flags)!;
+    }
+
+    private static AvaloniaView? FindAvaloniaView(View? view)
+    {
+        if (view is AvaloniaView avaloniaView) return avaloniaView;
+        if (view is not ViewGroup group) return null;
+        for (int i = 0; i < group.ChildCount; i++)
+        {
+            if (FindAvaloniaView(group.GetChildAt(i)) is { } found) return found;
+        }
+        return null;
     }
 
     protected override void OnDestroy()
