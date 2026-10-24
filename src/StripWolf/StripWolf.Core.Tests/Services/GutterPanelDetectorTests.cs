@@ -85,4 +85,84 @@ public sealed class GutterPanelDetectorTests
             }
         }
     }
+
+    /// <summary>
+    /// A white page between black bars left and right, with white margins at the top and bottom. Row 1 has a framed
+    /// panel and next to it a panel without a frame (art on the white background), row 2 one wide panel, row 3 two
+    /// panels. The panels are framed by a black line and filled with art.
+    /// </summary>
+    private static byte[] CreateWhitePageBetweenBlackBars(int width, int height)
+    {
+        int bar = width * 96 / 2400;
+        int Px(double fraction, int size) => (int)(fraction * size);
+        var framed = new[]
+        {
+            (X0: 0.092, Y0: 0.041, X1: 0.495, Y1: 0.369),
+            (X0: 0.093, Y0: 0.374, X1: 0.906, Y1: 0.601),
+            (X0: 0.092, Y0: 0.606, X1: 0.496, Y1: 0.955),
+            (X0: 0.502, Y0: 0.606, X1: 0.906, Y1: 0.955)
+        };
+        // The unframed panel: art which doesn't fill the whole panel, on the white page
+        var unframedArt = (X0: 0.53, Y0: 0.06, X1: 0.90, Y1: 0.35);
+        var random = new Random(7);
+        using var image = new Image<L8>(width, height, new L8(White));
+        image.ProcessPixelRows(accessor =>
+        {
+            for (int y = 0; y < height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (int x = 0; x < width; x++)
+                {
+                    if (x < bar || x >= width - bar)
+                    {
+                        row[x] = new L8(Black);
+                        continue;
+                    }
+
+                    byte art = (byte)(60 + ((x / 23 + y / 31) % 7) * 25 + random.Next(10));
+                    foreach (var panel in framed)
+                    {
+                        int x0 = Px(panel.X0, width), x1 = Px(panel.X1, width), y0 = Px(panel.Y0, height), y1 = Px(panel.Y1, height);
+                        if (x >= x0 && x < x1 && y >= y0 && y < y1)
+                        {
+                            bool isFrame = x < x0 + 4 || x >= x1 - 4 || y < y0 + 4 || y >= y1 - 4;
+                            row[x] = new L8(isFrame ? Black : art);
+                        }
+                    }
+
+                    if (x >= Px(unframedArt.X0, width) && x < Px(unframedArt.X1, width) && y >= Px(unframedArt.Y0, height) && y < Px(unframedArt.Y1, height))
+                    {
+                        row[x] = new L8(art);
+                    }
+                }
+            }
+        });
+
+        using var stream = new MemoryStream();
+        image.SaveAsPng(stream);
+        return stream.ToArray();
+    }
+
+    [Theory]
+    [InlineData(2400, 3392)]
+    [InlineData(1200, 1696)]
+    public void Detect_WhitePageBetweenBlackBars_FindsTheFivePanelsInOrder(int width, int height)
+    {
+        var page = CreateWhitePageBetweenBlackBars(width, height);
+
+        foreach (bool findInsets in new[] { false, true })
+        {
+            var log = new List<string>();
+            var panels = GutterPanelDetector.Detect(0, page, false, log.Add, findInsets);
+
+            Assert.True(panels.Count == 5, string.Join(" | ", log));
+            // Row 1 framed left, unframed right; row 2 wide; row 3 left and right
+            (double X, double Y)[] centres = [(0.29, 0.20), (0.71, 0.20), (0.50, 0.49), (0.29, 0.78), (0.70, 0.78)];
+            for (int i = 0; i < panels.Count; i++)
+            {
+                Assert.InRange(centres[i].X, panels[i].X, panels[i].X + panels[i].Width);
+                Assert.InRange(centres[i].Y, panels[i].Y, panels[i].Y + panels[i].Height);
+            }
+        }
+    }
 }
