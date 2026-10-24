@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel labels</title>
+<style>
+  :root { --bg: #1e1f22; --panel: #2b2d31; --text: #e6e6e6; --muted: #9a9ca3; --label: #3fb950; --detected: #f85149; --sel: #58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px system-ui, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #side { width: 240px; background: var(--panel); display: flex; flex-direction: column; }
+  #side header { padding: 10px; border-bottom: 1px solid #444; }
+  #side h1 { font-size: 14px; margin: 0 0 4px; word-break: break-word; }
+  #list { overflow-y: auto; flex: 1; }
+  #list div { padding: 4px 10px; cursor: pointer; display: flex; justify-content: space-between; gap: 6px; }
+  #list div.active { background: #3a3d44; }
+  #list .state { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  #list .ok { color: var(--label); }
+  #list .bad { color: var(--detected); }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #toolbar { padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--panel); border-bottom: 1px solid #444; }
+  button { background: #3a3d44; color: var(--text); border: 1px solid #555; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: #4a4d55; }
+  button.primary { background: #238636; border-color: #2ea043; }
+  label { display: flex; gap: 4px; align-items: center; }
+  #stage { flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 12px; }
+  #wrap { position: relative; user-select: none; }
+  #wrap img { display: block; max-height: calc(100vh - 90px); max-width: 100%; }
+  svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .lbl { fill: rgba(63,185,80,.12); stroke: var(--label); stroke-width: 2; cursor: move; vector-effect: non-scaling-stroke; }
+  .lbl.sel { stroke: var(--sel); fill: rgba(88,166,255,.15); }
+  .det { fill: none; stroke: var(--detected); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; vector-effect: non-scaling-stroke; }
+  .num { fill: #fff; font: bold 22px system-ui; paint-order: stroke; stroke: #000; stroke-width: 4px; pointer-events: none; }
+  .handle { fill: var(--sel); cursor: nwse-resize; }
+  #help { color: var(--muted); font-size: 12px; padding: 10px; border-top: 1px solid #444; line-height: 1.5; }
+  #status { margin-left: auto; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="side">
+  <header><h1 id="title"></h1><div id="progress" class="state"></div></header>
+  <div id="list"></div>
+  <div id="help">
+    <b>Green</b>: your panels (numbered in reading order). <b style="color:var(--detected)">Red dashed</b>: detection.<br>
+    Drag on empty space: new panel. Drag a panel: move, corner: resize.<br>
+    Del: delete selected. [ / ]: move selected earlier / later in the order.<br>
+    D: copy detection. S: splash (whole page). O: sort into rows.<br>
+    Enter: mark reviewed and next. N / P: next / previous page.<br>
+    Only reviewed pages are scored, changing a page marks it reviewed. Save the file next to the comic.
+  </div>
+</div>
+<div id="main">
+  <div id="toolbar">
+    <button id="prev">&larr; Prev</button>
+    <button id="next">Next &rarr;</button>
+    <button id="copy">Copy detection (D)</button>
+    <button id="splash">Splash (S)</button>
+    <button id="order">Sort rows (O)</button>
+    <button id="clear">Clear</button>
+    <label><input type="checkbox" id="reviewed"> Reviewed</label>
+    <label><input type="checkbox" id="showDet" checked> Show detection</label>
+    <button id="save" class="primary">Save labels</button>
+    <span id="status"></span>
+  </div>
+  <div id="stage"><div id="wrap"><img id="img" alt=""><svg id="svg" viewBox="0 0 1 1" preserveAspectRatio="none"></svg></div></div>
+</div>
+<script>
+const BENCH = /*BENCH_DATA*/null;
+const storageKey = 'stripwolf-panels:' + BENCH.comic;
+const $ = id => document.getElementById(id);
+const round = v => Math.round(v * 10000) / 10000;
+
+// Labels: the saved labels, or the detection as a starting point
+let labels = BENCH.pages.map(p => p.label
+  ? { name: p.name, reviewed: !!p.label.reviewed, panels: p.label.panels.map(b => ({ ...b })) }
+  : { name: p.name, reviewed: false, panels: p.detected.map(b => ({ ...b })) });
+try {
+  const draft = JSON.parse(localStorage.getItem(storageKey) || 'null');
+  if (draft && draft.length === labels.length && draft.every((d, i) => d.name === labels[i].name)) labels = draft;
+} catch (e) { /* no draft */ }
+
+let current = 0, selected = -1, dirty = false, drag = null;
+
+// Any change of the panels means the page was looked at, so it is marked as reviewed
+function persist(markReviewed = true) {
+  if (markReviewed) labels[current].reviewed = true;
+  dirty = true;
+  try { localStorage.setItem(storageKey, JSON.stringify(labels)); } catch (e) { /* storage not available */ }
+  $('status').textContent = 'unsaved changes';
+}
+
+function renderList() {
+  const list = $('list');
+  list.innerHTML = '';
+  BENCH.pages.forEach((p, i) => {
+    const div = document.createElement('div');
+    if (i === current) div.className = 'active';
+    const state = document.createElement('span');
+    state.className = 'state';
+    const s = p.score;
+    if (labels[i].reviewed && s) {
+      state.textContent = (s.isCorrectInOrder ? '✓ ' : '✗ ') + s.detected + '/' + s.expected;
+      state.classList.add(s.isCorrectInOrder ? 'ok' : 'bad');
+    } else {
+      state.textContent = (labels[i].reviewed ? '● ' : '') + labels[i].panels.length;
+    }
+    const name = document.createElement('span');
+    name.textContent = (i + 1) + '. ' + p.name.split('/').pop();
+    div.append(name, state);
+    div.onclick = () => go(i);
+    list.append(div);
+  });
+  const reviewed = labels.filter(l => l.reviewed).length;
+  $('progress').textContent = reviewed + ' of ' + labels.length + ' pages reviewed, detector: ' + BENCH.detector;
+  list.children[current]?.scrollIntoView({ block: 'nearest' });
+}
+
+function rectEl(b, cls) {
+  const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  r.setAttribute('x', b.x); r.setAttribute('y', b.y); r.setAttribute('width', b.w); r.setAttribute('height', b.h);
+  r.setAttribute('class', cls);
+  return r;
+}
+
+function render() {
+  const svg = $('svg');
+  const img = $('img');
+  const aspect = img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : 1.4;
+  // The viewBox is 1 x aspect, so text and handles are not distorted, boxes are scaled on y
+  svg.setAttribute('viewBox', `0 0 1 ${aspect}`);
+  svg.innerHTML = '';
+  const page = labels[current];
+  const scaleBox = b => ({ x: b.x, y: b.y * aspect, w: b.w, h: b.h * aspect });
+  if ($('showDet').checked) BENCH.pages[current].detected.forEach(b => svg.append(rectEl(scaleBox(b), 'det')));
+  page.panels.forEach((b, i) => {
+    const sb = scaleBox(b);
+    const r = rectEl(sb, 'lbl' + (i === selected ? ' sel' : ''));
+    r.dataset.index = i;
+    svg.append(r);
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', sb.x + 0.01); t.setAttribute('y', sb.y + 0.035);
+    t.setAttribute('class', 'num');
+    t.style.fontSize = '0.035px'; t.style.strokeWidth = '0.004px';
+    t.textContent = i + 1;
+    svg.append(t);
+    if (i === selected) {
+      for (const [cx, cy, corner] of [[sb.x, sb.y, 'tl'], [sb.x + sb.w, sb.y, 'tr'], [sb.x, sb.y + sb.h, 'bl'], [sb.x + sb.w, sb.y + sb.h, 'br']]) {
+        const h = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        h.setAttribute('x', cx - 0.008); h.setAttribute('y', cy - 0.008); h.setAttribute('width', 0.016); h.setAttribute('height', 0.016);
+        h.setAttribute('class', 'handle'); h.dataset.corner = corner; h.dataset.index = i;
+        svg.append(h);
+      }
+    }
+  });
+  $('reviewed').checked = page.reviewed;
+  renderList();
+}
+
+function go(i) {
+  if (i < 0 || i >= labels.length) return;
+  current = i; selected = -1;
+  $('img').src = BENCH.pages[i].image;
+}
+
+function pointer(e) {
+  const r = $('img').getBoundingClientRect();
+  return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+}
+
+function normalize(b) {
+  const x1 = Math.min(b.x, b.x + b.w), y1 = Math.min(b.y, b.y + b.h);
+  const x2 = Math.max(b.x, b.x + b.w), y2 = Math.max(b.y, b.y + b.h);
+  return { x: round(x1), y: round(y1), w: round(x2 - x1), h: round(y2 - y1) };
+}
+
+function sortRows(panels) {
+  // Same idea as the reader: take the top most panel, everything overlapping its vertical center is the same row
+  const remaining = [...panels].sort((a, b) => a.y - b.y);
+  const result = [];
+  while (remaining.length) {
+    const top = remaining[0];
+    const center = top.y + top.h / 2;
+    let row = remaining.filter(p => p.y < center && p.y + p.h > center);
+    if (!row.length) row = [top];
+    row.sort((a, b) => a.x - b.x);
+    for (const p of row) { result.push(p); remaining.splice(remaining.indexOf(p), 1); }
+  }
+  return result;
+}
+
+$('svg').addEventListener('pointerdown', e => {
+  const p = pointer(e);
+  const page = labels[current];
+  const t = e.target;
+  if (t.dataset.corner) {
+    selected = +t.dataset.index;
+    const b = page.panels[selected];
+    // Resize: keep the opposite corner fixed
+    const fixed = { x: t.dataset.corner.includes('l') ? b.x + b.w : b.x, y: t.dataset.corner.includes('t') ? b.y + b.h : b.y };
+    drag = { mode: 'new', index: selected, start: fixed };
+  } else if (t.dataset.index !== undefined) {
+    selected = +t.dataset.index;
+    const b = page.panels[selected];
+    drag = { mode: 'move', index: selected, dx: p.x - b.x, dy: p.y - b.y };
+  } else {
+    page.panels.push({ x: p.x, y: p.y, w: 0, h: 0 });
+    selected = page.panels.length - 1;
+    drag = { mode: 'new', index: selected, start: p };
+  }
+  $('svg').setPointerCapture(e.pointerId);
+  render();
+});
+
+$('svg').addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = pointer(e);
+  const b = labels[current].panels[drag.index];
+  if (drag.mode === 'move') {
+    b.x = round(Math.min(1 - b.w, Math.max(0, p.x - drag.dx)));
+    b.y = round(Math.min(1 - b.h, Math.max(0, p.y - drag.dy)));
+  } else {
+    Object.assign(b, normalize({ x: drag.start.x, y: drag.start.y, w: p.x - drag.start.x, h: p.y - drag.start.y }));
+  }
+  render();
+});
+
+$('svg').addEventListener('pointerup', () => {
+  if (!drag) return;
+  const page = labels[current];
+  const b = page.panels[drag.index];
+  if (drag.mode === 'new' && (b.w < 0.02 || b.h < 0.02)) { page.panels.splice(drag.index, 1); selected = -1; }
+  drag = null;
+  persist();
+  render();
+});
+
+function setPanels(panels) { labels[current].panels = panels.map(b => ({ ...b })); selected = -1; persist(); render(); }
+
+function moveSelected(delta) {
+  const panels = labels[current].panels;
+  const target = selected + delta;
+  if (selected < 0 || target < 0 || target >= panels.length) return;
+  [panels[selected], panels[target]] = [panels[target], panels[selected]];
+  selected = target; persist(); render();
+}
+
+async function save() {
+  const data = JSON.stringify({ version: 1, comic: BENCH.comic, pages: labels }, null, 2);
+  try {
+    if (window.showSaveFilePicker) {
+      const handle = await showSaveFilePicker({ suggestedName: BENCH.labelFile, types: [{ description: 'Panel labels', accept: { 'application/json': ['.json'] } }] });
+      const writable = await handle.createWritable();
+      await writable.write(data);
+      await writable.close();
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.download = BENCH.labelFile;
+      a.click();
+    }
+    dirty = false;
+    $('status').textContent = 'saved, put ' + BENCH.labelFile + ' next to the comic';
+  } catch (e) {
+    if (e.name !== 'AbortError') $('status').textContent = 'saving failed: ' + e.message;
+  }
+}
+
+$('img').onload = render;
+$('prev').onclick = () => go(current - 1);
+$('next').onclick = () => go(current + 1);
+$('copy').onclick = () => setPanels(BENCH.pages[current].detected);
+$('splash').onclick = () => setPanels([{ x: 0, y: 0, w: 1, h: 1 }]);
+$('order').onclick = () => setPanels(sortRows(labels[current].panels));
+$('clear').onclick = () => setPanels([]);
+$('reviewed').onchange = e => { labels[current].reviewed = e.target.checked; persist(false); renderList(); };
+$('showDet').onchange = render;
+$('save').onclick = save;
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const key = e.key.toLowerCase();
+  if (key === 'delete' || key === 'backspace') {
+    if (selected >= 0) { labels[current].panels.splice(selected, 1); selected = -1; persist(); render(); }
+  } else if (key === '[') moveSelected(-1);
+  else if (key === ']') moveSelected(1);
+  else if (key === 'd') $('copy').click();
+  else if (key === 's' && !e.ctrlKey) $('splash').click();
+  else if (key === 's' && e.ctrlKey) { e.preventDefault(); save(); }
+  else if (key === 'o') $('order').click();
+  else if (key === 'n' || key === 'arrowright') go(current + 1);
+  else if (key === 'p' || key === 'arrowleft') go(current - 1);
+  else if (key === 'enter') { labels[current].reviewed = true; persist(); go(current + 1); renderList(); }
+  else return;
+  e.preventDefault();
+});
+
+window.addEventListener('beforeunload', e => { if (dirty) e.preventDefault(); });
+
+$('title').textContent = BENCH.comic;
+document.title = 'Panel labels: ' + BENCH.comic;
+go(0);
+</script>
+</body>
+</html>

@@ -36,6 +36,8 @@
   <ItemGroup>
     <!-- The tests use the internal constructors (custom data directories, mocked HTTP handler) -->
     <InternalsVisibleTo Include="StripWolf.Core.Tests" />
+    <!-- The panel bench sorts the pages like the reader does -->
+    <InternalsVisibleTo Include="StripWolf.PanelBench" />
   </ItemGroup>
 
   <ItemGroup>
@@ -67,6 +69,7 @@
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' == 'false'">
     <Compile Remove="Services\PanelDetectionService.cs" />
+    <Compile Remove="Services\GutterPanelDetector.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseOpenCvPanelDetection)' != 'false'">

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Developer tool to measure the panel detection against real comics, which are kept outside of the repository.
+    See README.md for the usage.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>StripWolf.PanelBench</RootNamespace>
+    <AssemblyName>StripWolf.PanelBench</AssemblyName>
+  </PropertyGroup>
+
+  <!-- See StripWolf.Core.Tests.csproj, ImageSharp only checks the license for projects referencing it directly -->
+  <PropertyGroup Condition="'$(SixLaborsLicenseFile)' == '' and '$(SixLaborsLicenseKey)' == '' and Exists('$(MSBuildThisFileDirectory)..\StripWolf.Core\sixlabors.lic')">
+    <SixLaborsLicenseFile>$(MSBuildThisFileDirectory)..\StripWolf.Core\sixlabors.lic</SixLaborsLicenseFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <PackageReference Include="SharpCompress" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StripWolf.Core\StripWolf.Core.csproj" AdditionalProperties="UseOpenCvPanelDetection=true;UseEpubSupport=true" UndefineProperties="RuntimeIdentifier" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="LabelEditor.html" LogicalName="LabelEditor.html" />
+  </ItemGroup>
+</Project>

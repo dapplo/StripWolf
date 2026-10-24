@@ -12,6 +12,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.iOS", "StripWolf.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.Core.Tests", "StripWolf.Core.Tests\StripWolf.Core.Tests.csproj", "{EA01336D-F246-4F0B-BE68-BE4221564FB5}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StripWolf.PanelBench", "StripWolf.PanelBench\StripWolf.PanelBench.csproj", "{A2EEC9C3-A97A-4F1D-9824-3060999E650A}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3DA99C4E-89E3-4049-9C22-0A7EC60D83D8}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Packages.props = Directory.Packages.props
@@ -45,6 +47,10 @@ Global
 		{EA01336D-F246-4F0B-BE68-BE4221564FB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EA01336D-F246-4F0B-BE68-BE4221564FB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EA01336D-F246-4F0B-BE68-BE4221564FB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2EEC9C3-A97A-4F1D-9824-3060999E650A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2EEC9C3-A97A-4F1D-9824-3060999E650A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2EEC9C3-A97A-4F1D-9824-3060999E650A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2EEC9C3-A97A-4F1D-9824-3060999E650A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
