@@ -1,4 +1,4 @@
-; StripWolf installer for Windows (Inno Setup 6)
+﻿; StripWolf installer for Windows (Inno Setup 6)
 ;
 ; Installs per user by default (no administrator rights needed, into %LOCALAPPDATA%\Programs\StripWolf), the user can
 ; choose an installation for all users in the dialog. The registry entries use HKA, which is HKCU or HKLM accordingly.
@@ -135,8 +135,20 @@ Root: HKA; Subkey: "{#CapabilitiesKey}\FileAssociations"; ValueType: string; Val
 Root: HKA; Subkey: "{#CapabilitiesKey}\FileAssociations"; ValueType: string; ValueName: ".pdf"; ValueData: "StripWolf.pdf"
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#AppName}"; ValueData: "{#CapabilitiesKey}"; Flags: uninsdeletevalue
 
+[CustomMessages]
+en.ChooseDefaultApp=Choose StripWolf as default app for comic books (opens Windows settings)
+de.ChooseDefaultApp=StripWolf als Standard-App für Comics auswählen (öffnet die Windows-Einstellungen)
+nl.ChooseDefaultApp=StripWolf als standaard-app voor stripboeken kiezen (opent de Windows-instellingen)
+fr.ChooseDefaultApp=Choisir StripWolf comme application par défaut pour les bandes dessinées (ouvre les paramètres Windows)
+es.ChooseDefaultApp=Elegir StripWolf como aplicación predeterminada para cómics (abre la configuración de Windows)
+
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; An installer may not change the default application once the user chose one (UserChoice, e.g. Directory Opus or
+; another reader): only the user can, this opens the Default apps page of StripWolf (Windows 11, Windows 10 shows the
+; Default apps overview). Only offered when another application is the default for .cbz.
+Filename: "ms-settings:defaultapps?registeredAppUser={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: not IsAdminInstallMode and OtherDefaultForCbz
+Filename: "ms-settings:defaultapps?registeredAppMachine={#AppName}"; Description: "{cm:ChooseDefaultApp}"; Flags: postinstall shellexec nowait skipifsilent; Check: IsAdminInstallMode and OtherDefaultForCbz
 
 [Code]
 // Versions before the installer registered the file types themselves, on every start, under HKCU with the ProgIDs
@@ -154,6 +166,16 @@ begin
   end;
   RegDeleteValue(HKEY_CURRENT_USER, 'Software\Classes\.' + Extension + '\OpenWithProgids', ProgId);
   RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\Classes\' + ProgId);
+end;
+
+// True when the user chose another application for .cbz in Explorer ("Open with > Always"), which Windows keeps
+function OtherDefaultForCbz: Boolean;
+var
+  ProgId: String;
+begin
+  Result := RegQueryStringValue(HKEY_CURRENT_USER,
+    'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.cbz\UserChoice', 'ProgId', ProgId)
+    and (CompareText(ProgId, 'StripWolf.cbz') <> 0);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
