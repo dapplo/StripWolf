@@ -1,0 +1,118 @@
+name: Packaging
+
+# Builds the desktop packages (Windows installer, macOS app, Linux tarball with the desktop integration) for a pull
+# request which changes them, so they can be tested before the release. The release itself is built by release.yml.
+on:
+  pull_request:
+    paths:
+      - 'installer/**'
+      - 'media/Wolf.png'
+      - 'src/StripWolf/StripWolf.Desktop/**'
+      - 'src/StripWolf/StripWolf.Core/App.axaml.cs'
+      - 'src/StripWolf/StripWolf.Core/Services/ActivationManager.cs'
+      - 'src/StripWolf/StripWolf.Core/Services/SingleInstance.cs'
+      - '.github/workflows/packaging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Not a release: a fixed version, GitVersion.MsBuild crashes on the merge commit of a pull request (see tests.yml)
+  PACKAGE_VERSION: 0.0.0
+  PUBLISH_ARGS: -c Release --self-contained -p:DisableGitVersionTask=true -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -r win-x64 -o publish/windows ${{ env.PUBLISH_ARGS }}
+
+      - name: Create installer
+        shell: pwsh
+        run: ./installer/windows/build-installer.ps1 -Version $env:PACKAGE_VERSION -PublishDir publish/windows -OutputName StripWolf-Windows-x64-Setup-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StripWolf-Windows-x64-Setup
+          path: StripWolf-Windows-x64-Setup-test.exe
+          retention-days: 14
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Check the desktop integration
+        run: |
+          sudo apt-get install -y --no-install-recommends desktop-file-utils shellcheck
+          shellcheck installer/linux/install.sh installer/macos/complete-bundle.sh
+          # A path with characters which must be escaped in the desktop file
+          TEST_DIR="$RUNNER_TEMP/Strip Wolf \$test \"quoted\""
+          mkdir -p "$TEST_DIR"
+          cp installer/linux/install.sh installer/linux/stripwolf.desktop.in "$TEST_DIR/"
+          cp media/Wolf.png "$TEST_DIR/stripwolf.png"
+          printf '#!/bin/sh\n' > "$TEST_DIR/StripWolf"
+          chmod +x "$TEST_DIR/StripWolf"
+          XDG_DATA_HOME="$RUNNER_TEMP/xdg" "$TEST_DIR/install.sh"
+          cat "$RUNNER_TEMP/xdg/applications/stripwolf.desktop"
+          desktop-file-validate "$RUNNER_TEMP/xdg/applications/stripwolf.desktop"
+          XDG_DATA_HOME="$RUNNER_TEMP/xdg" "$TEST_DIR/install.sh" --uninstall
+          test ! -e "$RUNNER_TEMP/xdg/applications/stripwolf.desktop"
+
+      - name: Publish
+        run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -r linux-x64 -o publish/linux ${{ env.PUBLISH_ARGS }}
+
+      - name: Create tarball
+        run: |
+          cp installer/linux/install.sh installer/linux/stripwolf.desktop.in publish/linux/
+          cp media/Wolf.png publish/linux/stripwolf.png
+          chmod +x publish/linux/install.sh publish/linux/StripWolf
+          tar -czf StripWolf-Linux-x64-test.tar.gz -C publish/linux .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StripWolf-Linux-x64
+          path: StripWolf-Linux-x64-test.tar.gz
+          retention-days: 14
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish and complete the bundle
+        run: |
+          dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -r osx-arm64 -o publish/macos-arm64/StripWolf.app/Contents/MacOS ${{ env.PUBLISH_ARGS }}
+          ./installer/macos/complete-bundle.sh publish/macos-arm64/StripWolf.app "$PACKAGE_VERSION"
+          find publish/macos-arm64/StripWolf.app -name "*.dylib" -exec codesign --force -s - {} \;
+          codesign --force -s - publish/macos-arm64/StripWolf.app/Contents/MacOS/StripWolf
+          codesign --force -s - publish/macos-arm64/StripWolf.app
+          tar -czf StripWolf-macOS-arm64-test.tar.gz -C publish/macos-arm64 StripWolf.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StripWolf-macOS-arm64
+          path: StripWolf-macOS-arm64-test.tar.gz
+          retention-days: 14

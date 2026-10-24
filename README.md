@@ -74,7 +74,9 @@ Download the latest APK from the [Releases](https://github.com/dapplo/StripWolf/
 
 ### Windows
 
-Download the `StripWolf-Windows-x64.zip` from the [Releases](https://github.com/dapplo/StripWolf/releases) page and extract it to your preferred location.
+Download `StripWolf-Windows-x64-Setup.exe` from the [Releases](https://github.com/dapplo/StripWolf/releases) page and run it. It installs StripWolf for your user (no administrator rights needed) and registers it for comic books (CBZ, CBR, CB7, CBT), so they open with a double-click. For PDF files StripWolf is added to "Open with". If Windows asks which app to use, or another app is already the default, pick StripWolf in **Settings > Apps > Default apps > StripWolf**.
+
+There is also a portable `StripWolf-Windows-x64.zip`, extract it to your preferred location. The portable version doesn't register any file types.
 
 ### Linux
 
@@ -83,8 +85,10 @@ Download the `StripWolf-Linux-x64.tar.gz` from the [Releases](https://github.com
 ```bash
 mkdir -p ~/StripWolf
 tar -xzvf StripWolf-Linux-x64.tar.gz -C ~/StripWolf
-chmod +x ~/StripWolf/StripWolf.Desktop
+~/StripWolf/install.sh
 ```
+
+`install.sh` adds StripWolf to the application menu and makes it the default application for comic books, so they open with a double-click (PDF files can be opened with "Open With"). Run it again after moving the folder, `install.sh --uninstall` removes the registration.
 
 ### macOS
 
@@ -102,6 +106,8 @@ Extract the archive:
 ```bash
 tar -xzvf StripWolf-macOS-*.tar.gz -C ~/Applications
 ```
+
+StripWolf registers itself for comic books (CBZ, CBR, CB7, CBT) when macOS sees the app, they open with a double-click. For PDF files it is available in "Open With".
 
 **Gatekeeper Notice**: Because the application is ad-hoc signed, macOS will block it on first run with a security warning. To easily bypass this:
 - **Using Finder**: Right-click (or Control-click) `StripWolf.app` in your `~/Applications` folder, select **Open**, and then click **Open** in the dialog. You only need to do this once; macOS will approve the app and all its nested library files.

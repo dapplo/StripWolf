@@ -1,15 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Info.plist of StripWolf.app, copied into the bundle by .github/workflows/release.yml, which also sets the versions.
+	The comic book types are imported (not exported) under our own identifiers: StripWolf doesn't define these formats,
+	public.* identifiers are reserved for Apple. EPUB is not registered, the macOS build has no EPUB support.
+-->
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>StripWolf</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.dapplo.StripWolf</string>
+	<string>net.dapplo.stripwolf</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>StripWolf</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
@@ -18,7 +29,11 @@
 	<string>StripWolf</string>
 	<key>CFBundleIconFile</key>
 	<string>Icon.icns</string>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.12</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.entertainment</string>
+	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
@@ -27,14 +42,16 @@
 			<string>Comic Book Archive</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
+			<key>CFBundleTypeIconFile</key>
+			<string>Icon.icns</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.cbz-archive</string>
-				<string>public.cbr-archive</string>
-				<string>public.cb7-archive</string>
-				<string>public.cbt-archive</string>
+				<string>net.dapplo.stripwolf.cbz</string>
+				<string>net.dapplo.stripwolf.cbr</string>
+				<string>net.dapplo.stripwolf.cb7</string>
+				<string>net.dapplo.stripwolf.cbt</string>
 			</array>
 		</dict>
 		<dict>
@@ -49,29 +66,19 @@
 				<string>com.adobe.pdf</string>
 			</array>
 		</dict>
-		<dict>
-			<key>CFBundleTypeName</key>
-			<string>EPUB Document</string>
-			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
-			<key>LSHandlerRank</key>
-			<string>Alternate</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>org.idpf.epub-container</string>
-			</array>
-		</dict>
 	</array>
-	<key>UTExportedTypeDeclarations</key>
+	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbz-archive</string>
+			<string>net.dapplo.stripwolf.cbz</string>
 			<key>UTTypeDescription</key>
-			<string>Comic Book Zip Archive</string>
+			<string>Comic Book Archive (CBZ)</string>
+			<key>UTTypeIconFile</key>
+			<string>Icon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.archive</string>
+				<string>public.zip-archive</string>
 				<string>public.data</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
@@ -82,17 +89,18 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
+					<string>application/vnd.comicbook+zip</string>
 					<string>application/x-cbz</string>
-					<string>application/x-zip-compressed</string>
-					<string>application/zip</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbr-archive</string>
+			<string>net.dapplo.stripwolf.cbr</string>
 			<key>UTTypeDescription</key>
-			<string>Comic Book Rar Archive</string>
+			<string>Comic Book Archive (CBR)</string>
+			<key>UTTypeIconFile</key>
+			<string>Icon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.archive</string>
@@ -106,16 +114,18 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
+					<string>application/vnd.comicbook-rar</string>
 					<string>application/x-cbr</string>
-					<string>application/x-rar-compressed</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cb7-archive</string>
+			<string>net.dapplo.stripwolf.cb7</string>
 			<key>UTTypeDescription</key>
-			<string>Comic Book 7z Archive</string>
+			<string>Comic Book Archive (CB7)</string>
+			<key>UTTypeIconFile</key>
+			<string>Icon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.archive</string>
@@ -130,15 +140,16 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>application/x-cb7</string>
-					<string>application/x-7z-compressed</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbt-archive</string>
+			<string>net.dapplo.stripwolf.cbt</string>
 			<key>UTTypeDescription</key>
-			<string>Comic Book Tar Archive</string>
+			<string>Comic Book Archive (CBT)</string>
+			<key>UTTypeIconFile</key>
+			<string>Icon.icns</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.archive</string>
@@ -153,7 +164,6 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>application/x-cbt</string>
-					<string>application/x-tar</string>
 				</array>
 			</dict>
 		</dict>

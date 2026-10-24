@@ -51,10 +51,10 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.cbz-archive</string>
-				<string>public.cbr-archive</string>
-				<string>public.cb7-archive</string>
-				<string>public.cbt-archive</string>
+				<string>net.dapplo.stripwolf.cbz</string>
+				<string>net.dapplo.stripwolf.cbr</string>
+				<string>net.dapplo.stripwolf.cb7</string>
+				<string>net.dapplo.stripwolf.cbt</string>
 			</array>
 		</dict>
 		<dict>
@@ -82,11 +82,11 @@
 			</array>
 		</dict>
 	</array>
-	<key>UTExportedTypeDeclarations</key>
+	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbz-archive</string>
+			<string>net.dapplo.stripwolf.cbz</string>
 			<key>UTTypeDescription</key>
 			<string>Comic Book Zip Archive</string>
 			<key>UTTypeConformsTo</key>
@@ -102,15 +102,14 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
+					<string>application/vnd.comicbook+zip</string>
 					<string>application/x-cbz</string>
-					<string>application/x-zip-compressed</string>
-					<string>application/zip</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbr-archive</string>
+			<string>net.dapplo.stripwolf.cbr</string>
 			<key>UTTypeDescription</key>
 			<string>Comic Book Rar Archive</string>
 			<key>UTTypeConformsTo</key>
@@ -126,14 +125,14 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
+					<string>application/vnd.comicbook-rar</string>
 					<string>application/x-cbr</string>
-					<string>application/x-rar-compressed</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cb7-archive</string>
+			<string>net.dapplo.stripwolf.cb7</string>
 			<key>UTTypeDescription</key>
 			<string>Comic Book 7z Archive</string>
 			<key>UTTypeConformsTo</key>
@@ -150,13 +149,12 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>application/x-cb7</string>
-					<string>application/x-7z-compressed</string>
 				</array>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.cbt-archive</string>
+			<string>net.dapplo.stripwolf.cbt</string>
 			<key>UTTypeDescription</key>
 			<string>Comic Book Tar Archive</string>
 			<key>UTTypeConformsTo</key>
@@ -173,7 +171,6 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>application/x-cbt</string>
-					<string>application/x-tar</string>
 				</array>
 			</dict>
 		</dict>
