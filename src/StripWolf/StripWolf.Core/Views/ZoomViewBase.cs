@@ -379,6 +379,10 @@ public abstract class ZoomViewBase : UserControl
         var zoomPane = vm.IsOverviewOnLeft ? rightPane : leftPane;
         bool stacked = Bounds.Height > Bounds.Width;
 
+        // Without an overview (its Auto row/column collapses) the zoomed area gets the whole view
+        overviewPane.IsVisible = ShowOverview(vm);
+        zoomPane.IsVisible = true;
+
         // Only rebuild the grid when the arrangement changes, this runs for every pan step
         if (_paneArrangement != (stacked, vm.IsOverviewOnLeft))
         {
@@ -425,6 +429,11 @@ public abstract class ZoomViewBase : UserControl
     /// The part of the page (normalized) the overview shows, the whole page unless a view knows where the content is.
     /// </summary>
     protected virtual Rect GetOverviewCrop(ReaderViewModel vm) => new Rect(0, 0, 1, 1);
+
+    /// <summary>
+    /// Whether the overview is worth its space, a view can hide it when it adds nothing to the zoomed area.
+    /// </summary>
+    protected virtual bool ShowOverview(ReaderViewModel vm) => true;
 
     protected abstract void RedrawOverview();
 
