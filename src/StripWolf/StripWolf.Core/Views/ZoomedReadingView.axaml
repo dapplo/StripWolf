@@ -3,15 +3,12 @@
              xmlns:vm="using:StripWolf.Core.ViewModels"
              x:Class="StripWolf.Core.Views.ZoomedReadingView"
              x:DataType="vm:ReaderViewModel">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{Binding LeftColumnWidth}" />
-            <ColumnDefinition Width="{Binding RightColumnWidth}" />
-        </Grid.ColumnDefinitions>
+    <!-- Rows and columns are set by ZoomViewBase: side by side in landscape, overview above the zoom in portrait -->
+    <Grid x:Name="PaneLayoutRoot">
 
         <!-- Left Side -->
 
-        <Grid Grid.Column="0">
+        <Grid x:Name="LeftPane">
             <!-- Overview if Right-Handed -->
             <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#1A1A1A" Margin="4">
                 <Viewbox Stretch="Uniform">
@@ -42,7 +39,7 @@
         </Grid>
 
         <!-- Right Panel -->
-        <Grid Grid.Column="1">
+        <Grid x:Name="RightPane">
             <!-- Zoom Area if Right-Handed -->
             <Border IsVisible="{Binding IsOverviewOnLeft}" Background="#0A0A0A" Margin="4" ClipToBounds="True">
                 <Viewbox x:Name="ZoomedViewboxRight" Stretch="Fill">

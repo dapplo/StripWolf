@@ -603,9 +603,6 @@
   <data name="SectionKeepReading" xml:space="preserve">
     <value>Continuer la lecture</value>
   </data>
-  <data name="CompactOverviewDescription" xml:space="preserve">
-    <value>Lorsqu'elle est activée, la zone d'aperçu n'occupe que l'espace nécessaire selon les proportions de l'image, laissant plus d'espace à la zone zoomée.</value>
-  </data>
   <data name="AppTheme" xml:space="preserve">
     <value>Thème de l'application</value>
   </data>
@@ -654,17 +651,11 @@
   <data name="Handedness" xml:space="preserve">
     <value>Latéralité (pour les modes Zoom/Guidé)</value>
   </data>
-  <data name="CompactOverviewEnabled" xml:space="preserve">
-    <value>Aperçu compact activé</value>
-  </data>
   <data name="Or" xml:space="preserve">
     <value>OU</value>
   </data>
   <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
     <value>Choisissez combien de livres Komga peuvent être téléchargés en même temps.</value>
-  </data>
-  <data name="CompactOverviewDisabled" xml:space="preserve">
-    <value>Aperçu compact désactivé</value>
   </data>
   <data name="SectionLibraries" xml:space="preserve">
     <value>Bibliothèques</value>
@@ -767,9 +758,6 @@
   </data>
   <data name="SectionLayoutDescription" xml:space="preserve">
     <value>Choisissez quelles sections sont affichées, si elles sont développées au démarrage, et l'ordre dans lequel elles apparaissent.</value>
-  </data>
-  <data name="CompactOverview" xml:space="preserve">
-    <value>Aperçu compact</value>
   </data>
   <data name="SectionRecentlyAddedSeries" xml:space="preserve">
     <value>Séries ajoutées récemment</value>

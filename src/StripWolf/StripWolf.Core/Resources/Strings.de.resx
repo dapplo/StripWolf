@@ -603,9 +603,6 @@
   <data name="SectionKeepReading" xml:space="preserve">
     <value>Weiterlesen</value>
   </data>
-  <data name="CompactOverviewDescription" xml:space="preserve">
-    <value>Wenn aktiviert, nimmt die Übersichtsseite nur so viel Platz ein, wie das Seitenverhältnis des Bildes erfordert, wodurch mehr Platz für den gezoomten Bereich bleibt.</value>
-  </data>
   <data name="AppTheme" xml:space="preserve">
     <value>App-Theme</value>
   </data>
@@ -654,17 +651,11 @@
   <data name="Handedness" xml:space="preserve">
     <value>Händigkeit (für gezoomte/geführte Modi)</value>
   </data>
-  <data name="CompactOverviewEnabled" xml:space="preserve">
-    <value>Kompakte Übersicht aktiviert</value>
-  </data>
   <data name="Or" xml:space="preserve">
     <value>ODER</value>
   </data>
   <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
     <value>Wählen Sie aus, wie viele Komga-Bücher gleichzeitig heruntergeladen werden dürfen.</value>
-  </data>
-  <data name="CompactOverviewDisabled" xml:space="preserve">
-    <value>Kompakte Übersicht deaktiviert</value>
   </data>
   <data name="SectionLibraries" xml:space="preserve">
     <value>Bibliotheken</value>
@@ -767,9 +758,6 @@
   </data>
   <data name="SectionLayoutDescription" xml:space="preserve">
     <value>Wählen Sie aus, welche Sektionen angezeigt werden, ob sie ausgeklappt starten und in welcher Reihenfolge sie erscheinen.</value>
-  </data>
-  <data name="CompactOverview" xml:space="preserve">
-    <value>Kompakte Übersicht</value>
   </data>
   <data name="SectionRecentlyAddedSeries" xml:space="preserve">
     <value>Kürzlich hinzugefügte Serien</value>

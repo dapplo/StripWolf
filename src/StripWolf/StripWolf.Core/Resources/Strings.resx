@@ -640,9 +640,6 @@
   <data name="SectionKeepReading" xml:space="preserve">
     <value>Keep Reading</value>
   </data>
-  <data name="CompactOverviewDescription" xml:space="preserve">
-    <value>When enabled, the overview side will only take up as much space as needed by the page aspect ratio, giving more space to the zoomed area.</value>
-  </data>
   <data name="AppTheme" xml:space="preserve">
     <value>App Theme</value>
   </data>
@@ -694,9 +691,6 @@
   <data name="Handedness" xml:space="preserve">
     <value>Handedness (for Zoomed/Guided modes)</value>
   </data>
-  <data name="CompactOverviewEnabled" xml:space="preserve">
-    <value>Compact Overview Enabled</value>
-  </data>
   <data name="Or" xml:space="preserve">
     <value>OR</value>
   </data>
@@ -723,9 +717,6 @@
   </data>
   <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
     <value>Disabled by default to avoid mobile data usage. Enable this to allow Komga downloads on metered connections.</value>
-  </data>
-  <data name="CompactOverviewDisabled" xml:space="preserve">
-    <value>Compact Overview Disabled</value>
   </data>
   <data name="UseFullScreenWhenReading" xml:space="preserve">
     <value>Fullscreen When Reading</value>
@@ -858,9 +849,6 @@
   </data>
   <data name="SectionLayoutDescription" xml:space="preserve">
     <value>Choose which sections are shown, whether they start expanded, and the order they appear in.</value>
-  </data>
-  <data name="CompactOverview" xml:space="preserve">
-    <value>Compact Overview</value>
   </data>
   <data name="SectionRecentlyAddedSeries" xml:space="preserve">
     <value>Recently Added Series</value>
