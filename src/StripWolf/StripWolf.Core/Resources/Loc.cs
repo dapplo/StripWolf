@@ -77,6 +77,7 @@ public class Loc : INotifyPropertyChanged
     public string DefaultReadingDirection => GetString();
     public string Handedness => GetString();
     public string UseFullScreenWhenReading => GetString();
+    public string DimOutsidePanel => GetString();
     public string AppTheme => GetString();
     public string EpubConversionTheme => GetString();
     public string EpubOutputResolution => GetString();
@@ -116,6 +117,8 @@ public class Loc : INotifyPropertyChanged
     public string UnsupportedFormatHandlingConvertWhileReading => GetString();
     public string UseFullScreenWhenReadingEnabled => GetString();
     public string UseFullScreenWhenReadingDisabled => GetString();
+    public string DimOutsidePanelEnabled => GetString();
+    public string DimOutsidePanelDisabled => GetString();
     public string SkipExternalDeleteConfirmationEnabled => GetString();
     public string SkipExternalDeleteConfirmationDisabled => GetString();
     public string AllowMeteredKomgaDownloadsEnabled => GetString();
@@ -138,6 +141,7 @@ public class Loc : INotifyPropertyChanged
     public string ReadingDirectionDescription => GetString();
     public string HandednessDescription => GetString();
     public string UseFullScreenWhenReadingDescription => GetString();
+    public string DimOutsidePanelDescription => GetString();
     public string AppThemeDescription => GetString();
     public string EpubConversionThemeDescription => GetString();
     public string EpubOutputResolutionDescription => GetString();

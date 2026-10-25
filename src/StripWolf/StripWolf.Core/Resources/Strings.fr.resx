@@ -1026,4 +1026,16 @@
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Intégration du serveur Komga</value>
   </data>
+  <data name="DimOutsidePanel" xml:space="preserve">
+    <value>Assombrir hors de la case</value>
+  </data>
+  <data name="DimOutsidePanelEnabled" xml:space="preserve">
+    <value>Assombrissement activé</value>
+  </data>
+  <data name="DimOutsidePanelDisabled" xml:space="preserve">
+    <value>Assombrissement désactivé</value>
+  </data>
+  <data name="DimOutsidePanelDescription" xml:space="preserve">
+    <value>En lecture guidée, assombrit les parties de la vue agrandie qui n'appartiennent pas à la case actuelle.</value>
+  </data>
 </root>

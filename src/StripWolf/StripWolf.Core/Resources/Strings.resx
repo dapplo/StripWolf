@@ -1138,4 +1138,16 @@
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Komga Server Integration</value>
   </data>
+  <data name="DimOutsidePanel" xml:space="preserve">
+    <value>Dim Outside Panel</value>
+  </data>
+  <data name="DimOutsidePanelEnabled" xml:space="preserve">
+    <value>Dimming Enabled</value>
+  </data>
+  <data name="DimOutsidePanelDisabled" xml:space="preserve">
+    <value>Dimming Disabled</value>
+  </data>
+  <data name="DimOutsidePanelDescription" xml:space="preserve">
+    <value>In guided reading, darkens the parts of the zoomed view that do not belong to the current panel.</value>
+  </data>
 </root>

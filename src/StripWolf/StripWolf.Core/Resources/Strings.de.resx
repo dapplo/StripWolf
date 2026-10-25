@@ -1026,4 +1026,16 @@
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Komga-Server-Integration</value>
   </data>
+  <data name="DimOutsidePanel" xml:space="preserve">
+    <value>Außerhalb des Panels abdunkeln</value>
+  </data>
+  <data name="DimOutsidePanelEnabled" xml:space="preserve">
+    <value>Abdunkeln aktiviert</value>
+  </data>
+  <data name="DimOutsidePanelDisabled" xml:space="preserve">
+    <value>Abdunkeln deaktiviert</value>
+  </data>
+  <data name="DimOutsidePanelDescription" xml:space="preserve">
+    <value>Dunkelt beim geführten Lesen die Bereiche der vergrößerten Ansicht ab, die nicht zum aktuellen Panel gehören.</value>
+  </data>
 </root>

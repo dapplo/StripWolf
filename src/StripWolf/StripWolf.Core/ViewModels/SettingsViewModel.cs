@@ -199,6 +199,9 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _useFullScreenWhenReading;
 
     [ObservableProperty]
+    private bool _dimOutsidePanel;
+
+    [ObservableProperty]
     private AppThemeOption? _selectedAppThemeOption;
 
     [ObservableProperty]
@@ -585,6 +588,7 @@ public partial class SettingsViewModel : ViewModelBase
         SelectedHandednessOption = AvailableHandednessOptions.FirstOrDefault(o => o.Value == _appSettings.Handedness) ?? AvailableHandednessOptions[0];
         SelectedStartupBehaviorOption = AvailableStartupBehaviors.FirstOrDefault(o => o.Value == _appSettings.StartupBehavior) ?? AvailableStartupBehaviors[0];
         UseFullScreenWhenReading = _appSettings.UseFullScreenWhenReading;
+        DimOutsidePanel = _appSettings.DimOutsidePanel;
         SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme) ?? AvailableEpubConversionThemes[0];
         SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
         SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode) ?? AvailableUnsupportedFormatHandlingModes[0];
@@ -648,6 +652,15 @@ public partial class SettingsViewModel : ViewModelBase
         if (_appSettings is not null)
         {
             UpdateSetting(s => s.UseFullScreenWhenReading = value);
+        }
+    }
+
+    partial void OnDimOutsidePanelChanged(bool value)
+    {
+        // Save to settings
+        if (_appSettings is not null)
+        {
+            UpdateSetting(s => s.DimOutsidePanel = value);
         }
     }
 

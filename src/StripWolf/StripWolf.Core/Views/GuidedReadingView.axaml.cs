@@ -50,7 +50,9 @@ public partial class GuidedReadingView : ZoomViewBase
     }
 
     private static readonly IImmutableSolidColorBrush CurrentPanelFill = new ImmutableSolidColorBrush(Colors.Yellow, 0.2);
+    private static readonly IImmutableSolidColorBrush OutsidePanelFill = new ImmutableSolidColorBrush(Colors.Black, 0.45);
     private Rectangle? _zoomRect;
+    private Avalonia.Controls.Shapes.Path? _outsidePanelShade;
     private readonly List<Rectangle> _panelRects = new();
 
     protected override void RedrawOverview()
@@ -121,6 +123,39 @@ public partial class GuidedReadingView : ZoomViewBase
 
     // A page with a single panel (e.g. a cover) is shown completely in the zoomed area, the overview would only repeat it
     protected override bool ShowOverview(ReaderViewModel vm) => vm.CurrentPagePanels?.Panels.Count != 1;
+
+    protected override void RedrawZoomedArea(ReaderViewModel vm, Canvas canvas, Rect imageRect)
+    {
+        var panel = vm.CurrentPanel;
+        if (!vm.DimOutsidePanel || panel == null)
+        {
+            if (_outsidePanelShade != null) _outsidePanelShade.IsVisible = false;
+            return;
+        }
+
+        if (_outsidePanelShade == null)
+        {
+            _outsidePanelShade = new Avalonia.Controls.Shapes.Path { Fill = OutsidePanelFill, IsHitTestVisible = false };
+        }
+        // The zoomed canvas changes side with the handedness
+        if (_outsidePanelShade.Parent != canvas)
+        {
+            (_outsidePanelShade.Parent as Canvas)?.Children.Remove(_outsidePanelShade);
+            canvas.Children.Add(_outsidePanelShade);
+        }
+
+        // Even-odd fill of the whole canvas with the panel as hole: everything but the current panel gets darker
+        var panelRect = new Rect(
+            imageRect.X + panel.X * imageRect.Width,
+            imageRect.Y + panel.Y * imageRect.Height,
+            panel.Width * imageRect.Width,
+            panel.Height * imageRect.Height);
+        var geometry = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        geometry.Children.Add(new RectangleGeometry(new Rect(0, 0, canvas.Width, canvas.Height).Union(panelRect)));
+        geometry.Children.Add(new RectangleGeometry(panelRect));
+        _outsidePanelShade.Data = geometry;
+        _outsidePanelShade.IsVisible = true;
+    }
 
     protected override Rect GetOverviewCrop(ReaderViewModel vm)
     {

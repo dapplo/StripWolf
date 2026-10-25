@@ -319,6 +319,9 @@ public partial class ReaderViewModel : ViewModelBase
     private Handedness _handedness = Handedness.RightHanded;
 
     [ObservableProperty]
+    private bool _dimOutsidePanel = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPreviousPage))]
     [NotifyPropertyChangedFor(nameof(HasNextPage))]
     [NotifyPropertyChangedFor(nameof(PageDisplay))]
@@ -1007,6 +1010,7 @@ public partial class ReaderViewModel : ViewModelBase
             var settings = _settingsService.LoadSettings();
             ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
+            DimOutsidePanel = settings.DimOutsidePanel;
             SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == settings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
             IsFullScreen = settings.UseFullScreenWhenReading;
