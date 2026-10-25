@@ -115,6 +115,11 @@ public class AppSettings
     public bool UseFullScreenWhenReading { get; set; } = false;
 
     /// <summary>
+    /// Whether guided reading darkens the part of the zoomed area outside the current panel
+    /// </summary>
+    public bool DimOutsidePanel { get; set; } = true;
+
+    /// <summary>
     /// Theme to use for the application UI.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<AppThemePreference>))]
@@ -221,6 +226,7 @@ public class AppSettings
             PreferredReadingDirectionMode = PreferredReadingDirectionMode,
             DefaultZoomRegionSize = DefaultZoomRegionSize,
             UseFullScreenWhenReading = UseFullScreenWhenReading,
+            DimOutsidePanel = DimOutsidePanel,
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
             UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,

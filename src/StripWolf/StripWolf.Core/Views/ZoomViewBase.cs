@@ -223,7 +223,8 @@ public abstract class ZoomViewBase : UserControl
             e.PropertyName == nameof(ReaderViewModel.CurrentPageImage) ||
             e.PropertyName == nameof(ReaderViewModel.CurrentPanel) ||
             e.PropertyName == nameof(ReaderViewModel.CurrentPagePanels) ||
-            e.PropertyName == nameof(ReaderViewModel.Handedness))
+            e.PropertyName == nameof(ReaderViewModel.Handedness) ||
+            e.PropertyName == nameof(ReaderViewModel.DimOutsidePanel))
         {
             ScheduleZoomRegionUpdate();
         }
@@ -352,8 +353,11 @@ public abstract class ZoomViewBase : UserControl
             areaImage.Height = displayImgHeight;
 
             // Position image so the requested region center is at canvas center
-            Canvas.SetLeft(areaImage, (canvas.Width / 2) - (region.CenterX * displayImgWidth));
-            Canvas.SetTop(areaImage, (canvas.Height / 2) - (region.CenterY * displayImgHeight));
+            double imageLeft = (canvas.Width / 2) - (region.CenterX * displayImgWidth);
+            double imageTop = (canvas.Height / 2) - (region.CenterY * displayImgHeight);
+            Canvas.SetLeft(areaImage, imageLeft);
+            Canvas.SetTop(areaImage, imageTop);
+            RedrawZoomedArea(vm, canvas, new Rect(imageLeft, imageTop, displayImgWidth, displayImgHeight));
 
             // Track what portion of the image is actually visible in the window for RedrawOverview
             _actualDisplayWidthNormalized = canvas.Width / displayImgWidth;
@@ -434,6 +438,13 @@ public abstract class ZoomViewBase : UserControl
     /// Whether the overview is worth its space, a view can hide it when it adds nothing to the zoomed area.
     /// </summary>
     protected virtual bool ShowOverview(ReaderViewModel vm) => true;
+
+    /// <summary>
+    /// Draw on top of the zoomed area, imageRect is where the page image is in the canvas coordinates.
+    /// </summary>
+    protected virtual void RedrawZoomedArea(ReaderViewModel vm, Canvas canvas, Rect imageRect)
+    {
+    }
 
     protected abstract void RedrawOverview();
 

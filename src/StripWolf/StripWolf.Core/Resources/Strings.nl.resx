@@ -1036,4 +1036,16 @@
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Komga server integratie</value>
   </data>
+  <data name="DimOutsidePanel" xml:space="preserve">
+    <value>Buiten het paneel dimmen</value>
+  </data>
+  <data name="DimOutsidePanelEnabled" xml:space="preserve">
+    <value>Dimmen ingeschakeld</value>
+  </data>
+  <data name="DimOutsidePanelDisabled" xml:space="preserve">
+    <value>Dimmen uitgeschakeld</value>
+  </data>
+  <data name="DimOutsidePanelDescription" xml:space="preserve">
+    <value>Maakt bij begeleid lezen de delen van de vergrote weergave die niet bij het huidige paneel horen donkerder.</value>
+  </data>
 </root>

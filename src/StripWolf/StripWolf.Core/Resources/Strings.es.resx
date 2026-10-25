@@ -1026,4 +1026,16 @@
   <data name="TrialKomgaServerIntegration" xml:space="preserve">
     <value>Integración con el servidor Komga</value>
   </data>
+  <data name="DimOutsidePanel" xml:space="preserve">
+    <value>Oscurecer fuera de la viñeta</value>
+  </data>
+  <data name="DimOutsidePanelEnabled" xml:space="preserve">
+    <value>Oscurecimiento activado</value>
+  </data>
+  <data name="DimOutsidePanelDisabled" xml:space="preserve">
+    <value>Oscurecimiento desactivado</value>
+  </data>
+  <data name="DimOutsidePanelDescription" xml:space="preserve">
+    <value>En la lectura guiada, oscurece las partes de la vista ampliada que no pertenecen a la viñeta actual.</value>
+  </data>
 </root>
