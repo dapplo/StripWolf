@@ -125,8 +125,10 @@ public static class GutterPanelDetector
         int bands = panels.Count(panel => panel.X <= PageEdgeRatio && panel.X + panel.Width >= 1 - PageEdgeRatio);
         bool hasFrames = mask.FrameEvidence.Any(evidence => evidence >= NoFrameEvidence);
         bool isBandPage = (bands == panels.Count || (bands >= 2 && bands >= panels.Count - 1)) && !hasFrames;
-        log?.Invoke($"{panels.Count} panels, {bands} edge to edge bands{(isBandPage ? ", band page: splash" : string.Empty)}");
-        return panels.Count > 1 && !isBandPage ? panels : [];
+        // Cuts without a frame along any of them on a page without insets: light areas of one full-bleed panel
+        bool isFramelessPage = !hasFrames && mask.FrameEvidence.Count > 0 && !mask.HasInsets;
+        log?.Invoke($"{panels.Count} panels, {bands} edge to edge bands{(isBandPage ? ", band page: splash" : string.Empty)}{(isFramelessPage ? ", no frames: splash" : string.Empty)}");
+        return panels.Count > 1 && !isBandPage && !isFramelessPage ? panels : [];
     }
 
     private static ContentMask? CreateContentMask(byte[] pageData, bool findInsets)
@@ -700,6 +702,8 @@ public static class GutterPanelDetector
                 result.Add(leaf);
                 continue;
             }
+
+            mask.HasInsets = true;
 
             // The background panel(s): what is left with the insets cleared, holes are no gutters
             var saved = mask.Snapshot();
@@ -1309,6 +1313,9 @@ public static class GutterPanelDetector
 
             return lines.Area == 0 || sum / lines.Area <= flatness;
         }
+
+        /// <summary>Whether framed insets were found on the page.</summary>
+        public bool HasInsets { get; set; }
 
         /// <summary>The colour of the gutters when it differs from the page background, once found.</summary>
         public int? GutterColour { get; set; }

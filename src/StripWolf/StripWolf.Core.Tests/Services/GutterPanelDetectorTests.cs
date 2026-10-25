@@ -174,4 +174,50 @@ public sealed class GutterPanelDetectorTests
             Assert.InRange(panels[1].Y + panels[1].Height, 0.35, 0.38);
         }
     }
+
+    /// <summary>
+    /// One full-bleed panel: art over the top of the page down to a straight edge, below it a flat grey floor with a
+    /// small object on it. There is no frame anywhere, the art is not much darker than the floor.
+    /// </summary>
+    private static byte[] CreateFullBleedPageWithToneEdge(int width, int height)
+    {
+        int edge = height * 73 / 100;
+        var random = new Random(3);
+        using var image = new Image<L8>(width, height);
+        image.ProcessPixelRows(accessor =>
+        {
+            for (int y = 0; y < height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (int x = 0; x < width; x++)
+                {
+                    bool isObject = x > width * 22 / 100 && x < width * 71 / 100 && y > height * 88 / 100 && y < height * 97 / 100;
+                    row[x] = y < edge || isObject
+                        ? new L8((byte)(140 + ((x / 19 + y / 27) % 6) * 20 + random.Next(4)))
+                        : new L8((byte)(196 + random.Next(4)));
+                }
+            }
+        });
+
+        using var stream = new MemoryStream();
+        image.SaveAsPng(stream);
+        return stream.ToArray();
+    }
+
+    [Theory]
+    [InlineData(2400, 3392)]
+    [InlineData(1200, 1696)]
+    public void Detect_FullBleedPageWithToneEdge_IsOnePanel(int width, int height)
+    {
+        var page = CreateFullBleedPageWithToneEdge(width, height);
+
+        foreach (bool findInsets in new[] { false, true })
+        {
+            var log = new List<string>();
+            var panels = GutterPanelDetector.Detect(0, page, false, log.Add, findInsets);
+
+            // No panels: the reader shows the whole page
+            Assert.True(panels.Count == 0, string.Join(" | ", log));
+        }
+    }
 }
