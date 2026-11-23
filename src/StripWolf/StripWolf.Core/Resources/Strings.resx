@@ -943,6 +943,24 @@
   <data name="BringMeThere" xml:space="preserve">
     <value>Bring me there</value>
   </data>
+  <data name="InstallUpdate" xml:space="preserve">
+    <value>Install update</value>
+  </data>
+  <data name="UpdatePopupMessageInstall" xml:space="preserve">
+    <value>A newer version ({0}) is available. StripWolf can download and install it for you. Android asks you to confirm the update, and the first time to allow StripWolf to install apps.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Downloading update… {0}%</value>
+  </data>
+  <data name="UpdateReadyToInstall" xml:space="preserve">
+    <value>Confirm the update in the Android dialog</value>
+  </data>
+  <data name="UpdateDownloadFailed" xml:space="preserve">
+    <value>Downloading the update failed</value>
+  </data>
+  <data name="UpdateNoDownloadFound" xml:space="preserve">
+    <value>No download for this device in the release</value>
+  </data>
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>

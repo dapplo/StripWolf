@@ -71,6 +71,12 @@ public partial class App : Application
     /// </summary>
     public static Action<IServiceCollection>? RegisterBillingService { get; set; }
 
+    /// <summary>
+    /// Action to register the platform-specific update installer (the Android build from GitHub installs its own APK).
+    /// Without it, updates are offered as a link to the release page.
+    /// </summary>
+    public static Action<IServiceCollection>? RegisterAppUpdateInstaller { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -368,6 +374,14 @@ public partial class App : Application
         else
         {
             services.AddSingleton<IFullScreenService, DefaultFullScreenService>();
+        }
+        if (RegisterAppUpdateInstaller is not null)
+        {
+            RegisterAppUpdateInstaller(services);
+        }
+        else
+        {
+            services.AddSingleton<IAppUpdateInstaller, UnsupportedAppUpdateInstaller>();
         }
         services.AddSingleton<PdfToCbzConverterService>();
         services.AddSingleton<EpubToCbzConverterService>();

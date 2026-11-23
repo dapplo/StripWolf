@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace StripWolf.Core.Models;
@@ -26,5 +27,20 @@ namespace StripWolf.Core.Models;
 /// </summary>
 public record GitHubRelease(
     [property: JsonPropertyName("tag_name")] string TagName,
-    [property: JsonPropertyName("html_url")] string HtmlUrl
+    [property: JsonPropertyName("html_url")] string HtmlUrl,
+    [property: JsonPropertyName("assets")] List<GitHubReleaseAsset>? Assets = null
+);
+
+/// <summary>
+/// A file attached to a GitHub release
+/// </summary>
+/// <param name="Name">The file name, e.g. StripWolf-Android-arm64-v1.0.79-gc97e8f0.apk</param>
+/// <param name="DownloadUrl">The public download URL</param>
+/// <param name="Size">The size in bytes</param>
+/// <param name="Digest">The checksum GitHub calculated on upload, e.g. "sha256:1f07..." (missing on old releases)</param>
+public record GitHubReleaseAsset(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("browser_download_url")] string DownloadUrl,
+    [property: JsonPropertyName("size")] long Size,
+    [property: JsonPropertyName("digest")] string? Digest = null
 );

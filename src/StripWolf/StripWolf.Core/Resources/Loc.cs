@@ -319,6 +319,12 @@ public class Loc : INotifyPropertyChanged
     public string UpdateAvailable => GetString();
     public string UpdatePopupMessage => GetString();
     public string BringMeThere => GetString();
+    public string InstallUpdate => GetString();
+    public string UpdatePopupMessageInstall => GetString();
+    public string UpdateDownloading => GetString();
+    public string UpdateReadyToInstall => GetString();
+    public string UpdateDownloadFailed => GetString();
+    public string UpdateNoDownloadFound => GetString();
     public string Ok => GetString();
 
     // Welcome Experience

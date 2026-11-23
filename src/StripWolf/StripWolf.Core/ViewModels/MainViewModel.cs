@@ -83,6 +83,18 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _updateNotificationMessage = string.Empty;
 
+    /// <summary>
+    /// The update service, the update popup shows its download progress
+    /// </summary>
+    public UpdateService UpdateService => _updateService;
+
+    /// <summary>
+    /// The label of the update popup's main button: install it ourselves, or go to the release page
+    /// </summary>
+    public string UpdateNotificationActionLabel => _updateService.CanInstallUpdate
+        ? Resources.Loc.Instance.InstallUpdate
+        : Resources.Loc.Instance.BringMeThere;
+
     [ObservableProperty]
     private bool _showWelcomeExperience;
 
@@ -148,7 +160,11 @@ public partial class MainViewModel : ViewModelBase
         
         _updateService.NewVersionDetected += (sender, version) =>
         {
-            UpdateNotificationMessage = string.Format(Resources.Loc.Instance.UpdatePopupMessage, version);
+            var message = _updateService.CanInstallUpdate
+                ? Resources.Loc.Instance.UpdatePopupMessageInstall
+                : Resources.Loc.Instance.UpdatePopupMessage;
+            UpdateNotificationMessage = string.Format(message, version);
+            OnPropertyChanged(nameof(UpdateNotificationActionLabel));
             ShowUpdateNotification = true;
         };
 
@@ -488,10 +504,20 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void GoToUpdate()
+    private async Task GoToUpdateAsync()
     {
-        ShowUpdateNotification = false;
-        _updateService.GoToReleases();
+        if (!_updateService.CanInstallUpdate)
+        {
+            ShowUpdateNotification = false;
+            _updateService.GoToReleases();
+            return;
+        }
+
+        // Keep the popup open while downloading, it shows the progress (and the error, if there is one)
+        if (await _updateService.DownloadAndInstallUpdateAsync())
+        {
+            ShowUpdateNotification = false;
+        }
     }
 
     [RelayCommand]

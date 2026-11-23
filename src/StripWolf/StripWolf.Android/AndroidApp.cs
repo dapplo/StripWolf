@@ -47,6 +47,10 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
             services.AddSingleton<INetworkConnectionService, AndroidNetworkConnectionService>();
         App.RegisterFullScreenService = services =>
             services.AddSingleton<IFullScreenService, AndroidFullScreenService>();
+#if !PLAY_STORE_BUILD
+        App.RegisterAppUpdateInstaller = services =>
+            services.AddSingleton<IAppUpdateInstaller, AndroidAppUpdateInstaller>();
+#endif
               
         return base.CustomizeAppBuilder(builder)
             .WithInterFont();

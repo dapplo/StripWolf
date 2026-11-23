@@ -18,9 +18,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,7 +41,15 @@ public partial class UpdateService : ObservableObject
 {
     private readonly SettingsService _settingsService;
     private readonly IExternalLinkService _externalLinkService;
+    private readonly IAppUpdateInstaller _appUpdateInstaller;
+    private readonly TrialService _trialService;
     private static readonly HttpClient HttpClient = new();
+    private const string LatestReleaseUrl = "https://api.github.com/repos/dapplo/StripWolf/releases/latest";
+
+    /// <summary>
+    /// The release found by the last check, so installing it doesn't need to ask GitHub again
+    /// </summary>
+    private GitHubRelease? _latestRelease;
 
     static UpdateService()
     {
@@ -44,6 +57,7 @@ public partial class UpdateService : ObservableObject
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanInstallAvailableUpdate))]
     private bool _isNewerVersionAvailable;
 
     [ObservableProperty]
@@ -55,16 +69,32 @@ public partial class UpdateService : ObservableObject
     [ObservableProperty]
     private string? _updateStatus;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanStartUpdateInstall))]
+    private bool _isDownloadingUpdate;
+
+    /// <summary>
+    /// Progress or error of downloading and installing an update, null when nothing happened yet
+    /// </summary>
+    [ObservableProperty]
+    private string? _updateInstallStatus;
+
     /// <summary>
     /// Event raised when a newer version has been detected.
     /// Passes the version tag string.
     /// </summary>
     public event EventHandler<string>? NewVersionDetected;
 
-    public UpdateService(SettingsService settingsService, IExternalLinkService externalLinkService)
+    public UpdateService(
+        SettingsService settingsService,
+        IExternalLinkService externalLinkService,
+        IAppUpdateInstaller appUpdateInstaller,
+        TrialService trialService)
     {
         _settingsService = settingsService;
         _externalLinkService = externalLinkService;
+        _appUpdateInstaller = appUpdateInstaller;
+        _trialService = trialService;
 
         // Load initial state from settings
         var settings = _settingsService.LoadSettings();
@@ -75,6 +105,32 @@ public partial class UpdateService : ObservableObject
             _isNewerVersionAvailable = IsNewerVersion(currentVersion, _latestVersion);
         }
     }
+
+    /// <summary>
+    /// Whether this build can download and install an update itself: only the unlocked Android build from the
+    /// GitHub releases. The Play Store build is updated by the store, other platforms use the release page.
+    /// </summary>
+    public bool CanInstallUpdate
+    {
+        get
+        {
+#if PLAY_STORE_BUILD
+            return false;
+#else
+            return _appUpdateInstaller.IsSupported && _trialService.IsUnlimitedUnlocked;
+#endif
+        }
+    }
+
+    /// <summary>
+    /// Whether the install button should be enabled right now
+    /// </summary>
+    public bool CanStartUpdateInstall => CanInstallUpdate && !IsDownloadingUpdate;
+
+    /// <summary>
+    /// Whether there is a newer version which this build can install itself
+    /// </summary>
+    public bool CanInstallAvailableUpdate => CanInstallUpdate && IsNewerVersionAvailable;
 
     /// <summary>
     /// Gets the current running version string stripped of metadata
@@ -187,7 +243,7 @@ public partial class UpdateService : ObservableObject
 
         try
         {
-            var response = await HttpClient.GetAsync("https://api.github.com/repos/dapplo/StripWolf/releases/latest");
+            var response = await HttpClient.GetAsync(LatestReleaseUrl);
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
@@ -195,6 +251,7 @@ public partial class UpdateService : ObservableObject
 
                 if (release != null && !string.IsNullOrEmpty(release.TagName))
                 {
+                    _latestRelease = release;
                     var currentVersion = GetRawCurrentVersion();
                     var isNewer = IsNewerVersion(currentVersion, release.TagName);
 
@@ -267,6 +324,163 @@ public partial class UpdateService : ObservableObject
                 UpdateStatus = null;
             }
         });
+    }
+
+    /// <summary>
+    /// Downloads the update for this device from the latest GitHub release and hands it to the system installer,
+    /// which asks the user to confirm. Falls back to the release page when that isn't possible.
+    /// </summary>
+    /// <returns>True when the system installer was started</returns>
+    public async Task<bool> DownloadAndInstallUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        if (!CanInstallUpdate)
+        {
+            GoToReleases();
+            return false;
+        }
+        if (IsDownloadingUpdate) return false;
+
+        IsDownloadingUpdate = true;
+        UpdateInstallStatus = string.Format(Resources.Loc.Instance.UpdateDownloading, 0);
+        try
+        {
+            var release = _latestRelease ?? await FetchLatestReleaseAsync(cancellationToken);
+            if (release?.Assets is not { Count: > 0 } assets || _appUpdateInstaller.SelectAsset(assets) is not { } asset)
+            {
+                // The release has no file for this device (yet), let the user look for themselves
+                UpdateInstallStatus = Resources.Loc.Instance.UpdateNoDownloadFound;
+                GoToReleases();
+                return false;
+            }
+
+            // Download off the UI thread, the progress is posted back to it
+            var downloadDirectory = _appUpdateInstaller.DownloadDirectory;
+            var filePath = await Task.Run(() => DownloadAssetAsync(asset, downloadDirectory, percent =>
+                Dispatcher.UIThread.Post(() => UpdateInstallStatus = string.Format(Resources.Loc.Instance.UpdateDownloading, percent)),
+                cancellationToken), cancellationToken);
+
+            UpdateInstallStatus = Resources.Loc.Instance.UpdateReadyToInstall;
+            _appUpdateInstaller.LaunchInstaller(filePath);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.Error("Downloading the update failed", ex);
+            UpdateInstallStatus = Resources.Loc.Instance.UpdateDownloadFailed;
+            return false;
+        }
+        finally
+        {
+            IsDownloadingUpdate = false;
+        }
+    }
+
+    private static async Task<GitHubRelease?> FetchLatestReleaseAsync(CancellationToken cancellationToken)
+    {
+        using var response = await HttpClient.GetAsync(LatestReleaseUrl, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.GitHubRelease);
+    }
+
+    /// <summary>
+    /// Downloads a release file into the (cleared) directory and checks its size and checksum
+    /// </summary>
+    /// <returns>The path of the downloaded file</returns>
+    internal static async Task<string> DownloadAssetAsync(
+        GitHubReleaseAsset asset,
+        string directory,
+        Action<int>? progress,
+        CancellationToken cancellationToken,
+        HttpClient? httpClient = null)
+    {
+        // Only one update is kept, remove what earlier downloads left behind
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+        Directory.CreateDirectory(directory);
+
+        // The name comes from GitHub, don't let it point outside the directory
+        var filePath = Path.Combine(directory, Path.GetFileName(asset.Name));
+        var client = httpClient ?? HttpClient;
+        using (var response = await client.GetAsync(asset.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+        {
+            response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength ?? asset.Size;
+            await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var target = File.Create(filePath);
+            var buffer = new byte[81920];
+            long received = 0;
+            var lastPercent = -1;
+            int read;
+            while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                received += read;
+                if (total > 0)
+                {
+                    var percent = (int)Math.Min(100, received * 100 / total);
+                    if (percent != lastPercent)
+                    {
+                        lastPercent = percent;
+                        progress?.Invoke(percent);
+                    }
+                }
+            }
+        }
+
+        var length = new FileInfo(filePath).Length;
+        if (asset.Size > 0 && length != asset.Size)
+        {
+            File.Delete(filePath);
+            throw new InvalidDataException($"The download of {asset.Name} has {length} bytes, the release says {asset.Size}");
+        }
+        if (!await MatchesDigestAsync(filePath, asset.Digest, cancellationToken))
+        {
+            File.Delete(filePath);
+            throw new InvalidDataException($"The checksum of {asset.Name} doesn't match {asset.Digest}");
+        }
+        return filePath;
+    }
+
+    /// <summary>
+    /// Checks a file against a GitHub asset digest ("sha256:hex"). Old releases have no digest, those pass.
+    /// </summary>
+    internal static async Task<bool> MatchesDigestAsync(string filePath, string? digest, CancellationToken cancellationToken = default)
+    {
+        const string sha256Prefix = "sha256:";
+        if (string.IsNullOrWhiteSpace(digest) || !digest.StartsWith(sha256Prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        await using var stream = File.OpenRead(filePath);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return string.Equals(Convert.ToHexString(hash), digest[sha256Prefix.Length..].Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Picks the Android APK of a release that matches the processor architecture.
+    /// The release workflow names them StripWolf-Android-arm64-{version}.apk and StripWolf-Android-x86_64-{version}.apk.
+    /// </summary>
+    public static GitHubReleaseAsset? SelectAndroidApkAsset(IReadOnlyList<GitHubReleaseAsset> assets, Architecture architecture)
+    {
+        var abi = architecture switch
+        {
+            Architecture.Arm64 => "arm64",
+            Architecture.X64 => "x86_64",
+            _ => null
+        };
+        if (abi is null)
+        {
+            return null;
+        }
+
+        var prefix = $"StripWolf-Android-{abi}-";
+        return assets.FirstOrDefault(a =>
+            a.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+            a.Name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

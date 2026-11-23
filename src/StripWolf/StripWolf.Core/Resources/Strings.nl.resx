@@ -841,6 +841,24 @@
   <data name="BringMeThere" xml:space="preserve">
     <value>Breng me erheen</value>
   </data>
+  <data name="InstallUpdate" xml:space="preserve">
+    <value>Update installeren</value>
+  </data>
+  <data name="UpdatePopupMessageInstall" xml:space="preserve">
+    <value>Er is een nieuwere versie ({0}) beschikbaar. StripWolf kan deze voor je downloaden en installeren. Android vraagt je de update te bevestigen, en de eerste keer om StripWolf toestemming te geven apps te installeren.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Update downloaden… {0}%</value>
+  </data>
+  <data name="UpdateReadyToInstall" xml:space="preserve">
+    <value>Bevestig de update in het Android-venster</value>
+  </data>
+  <data name="UpdateDownloadFailed" xml:space="preserve">
+    <value>Het downloaden van de update is mislukt</value>
+  </data>
+  <data name="UpdateNoDownloadFound" xml:space="preserve">
+    <value>Deze release bevat geen download voor dit apparaat</value>
+  </data>
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
