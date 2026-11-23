@@ -51,6 +51,19 @@
     <TrimmerRootAssembly Include="SQLite-net" />
   </ItemGroup>
 
+  <!--
+    .NET 11 Native AOT only compiles satellite assemblies with AssetType "resources" (from packages) into the binary.
+    The translations of StripWolf.Core (de, es, fr, nl) come from a project reference and have no AssetType, so they
+    weren't compiled in (no translations at runtime) and were published as loose de/StripWolf.Core.resources.dll files,
+    which broke codesign of the macOS app bundle. Hand them to ILC as well, NativeCompile then removes them from the publish output.
+  -->
+  <Target Name="StripWolfIlcProjectSatelliteAssemblies" AfterTargets="_ComputeIlcCompileInputs" Condition="'$(PublishAot)' == 'true'">
+    <ItemGroup>
+      <_StripWolfProjectSatellite Include="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Extension)' == '.dll' and $([System.String]::Copy('%(ResolvedFileToPublish.Filename)').EndsWith('.resources')) and '%(ResolvedFileToPublish.AssetType)' != 'resources'" />
+      <IlcSatelliteAssembly Include="@(_StripWolfProjectSatellite)" Exclude="@(IlcSatelliteAssembly)" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup Condition="'$(UseEpubSupport)' == 'true' and '$(StripWolfTargetWindows)' == 'true'">
     <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
   </ItemGroup>
