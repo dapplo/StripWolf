@@ -89,11 +89,16 @@
           
           <TextBlock Text="{Binding UpdateNotificationMessage}" TextWrapping="Wrap"/>
 
+          <!-- Download progress or error when the update is installed by StripWolf itself (Android build from GitHub) -->
+          <TextBlock Text="{Binding UpdateService.UpdateInstallStatus}" Foreground="Gray" FontSize="12" TextWrapping="Wrap"
+                     IsVisible="{Binding UpdateService.UpdateInstallStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
           <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
             <Button Content="{Binding Ok, Source={x:Static res:Loc.Instance}}" 
                     Command="{Binding CloseUpdateNotificationCommand}"/>
-            <Button Content="{Binding BringMeThere, Source={x:Static res:Loc.Instance}}" 
+            <Button Content="{Binding UpdateNotificationActionLabel}" 
                     Command="{Binding GoToUpdateCommand}" 
+                    IsEnabled="{Binding !UpdateService.IsDownloadingUpdate}"
                     Classes="accent"/>
           </StackPanel>
         </StackPanel>

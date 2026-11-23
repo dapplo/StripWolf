@@ -584,6 +584,12 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task InstallUpdateAsync()
+    {
+        await _updateService.DownloadAndInstallUpdateAsync();
+    }
+
+    [RelayCommand]
     private void LoadServers()
     {
         _appSettings = _settingsService.LoadSettings();

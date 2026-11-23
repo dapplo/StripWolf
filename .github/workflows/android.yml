@@ -1,0 +1,97 @@
+name: Android
+
+# Builds the Android APK (GitHub release flavor) and the Play Store bundle for a pull request which changes the
+# Android app, so Android-only code is compiled before it is merged. The APK is uploaded for testing on a device.
+# The release itself is built by release.yml.
+on:
+  pull_request:
+    paths:
+      - 'src/StripWolf/StripWolf.Android/**'
+      - 'src/StripWolf/StripWolf.Core/Services/UpdateService.cs'
+      - 'src/StripWolf/StripWolf.Core/Services/IAppUpdateInstaller.cs'
+      - 'src/StripWolf/Directory.Packages.props'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Not a release: GitVersion.MsBuild crashes on the merge commit of a pull request (see tests.yml).
+  # Version 0.0.1 with versionCode 1, so every release counts as newer (handy to test the in-app update).
+  BUILD_ARGS: -c Release -p:DisableGitVersionTask=true -p:Version=0.0.1 -p:ApplicationDisplayVersion=0.0.1 -p:ApplicationVersion=1 -p:DebugType=none -p:DebugSymbols=false -p:AllowedReferenceRelatedFileExtensions=none
+
+jobs:
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Restore dependencies
+        run: dotnet restore src/StripWolf/StripWolf.Android/StripWolf.Android.csproj
+
+      - name: Setup signing keystore
+        # The release key when available (pull requests from this repository), so the APK installs over a release
+        # and a release installs over it. Otherwise a throw-away key.
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > src/StripWolf/StripWolf.Android/StripWolf.keystore
+          else
+            keytool -genkeypair -keystore src/StripWolf/StripWolf.Android/StripWolf.keystore -alias StripWolf \
+              -keyalg RSA -keysize 2048 -validity 30 -storepass android -keypass android \
+              -dname "CN=StripWolf CI, O=Dapplo, C=NL"
+          fi
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build ARM64 APK (GitHub release flavor)
+        run: dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj $BUILD_ARGS -r android-arm64 -p:RuntimeIdentifier=android-arm64 -o publish/android-arm64
+        env:
+          ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
+          ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
+
+      - name: Build App Bundle (Play Store flavor)
+        run: >-
+          dotnet publish src/StripWolf/StripWolf.Android/StripWolf.Android.csproj $BUILD_ARGS -o publish/android-aab
+          -p:AndroidPackageFormat=aab -p:AndroidCreatePackagePerAbi=false -p:IsPlayStoreBuild=true
+          -p:RuntimeIdentifiers='"android-arm64;android-x64"'
+        env:
+          ANDROID_SIGNING_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASS || 'android' }}
+          ANDROID_SIGNING_STORE_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASS || 'android' }}
+
+      - name: Check the permissions of both flavors
+        # Only the GitHub flavor may ask to install packages, Google Play rejects apps with that permission
+        run: |
+          APK=$(find publish/android-arm64 -name "*-Signed.apk" | head -1)
+          AAB=$(find publish/android-aab -name "*-Signed.aab" | head -1)
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)
+          "$AAPT2" dump permissions "$APK" | tee apk-permissions.txt
+          grep -q "android.permission.REQUEST_INSTALL_PACKAGES" apk-permissions.txt
+          unzip -p "$AAB" base/manifest/AndroidManifest.xml > aab-manifest.pb
+          if grep -q "REQUEST_INSTALL_PACKAGES" aab-manifest.pb; then
+            echo "::error::The Play Store bundle requests REQUEST_INSTALL_PACKAGES"
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: StripWolf-Android-arm64-pr
+          path: publish/android-arm64/*-Signed.apk
+          retention-days: 14

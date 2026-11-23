@@ -834,6 +834,24 @@
   <data name="BringMeThere" xml:space="preserve">
     <value>Dorthin bringen</value>
   </data>
+  <data name="InstallUpdate" xml:space="preserve">
+    <value>Update installieren</value>
+  </data>
+  <data name="UpdatePopupMessageInstall" xml:space="preserve">
+    <value>Eine neuere Version ({0}) ist verfügbar. StripWolf kann sie für dich herunterladen und installieren. Android fragt nach einer Bestätigung und beim ersten Mal, ob StripWolf Apps installieren darf.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Update wird heruntergeladen… {0}%</value>
+  </data>
+  <data name="UpdateReadyToInstall" xml:space="preserve">
+    <value>Bestätige das Update im Android-Dialog</value>
+  </data>
+  <data name="UpdateDownloadFailed" xml:space="preserve">
+    <value>Das Herunterladen des Updates ist fehlgeschlagen</value>
+  </data>
+  <data name="UpdateNoDownloadFound" xml:space="preserve">
+    <value>Dieses Release enthält keinen Download für dieses Gerät</value>
+  </data>
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>

@@ -78,6 +78,17 @@
                 </StackPanel>
               </StackPanel>
 
+              <!-- The Android build from GitHub downloads and installs the update itself -->
+              <StackPanel Spacing="4" IsVisible="{Binding UpdateService.CanInstallAvailableUpdate}">
+                <Button Content="{Binding InstallUpdate, Source={x:Static res:Loc.Instance}}"
+                        Command="{Binding InstallUpdateCommand}"
+                        IsEnabled="{Binding UpdateService.CanStartUpdateInstall}"
+                        HorizontalAlignment="Left"
+                        Classes="accent"/>
+                <TextBlock Text="{Binding UpdateService.UpdateInstallStatus}" Foreground="Gray" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding UpdateService.UpdateInstallStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              </StackPanel>
+
               <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
                 <Button Content="{Binding ProjectOnGitHub, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenGitHubCommand}"
                         Background="Transparent" Padding="0"/>

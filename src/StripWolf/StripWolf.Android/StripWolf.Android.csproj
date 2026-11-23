@@ -32,6 +32,11 @@
     <AllowedReferenceRelatedFileExtensions Condition="'$(Configuration)' == 'Release'">none</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
 
+  <!-- The Play Store build (AAB) can't update itself, see Services/AndroidAppUpdateInstaller.cs -->
+  <PropertyGroup Condition="'$(IsPlayStoreBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);PLAY_STORE_BUILD</DefineConstants>
+  </PropertyGroup>
+
   <!-- Release signing configuration -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <StripWolfSigningKeyStore Condition="'$(STRIPWOLF_KEYSTORE_PATH)' != ''">$(STRIPWOLF_KEYSTORE_PATH)</StripWolfSigningKeyStore>

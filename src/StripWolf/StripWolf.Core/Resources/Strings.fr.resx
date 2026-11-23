@@ -834,6 +834,24 @@
   <data name="BringMeThere" xml:space="preserve">
     <value>M'y amener</value>
   </data>
+  <data name="InstallUpdate" xml:space="preserve">
+    <value>Installer la mise à jour</value>
+  </data>
+  <data name="UpdatePopupMessageInstall" xml:space="preserve">
+    <value>Une version plus récente ({0}) est disponible. StripWolf peut la télécharger et l’installer pour vous. Android vous demande de confirmer la mise à jour et, la première fois, d’autoriser StripWolf à installer des applications.</value>
+  </data>
+  <data name="UpdateDownloading" xml:space="preserve">
+    <value>Téléchargement de la mise à jour… {0} %</value>
+  </data>
+  <data name="UpdateReadyToInstall" xml:space="preserve">
+    <value>Confirmez la mise à jour dans la boîte de dialogue Android</value>
+  </data>
+  <data name="UpdateDownloadFailed" xml:space="preserve">
+    <value>Le téléchargement de la mise à jour a échoué</value>
+  </data>
+  <data name="UpdateNoDownloadFound" xml:space="preserve">
+    <value>Cette version ne contient pas de téléchargement pour cet appareil</value>
+  </data>
   <data name="Ok" xml:space="preserve">
     <value>OK</value>
   </data>
