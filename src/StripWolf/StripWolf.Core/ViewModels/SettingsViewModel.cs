@@ -61,6 +61,36 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _suppressSectionLayoutPersistence;
     private CancellationTokenSource? _testConnectionCts;
 
+    /// <summary>
+    /// Raised when another screen asks to show the Komga settings, see <see cref="RequestKomgaSettings"/>
+    /// </summary>
+    public event EventHandler? KomgaSettingsRequested;
+
+    /// <summary>
+    /// True when the settings view should scroll to the Komga section the next time it is shown.
+    /// The SettingsView is recreated on every visit, so a request made before the view exists is kept here.
+    /// </summary>
+    public bool IsKomgaSettingsRequested { get; private set; }
+
+    /// <summary>
+    /// Ask the settings view to scroll to the Komga section (e.g. from the settings button on the Komga tab)
+    /// </summary>
+    public void RequestKomgaSettings()
+    {
+        IsKomgaSettingsRequested = true;
+        KomgaSettingsRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Returns true once for a pending <see cref="RequestKomgaSettings"/>, the view calls this when it scrolls
+    /// </summary>
+    public bool ConsumeKomgaSettingsRequest()
+    {
+        var requested = IsKomgaSettingsRequested;
+        IsKomgaSettingsRequested = false;
+        return requested;
+    }
+
     [ObservableProperty]
     private ObservableCollection<KomgaServer> _servers = [];
 

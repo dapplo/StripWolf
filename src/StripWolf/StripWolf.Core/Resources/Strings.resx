@@ -164,6 +164,9 @@
   <data name="KomgaServers" xml:space="preserve">
     <value>Komga Servers</value>
   </data>
+  <data name="KomgaBrowsingAndDownloads" xml:space="preserve">
+    <value>Browsing &amp; downloads</value>
+  </data>
   <data name="AddServer" xml:space="preserve">
     <value>Add Server</value>
   </data>

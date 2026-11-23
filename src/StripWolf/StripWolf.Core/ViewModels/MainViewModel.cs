@@ -142,6 +142,7 @@ public partial class MainViewModel : ViewModelBase
         _libraryViewModel.ComicOpenRequested += OnComicOpenRequested;
         _libraryViewModel.ViewKomgaSeriesRequested += OnViewKomgaSeriesRequested;
         _komgaViewModel.ConfigureServerRequested += OnConfigureKomgaServerRequested;
+        _komgaViewModel.OpenSettingsRequested += OnOpenKomgaSettingsRequested;
         _readerViewModel.CloseRequested += OnReaderCloseRequested;
         _readerViewModel.ComicOpenRequested += OnComicOpenRequested;
         _readerViewModel.ViewSeriesRequested += OnViewKomgaSeriesRequested;
@@ -330,6 +331,13 @@ public partial class MainViewModel : ViewModelBase
     {
         ActivateTab(3);
         _settingsViewModel.AddServerCommand.Execute(null);
+    }
+
+    private void OnOpenKomgaSettingsRequested(object? sender, EventArgs e)
+    {
+        // Request first: the settings view is created by ActivateTab and picks the request up when it is loaded
+        _settingsViewModel.RequestKomgaSettings();
+        ActivateTab(3);
     }
 
     private void OnReaderCloseRequested(object? sender, EventArgs e)

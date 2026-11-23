@@ -68,6 +68,7 @@ public class Loc : INotifyPropertyChanged
     public string UsernamePasswordTitle => GetString();
     public string About => GetString();
     public string KomgaServers => GetString();
+    public string KomgaBrowsingAndDownloads => GetString();
     public string SupportMe => GetString();
 
     // Setting Labels

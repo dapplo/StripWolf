@@ -50,6 +50,11 @@ public partial class KomgaViewModel : ViewModelBase
     private readonly IExternalLinkService _externalLinkService;
 
     public event EventHandler? ConfigureServerRequested;
+
+    /// <summary>
+    /// Raised when the user wants to see the Komga settings (servers, downloads, home layout)
+    /// </summary>
+    public event EventHandler? OpenSettingsRequested;
     
     private KomgaServer? _activeServer;
     private CancellationTokenSource? _loadingCts;
@@ -1141,6 +1146,12 @@ public partial class KomgaViewModel : ViewModelBase
     private void ConfigureServer()
     {
         ConfigureServerRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
     }
     
     [RelayCommand]
