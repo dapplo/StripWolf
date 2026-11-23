@@ -796,6 +796,7 @@ public partial class KomgaViewModel : ViewModelBase
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
         _libraryService.LibraryChanged += (s, e) => InvalidateDownloadedComicsCache();
+        KomgaThumbnailCache.PruneInBackground();
     }
 
     private void RegisterHomeSectionLayoutState(SectionLayoutItemViewModel section)
@@ -1793,35 +1794,6 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Returns the path for a cached thumbnail. The path includes the server ID so that
-    /// thumbnails from different servers do not overlap.
-    /// The item id comes from the server, it is sanitized so a malicious server can't write outside the cache.
-    /// </summary>
-    private static string GetThumbnailCachePath(int serverId, string type, string itemId)
-    {
-        var cacheDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "StripWolf", "thumbnails", serverId.ToString(), type);
-        Directory.CreateDirectory(cacheDir);
-        return Path.Combine(cacheDir, $"{LibraryService.SanitizeFileName(itemId)}.jpg");
-    }
-
-    /// <summary>
-    /// Returns cached thumbnail bytes, fetching and caching them from the server if not found on disk.
-    /// </summary>
-    private static async Task<byte[]?> GetOrFetchCachedThumbnailAsync(int serverId, string type, string itemId,
-        Func<CancellationToken, Task<byte[]?>> fetch, CancellationToken ct)
-    {
-        var cachePath = GetThumbnailCachePath(serverId, type, itemId);
-        if (File.Exists(cachePath))
-            return await File.ReadAllBytesAsync(cachePath, ct);
-        var bytes = await fetch(ct);
-        if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
-            await File.WriteAllBytesAsync(cachePath, bytes, ct);
-        return bytes;
-    }
-
-    /// <summary>
     /// Called by the view when an ItemsRepeater realized a card: loads the thumbnail of the item.
     /// Only realized (≈ visible) cards hold a decoded thumbnail, so big libraries don't decode thousands of covers.
     /// </summary>
@@ -1910,24 +1882,24 @@ public partial class KomgaViewModel : ViewModelBase
         // Capture the server state now, it can change while the request waits for a free slot
         var komgaApiService = _komgaApiService;
         var serverId = _activeServer?.Id ?? 0;
-        Func<CancellationToken, Task<byte[]?>> fetch;
+        Func<CancellationToken, Task<(byte[]? Bytes, string? CachePath)>> fetch;
         if (display is KomgaSeriesDisplay seriesDisplay)
         {
             var seriesId = seriesDisplay.Id;
-            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "series", seriesId,
+            fetch = ct => KomgaThumbnailCache.GetOrFetchAsync(serverId, "series", seriesId,
                 token => komgaApiService.GetSeriesThumbnailAsync(seriesId, token), ct);
         }
         else if (display is KomgaBookDisplay bookDisplay)
         {
             var bookId = bookDisplay.Id;
-            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "books", bookId,
+            fetch = ct => KomgaThumbnailCache.GetOrFetchAsync(serverId, "books", bookId,
                 token => komgaApiService.GetBookThumbnailAsync(bookId, token), ct);
         }
         else if (display is KomgaReadListDisplay readListDisplay)
         {
             // Read list thumbnails are composed from their books and change with the list, they are not cached on disk
             var readListId = readListDisplay.Id;
-            fetch = ct => komgaApiService.GetReadListThumbnailAsync(readListId, ct);
+            fetch = async ct => (await komgaApiService.GetReadListThumbnailAsync(readListId, ct), null);
         }
         else
         {
@@ -1941,7 +1913,7 @@ public partial class KomgaViewModel : ViewModelBase
     /// <summary>
     /// Fetches (disk cache or server) and decodes a thumbnail on a background thread, then applies it on the UI thread.
     /// </summary>
-    private async Task LoadThumbnailAsync(KomgaThumbnailDisplay display, int version, Func<CancellationToken, Task<byte[]?>> fetch)
+    private async Task LoadThumbnailAsync(KomgaThumbnailDisplay display, int version, Func<CancellationToken, Task<(byte[]? Bytes, string? CachePath)>> fetch)
     {
         Bitmap? thumbnail = null;
         var failed = false;
@@ -1953,10 +1925,19 @@ public partial class KomgaViewModel : ViewModelBase
                 // The card may have been recycled while this request waited for a slot
                 if (display.IsThumbnailLoadCurrent(version))
                 {
-                    var thumbnailBytes = await fetch(CancellationToken.None);
+                    var (thumbnailBytes, cachePath) = await fetch(CancellationToken.None);
                     if (thumbnailBytes is { Length: > 0 } && display.IsThumbnailLoadCurrent(version))
                     {
-                        thumbnail = ThumbnailDecoder.Decode(thumbnailBytes, ThumbnailDecodeWidth);
+                        try
+                        {
+                            thumbnail = ThumbnailDecoder.Decode(thumbnailBytes, ThumbnailDecodeWidth);
+                        }
+                        catch
+                        {
+                            // A broken cache file would fail on every visit, fetch it again next time
+                            KomgaThumbnailCache.Invalidate(cachePath);
+                            throw;
+                        }
                     }
                 }
             }

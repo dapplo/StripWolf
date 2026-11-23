@@ -369,6 +369,20 @@ public class DatabaseService : IAsyncDisposable
         return await db.DeleteAsync<KomgaPendingReadProgress>(comicId);
     }
 
+    /// <summary>
+    /// A Komga server was deleted: its downloaded comics stay in the library as local comics of no server (they are
+    /// no longer synced), the progress and downloads still queued for it are dropped.
+    /// </summary>
+    /// <returns>The number of comics which belonged to the server</returns>
+    public async Task<int> DetachKomgaServerAsync(int serverId)
+    {
+        var db = await GetDatabaseAsync();
+        var comics = await db.ExecuteAsync("UPDATE Comic SET KomgaServerId = NULL WHERE KomgaServerId = ?", serverId);
+        await db.ExecuteAsync("DELETE FROM KomgaPendingReadProgress WHERE ServerId = ?", serverId);
+        await db.ExecuteAsync("DELETE FROM KomgaPendingDownload WHERE ServerId = ?", serverId);
+        return comics;
+    }
+
     #endregion
 
     #region Komga Download Queue

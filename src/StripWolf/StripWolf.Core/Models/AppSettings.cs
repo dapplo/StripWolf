@@ -30,6 +30,12 @@ public class AppSettings
 
     public int? ActiveServerId { get; set; }
 
+    /// <summary>
+    /// The id the next new Komga server gets. Ids used to be "highest id + 1", deleting the newest server and adding
+    /// another one reused its id, and the new server inherited the downloads, pending progress and thumbnails of the old one.
+    /// </summary>
+    public int NextServerId { get; set; }
+
     public string? LastOpenedComicPath { get; set; }
 
     public int? LastOpenedComicId { get; set; }
@@ -228,6 +234,7 @@ public class AppSettings
                 BypassSslValidation = s.BypassSslValidation
             }).ToList(),
             ActiveServerId = ActiveServerId,
+            NextServerId = NextServerId,
             LastOpenedComicPath = LastOpenedComicPath,
             LastOpenedComicId = LastOpenedComicId,
             ComicsDirectory = ComicsDirectory,
