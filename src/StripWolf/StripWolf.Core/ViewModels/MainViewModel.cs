@@ -835,6 +835,12 @@ public partial class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Failed to open file: {ex.Message}");
+            // Opened by a double-click or "open with": without a message nothing happened at all.
+            // The trial limit already shows the premium dialog.
+            if (ex.Message != "TRIAL_LIMIT_REACHED")
+            {
+                _libraryViewModel.ErrorMessage = string.Format(Resources.Loc.Instance.ImportFailed, ex.Message);
+            }
         }
     }
 

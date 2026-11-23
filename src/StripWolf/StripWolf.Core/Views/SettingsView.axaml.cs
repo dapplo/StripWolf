@@ -125,9 +125,14 @@ public partial class SettingsView : UserControl
         var data = new DataTransfer();
         data.Add(DataTransferItem.CreateText(section.Key));
 
+        // async void: an exception (a platform without drag and drop support, a failing settings save) would end the app
         try
         {
             await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"SettingsView: Dragging a section failed: {ex.Message}");
         }
         finally
         {
@@ -160,6 +165,13 @@ public partial class SettingsView : UserControl
         }
 
         e.Handled = true;
-        await viewModel.MoveSectionAsync(_draggedSection, targetSection);
+        try
+        {
+            await viewModel.MoveSectionAsync(_draggedSection, targetSection);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"SettingsView: Moving a section failed: {ex.Message}");
+        }
     }
 }
