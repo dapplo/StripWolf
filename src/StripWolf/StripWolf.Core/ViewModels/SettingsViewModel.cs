@@ -417,15 +417,32 @@ public partial class SettingsViewModel : ViewModelBase
         _trialService = trialService;
         _databaseService = databaseService;
         Title = "Settings";
+        string? appliedSectionsKey = null;
+        string? appliedTrialKey = null;
         _settingsService.SettingsChanged += (_, settings) =>
         {
             Dispatcher.UIThread.Post(() =>
             {
                 _appSettings = settings.Clone();
-                ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
-                ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
                 OnPropertyChanged(nameof(ActiveServerId));
-                _ = LoadTrialStatusAndStatsAsync();
+
+                // Settings are saved for many unrelated reasons (switching tabs, opening a comic...): only rebuild the
+                // section lists and reload the statistics (database) when something they show changed
+                var sectionsKey = SectionLayoutSettings.GetLayoutKey(settings.LibrarySections) + "#" +
+                                  SectionLayoutSettings.GetLayoutKey(settings.KomgaSections);
+                if (sectionsKey != appliedSectionsKey)
+                {
+                    appliedSectionsKey = sectionsKey;
+                    ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
+                    ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
+                }
+
+                var trialKey = $"{settings.IsUnlimitedUnlocked}|{settings.PermanentViewedKomgaBooks.Count}|{settings.PermanentViewedLocalPaths.Count}|{settings.LastOpenedComicId}";
+                if (trialKey != appliedTrialKey)
+                {
+                    appliedTrialKey = trialKey;
+                    _ = LoadTrialStatusAndStatsAsync();
+                }
             });
         };
     }

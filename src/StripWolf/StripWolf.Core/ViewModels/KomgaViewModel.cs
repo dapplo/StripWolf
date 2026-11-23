@@ -733,6 +733,9 @@ public partial class KomgaViewModel : ViewModelBase
         var initialSettings = _settingsService.LoadSettings();
         ApplySectionLayout(initialSettings);
         ApplyDownloadSettings(initialSettings);
+        var appliedBrowsingKey = initialSettings.GetKomgaBrowsingKey();
+        var appliedLanguageKey = initialSettings.GetLanguageKey();
+        var appliedServerListKey = initialSettings.GetServerListKey();
         _settingsService.SettingsChanged += (_, settings) =>
         {
             Dispatcher.UIThread.Post(async () =>
@@ -740,9 +743,32 @@ public partial class KomgaViewModel : ViewModelBase
                 // async void (posted async lambda): exceptions must not escape, they would crash the app
                 try
                 {
+                    // Settings are saved for many unrelated reasons (switching tabs, opening a comic, the trial lists).
+                    // Before, every save reloaded the libraries from the server (and, once the cache expired, the
+                    // read lists and smart lists). Only react to the settings this tab uses.
+                    var browsingKey = settings.GetKomgaBrowsingKey();
+                    var languageKey = settings.GetLanguageKey();
+                    var serverListKey = settings.GetServerListKey();
+                    var browsingChanged = browsingKey != appliedBrowsingKey;
+                    var languageChanged = languageKey != appliedLanguageKey;
+                    var serversChanged = serverListKey != appliedServerListKey;
+                    var connectionChanged = _activeServer is not null &&
+                        settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id) is { } changedServer &&
+                        !HasSameConnectionSettings(_activeServer, changedServer);
+                    if (!browsingChanged && !languageChanged && !serversChanged && !connectionChanged)
+                    {
+                        return;
+                    }
+                    appliedBrowsingKey = browsingKey;
+                    appliedLanguageKey = languageKey;
+                    appliedServerListKey = serverListKey;
+
                     ApplySectionLayout(settings);
                     ApplyDownloadSettings(settings);
-                    RefreshLocalization();
+                    if (languageChanged)
+                    {
+                        RefreshLocalization();
+                    }
                     
                     RefreshConfiguredServers(settings);
                     
@@ -757,7 +783,10 @@ public partial class KomgaViewModel : ViewModelBase
                         }
                     }
                     
-                    await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                    if (browsingChanged || connectionChanged)
+                    {
+                        await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                    }
                 }
                 catch (Exception ex)
                 {

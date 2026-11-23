@@ -186,6 +186,27 @@ public class AppSettings
     /// </summary>
     public string? LatestAvailableVersion { get; set; }
 
+    // SettingsChanged is raised for every saved change, also for the many which only concern one place (tab index,
+    // last opened comic, trial lists). The listeners compare these keys to skip their (sometimes expensive) refresh.
+    // Methods, not properties: System.Text.Json would serialize a get-only property into settings.json.
+
+    /// <summary>
+    /// Changes when the UI language changes
+    /// </summary>
+    public string GetLanguageKey() => $"{UseSystemLanguage}|{LanguageCode}";
+
+    /// <summary>
+    /// Changes when a server is added, removed or edited (not including the secrets)
+    /// </summary>
+    public string GetServerListKey() => string.Join(";", Servers.Select(s =>
+        $"{s.Id}|{s.Name}|{s.BaseUrl}|{s.Username}|{s.BypassSslValidation}|{s.CustomHeaders.Count}")) + $"#{ActiveServerId}";
+
+    /// <summary>
+    /// Changes when a setting which the Komga tab shows changes (except the servers, see <see cref="GetServerListKey"/>)
+    /// </summary>
+    public string GetKomgaBrowsingKey() =>
+        $"{SectionLayoutSettings.GetLayoutKey(KomgaSections)}|{KomgaParallelDownloads}|{KomgaSearchLimit}|{KomgaSmartListSize}|{KomgaSeriesPageSize}";
+
     /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
