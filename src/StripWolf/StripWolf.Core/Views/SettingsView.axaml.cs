@@ -17,8 +17,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
@@ -26,6 +29,7 @@ namespace StripWolf.Core.Views;
 public partial class SettingsView : UserControl
 {
     private SectionLayoutItemViewModel? _draggedSection;
+    private SettingsViewModel? _subscribedViewModel;
 
     public SettingsView()
     {
@@ -35,6 +39,17 @@ public partial class SettingsView : UserControl
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.KomgaSettingsRequested -= OnKomgaSettingsRequested;
+            _subscribedViewModel = null;
+        }
+        if (DataContext is SettingsViewModel newViewModel)
+        {
+            _subscribedViewModel = newViewModel;
+            newViewModel.KomgaSettingsRequested += OnKomgaSettingsRequested;
+        }
         
         // Load settings when the view is displayed
         if (DataContext is SettingsViewModel viewModel)
@@ -48,6 +63,55 @@ public partial class SettingsView : UserControl
                 System.Diagnostics.Debug.WriteLine($"Failed to load servers: {ex.Message}");
             }
         }
+    }
+
+    protected override void OnLoaded(RoutedEventArgs e)
+    {
+        base.OnLoaded(e);
+        // A request made before this view existed (e.g. the settings button on the Komga tab creates this view)
+        ScrollToRequestedSection();
+    }
+
+    private void OnKomgaSettingsRequested(object? sender, EventArgs e)
+    {
+        // The settings tab may already be shown, in that case there is no Loaded event
+        if (IsLoaded)
+        {
+            ScrollToRequestedSection();
+        }
+    }
+
+    private void ScrollToRequestedSection()
+    {
+        // Wait until the layout is done, otherwise the position of the section isn't known yet
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is SettingsViewModel viewModel && viewModel.ConsumeKomgaSettingsRequest())
+            {
+                ScrollToSection(KomgaSettingsHeader);
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    private void OnJumpToSectionClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { Tag: string sectionName } && this.FindControl<Control>(sectionName) is { } section)
+        {
+            ScrollToSection(section);
+        }
+    }
+
+    /// <summary>
+    /// Scrolls the settings so the section header is at the top (as far as the ScrollViewer allows)
+    /// </summary>
+    private void ScrollToSection(Control section)
+    {
+        if (section.TranslatePoint(new Point(0, 0), SettingsContent) is not { } position)
+        {
+            return;
+        }
+
+        SettingsScroll.Offset = new Vector(SettingsScroll.Offset.X, Math.Max(0, position.Y - 8));
     }
 
     private async void OnSectionDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)

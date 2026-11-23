@@ -276,7 +276,7 @@
   <Grid RowDefinitions="Auto,*">
     <!-- Header -->
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}" Padding="16">
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <TextBlock Text="{Binding Komga, Source={x:Static res:Loc.Instance}}" FontSize="24" FontWeight="Bold"/>
           <TextBlock Text="-" FontSize="24" VerticalAlignment="Center"
@@ -295,6 +295,12 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
         <Button Grid.Column="2" Content="{Binding Refresh, Source={x:Static res:Loc.Instance}}" Command="{Binding RefreshCommand}" Padding="16,8"/>
+        <!-- Jump to the Komga part of the settings (servers, downloads, home layout) -->
+        <Button Grid.Column="3" Command="{Binding OpenSettingsCommand}" Padding="8" VerticalAlignment="Stretch"
+                ToolTip.Tip="{Binding KomgaSettings, Source={x:Static res:Loc.Instance}}"
+                AutomationProperties.Name="{Binding KomgaSettings, Source={x:Static res:Loc.Instance}}">
+          <Image Source="{StaticResource Icon.Settings}" Width="22" Height="22"/>
+        </Button>
       </Grid>
     </Border>
     
