@@ -1,20 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-android36.0</TargetFramework>
+    <TargetFramework>net11.0-android37.0</TargetFramework>
     <!-- Minimum Android version: 24 = Android 7.0. The AndroidX packages need at least 23, .NET 11 raises the floor to 24.
-         (Was 36, which only allowed installation on Android 16.) TargetFramework above keeps targeting API 36. -->
+         (Was 36, which only allowed installation on Android 16.) TargetFramework above targets API 37 (the .NET 11 Android workload no longer supports 36). -->
     <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <AssemblyName>StripWolf</AssemblyName>
     <ApplicationId>com.dapplo.StripWolf</ApplicationId>
-    <ApplicationVersion Condition="'$(GitVersion_CommitsSinceVersionSource)' != ''">$(GitVersion_CommitsSinceVersionSource)</ApplicationVersion>
+    <ApplicationVersion Condition="'$(GitVersion_VersionSourceDistance)' != ''">$(GitVersion_VersionSourceDistance)</ApplicationVersion>
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
     <ApplicationDisplayVersion Condition="'$(GitVersion_SemVer)' != ''">$(GitVersion_SemVer)</ApplicationDisplayVersion>
     <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
-    <AndroidEnableProfiledAot Condition="'$(Configuration)' == 'Release'">true</AndroidEnableProfiledAot>
+    <!-- .NET 11 runs Android apps on CoreCLR by default, Mono AOT only applies when UseMonoRuntime=true -->
+    <RunAOTCompilation Condition="'$(Configuration)' == 'Release' and '$(UseMonoRuntime)' == 'true'">true</RunAOTCompilation>
+    <AndroidEnableProfiledAot Condition="'$(Configuration)' == 'Release' and '$(UseMonoRuntime)' == 'true'">true</AndroidEnableProfiledAot>
     <PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
     <!-- Full trimming. AndroidLinkMode is the legacy (Xamarin) setting and was ignored because TrimMode was set
          (the old "link" value already meant full trimming), so this keeps the effective behavior. If something breaks

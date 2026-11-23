@@ -1,6 +1,6 @@
 # StripWolf.Core.Tests
 
-Automated tests for `StripWolf.Core` (xUnit v3, .NET 10). The platform specific parts are replaced by small
+Automated tests for `StripWolf.Core` (xUnit v3, .NET 11). The platform specific parts are replaced by small
 hand-written fakes:
 
 | Real implementation | Replaced by | Why |
