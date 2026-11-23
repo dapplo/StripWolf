@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Publish
         run: dotnet publish src/StripWolf/StripWolf.Desktop/StripWolf.Desktop.csproj -r win-x64 -o publish/windows ${{ env.PUBLISH_ARGS }}
@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Check the desktop integration
         run: |
@@ -100,7 +100,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Publish and complete the bundle
         run: |

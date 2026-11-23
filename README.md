@@ -118,7 +118,7 @@ StripWolf registers itself for comic books (CBZ, CBR, CB7, CBT) when macOS sees 
 
 ## Requirements
 
-- .NET 10.0 SDK
+- .NET 11.0 SDK
 
 ## Building
 
