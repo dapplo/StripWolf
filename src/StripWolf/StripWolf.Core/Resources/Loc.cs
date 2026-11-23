@@ -326,7 +326,26 @@ public class Loc : INotifyPropertyChanged
     public string UpdateReadyToInstall => GetString();
     public string UpdateDownloadFailed => GetString();
     public string UpdateNoDownloadFound => GetString();
+    public string UpdateStatusChecking => GetString();
+    public string UpdateStatusUpToDate => GetString();
+    public string UpdateStatusCheckFailed => GetString();
+    public string UpdateStatusConnectionError => GetString();
     public string Ok => GetString();
+
+    // Reader errors
+    public string ReaderErrorLoadComic => GetString();
+    public string ReaderErrorLoadPage => GetString();
+    public string ReaderErrorNotReadable => GetString();
+    public string ReaderPreparingFirstPage => GetString();
+    public string ReaderPreparingPages => GetString();
+    public string ReaderNoPages => GetString();
+
+    // Import
+    public string SelectComicFiles => GetString();
+    public string ComicFilesFilter => GetString();
+    public string PdfFilesFilter => GetString();
+    public string AllFilesFilter => GetString();
+    public string ImportFailed => GetString();
 
     // Welcome Experience
     public string WelcomeExperience => GetString();

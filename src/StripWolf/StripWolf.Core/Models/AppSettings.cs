@@ -30,6 +30,12 @@ public class AppSettings
 
     public int? ActiveServerId { get; set; }
 
+    /// <summary>
+    /// The id the next new Komga server gets. Ids used to be "highest id + 1", deleting the newest server and adding
+    /// another one reused its id, and the new server inherited the downloads, pending progress and thumbnails of the old one.
+    /// </summary>
+    public int NextServerId { get; set; }
+
     public string? LastOpenedComicPath { get; set; }
 
     public int? LastOpenedComicId { get; set; }
@@ -186,6 +192,27 @@ public class AppSettings
     /// </summary>
     public string? LatestAvailableVersion { get; set; }
 
+    // SettingsChanged is raised for every saved change, also for the many which only concern one place (tab index,
+    // last opened comic, trial lists). The listeners compare these keys to skip their (sometimes expensive) refresh.
+    // Methods, not properties: System.Text.Json would serialize a get-only property into settings.json.
+
+    /// <summary>
+    /// Changes when the UI language changes
+    /// </summary>
+    public string GetLanguageKey() => $"{UseSystemLanguage}|{LanguageCode}";
+
+    /// <summary>
+    /// Changes when a server is added, removed or edited (not including the secrets)
+    /// </summary>
+    public string GetServerListKey() => string.Join(";", Servers.Select(s =>
+        $"{s.Id}|{s.Name}|{s.BaseUrl}|{s.Username}|{s.BypassSslValidation}|{s.CustomHeaders.Count}")) + $"#{ActiveServerId}";
+
+    /// <summary>
+    /// Changes when a setting which the Komga tab shows changes (except the servers, see <see cref="GetServerListKey"/>)
+    /// </summary>
+    public string GetKomgaBrowsingKey() =>
+        $"{SectionLayoutSettings.GetLayoutKey(KomgaSections)}|{KomgaParallelDownloads}|{KomgaSearchLimit}|{KomgaSmartListSize}|{KomgaSeriesPageSize}";
+
     /// <summary>
     /// Creates a deep copy of the settings
     /// </summary>
@@ -207,6 +234,7 @@ public class AppSettings
                 BypassSslValidation = s.BypassSslValidation
             }).ToList(),
             ActiveServerId = ActiveServerId,
+            NextServerId = NextServerId,
             LastOpenedComicPath = LastOpenedComicPath,
             LastOpenedComicId = LastOpenedComicId,
             ComicsDirectory = ComicsDirectory,

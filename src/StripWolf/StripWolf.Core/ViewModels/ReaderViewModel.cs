@@ -372,6 +372,17 @@ public partial class ReaderViewModel : ViewModelBase
 
     private CancellationTokenSource? _viewportChangedCts;
 
+    /// <summary>
+    /// The error shown because a page failed to load, it is cleared when a page loads again
+    /// </summary>
+    private string? _pageLoadError;
+
+    /// <summary>
+    /// True from the moment a comic passed the checks in LoadComicAsync until the reader is left
+    /// (Comic keeps the last comic after that). Only an open comic has progress to save.
+    /// </summary>
+    private bool _isComicOpen;
+
     private void OnViewportSizeChanged()
     {
         ClearBitmapPrefetchCache();
@@ -782,6 +793,8 @@ public partial class ReaderViewModel : ViewModelBase
 
     private void ReleaseReaderResources()
     {
+        _isComicOpen = false;
+        _komgaSyncService.ReaderComicId = null;
         _periodicSyncTimer.Stop();
         ClearKomgaSyncPrompt();
         if (Comic is not null && HasPendingEpubConversion)
@@ -987,6 +1000,17 @@ public partial class ReaderViewModel : ViewModelBase
 
     public async Task LoadComicAsync(int comicId)
     {
+        // Another comic is opened while reading (next in series, a file opened from outside): finish the one we are
+        // leaving like GoBackAsync does. ReleaseReaderResources below cancels the pending (debounced) save, the last
+        // page turn was lost, and the progress was never pushed to Komga.
+        // Only while a comic is open: after GoBackAsync, Comic still holds the closed comic and saving it again would
+        // move its "last read" date.
+        if (_isComicOpen && Comic is not null && !_isInitializingComic && Comic.Id != comicId)
+        {
+            await SaveProgressAsync(forceImmediate: true);
+            _ = SyncProgressWithKomgaAsync();
+        }
+
         ComicId = comicId;
         try
         {
@@ -1042,6 +1066,9 @@ public partial class ReaderViewModel : ViewModelBase
                     return;
                 }
 
+                _isComicOpen = true;
+                _komgaSyncService.ReaderComicId = Comic.Id;
+
                 // Save last opened comic info in settings, only these fields: the settings snapshot loaded above
                 // is stale by now and saving it as a whole would overwrite concurrent changes
                 var openedComicId = Comic.Id;
@@ -1093,8 +1120,8 @@ public partial class ReaderViewModel : ViewModelBase
                 if (Comic.PageCount <= 0)
                 {
                     ErrorMessage = HasPendingEpubConversion
-                        ? "Preparing the first readable page..."
-                        : "This book could not be prepared for reading.";
+                        ? Resources.Loc.Instance.ReaderPreparingFirstPage
+                        : Resources.Loc.Instance.ReaderErrorNotReadable;
                     return;
                 }
 
@@ -1137,7 +1164,7 @@ public partial class ReaderViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load comic: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.ReaderErrorLoadComic, ex.Message);
         }
         finally
         {
@@ -1240,7 +1267,7 @@ public partial class ReaderViewModel : ViewModelBase
                 // Validate page index is within range
                 if (Comic.PageCount == 0)
                 {
-                    ErrorMessage = HasPendingEpubConversion ? "Preparing readable pages..." : "Comic has no pages";
+                    ErrorMessage = HasPendingEpubConversion ? Resources.Loc.Instance.ReaderPreparingPages : Resources.Loc.Instance.ReaderNoPages;
                     return;
                 }
 
@@ -1263,9 +1290,10 @@ public partial class ReaderViewModel : ViewModelBase
                         var readPath = GetActiveReadPath();
 
                         // Load in parallel but with cancellation support
-                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, null);
+                        var decodeTarget = GetDecodeTarget();
+                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
                         var rightTask = pageIndex + 1 < Comic.PageCount
-                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, null)
+                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget)
                             : Task.FromResult<Bitmap?>(null);
 
                         Bitmap? newLeftBitmap = null;
@@ -1343,6 +1371,16 @@ public partial class ReaderViewModel : ViewModelBase
                     _lastLoadedPageIndex = pageIndex;
                     _appEventsService.RaisePageRead();
 
+                    // A page which failed before must not leave its error on the pages which load fine
+                    if (_pageLoadError is not null)
+                    {
+                        if (ErrorMessage == _pageLoadError)
+                        {
+                            ErrorMessage = null;
+                        }
+                        _pageLoadError = null;
+                    }
+
                     // Reset zoom when changing pages
                     ZoomLevel = 1.0;
                 }
@@ -1350,7 +1388,7 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     if (ex is not OperationCanceledException && !ct.IsCancellationRequested)
                     {
-                        ErrorMessage = $"Failed to load page: {ex.Message}";
+                        ErrorMessage = _pageLoadError = string.Format(Resources.Loc.Instance.ReaderErrorLoadPage, ex.Message);
                     }
                     _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
                 }
@@ -1474,12 +1512,15 @@ public partial class ReaderViewModel : ViewModelBase
         {
             IsEndOfComicOptionsVisible = false;
             IsInfoPanelVisible = false;
-            await SaveProgressAsync();
-            ViewSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
+            var request = new KomgaSeriesNavigationRequest
             {
                 SeriesId = Comic.KomgaSeriesId,
                 ServerId = Comic.KomgaServerId
-            });
+            };
+            // This leaves the reader: before, it only saved (debounced) and switched tabs, so full screen stayed on,
+            // the periodic Komga sync kept running and the page bitmaps and PDF/EPUB session stayed in memory.
+            await LeaveReaderAsync();
+            ViewSeriesRequested?.Invoke(this, request);
         }
     }
 
@@ -1713,7 +1754,7 @@ public partial class ReaderViewModel : ViewModelBase
         var nextComicId = NextSeriesComic.Id;
         IsEndOfComicOptionsVisible = false;
         IsInfoPanelVisible = false;
-        _ = SaveProgressAsync(forceImmediate: true);
+        // LoadComicAsync saves (and pushes) the progress of this comic before it opens the next one
         ComicOpenRequested?.Invoke(this, nextComicId);
     }
 
@@ -2076,7 +2117,7 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     private DecodeTarget? GetDecodeTarget()
     {
-        if (ReadingMode != ReadingMode.Normal || IsTwoPageMode || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
+        if (ReadingMode != ReadingMode.Normal || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
         {
             return null;
         }
@@ -2087,7 +2128,9 @@ public partial class ReaderViewModel : ViewModelBase
             return null;
         }
 
-        return new DecodeTarget(DecodeWidth, DecodeHeight, StretchMode);
+        // Two-page mode shows each page in half of the width. It used to always decode both pages at full resolution
+        // (two ~96MB bitmaps for 4000x6000 scans), on tablets, the devices two-page mode is mostly used on.
+        return new DecodeTarget(IsTwoPageMode ? Math.Max(1, DecodeWidth / 2) : DecodeWidth, DecodeHeight, StretchMode);
     }
 
     /// <summary>
@@ -2155,8 +2198,14 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     private async Task ReloadCurrentPageAsync(DecodeTarget? decodeTarget)
     {
+        if (IsTwoPageMode)
+        {
+            await ReloadCurrentSpreadAsync(decodeTarget);
+            return;
+        }
+
         var current = CurrentPageImage;
-        if (_isUpgradingResolution || Comic is null || IsTwoPageMode || !IsDownscaled(current))
+        if (_isUpgradingResolution || Comic is null || !IsDownscaled(current))
         {
             return;
         }
@@ -2195,6 +2244,63 @@ public partial class ReaderViewModel : ViewModelBase
         }
         finally
         {
+            _isUpgradingResolution = false;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ReloadCurrentPageAsync"/> for the two pages of two-page mode
+    /// </summary>
+    private async Task ReloadCurrentSpreadAsync(DecodeTarget? decodeTarget)
+    {
+        var left = LeftPageImage;
+        var right = RightPageImage;
+        if (_isUpgradingResolution || Comic is null || left is null || (!IsDownscaled(left) && !IsDownscaled(right)))
+        {
+            return;
+        }
+
+        _isUpgradingResolution = true;
+        var pageIndex = _lastLoadedPageIndex;
+        var ct = _pageLoadingCts?.Token ?? CancellationToken.None;
+        Bitmap? newLeft = null;
+        Bitmap? newRight = null;
+        try
+        {
+            var readPath = GetActiveReadPath();
+            newLeft = await LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
+            if (right is not null)
+            {
+                newRight = await LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget);
+            }
+
+            // Only swap when we are still looking at the same pages
+            if (newLeft is null || (right is not null && newRight is null) || ct.IsCancellationRequested ||
+                _lastLoadedPageIndex != pageIndex || !ReferenceEquals(LeftPageImage, left) || !ReferenceEquals(RightPageImage, right))
+            {
+                return;
+            }
+
+            IsReplacingPageResolution = true;
+            try
+            {
+                ReplacePageImages(newLeft, newLeft, newRight);
+                newLeft = null;
+                newRight = null;
+            }
+            finally
+            {
+                IsReplacingPageResolution = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to reload the pages at another resolution: {ex.Message}");
+        }
+        finally
+        {
+            newLeft?.Dispose();
+            newRight?.Dispose();
             _isUpgradingResolution = false;
         }
     }
@@ -2569,19 +2675,51 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackAsync()
     {
-        // Reset fullscreen before leaving the reader
-        IsFullScreen = false;
-
-        // Fire and forget the Komga sync in the background so it doesn't delay UI closing
-        _ = SyncProgressWithKomgaAsync();
-
-        // Await the (fast, local) progress save: the reader saves without raising LibraryChanged, the library refresh
-        // triggered by CloseRequested must see the final position.
-        await SaveProgressAsync(forceImmediate: true);
-        ReleaseReaderResources();
+        await LeaveReaderAsync();
         CloseRequested?.Invoke(this, EventArgs.Empty);
         // The forced GC.Collect/WaitForPendingFinalizers which was here is no longer needed,
         // page bitmaps are disposed deterministically in ReleaseReaderResources.
+    }
+
+    /// <summary>
+    /// The system back gesture/button (Android) or the mouse back button: close an open panel, otherwise leave the reader
+    /// </summary>
+    public void HandleBack()
+    {
+        if (IsInfoPanelVisible)
+        {
+            IsInfoPanelVisible = false;
+            return;
+        }
+
+        if (IsEndOfComicOptionsVisible)
+        {
+            IsEndOfComicOptionsVisible = false;
+            return;
+        }
+
+        GoBackCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Everything which has to happen when the reader is left, whatever is shown next (library, Komga series)
+    /// </summary>
+    private async Task LeaveReaderAsync()
+    {
+        // Reset fullscreen before leaving the reader
+        IsFullScreen = false;
+
+        // A comic which was blocked (trial limit) or failed to load has no progress: saving it marked it as started
+        if (_isComicOpen)
+        {
+            // Fire and forget the Komga sync in the background so it doesn't delay UI closing
+            _ = SyncProgressWithKomgaAsync();
+
+            // Await the (fast, local) progress save: the reader saves without raising LibraryChanged, the library
+            // refresh that follows must see the final position.
+            await SaveProgressAsync(forceImmediate: true);
+        }
+        ReleaseReaderResources();
     }
 
     private async Task RefreshSeriesNavigationTargetsAsync()

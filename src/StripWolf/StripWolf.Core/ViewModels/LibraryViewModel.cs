@@ -198,13 +198,29 @@ public partial class LibraryViewModel : ViewModelBase
         RegisterSectionLayoutState(SeriesSection);
         RegisterSectionLayoutState(ReadSection);
 
-        ApplySectionLayout(_settingsService.LoadSettings());
+        var initialSettings = _settingsService.LoadSettings();
+        ApplySectionLayout(initialSettings);
+        var appliedLayoutKey = SectionLayoutSettings.GetLayoutKey(initialSettings.LibrarySections);
+        var appliedLanguageKey = initialSettings.GetLanguageKey();
         _settingsService.SettingsChanged += (_, settings) =>
         {
             Dispatcher.UIThread.Post(() => 
             {
-                ApplySectionLayout(settings);
-                RefreshLocalization();
+                // Settings are saved for many unrelated reasons (switching tabs, opening a comic...). RefreshLocalization
+                // raises PropertyChanged for every comic in every section, only do that when the language changed.
+                var layoutKey = SectionLayoutSettings.GetLayoutKey(settings.LibrarySections);
+                if (layoutKey != appliedLayoutKey)
+                {
+                    appliedLayoutKey = layoutKey;
+                    ApplySectionLayout(settings);
+                }
+
+                var languageKey = settings.GetLanguageKey();
+                if (languageKey != appliedLanguageKey)
+                {
+                    appliedLanguageKey = languageKey;
+                    RefreshLocalization();
+                }
             });
         };
         
@@ -456,15 +472,35 @@ public partial class LibraryViewModel : ViewModelBase
 
     private void MergeComics(ObservableCollection<Comic> currentList, List<Comic> newList)
     {
+        // This runs on the UI thread for every collection on every refresh: lookups by id go through a set/dictionary,
+        // the former All/FirstOrDefault per item made it quadratic in the size of the library.
+        var newIds = new HashSet<int>(newList.Count);
+        foreach (var newItem in newList)
+        {
+            newIds.Add(newItem.Id);
+        }
+
         // Remove items no longer in the list (unless they are being deleted)
-        var toRemove = currentList.Where(c => !c.IsDeleting && newList.All(n => n.Id != c.Id)).ToList();
-        foreach (var item in toRemove) currentList.Remove(item);
+        for (int index = currentList.Count - 1; index >= 0; index--)
+        {
+            var item = currentList[index];
+            if (!item.IsDeleting && !newIds.Contains(item.Id))
+            {
+                currentList.RemoveAt(index);
+            }
+        }
+
+        var currentById = new Dictionary<int, Comic>(currentList.Count);
+        foreach (var item in currentList)
+        {
+            currentById.TryAdd(item.Id, item);
+        }
 
         // Add or update items
         for (int i = 0; i < newList.Count; i++)
         {
             var newItem = newList[i];
-            var existing = currentList.FirstOrDefault(c => c.Id == newItem.Id);
+            currentById.TryGetValue(newItem.Id, out var existing);
 
             if (existing == null)
             {
@@ -475,6 +511,7 @@ public partial class LibraryViewModel : ViewModelBase
                     newItem.DeletionSecondsRemaining = entry.Comic.DeletionSecondsRemaining;
                 }
                 currentList.Insert(i, newItem);
+                currentById[newItem.Id] = newItem;
             }
             else
             {
@@ -503,11 +540,14 @@ public partial class LibraryViewModel : ViewModelBase
                     existing.KomgaServerId = newItem.KomgaServerId;
                 }
                 
-                // Move to correct position if needed
-                int currentIndex = currentList.IndexOf(existing);
-                if (currentIndex != i)
+                // Move to correct position if needed (usually it already is, then no IndexOf is needed)
+                if (i >= currentList.Count || !ReferenceEquals(currentList[i], existing))
                 {
-                    currentList.Move(currentIndex, i);
+                    int currentIndex = currentList.IndexOf(existing);
+                    if (currentIndex != i)
+                    {
+                        currentList.Move(currentIndex, i);
+                    }
                 }
             }
         }
@@ -547,17 +587,24 @@ public partial class LibraryViewModel : ViewModelBase
             .ToList();
 
         // Merge series groups in-place to preserve their visual container state (prevent cover/expander twitching)
-        var toRemove = SeriesGroups.Where(existing => groups.All(g => !string.Equals(NormalizeSeriesName(g.Name), NormalizeSeriesName(existing.Name), StringComparison.OrdinalIgnoreCase))).ToList();
+        var targetNames = new HashSet<string>(groups.Select(g => NormalizeSeriesName(g.Name)), StringComparer.OrdinalIgnoreCase);
+        var toRemove = SeriesGroups.Where(existing => !targetNames.Contains(NormalizeSeriesName(existing.Name))).ToList();
         foreach (var group in toRemove)
         {
             SeriesGroups.Remove(group);
+        }
+
+        var existingByName = new Dictionary<string, ComicSeriesGroup>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in SeriesGroups)
+        {
+            existingByName.TryAdd(NormalizeSeriesName(group.Name), group);
         }
 
         for (int i = 0; i < groups.Count; i++)
         {
             var targetGroup = groups[i];
             var targetNameNormalized = NormalizeSeriesName(targetGroup.Name);
-            var existing = SeriesGroups.FirstOrDefault(g => string.Equals(NormalizeSeriesName(g.Name), targetNameNormalized, StringComparison.OrdinalIgnoreCase));
+            existingByName.TryGetValue(targetNameNormalized, out var existing);
 
             if (existing == null)
             {

@@ -1059,4 +1059,49 @@
   <data name="DimOutsidePanelDescription" xml:space="preserve">
     <value>Dunkelt beim geführten Lesen die Bereiche der vergrößerten Ansicht ab, die nicht zum aktuellen Panel gehören.</value>
   </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>Suche nach Updates...</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>Auf dem neuesten Stand</value>
+  </data>
+  <data name="UpdateStatusCheckFailed" xml:space="preserve">
+    <value>Suche nach Updates fehlgeschlagen</value>
+  </data>
+  <data name="UpdateStatusConnectionError" xml:space="preserve">
+    <value>Verbindungsfehler</value>
+  </data>
+  <data name="ReaderErrorLoadComic" xml:space="preserve">
+    <value>Comic konnte nicht geladen werden: {0}</value>
+  </data>
+  <data name="ReaderErrorLoadPage" xml:space="preserve">
+    <value>Seite konnte nicht geladen werden: {0}</value>
+  </data>
+  <data name="ReaderErrorNotReadable" xml:space="preserve">
+    <value>Dieses Buch konnte nicht zum Lesen vorbereitet werden.</value>
+  </data>
+  <data name="ReaderPreparingFirstPage" xml:space="preserve">
+    <value>Erste lesbare Seite wird vorbereitet...</value>
+  </data>
+  <data name="ReaderPreparingPages" xml:space="preserve">
+    <value>Lesbare Seiten werden vorbereitet...</value>
+  </data>
+  <data name="ReaderNoPages" xml:space="preserve">
+    <value>Der Comic hat keine Seiten</value>
+  </data>
+  <data name="SelectComicFiles" xml:space="preserve">
+    <value>Comic-Dateien auswählen</value>
+  </data>
+  <data name="ComicFilesFilter" xml:space="preserve">
+    <value>Comic-Dateien</value>
+  </data>
+  <data name="PdfFilesFilter" xml:space="preserve">
+    <value>PDF-Dateien</value>
+  </data>
+  <data name="AllFilesFilter" xml:space="preserve">
+    <value>Alle Dateien</value>
+  </data>
+  <data name="ImportFailed" xml:space="preserve">
+    <value>Import fehlgeschlagen: {0}</value>
+  </data>
 </root>

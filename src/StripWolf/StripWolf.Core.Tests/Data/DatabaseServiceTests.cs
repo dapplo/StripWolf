@@ -500,4 +500,23 @@ public sealed class DatabaseServiceTests : IAsyncLifetime
         Assert.Equal(25, (await _database.GetComicsAsync()).Count);
         Assert.Equal(25, comics.Select(comic => comic.Id).Distinct().Count());
     }
+
+    [Fact]
+    public async Task DetachKomgaServerAsync_ClearsTheServerAndDropsItsQueues()
+    {
+        var ofDeleted = await InsertAsync("OfDeleted", c => { c.Source = ComicSource.Komga; c.KomgaId = "A1"; c.KomgaServerId = 3; });
+        var ofOther = await InsertAsync("OfOther", c => { c.Source = ComicSource.Komga; c.KomgaId = "B1"; c.KomgaServerId = 4; });
+        await _database.SavePendingKomgaReadProgressAsync(ofDeleted.Id, "A1", 3, 5, false, DateTime.UtcNow);
+        await _database.SavePendingKomgaReadProgressAsync(ofOther.Id, "B1", 4, 7, false, DateTime.UtcNow);
+        await _database.SavePendingKomgaDownloadAsync("A2", 3);
+        await _database.SavePendingKomgaDownloadAsync("B2", 4);
+
+        Assert.Equal(1, await _database.DetachKomgaServerAsync(3));
+
+        Assert.Null((await _database.GetComicAsync(ofDeleted.Id))!.KomgaServerId);
+        Assert.Equal(4, (await _database.GetComicAsync(ofOther.Id))!.KomgaServerId);
+        Assert.Null(await _database.GetPendingKomgaReadProgressAsync(ofDeleted.Id));
+        Assert.NotNull(await _database.GetPendingKomgaReadProgressAsync(ofOther.Id));
+        Assert.Equal(new[] { "B2" }, await _database.GetPendingKomgaDownloadBookIdsAsync());
+    }
 }

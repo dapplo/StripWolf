@@ -1059,4 +1059,49 @@
   <data name="DimOutsidePanelDescription" xml:space="preserve">
     <value>En la lectura guiada, oscurece las partes de la vista ampliada que no pertenecen a la viñeta actual.</value>
   </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>Buscando actualizaciones...</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>Actualizado</value>
+  </data>
+  <data name="UpdateStatusCheckFailed" xml:space="preserve">
+    <value>No se pudo buscar actualizaciones</value>
+  </data>
+  <data name="UpdateStatusConnectionError" xml:space="preserve">
+    <value>Error de conexión</value>
+  </data>
+  <data name="ReaderErrorLoadComic" xml:space="preserve">
+    <value>No se pudo cargar el cómic: {0}</value>
+  </data>
+  <data name="ReaderErrorLoadPage" xml:space="preserve">
+    <value>No se pudo cargar la página: {0}</value>
+  </data>
+  <data name="ReaderErrorNotReadable" xml:space="preserve">
+    <value>Este libro no se pudo preparar para la lectura.</value>
+  </data>
+  <data name="ReaderPreparingFirstPage" xml:space="preserve">
+    <value>Preparando la primera página legible...</value>
+  </data>
+  <data name="ReaderPreparingPages" xml:space="preserve">
+    <value>Preparando páginas legibles...</value>
+  </data>
+  <data name="ReaderNoPages" xml:space="preserve">
+    <value>El cómic no tiene páginas</value>
+  </data>
+  <data name="SelectComicFiles" xml:space="preserve">
+    <value>Seleccionar archivos de cómic</value>
+  </data>
+  <data name="ComicFilesFilter" xml:space="preserve">
+    <value>Archivos de cómic</value>
+  </data>
+  <data name="PdfFilesFilter" xml:space="preserve">
+    <value>Archivos PDF</value>
+  </data>
+  <data name="AllFilesFilter" xml:space="preserve">
+    <value>Todos los archivos</value>
+  </data>
+  <data name="ImportFailed" xml:space="preserve">
+    <value>La importación falló: {0}</value>
+  </data>
 </root>

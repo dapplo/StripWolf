@@ -79,8 +79,16 @@ public partial class ActivityViewModel : ViewModelBase
         _ = RefreshEpubConversionsAsync();
         RefreshActivityState();
 
-        settingsService.SettingsChanged += (_, _) =>
+        var appliedLanguageKey = settingsService.LoadSettings().GetLanguageKey();
+        settingsService.SettingsChanged += (_, settings) =>
         {
+            // Only the language matters here, settings are saved for many unrelated reasons
+            var languageKey = settings.GetLanguageKey();
+            if (languageKey == appliedLanguageKey)
+            {
+                return;
+            }
+            appliedLanguageKey = languageKey;
             Dispatcher.UIThread.Post(RefreshLocalization);
         };
     }

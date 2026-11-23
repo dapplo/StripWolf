@@ -332,15 +332,33 @@ public partial class MainViewModel : ViewModelBase
         if (sender == _readerViewModel || IsInReader)
         {
             IsInReader = false;
+            // Like CloseReader: the library shows the progress which was just saved
+            _ = _libraryViewModel.RefreshCommand.ExecuteAsync(null);
         }
 
         ActivateTab(1);
-        await _komgaViewModel.LoadSeriesByIdAsync(request.SeriesId, request.ServerId);
+        try
+        {
+            await _komgaViewModel.LoadSeriesByIdAsync(request.SeriesId, request.ServerId);
+        }
+        catch (Exception ex)
+        {
+            // async void event handler: an exception would end the process
+            Debug.WriteLine($"MainViewModel: Failed to show the Komga series: {ex.Message}");
+        }
     }
 
     private async void OnComicOpenRequested(object? sender, int comicId)
     {
-        await OpenReaderAsync(comicId);
+        try
+        {
+            await OpenReaderAsync(comicId);
+        }
+        catch (Exception ex)
+        {
+            // async void event handler: an exception would end the process
+            Debug.WriteLine($"MainViewModel: Failed to open comic {comicId}: {ex.Message}");
+        }
     }
 
     private void OnConfigureKomgaServerRequested(object? sender, EventArgs e)
@@ -503,6 +521,50 @@ public partial class MainViewModel : ViewModelBase
     public async Task OnShutdownAsync()
     {
         await _libraryViewModel.DeleteAllPendingComicsAsync();
+    }
+
+    /// <summary>
+    /// The system back gesture/button (Android) or the mouse back button. Before, nothing handled it, and on Android
+    /// it closed the activity, also from the reader (without saving the progress like the reader's back button does).
+    /// </summary>
+    /// <returns>True when handled, false lets the platform do its default (on Android: leave the app)</returns>
+    public bool TryHandleBack()
+    {
+        if (ShowWelcomeExperience)
+        {
+            return false;
+        }
+
+        if (ShowPremiumUnlockDialog)
+        {
+            ShowPremiumUnlockDialog = false;
+            return true;
+        }
+
+        if (ShowUpdateNotification)
+        {
+            ShowUpdateNotification = false;
+            return true;
+        }
+
+        if (IsInReader)
+        {
+            _readerViewModel.HandleBack();
+            return true;
+        }
+
+        if (SelectedTabIndex == 1 && _komgaViewModel.TryHandleBack())
+        {
+            return true;
+        }
+
+        if (SelectedTabIndex != 0)
+        {
+            ActivateTab(0);
+            return true;
+        }
+
+        return false;
     }
 
     [RelayCommand]

@@ -40,6 +40,12 @@ public class SectionLayoutSettings
         };
     }
 
+    /// <summary>
+    /// A key which changes when the order, visibility or expansion of one of the sections changes
+    /// </summary>
+    public static string GetLayoutKey(IEnumerable<SectionLayoutSettings> sections) =>
+        string.Join(";", sections.Select(section => $"{section.Key}|{section.Order}|{section.IsVisible}|{section.IsExpanded}"));
+
     public static string GetSectionLabel(string key)
     {
         return key switch

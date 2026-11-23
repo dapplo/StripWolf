@@ -417,15 +417,32 @@ public partial class SettingsViewModel : ViewModelBase
         _trialService = trialService;
         _databaseService = databaseService;
         Title = "Settings";
+        string? appliedSectionsKey = null;
+        string? appliedTrialKey = null;
         _settingsService.SettingsChanged += (_, settings) =>
         {
             Dispatcher.UIThread.Post(() =>
             {
                 _appSettings = settings.Clone();
-                ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
-                ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
                 OnPropertyChanged(nameof(ActiveServerId));
-                _ = LoadTrialStatusAndStatsAsync();
+
+                // Settings are saved for many unrelated reasons (switching tabs, opening a comic...): only rebuild the
+                // section lists and reload the statistics (database) when something they show changed
+                var sectionsKey = SectionLayoutSettings.GetLayoutKey(settings.LibrarySections) + "#" +
+                                  SectionLayoutSettings.GetLayoutKey(settings.KomgaSections);
+                if (sectionsKey != appliedSectionsKey)
+                {
+                    appliedSectionsKey = sectionsKey;
+                    ReplaceSectionCollection(LibrarySections, settings.LibrarySections);
+                    ReplaceSectionCollection(KomgaSections, settings.KomgaSections);
+                }
+
+                var trialKey = $"{settings.IsUnlimitedUnlocked}|{settings.PermanentViewedKomgaBooks.Count}|{settings.PermanentViewedLocalPaths.Count}|{settings.LastOpenedComicId}";
+                if (trialKey != appliedTrialKey)
+                {
+                    appliedTrialKey = trialKey;
+                    _ = LoadTrialStatusAndStatsAsync();
+                }
             });
         };
     }
@@ -599,11 +616,12 @@ public partial class SettingsViewModel : ViewModelBase
             Servers.Add(server);
         }
             
-        // Track the next available ID
+        // Track the next available ID (NextServerId: ids of deleted servers are never reused)
         if (_appSettings.Servers.Count > 0)
         {
             _nextServerId = _appSettings.Servers.Max(s => s.Id) + 1;
         }
+        _nextServerId = Math.Max(_nextServerId, _appSettings.NextServerId);
             
         // Load language setting
         if (_appSettings.UseSystemLanguage)
@@ -1031,13 +1049,22 @@ public partial class SettingsViewModel : ViewModelBase
             // to the encrypted credentials file and strips them from settings.json.
             var applyServer = (AppSettings settings) =>
             {
-                if (isNewServer && !isIdResolved && settings.Servers.Any(s => s.Id == server.Id))
+                if (isNewServer && !isIdResolved)
                 {
-                    // Make sure a new server never collides with an id which was added elsewhere in the meantime
-                    server.Id = settings.Servers.Max(s => s.Id) + 1;
+                    // Never reuse the id of a deleted server (NextServerId), and never collide with an id which was
+                    // added elsewhere in the meantime
+                    var minimumId = Math.Max(settings.NextServerId, settings.Servers.Count > 0 ? settings.Servers.Max(s => s.Id) + 1 : 1);
+                    if (server.Id < minimumId || settings.Servers.Any(s => s.Id == server.Id))
+                    {
+                        server.Id = minimumId;
+                    }
                     _nextServerId = Math.Max(_nextServerId, server.Id + 1);
                 }
                 isIdResolved = true;
+                if (isNewServer)
+                {
+                    settings.NextServerId = Math.Max(settings.NextServerId, server.Id + 1);
+                }
 
                 // Ensure we have a browsing server ID set if this is the only server
                 if (settings.ActiveServerId == null || settings.Servers.Count == 0)
@@ -1147,6 +1174,11 @@ public partial class SettingsViewModel : ViewModelBase
             }
 
             await _settingsService.UpdateSettingsAsync(removeServer);
+
+            // Before, everything which referenced the server stayed behind: the downloaded comics kept syncing against
+            // whichever server got the id next, its queued progress/downloads were sent there, and its thumbnails stayed.
+            await _databaseService.DetachKomgaServerAsync(server.Id);
+            KomgaThumbnailCache.DeleteServer(server.Id);
         }, "Failed to delete server");
     }
 

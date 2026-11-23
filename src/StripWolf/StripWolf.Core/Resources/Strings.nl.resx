@@ -1069,4 +1069,49 @@
   <data name="DimOutsidePanelDescription" xml:space="preserve">
     <value>Maakt bij begeleid lezen de delen van de vergrote weergave die niet bij het huidige paneel horen donkerder.</value>
   </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>Zoeken naar updates...</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>Up-to-date</value>
+  </data>
+  <data name="UpdateStatusCheckFailed" xml:space="preserve">
+    <value>Zoeken naar updates mislukt</value>
+  </data>
+  <data name="UpdateStatusConnectionError" xml:space="preserve">
+    <value>Verbindingsfout</value>
+  </data>
+  <data name="ReaderErrorLoadComic" xml:space="preserve">
+    <value>Strip kon niet worden geladen: {0}</value>
+  </data>
+  <data name="ReaderErrorLoadPage" xml:space="preserve">
+    <value>Pagina kon niet worden geladen: {0}</value>
+  </data>
+  <data name="ReaderErrorNotReadable" xml:space="preserve">
+    <value>Dit boek kon niet worden voorbereid om te lezen.</value>
+  </data>
+  <data name="ReaderPreparingFirstPage" xml:space="preserve">
+    <value>Eerste leesbare pagina wordt voorbereid...</value>
+  </data>
+  <data name="ReaderPreparingPages" xml:space="preserve">
+    <value>Leesbare pagina's worden voorbereid...</value>
+  </data>
+  <data name="ReaderNoPages" xml:space="preserve">
+    <value>De strip heeft geen pagina's</value>
+  </data>
+  <data name="SelectComicFiles" xml:space="preserve">
+    <value>Stripbestanden selecteren</value>
+  </data>
+  <data name="ComicFilesFilter" xml:space="preserve">
+    <value>Stripbestanden</value>
+  </data>
+  <data name="PdfFilesFilter" xml:space="preserve">
+    <value>PDF-bestanden</value>
+  </data>
+  <data name="AllFilesFilter" xml:space="preserve">
+    <value>Alle bestanden</value>
+  </data>
+  <data name="ImportFailed" xml:space="preserve">
+    <value>Importeren mislukt: {0}</value>
+  </data>
 </root>

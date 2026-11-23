@@ -70,54 +70,61 @@ public partial class KomgaViewModel : ViewModelBase
     private DateTime _recentSeriesCacheTime;
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
-    private readonly HashSet<string> _downloadedKomgaIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _downloadedKomgaHashes = new(StringComparer.OrdinalIgnoreCase);
-    private bool _downloadedComicsCacheLoaded;
+    /// <summary>
+    /// The Komga ids and file hashes of the downloaded comics, for the "downloaded" marks on the cards.
+    /// Replaced as a whole: the sets used to be cleared and refilled while the download state of books was checked on
+    /// the thread pool, and an invalidation that arrived during a rebuild was lost.
+    /// </summary>
+    private sealed record DownloadedComicsSnapshot(HashSet<string> KomgaIds, HashSet<string> KomgaHashes, int Version);
+    private volatile DownloadedComicsSnapshot? _downloadedComics;
+    private int _downloadedComicsVersion;
     private readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
 
     private void InvalidateDownloadedComicsCache()
     {
-        _downloadedComicsCacheLoaded = false;
+        Interlocked.Increment(ref _downloadedComicsVersion);
     }
 
-    private async Task EnsureDownloadedComicsCacheLoadedAsync()
+    private async Task<DownloadedComicsSnapshot> GetDownloadedComicsAsync()
     {
-        if (_downloadedComicsCacheLoaded)
+        var version = Volatile.Read(ref _downloadedComicsVersion);
+        if (_downloadedComics is { } current && current.Version == version)
         {
-            return;
+            return current;
         }
 
         await _cacheSemaphore.WaitAsync();
         try
         {
-            if (_downloadedComicsCacheLoaded)
+            version = Volatile.Read(ref _downloadedComicsVersion);
+            if (_downloadedComics is { } loaded && loaded.Version == version)
             {
-                return;
+                return loaded;
             }
 
-            _downloadedKomgaIds.Clear();
-            _downloadedKomgaHashes.Clear();
-
-            if (_activeServer is not null)
+            var komgaIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var komgaHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var activeServer = _activeServer;
+            if (activeServer is not null)
             {
                 var allComics = await _databaseService.GetComicsAsync();
-                var serverComics = allComics
-                    .Where(c => c.KomgaServerId == _activeServer.Id || c.KomgaServerId == null)
-                    .ToList();
-                foreach (var comic in serverComics)
+                foreach (var comic in allComics.Where(c => c.KomgaServerId == activeServer.Id || c.KomgaServerId == null))
                 {
                     if (!string.IsNullOrEmpty(comic.KomgaId))
                     {
-                        _downloadedKomgaIds.Add(comic.KomgaId);
+                        komgaIds.Add(comic.KomgaId);
                     }
                     if (!string.IsNullOrEmpty(comic.KomgaHash))
                     {
-                        _downloadedKomgaHashes.Add(comic.KomgaHash);
+                        komgaHashes.Add(comic.KomgaHash);
                     }
                 }
             }
 
-            _downloadedComicsCacheLoaded = true;
+            // Stored with the version read before loading: an invalidation during the load makes the next call reload
+            var snapshot = new DownloadedComicsSnapshot(komgaIds, komgaHashes, version);
+            _downloadedComics = snapshot;
+            return snapshot;
         }
         finally
         {
@@ -733,6 +740,9 @@ public partial class KomgaViewModel : ViewModelBase
         var initialSettings = _settingsService.LoadSettings();
         ApplySectionLayout(initialSettings);
         ApplyDownloadSettings(initialSettings);
+        var appliedBrowsingKey = initialSettings.GetKomgaBrowsingKey();
+        var appliedLanguageKey = initialSettings.GetLanguageKey();
+        var appliedServerListKey = initialSettings.GetServerListKey();
         _settingsService.SettingsChanged += (_, settings) =>
         {
             Dispatcher.UIThread.Post(async () =>
@@ -740,9 +750,32 @@ public partial class KomgaViewModel : ViewModelBase
                 // async void (posted async lambda): exceptions must not escape, they would crash the app
                 try
                 {
+                    // Settings are saved for many unrelated reasons (switching tabs, opening a comic, the trial lists).
+                    // Before, every save reloaded the libraries from the server (and, once the cache expired, the
+                    // read lists and smart lists). Only react to the settings this tab uses.
+                    var browsingKey = settings.GetKomgaBrowsingKey();
+                    var languageKey = settings.GetLanguageKey();
+                    var serverListKey = settings.GetServerListKey();
+                    var browsingChanged = browsingKey != appliedBrowsingKey;
+                    var languageChanged = languageKey != appliedLanguageKey;
+                    var serversChanged = serverListKey != appliedServerListKey;
+                    var connectionChanged = _activeServer is not null &&
+                        settings.Servers.FirstOrDefault(s => s.Id == _activeServer.Id) is { } changedServer &&
+                        !HasSameConnectionSettings(_activeServer, changedServer);
+                    if (!browsingChanged && !languageChanged && !serversChanged && !connectionChanged)
+                    {
+                        return;
+                    }
+                    appliedBrowsingKey = browsingKey;
+                    appliedLanguageKey = languageKey;
+                    appliedServerListKey = serverListKey;
+
                     ApplySectionLayout(settings);
                     ApplyDownloadSettings(settings);
-                    RefreshLocalization();
+                    if (languageChanged)
+                    {
+                        RefreshLocalization();
+                    }
                     
                     RefreshConfiguredServers(settings);
                     
@@ -757,7 +790,10 @@ public partial class KomgaViewModel : ViewModelBase
                         }
                     }
                     
-                    await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                    if (browsingChanged || connectionChanged)
+                    {
+                        await LoadVisibleAndExpandedSectionsAsync(useCache: true);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -767,6 +803,7 @@ public partial class KomgaViewModel : ViewModelBase
         };
         DownloadQueueItems.CollectionChanged += (_, _) => ScheduleRefreshDownloadQueueState();
         _libraryService.LibraryChanged += (s, e) => InvalidateDownloadedComicsCache();
+        KomgaThumbnailCache.PruneInBackground();
     }
 
     private void RegisterHomeSectionLayoutState(SectionLayoutItemViewModel section)
@@ -1058,14 +1095,14 @@ public partial class KomgaViewModel : ViewModelBase
     {
         try
         {
-            await EnsureDownloadedComicsCacheLoadedAsync();
+            var downloadedComics = await GetDownloadedComicsAsync();
             
-            if (_downloadedKomgaIds.Contains(book.Id))
+            if (downloadedComics.KomgaIds.Contains(book.Id))
             {
                 return true;
             }
             
-            if (!string.IsNullOrEmpty(book.FileHash) && _downloadedKomgaHashes.Contains(book.FileHash))
+            if (!string.IsNullOrEmpty(book.FileHash) && downloadedComics.KomgaHashes.Contains(book.FileHash))
             {
                 return true;
             }
@@ -1764,35 +1801,6 @@ public partial class KomgaViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Returns the path for a cached thumbnail. The path includes the server ID so that
-    /// thumbnails from different servers do not overlap.
-    /// The item id comes from the server, it is sanitized so a malicious server can't write outside the cache.
-    /// </summary>
-    private static string GetThumbnailCachePath(int serverId, string type, string itemId)
-    {
-        var cacheDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "StripWolf", "thumbnails", serverId.ToString(), type);
-        Directory.CreateDirectory(cacheDir);
-        return Path.Combine(cacheDir, $"{LibraryService.SanitizeFileName(itemId)}.jpg");
-    }
-
-    /// <summary>
-    /// Returns cached thumbnail bytes, fetching and caching them from the server if not found on disk.
-    /// </summary>
-    private static async Task<byte[]?> GetOrFetchCachedThumbnailAsync(int serverId, string type, string itemId,
-        Func<CancellationToken, Task<byte[]?>> fetch, CancellationToken ct)
-    {
-        var cachePath = GetThumbnailCachePath(serverId, type, itemId);
-        if (File.Exists(cachePath))
-            return await File.ReadAllBytesAsync(cachePath, ct);
-        var bytes = await fetch(ct);
-        if (bytes is { Length: > 0 } && !ct.IsCancellationRequested)
-            await File.WriteAllBytesAsync(cachePath, bytes, ct);
-        return bytes;
-    }
-
-    /// <summary>
     /// Called by the view when an ItemsRepeater realized a card: loads the thumbnail of the item.
     /// Only realized (≈ visible) cards hold a decoded thumbnail, so big libraries don't decode thousands of covers.
     /// </summary>
@@ -1881,24 +1889,24 @@ public partial class KomgaViewModel : ViewModelBase
         // Capture the server state now, it can change while the request waits for a free slot
         var komgaApiService = _komgaApiService;
         var serverId = _activeServer?.Id ?? 0;
-        Func<CancellationToken, Task<byte[]?>> fetch;
+        Func<CancellationToken, Task<(byte[]? Bytes, string? CachePath)>> fetch;
         if (display is KomgaSeriesDisplay seriesDisplay)
         {
             var seriesId = seriesDisplay.Id;
-            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "series", seriesId,
+            fetch = ct => KomgaThumbnailCache.GetOrFetchAsync(serverId, "series", seriesId,
                 token => komgaApiService.GetSeriesThumbnailAsync(seriesId, token), ct);
         }
         else if (display is KomgaBookDisplay bookDisplay)
         {
             var bookId = bookDisplay.Id;
-            fetch = ct => GetOrFetchCachedThumbnailAsync(serverId, "books", bookId,
+            fetch = ct => KomgaThumbnailCache.GetOrFetchAsync(serverId, "books", bookId,
                 token => komgaApiService.GetBookThumbnailAsync(bookId, token), ct);
         }
         else if (display is KomgaReadListDisplay readListDisplay)
         {
             // Read list thumbnails are composed from their books and change with the list, they are not cached on disk
             var readListId = readListDisplay.Id;
-            fetch = ct => komgaApiService.GetReadListThumbnailAsync(readListId, ct);
+            fetch = async ct => (await komgaApiService.GetReadListThumbnailAsync(readListId, ct), null);
         }
         else
         {
@@ -1912,7 +1920,7 @@ public partial class KomgaViewModel : ViewModelBase
     /// <summary>
     /// Fetches (disk cache or server) and decodes a thumbnail on a background thread, then applies it on the UI thread.
     /// </summary>
-    private async Task LoadThumbnailAsync(KomgaThumbnailDisplay display, int version, Func<CancellationToken, Task<byte[]?>> fetch)
+    private async Task LoadThumbnailAsync(KomgaThumbnailDisplay display, int version, Func<CancellationToken, Task<(byte[]? Bytes, string? CachePath)>> fetch)
     {
         Bitmap? thumbnail = null;
         var failed = false;
@@ -1924,10 +1932,19 @@ public partial class KomgaViewModel : ViewModelBase
                 // The card may have been recycled while this request waited for a slot
                 if (display.IsThumbnailLoadCurrent(version))
                 {
-                    var thumbnailBytes = await fetch(CancellationToken.None);
+                    var (thumbnailBytes, cachePath) = await fetch(CancellationToken.None);
                     if (thumbnailBytes is { Length: > 0 } && display.IsThumbnailLoadCurrent(version))
                     {
-                        thumbnail = ThumbnailDecoder.Decode(thumbnailBytes, ThumbnailDecodeWidth);
+                        try
+                        {
+                            thumbnail = ThumbnailDecoder.Decode(thumbnailBytes, ThumbnailDecodeWidth);
+                        }
+                        catch
+                        {
+                            // A broken cache file would fail on every visit, fetch it again next time
+                            KomgaThumbnailCache.Invalidate(cachePath);
+                            throw;
+                        }
                     }
                 }
             }
@@ -3287,6 +3304,33 @@ public partial class KomgaViewModel : ViewModelBase
             trackedBook.DownloadProgress = 0;
         });
         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
+    }
+
+    /// <summary>
+    /// The system back gesture/button (Android) or the mouse back button: go up one level in the Komga browser
+    /// </summary>
+    /// <returns>False when already at the top</returns>
+    public bool TryHandleBack()
+    {
+        if (SelectedSeries is not null)
+        {
+            GoBackToSeriesCommand.Execute(null);
+            return true;
+        }
+
+        if (SelectedReadList is not null)
+        {
+            GoBackToReadLists();
+            return true;
+        }
+
+        if (SelectedLibrary is not null)
+        {
+            GoBackToLibraries();
+            return true;
+        }
+
+        return false;
     }
 
     [RelayCommand]

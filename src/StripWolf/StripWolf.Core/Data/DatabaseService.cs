@@ -102,6 +102,9 @@ public class DatabaseService : IAsyncDisposable
             await MigrateUsageStatsAsync(_database);
             await _database.CreateTableAsync<BookmarkedFileImport>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
+            // Looked up for every Komga book shown, downloaded and synced
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_KomgaId ON Comic(KomgaId)");
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_KomgaHash ON Comic(KomgaHash)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
 
             _isInitialized = true;
@@ -367,6 +370,20 @@ public class DatabaseService : IAsyncDisposable
 
         var db = await GetDatabaseAsync();
         return await db.DeleteAsync<KomgaPendingReadProgress>(comicId);
+    }
+
+    /// <summary>
+    /// A Komga server was deleted: its downloaded comics stay in the library as local comics of no server (they are
+    /// no longer synced), the progress and downloads still queued for it are dropped.
+    /// </summary>
+    /// <returns>The number of comics which belonged to the server</returns>
+    public async Task<int> DetachKomgaServerAsync(int serverId)
+    {
+        var db = await GetDatabaseAsync();
+        var comics = await db.ExecuteAsync("UPDATE Comic SET KomgaServerId = NULL WHERE KomgaServerId = ?", serverId);
+        await db.ExecuteAsync("DELETE FROM KomgaPendingReadProgress WHERE ServerId = ?", serverId);
+        await db.ExecuteAsync("DELETE FROM KomgaPendingDownload WHERE ServerId = ?", serverId);
+        return comics;
     }
 
     #endregion
