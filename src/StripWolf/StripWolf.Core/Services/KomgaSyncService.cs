@@ -88,7 +88,7 @@ public class KomgaSyncService
             comic.IsCompleted,
             AsUtc(comic.ReadProgressLastModified) ?? DateTime.UtcNow);
 
-        comic.KomgaSyncStatus = "Pending sync";
+        comic.KomgaSyncState = KomgaSyncState.Pending;
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public class KomgaSyncService
 
         if (server is null)
         {
-            comic.KomgaSyncStatus = "Server not found";
+            comic.KomgaSyncState = KomgaSyncState.ServerNotFound;
             return false;
         }
 
@@ -139,12 +139,12 @@ public class KomgaSyncService
         {
             // Keep the pending progress so it is retried later. Before, the result was ignored: the pending entry
             // was deleted and "Synced to Komga" was shown even for a 401/403/500 response.
-            comic.KomgaSyncStatus = "Sync failed";
+            comic.KomgaSyncState = KomgaSyncState.Failed;
             return false;
         }
 
         await _databaseService.DeletePendingKomgaReadProgressAsync(comic.Id);
-        comic.KomgaSyncStatus = "Synced to Komga";
+        comic.KomgaSyncState = KomgaSyncState.Synced;
         return true;
     }
 
@@ -173,7 +173,7 @@ public class KomgaSyncService
             var server = settings.Servers.FirstOrDefault(s => s.Id == comic.KomgaServerId.Value);
             if (server == null)
             {
-                comic.KomgaSyncStatus = "Server not found";
+                comic.KomgaSyncState = KomgaSyncState.ServerNotFound;
                 return;
             }
 
@@ -220,7 +220,7 @@ public class KomgaSyncService
                 comic.CurrentPage = newPage;
                 comic.IsCompleted = newCompleted;
 
-                comic.KomgaSyncStatus = "Updated from Komga";
+                comic.KomgaSyncState = KomgaSyncState.UpdatedFromKomga;
             }
             else if (diff.TotalSeconds < -2)
             {
@@ -230,7 +230,7 @@ public class KomgaSyncService
             }
             else
             {
-                comic.KomgaSyncStatus = "In sync";
+                comic.KomgaSyncState = KomgaSyncState.InSync;
             }
         }
         catch (OperationCanceledException)
@@ -239,12 +239,12 @@ public class KomgaSyncService
         }
         catch (HttpRequestException ex)
         {
-            comic.KomgaSyncStatus = "Network error";
+            comic.KomgaSyncState = KomgaSyncState.NetworkError;
             Logger.Error($"Komga sync network error for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         catch (Exception ex)
         {
-            comic.KomgaSyncStatus = "Sync failed";
+            comic.KomgaSyncState = KomgaSyncState.Failed;
             Logger.Error($"Komga sync failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         finally
@@ -297,7 +297,7 @@ public class KomgaSyncService
                 {
                     foreach (var comic in serverGroup)
                     {
-                        comic.KomgaSyncStatus = "Server not found";
+                        comic.KomgaSyncState = KomgaSyncState.ServerNotFound;
                     }
                     continue;
                 }
@@ -378,7 +378,7 @@ public class KomgaSyncService
 
                 comic.CurrentPage = newPage;
                 comic.IsCompleted = newCompleted;
-                comic.KomgaSyncStatus = "Updated from Komga";
+                comic.KomgaSyncState = KomgaSyncState.UpdatedFromKomga;
             }
             else if (diff.TotalSeconds < -2)
             {
@@ -387,12 +387,12 @@ public class KomgaSyncService
             }
             else
             {
-                comic.KomgaSyncStatus = "In sync";
+                comic.KomgaSyncState = KomgaSyncState.InSync;
             }
         }
         catch (Exception ex)
         {
-            comic.KomgaSyncStatus = "Sync failed";
+            comic.KomgaSyncState = KomgaSyncState.Failed;
             Logger.Error($"Komga internal sync failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         finally
@@ -432,12 +432,12 @@ public class KomgaSyncService
         }
         catch (HttpRequestException ex)
         {
-            comic.KomgaSyncStatus = "Pending sync";
+            comic.KomgaSyncState = KomgaSyncState.Pending;
             Logger.Error($"Push progress to Komga network error for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
         catch (Exception ex)
         {
-            comic.KomgaSyncStatus = "Pending sync";
+            comic.KomgaSyncState = KomgaSyncState.Pending;
             Logger.Error($"Push progress to Komga failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
         }
     }

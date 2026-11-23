@@ -1216,4 +1216,40 @@
   <data name="ImportFailed" xml:space="preserve">
     <value>Import failed: {0}</value>
   </data>
+  <data name="KomgaSyncPending" xml:space="preserve">
+    <value>Pending sync</value>
+  </data>
+  <data name="KomgaSyncSynced" xml:space="preserve">
+    <value>Synced to Komga</value>
+  </data>
+  <data name="KomgaSyncUpdatedFromKomga" xml:space="preserve">
+    <value>Updated from Komga</value>
+  </data>
+  <data name="KomgaSyncInSync" xml:space="preserve">
+    <value>In sync</value>
+  </data>
+  <data name="KomgaSyncServerNotFound" xml:space="preserve">
+    <value>Server not found</value>
+  </data>
+  <data name="KomgaSyncNetworkError" xml:space="preserve">
+    <value>Network error</value>
+  </data>
+  <data name="KomgaSyncFailed" xml:space="preserve">
+    <value>Sync failed</value>
+  </data>
+  <data name="ReaderImageQuality" xml:space="preserve">
+    <value>Image quality</value>
+  </data>
+  <data name="ReaderImageQualityDescription" xml:space="preserve">
+    <value>High shows pages as sharp as the original at your screen size. Original always decodes the full image, which makes zooming sharp right away but uses the most memory. Save memory helps devices with little memory or a slow processor.</value>
+  </data>
+  <data name="ReaderImageQualityHigh" xml:space="preserve">
+    <value>High (recommended)</value>
+  </data>
+  <data name="ReaderImageQualityOriginal" xml:space="preserve">
+    <value>Original resolution</value>
+  </data>
+  <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
+    <value>Save memory</value>
+  </data>
 </root>

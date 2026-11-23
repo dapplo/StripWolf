@@ -884,7 +884,7 @@ public class LibraryService
                 currentPage,
                 isCompleted,
                 effectiveLastModified);
-            comic.KomgaSyncStatus = "Pending sync";
+            comic.KomgaSyncState = KomgaSyncState.Pending;
         }
 
         if (notifyLibraryChanged)

@@ -1114,4 +1114,40 @@
   <data name="ImportFailed" xml:space="preserve">
     <value>Importeren mislukt: {0}</value>
   </data>
+  <data name="KomgaSyncPending" xml:space="preserve">
+    <value>Synchronisatie in afwachting</value>
+  </data>
+  <data name="KomgaSyncSynced" xml:space="preserve">
+    <value>Gesynchroniseerd met Komga</value>
+  </data>
+  <data name="KomgaSyncUpdatedFromKomga" xml:space="preserve">
+    <value>Bijgewerkt vanuit Komga</value>
+  </data>
+  <data name="KomgaSyncInSync" xml:space="preserve">
+    <value>Gesynchroniseerd</value>
+  </data>
+  <data name="KomgaSyncServerNotFound" xml:space="preserve">
+    <value>Server niet gevonden</value>
+  </data>
+  <data name="KomgaSyncNetworkError" xml:space="preserve">
+    <value>Netwerkfout</value>
+  </data>
+  <data name="KomgaSyncFailed" xml:space="preserve">
+    <value>Synchronisatie mislukt</value>
+  </data>
+  <data name="ReaderImageQuality" xml:space="preserve">
+    <value>Beeldkwaliteit</value>
+  </data>
+  <data name="ReaderImageQualityDescription" xml:space="preserve">
+    <value>Hoog toont pagina's net zo scherp als het origineel op je schermgrootte. Origineel decodeert altijd de volledige afbeelding, zodat inzoomen meteen scherp is, maar gebruikt het meeste geheugen. Geheugen besparen helpt apparaten met weinig geheugen of een trage processor.</value>
+  </data>
+  <data name="ReaderImageQualityHigh" xml:space="preserve">
+    <value>Hoog (aanbevolen)</value>
+  </data>
+  <data name="ReaderImageQualityOriginal" xml:space="preserve">
+    <value>Originele resolutie</value>
+  </data>
+  <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
+    <value>Geheugen besparen</value>
+  </data>
 </root>

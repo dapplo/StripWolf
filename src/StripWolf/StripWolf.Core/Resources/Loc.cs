@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Resources;
 using System.Runtime.CompilerServices;
+using StripWolf.Core.Models;
 
 namespace StripWolf.Core.Resources;
 
@@ -410,4 +411,35 @@ public class Loc : INotifyPropertyChanged
     public string TrialLocalImports => GetString();
     public string TrialKomgaDownloads => GetString();
     public string TrialKomgaServerIntegration => GetString();
+
+    // Komga sync state, the comic stores a KomgaSyncState code
+    public string KomgaSyncPending => GetString();
+    public string KomgaSyncSynced => GetString();
+    public string KomgaSyncUpdatedFromKomga => GetString();
+    public string KomgaSyncInSync => GetString();
+    public string KomgaSyncServerNotFound => GetString();
+    public string KomgaSyncNetworkError => GetString();
+    public string KomgaSyncFailed => GetString();
+
+    /// <summary>
+    /// The text shown for a Komga sync state, null when the comic was never synced
+    /// </summary>
+    public string? GetKomgaSyncStateText(KomgaSyncState state) => state switch
+    {
+        KomgaSyncState.Pending => KomgaSyncPending,
+        KomgaSyncState.Synced => KomgaSyncSynced,
+        KomgaSyncState.UpdatedFromKomga => KomgaSyncUpdatedFromKomga,
+        KomgaSyncState.InSync => KomgaSyncInSync,
+        KomgaSyncState.ServerNotFound => KomgaSyncServerNotFound,
+        KomgaSyncState.NetworkError => KomgaSyncNetworkError,
+        KomgaSyncState.Failed => KomgaSyncFailed,
+        _ => null
+    };
+
+    // Reader image quality
+    public string ReaderImageQuality => GetString();
+    public string ReaderImageQualityDescription => GetString();
+    public string ReaderImageQualityHigh => GetString();
+    public string ReaderImageQualityOriginal => GetString();
+    public string ReaderImageQualitySaveMemory => GetString();
 }

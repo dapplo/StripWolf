@@ -157,7 +157,7 @@ public partial class Comic : ObservableObject
     /// The last synchronization status with Komga
     /// </summary>
     [ObservableProperty]
-    private string? _komgaSyncStatus;
+    private KomgaSyncState _komgaSyncState;
 
     /// <summary>
     /// Current page the user is on (0-indexed)
