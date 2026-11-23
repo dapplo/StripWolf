@@ -489,6 +489,20 @@ public sealed class LibraryServiceTests
     }
 
     [Fact]
+    public async Task CleanupMissingFilesAsync_KeepsComicsOfAFolderWhichIsGone()
+    {
+        await using var host = await TestServiceHost.CreateAsync();
+        // e.g. a USB drive or network share which isn't connected
+        var comic = new Comic { Title = "On a drive", FilePath = host.Temp.Combine("unplugged-drive", "comics", "drive.cbz"), PageCount = 10, CurrentPage = 4 };
+        await host.Database.SaveComicAsync(comic);
+
+        var removed = await host.Library.CleanupMissingFilesAsync();
+
+        Assert.Equal(0, removed);
+        Assert.Equal(4, (await host.Library.GetComicAsync(comic.Id))!.CurrentPage);
+    }
+
+    [Fact]
     public async Task GetNextComicInSeriesAsync_UsesTheNumberOrder()
     {
         await using var host = await TestServiceHost.CreateAsync();

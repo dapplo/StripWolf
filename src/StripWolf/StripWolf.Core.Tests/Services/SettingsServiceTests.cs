@@ -87,6 +87,28 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void LoadSettings_CorruptFile_IsKeptNextToTheDefaults()
+    {
+        File.WriteAllText(SettingsFile, "{ \"servers\": [ { broken");
+        var service = new SettingsService(SettingsDirectory);
+
+        var settings = service.LoadSettings();
+
+        Assert.Empty(settings.Servers);
+        Assert.Equal("{ \"servers\": [ { broken", File.ReadAllText(SettingsFile + ".corrupt"));
+    }
+
+    [Fact]
+    public void LoadSettings_ReadsTheImageQuality()
+    {
+        File.WriteAllText(SettingsFile, "{ \"readerImageQuality\": \"SaveMemory\" }");
+        var service = new SettingsService(SettingsDirectory);
+
+        Assert.Equal(ReaderImageQuality.SaveMemory, service.LoadSettings().ReaderImageQuality);
+        Assert.Equal(ReaderImageQuality.High, new AppSettings().ReaderImageQuality);
+    }
+
+    [Fact]
     public void LoadSettings_ReturnsACopy()
     {
         var service = new SettingsService(SettingsDirectory);

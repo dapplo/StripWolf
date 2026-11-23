@@ -194,12 +194,15 @@ public class LibraryService
     }
 
     /// <summary>
-    /// Checks if all comic files exist and removes missing ones from the library
+    /// Checks if all comic files exist and removes missing ones from the library.
+    /// A comic is only removed when its folder is still there: comics are read where they were imported, and a folder
+    /// which is gone as a whole is usually a USB drive, SD card or network share which is not connected right now.
+    /// Before, starting the app without that drive removed all its comics, with their reading progress and favourites.
     /// </summary>
     public async Task<int> CleanupMissingFilesAsync()
     {
         var comics = await _databaseService.GetComicsAsync();
-        var missingComics = comics.Where(c => !File.Exists(c.FilePath)).ToList();
+        var missingComics = comics.Where(IsComicFileGone).ToList();
 
         foreach (var comic in missingComics)
         {
@@ -212,6 +215,17 @@ public class LibraryService
         }
 
         return missingComics.Count;
+    }
+
+    private static bool IsComicFileGone(Comic comic)
+    {
+        if (string.IsNullOrEmpty(comic.FilePath) || File.Exists(comic.FilePath) || Directory.Exists(comic.FilePath))
+        {
+            return false;
+        }
+
+        var directory = Path.GetDirectoryName(comic.FilePath);
+        return !string.IsNullOrEmpty(directory) && Directory.Exists(directory);
     }
 
     /// <summary>

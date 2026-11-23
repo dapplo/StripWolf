@@ -310,7 +310,14 @@ public class KomgaSyncService
                     {
                         continue;
                     }
-                    await SyncComicReadProgressInternalAsync(comic, server, komgaApiService);
+
+                    // Server unreachable or refusing us: the other comics of this server would fail the same way,
+                    // each after a timeout of up to two minutes. Try again at the next full sync.
+                    if (!await SyncComicReadProgressInternalAsync(comic, server, komgaApiService))
+                    {
+                        Logger.Info($"Komga full sync of server '{server.Name}' stopped after a connection error");
+                        break;
+                    }
                 }
             }
         }
@@ -327,7 +334,8 @@ public class KomgaSyncService
     /// <summary>
     /// Internal sync logic for a specific server API service.
     /// </summary>
-    private async Task SyncComicReadProgressInternalAsync(Comic comic, KomgaServer server, KomgaApiService komgaApiService)
+    /// <returns>False when the server could not be reached (or refused the request), the full sync stops for that server</returns>
+    private async Task<bool> SyncComicReadProgressInternalAsync(Comic comic, KomgaServer server, KomgaApiService komgaApiService)
     {
         var semaphore = GetComicSemaphore(comic.Id);
         await semaphore.WaitAsync();
@@ -339,19 +347,19 @@ public class KomgaSyncService
             var current = await _libraryService.GetComicAsync(comic.Id);
             if (current is null || current.Source != ComicSource.Komga || string.IsNullOrEmpty(current.KomgaId))
             {
-                return;
+                return true;
             }
             comic = current;
 
             if (!await TryPushPendingReadProgressAsync(comic, server, komgaApiService))
             {
-                return;
+                return true;
             }
 
             var book = await komgaApiService.GetBookAsync(comic.KomgaId!);
             if (book is null)
             {
-                return;
+                return true;
             }
 
             if (book.ReadProgress is null)
@@ -361,7 +369,7 @@ public class KomgaSyncService
                     await QueueCurrentProgressAsync(comic);
                     await TryPushPendingReadProgressAsync(comic, server, komgaApiService);
                 }
-                return;
+                return true;
             }
 
             var komgaProgress = book.ReadProgress;
@@ -389,11 +397,19 @@ public class KomgaSyncService
             {
                 comic.KomgaSyncState = KomgaSyncState.InSync;
             }
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            comic.KomgaSyncState = KomgaSyncState.NetworkError;
+            Logger.Error($"Komga internal sync could not reach the server for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
+            return false;
         }
         catch (Exception ex)
         {
             comic.KomgaSyncState = KomgaSyncState.Failed;
             Logger.Error($"Komga internal sync failed for comic '{comic.Title}' (Komga ID: {comic.KomgaId})", ex);
+            return true;
         }
         finally
         {
