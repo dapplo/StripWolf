@@ -2614,6 +2614,26 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// The system back gesture/button (Android) or the mouse back button: close an open panel, otherwise leave the reader
+    /// </summary>
+    public void HandleBack()
+    {
+        if (IsInfoPanelVisible)
+        {
+            IsInfoPanelVisible = false;
+            return;
+        }
+
+        if (IsEndOfComicOptionsVisible)
+        {
+            IsEndOfComicOptionsVisible = false;
+            return;
+        }
+
+        GoBackCommand.Execute(null);
+    }
+
+    /// <summary>
     /// Everything which has to happen when the reader is left, whatever is shown next (library, Komga series)
     /// </summary>
     private async Task LeaveReaderAsync()

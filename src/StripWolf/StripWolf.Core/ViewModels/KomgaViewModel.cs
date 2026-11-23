@@ -3318,6 +3318,33 @@ public partial class KomgaViewModel : ViewModelBase
         RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
     }
 
+    /// <summary>
+    /// The system back gesture/button (Android) or the mouse back button: go up one level in the Komga browser
+    /// </summary>
+    /// <returns>False when already at the top</returns>
+    public bool TryHandleBack()
+    {
+        if (SelectedSeries is not null)
+        {
+            GoBackToSeriesCommand.Execute(null);
+            return true;
+        }
+
+        if (SelectedReadList is not null)
+        {
+            GoBackToReadLists();
+            return true;
+        }
+
+        if (SelectedLibrary is not null)
+        {
+            GoBackToLibraries();
+            return true;
+        }
+
+        return false;
+    }
+
     [RelayCommand]
     private void GoBackToLibraries()
     {

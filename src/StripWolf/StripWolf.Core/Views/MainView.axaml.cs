@@ -19,6 +19,8 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using StripWolf.Core.ViewModels;
 
 namespace StripWolf.Core.Views;
 
@@ -29,9 +31,38 @@ public partial class MainView : UserControl
         InitializeComponent();
     }
 
+    private TopLevel? _topLevel;
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        App.TopLevel = TopLevel.GetTopLevel(this);
+        _topLevel = TopLevel.GetTopLevel(this);
+        App.TopLevel = _topLevel;
+        if (_topLevel is not null)
+        {
+            _topLevel.BackRequested += OnBackRequested;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_topLevel is not null)
+        {
+            _topLevel.BackRequested -= OnBackRequested;
+            if (ReferenceEquals(App.TopLevel, _topLevel))
+            {
+                App.TopLevel = null;
+            }
+            _topLevel = null;
+        }
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnBackRequested(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel && viewModel.TryHandleBack())
+        {
+            e.Handled = true;
+        }
     }
 }

@@ -53,6 +53,34 @@ public class MainContentHost : Panel
         set => SetValue(CurrentContentProperty, value);
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (_currentView is null && CurrentContent is not null)
+        {
+            // Released in OnDetachedFromVisualTree, rebuild the views
+            ShowContent(CurrentContent);
+        }
+    }
+
+    /// <summary>
+    /// On Android the view models outlive the activity: every new activity gets a new MainView (MainViewFactory).
+    /// The cached views of the old one kept their DataContext, so they stayed subscribed to the (singleton) view models
+    /// and the whole old visual tree, cover bitmaps included, was kept alive and kept reacting to changes.
+    /// Release them when this host leaves the visual tree.
+    /// </summary>
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        foreach (var child in Children.ToList())
+        {
+            child.DataContext = null;
+        }
+        Children.Clear();
+        _cachedViews.Clear();
+        _currentView = null;
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);

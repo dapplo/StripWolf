@@ -34,7 +34,11 @@ namespace StripWolf.Core.Android;
     Icon = "@drawable/icon",
     MainLauncher = true,
     LaunchMode = LaunchMode.SingleTask,
-    ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
+    // Avalonia handles these itself. Without ScreenLayout/SmallestScreenSize/Density/Keyboard*, split screen, foldables,
+    // a display size change or connecting a keyboard recreated the activity (and with it the whole MainView).
+    ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode |
+                           ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density |
+                           ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden | ConfigChanges.Navigation)]
 [IntentFilter(
     new[] { Intent.ActionView },
     Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },
