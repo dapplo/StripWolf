@@ -372,6 +372,17 @@ public partial class ReaderViewModel : ViewModelBase
 
     private CancellationTokenSource? _viewportChangedCts;
 
+    /// <summary>
+    /// The error shown because a page failed to load, it is cleared when a page loads again
+    /// </summary>
+    private string? _pageLoadError;
+
+    /// <summary>
+    /// True from the moment a comic passed the checks in LoadComicAsync until the reader is left
+    /// (Comic keeps the last comic after that). Only an open comic has progress to save.
+    /// </summary>
+    private bool _isComicOpen;
+
     private void OnViewportSizeChanged()
     {
         ClearBitmapPrefetchCache();
@@ -782,6 +793,7 @@ public partial class ReaderViewModel : ViewModelBase
 
     private void ReleaseReaderResources()
     {
+        _isComicOpen = false;
         _periodicSyncTimer.Stop();
         ClearKomgaSyncPrompt();
         if (Comic is not null && HasPendingEpubConversion)
@@ -987,6 +999,17 @@ public partial class ReaderViewModel : ViewModelBase
 
     public async Task LoadComicAsync(int comicId)
     {
+        // Another comic is opened while reading (next in series, a file opened from outside): finish the one we are
+        // leaving like GoBackAsync does. ReleaseReaderResources below cancels the pending (debounced) save, the last
+        // page turn was lost, and the progress was never pushed to Komga.
+        // Only while a comic is open: after GoBackAsync, Comic still holds the closed comic and saving it again would
+        // move its "last read" date.
+        if (_isComicOpen && Comic is not null && !_isInitializingComic && Comic.Id != comicId)
+        {
+            await SaveProgressAsync(forceImmediate: true);
+            _ = SyncProgressWithKomgaAsync();
+        }
+
         ComicId = comicId;
         try
         {
@@ -1041,6 +1064,8 @@ public partial class ReaderViewModel : ViewModelBase
                     Dispatcher.UIThread.Post(() => _ = GoBackAsync());
                     return;
                 }
+
+                _isComicOpen = true;
 
                 // Save last opened comic info in settings, only these fields: the settings snapshot loaded above
                 // is stale by now and saving it as a whole would overwrite concurrent changes
@@ -1343,6 +1368,16 @@ public partial class ReaderViewModel : ViewModelBase
                     _lastLoadedPageIndex = pageIndex;
                     _appEventsService.RaisePageRead();
 
+                    // A page which failed before must not leave its error on the pages which load fine
+                    if (_pageLoadError is not null)
+                    {
+                        if (ErrorMessage == _pageLoadError)
+                        {
+                            ErrorMessage = null;
+                        }
+                        _pageLoadError = null;
+                    }
+
                     // Reset zoom when changing pages
                     ZoomLevel = 1.0;
                 }
@@ -1350,7 +1385,7 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     if (ex is not OperationCanceledException && !ct.IsCancellationRequested)
                     {
-                        ErrorMessage = $"Failed to load page: {ex.Message}";
+                        ErrorMessage = _pageLoadError = $"Failed to load page: {ex.Message}";
                     }
                     _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
                 }
@@ -1474,12 +1509,15 @@ public partial class ReaderViewModel : ViewModelBase
         {
             IsEndOfComicOptionsVisible = false;
             IsInfoPanelVisible = false;
-            await SaveProgressAsync();
-            ViewSeriesRequested?.Invoke(this, new KomgaSeriesNavigationRequest
+            var request = new KomgaSeriesNavigationRequest
             {
                 SeriesId = Comic.KomgaSeriesId,
                 ServerId = Comic.KomgaServerId
-            });
+            };
+            // This leaves the reader: before, it only saved (debounced) and switched tabs, so full screen stayed on,
+            // the periodic Komga sync kept running and the page bitmaps and PDF/EPUB session stayed in memory.
+            await LeaveReaderAsync();
+            ViewSeriesRequested?.Invoke(this, request);
         }
     }
 
@@ -1713,7 +1751,7 @@ public partial class ReaderViewModel : ViewModelBase
         var nextComicId = NextSeriesComic.Id;
         IsEndOfComicOptionsVisible = false;
         IsInfoPanelVisible = false;
-        _ = SaveProgressAsync(forceImmediate: true);
+        // LoadComicAsync saves (and pushes) the progress of this comic before it opens the next one
         ComicOpenRequested?.Invoke(this, nextComicId);
     }
 
@@ -2569,19 +2607,31 @@ public partial class ReaderViewModel : ViewModelBase
     [RelayCommand]
     private async Task GoBackAsync()
     {
-        // Reset fullscreen before leaving the reader
-        IsFullScreen = false;
-
-        // Fire and forget the Komga sync in the background so it doesn't delay UI closing
-        _ = SyncProgressWithKomgaAsync();
-
-        // Await the (fast, local) progress save: the reader saves without raising LibraryChanged, the library refresh
-        // triggered by CloseRequested must see the final position.
-        await SaveProgressAsync(forceImmediate: true);
-        ReleaseReaderResources();
+        await LeaveReaderAsync();
         CloseRequested?.Invoke(this, EventArgs.Empty);
         // The forced GC.Collect/WaitForPendingFinalizers which was here is no longer needed,
         // page bitmaps are disposed deterministically in ReleaseReaderResources.
+    }
+
+    /// <summary>
+    /// Everything which has to happen when the reader is left, whatever is shown next (library, Komga series)
+    /// </summary>
+    private async Task LeaveReaderAsync()
+    {
+        // Reset fullscreen before leaving the reader
+        IsFullScreen = false;
+
+        // A comic which was blocked (trial limit) or failed to load has no progress: saving it marked it as started
+        if (_isComicOpen)
+        {
+            // Fire and forget the Komga sync in the background so it doesn't delay UI closing
+            _ = SyncProgressWithKomgaAsync();
+
+            // Await the (fast, local) progress save: the reader saves without raising LibraryChanged, the library
+            // refresh that follows must see the final position.
+            await SaveProgressAsync(forceImmediate: true);
+        }
+        ReleaseReaderResources();
     }
 
     private async Task RefreshSeriesNavigationTargetsAsync()

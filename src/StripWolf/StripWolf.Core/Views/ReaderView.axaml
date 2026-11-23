@@ -62,6 +62,12 @@
             IsVisible="{Binding ReaderStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
       <TextBlock Text="{Binding ReaderStatusMessage}" Foreground="White"/>
     </Border>
+    <!-- Errors (the comic or a page couldn't be loaded, trial limit): without this the reader just stayed empty -->
+    <Border Background="#E0000000" CornerRadius="6" Padding="16,10" MaxWidth="520" Margin="24,120,24,0"
+            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF8A80" TextWrapping="Wrap" TextAlignment="Center"/>
+    </Border>
 
     <!-- Top Controls -->
     <Border VerticalAlignment="Top" Background="#E0000000" Padding="16"

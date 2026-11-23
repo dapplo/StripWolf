@@ -172,14 +172,39 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
         ProxyPropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    // async void: an exception from the picker or the storage provider (e.g. an Android content URI which can't be
+    // read) would end the process
     private async void OnImportClicked(object? sender, RoutedEventArgs e)
     {
-        await OpenFilePickerAsync();
+        try
+        {
+            await OpenFilePickerAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowImportError(ex);
+        }
     }
 
     private async void OnImportFolderClicked(object? sender, RoutedEventArgs e)
     {
-        await OpenFolderPickerAsync();
+        try
+        {
+            await OpenFolderPickerAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowImportError(ex);
+        }
+    }
+
+    private void ShowImportError(Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"LibraryView: Import failed: {ex}");
+        if (DataContext is LibraryViewModel viewModel)
+        {
+            viewModel.ErrorMessage = $"Import failed: {ex.Message}";
+        }
     }
 
     private void OnComicInfoBackdropPressed(object? sender, PointerPressedEventArgs e)

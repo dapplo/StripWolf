@@ -89,14 +89,16 @@ public class TrialService
     // Note: the usage counters feed the "personal reading statistics" in the settings, which are shown in every
     // build (not only in the Play Store trial), so they are always recorded. They are aggregated counters now,
     // the database no longer grows with every event.
+    // These handlers are async void: an exception (e.g. a locked database or a full disk) would end the process,
+    // and OnPageRead runs on every page turn. A lost statistic is not worth a crash.
     private async void OnLocalComicImported(object? sender, string filePath)
     {
-        await IncrementUsageAsync("LocalImport");
+        await TryIncrementUsageAsync("LocalImport");
     }
 
     private async void OnKomgaBookDownloaded(object? sender, string bookId)
     {
-        await IncrementUsageAsync("KomgaDownload");
+        await TryIncrementUsageAsync("KomgaDownload");
     }
 
     private async void OnPageRead(object? sender, EventArgs e)
@@ -108,12 +110,29 @@ public class TrialService
             return;
         }
 
-        await Task.Delay(PagesReadFlushDelay);
-
-        // Reset the flag before taking the count: a page read in between schedules a new flush (which might write 0)
-        Volatile.Write(ref _isPagesReadFlushScheduled, 0);
+        try
+        {
+            await Task.Delay(PagesReadFlushDelay);
+        }
+        finally
+        {
+            // Reset the flag before taking the count: a page read in between schedules a new flush (which might write 0)
+            Volatile.Write(ref _isPagesReadFlushScheduled, 0);
+        }
         var pagesRead = Interlocked.Exchange(ref _pendingPagesRead, 0);
-        await IncrementUsageAsync("PagesRead", pagesRead);
+        await TryIncrementUsageAsync("PagesRead", pagesRead);
+    }
+
+    private async Task TryIncrementUsageAsync(string metric, long amount = 1)
+    {
+        try
+        {
+            await IncrementUsageAsync(metric, amount);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"TrialService: Failed to record usage '{metric}': {ex.Message}");
+        }
     }
 
     /// <summary>
