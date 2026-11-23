@@ -71,13 +71,12 @@ public static class KomgaThumbnailCache
             try
             {
                 cachedBytes = await File.ReadAllBytesAsync(cachePath, ct);
-                // Used by Prune to find the entries which weren't needed for the longest time
-                File.SetLastAccessTimeUtc(cachePath, DateTime.UtcNow);
             }
             catch (IOException)
             {
                 // Being replaced by another load of the same thumbnail, fetch it
             }
+            TouchLastAccess(cachePath);
 
             if (cachedBytes is { Length: > 0 } && DateTime.UtcNow - cacheFile.LastWriteTimeUtc < MaxAge)
             {
@@ -106,6 +105,22 @@ public static class KomgaThumbnailCache
             await WriteAtomicallyAsync(cachePath, bytes);
         }
         return (bytes, cachePath);
+    }
+
+    /// <summary>
+    /// Used by Prune to find the entries which weren't needed for the longest time (many file systems don't update the
+    /// access time themselves). Best effort.
+    /// </summary>
+    private static void TouchLastAccess(string path)
+    {
+        try
+        {
+            File.SetLastAccessTimeUtc(path, DateTime.UtcNow);
+        }
+        catch
+        {
+            // Not supported or not allowed, pruning then falls back to the write time
+        }
     }
 
     /// <summary>
