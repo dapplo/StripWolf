@@ -204,6 +204,11 @@ public partial class UpdateService : ObservableObject
     /// </summary>
     public async Task CheckForUpdatesIfNeededAsync()
     {
+        if (!IsDownloadingUpdate)
+        {
+            RemoveInstalledUpdates(_appUpdateInstaller.DownloadDirectory, GetRawCurrentVersion());
+        }
+
         var settings = _settingsService.LoadSettings();
         var now = DateTime.UtcNow;
         bool shouldCheck = false;
@@ -382,6 +387,45 @@ public partial class UpdateService : ObservableObject
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.GitHubRelease);
     }
+
+    /// <summary>
+    /// Removes downloaded update files which are already installed: the version in their name
+    /// (StripWolf-Android-arm64-1.2.3-gabcdef.apk) is not newer than the running one. A download for a newer version
+    /// is kept, the user might not have finished installing it. Files without a version are left overs, removed too.
+    /// </summary>
+    internal static void RemoveInstalledUpdates(string? directory, string currentVersion)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            {
+                return;
+            }
+
+            foreach (var file in Directory.EnumerateFiles(directory))
+            {
+                var match = DownloadVersionRegex().Match(Path.GetFileName(file));
+                if (match.Success && IsNewerVersion(currentVersion, match.Groups[1].Value))
+                {
+                    continue;
+                }
+                File.Delete(file);
+            }
+
+            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Directory.Delete(directory);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Only disk space, the next download clears the directory anyway
+            Logger.Warning($"Removing installed update files failed: {ex.Message}");
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"-v?(\d+\.\d+\.\d+(?:\.\d+)?)")]
+    private static partial System.Text.RegularExpressions.Regex DownloadVersionRegex();
 
     /// <summary>
     /// Downloads a release file into the (cleared) directory and checks its size and checksum
