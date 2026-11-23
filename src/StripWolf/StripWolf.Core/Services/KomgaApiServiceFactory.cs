@@ -60,7 +60,9 @@ public sealed class KomgaApiServiceFactory : IDisposable
         var replacement = new KomgaApiService();
         replacement.Configure(server);
         _servicesByServerId[server.Id] = (signature, replacement);
-        existing.Service.Dispose();
+        // The previous service is not disposed: downloads, thumbnail loads and syncs which are still running on it
+        // failed with an ObjectDisposedException when the server settings were changed. It is released by the GC
+        // once those are done (idle pooled connections are closed by the handler).
         return replacement;
     }
 

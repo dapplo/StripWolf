@@ -102,6 +102,9 @@ public class DatabaseService : IAsyncDisposable
             await MigrateUsageStatsAsync(_database);
             await _database.CreateTableAsync<BookmarkedFileImport>();
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_FilePath ON Comic(FilePath)");
+            // Looked up for every Komga book shown, downloaded and synced
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_KomgaId ON Comic(KomgaId)");
+            await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Comic_KomgaHash ON Comic(KomgaHash)");
             await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EpubConversionState_Status ON EpubConversionState(Status)");
 
             _isInitialized = true;

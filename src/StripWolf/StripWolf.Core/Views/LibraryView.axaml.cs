@@ -21,6 +21,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
 using StripWolf.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -203,7 +204,7 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
         System.Diagnostics.Debug.WriteLine($"LibraryView: Import failed: {ex}");
         if (DataContext is LibraryViewModel viewModel)
         {
-            viewModel.ErrorMessage = $"Import failed: {ex.Message}";
+            viewModel.ErrorMessage = string.Format(Loc.Instance.ImportFailed, ex.Message);
         }
     }
 
@@ -253,19 +254,19 @@ public partial class LibraryView : UserControl, INotifyPropertyChanged
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select Comic Files",
+            Title = Loc.Instance.SelectComicFiles,
             AllowMultiple = true,
             FileTypeFilter =
             [
-                new FilePickerFileType("Comic Files")
+                new FilePickerFileType(Loc.Instance.ComicFilesFilter)
                 {
                     Patterns = ComicConstants.ComicFilePickerPatterns
                 },
-                new FilePickerFileType("PDF Files")
+                new FilePickerFileType(Loc.Instance.PdfFilesFilter)
                 {
                     Patterns = ["*.pdf"]
                 },
-                new FilePickerFileType("All Files")
+                new FilePickerFileType(Loc.Instance.AllFilesFilter)
                 {
                     Patterns = ["*.*"]
                 }

@@ -794,6 +794,7 @@ public partial class ReaderViewModel : ViewModelBase
     private void ReleaseReaderResources()
     {
         _isComicOpen = false;
+        _komgaSyncService.ReaderComicId = null;
         _periodicSyncTimer.Stop();
         ClearKomgaSyncPrompt();
         if (Comic is not null && HasPendingEpubConversion)
@@ -1066,6 +1067,7 @@ public partial class ReaderViewModel : ViewModelBase
                 }
 
                 _isComicOpen = true;
+                _komgaSyncService.ReaderComicId = Comic.Id;
 
                 // Save last opened comic info in settings, only these fields: the settings snapshot loaded above
                 // is stale by now and saving it as a whole would overwrite concurrent changes
@@ -1118,8 +1120,8 @@ public partial class ReaderViewModel : ViewModelBase
                 if (Comic.PageCount <= 0)
                 {
                     ErrorMessage = HasPendingEpubConversion
-                        ? "Preparing the first readable page..."
-                        : "This book could not be prepared for reading.";
+                        ? Resources.Loc.Instance.ReaderPreparingFirstPage
+                        : Resources.Loc.Instance.ReaderErrorNotReadable;
                     return;
                 }
 
@@ -1162,7 +1164,7 @@ public partial class ReaderViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load comic: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.ReaderErrorLoadComic, ex.Message);
         }
         finally
         {
@@ -1265,7 +1267,7 @@ public partial class ReaderViewModel : ViewModelBase
                 // Validate page index is within range
                 if (Comic.PageCount == 0)
                 {
-                    ErrorMessage = HasPendingEpubConversion ? "Preparing readable pages..." : "Comic has no pages";
+                    ErrorMessage = HasPendingEpubConversion ? Resources.Loc.Instance.ReaderPreparingPages : Resources.Loc.Instance.ReaderNoPages;
                     return;
                 }
 
@@ -1288,9 +1290,10 @@ public partial class ReaderViewModel : ViewModelBase
                         var readPath = GetActiveReadPath();
 
                         // Load in parallel but with cancellation support
-                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, null);
+                        var decodeTarget = GetDecodeTarget();
+                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
                         var rightTask = pageIndex + 1 < Comic.PageCount
-                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, null)
+                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget)
                             : Task.FromResult<Bitmap?>(null);
 
                         Bitmap? newLeftBitmap = null;
@@ -1385,7 +1388,7 @@ public partial class ReaderViewModel : ViewModelBase
                 {
                     if (ex is not OperationCanceledException && !ct.IsCancellationRequested)
                     {
-                        ErrorMessage = _pageLoadError = $"Failed to load page: {ex.Message}";
+                        ErrorMessage = _pageLoadError = string.Format(Resources.Loc.Instance.ReaderErrorLoadPage, ex.Message);
                     }
                     _lastLoadedPageIndex = pageIndex; // Prevent infinite loop on error
                 }
@@ -2114,7 +2117,7 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     private DecodeTarget? GetDecodeTarget()
     {
-        if (ReadingMode != ReadingMode.Normal || IsTwoPageMode || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
+        if (ReadingMode != ReadingMode.Normal || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
         {
             return null;
         }
@@ -2125,7 +2128,9 @@ public partial class ReaderViewModel : ViewModelBase
             return null;
         }
 
-        return new DecodeTarget(DecodeWidth, DecodeHeight, StretchMode);
+        // Two-page mode shows each page in half of the width. It used to always decode both pages at full resolution
+        // (two ~96MB bitmaps for 4000x6000 scans), on tablets, the devices two-page mode is mostly used on.
+        return new DecodeTarget(IsTwoPageMode ? Math.Max(1, DecodeWidth / 2) : DecodeWidth, DecodeHeight, StretchMode);
     }
 
     /// <summary>
@@ -2193,8 +2198,14 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     private async Task ReloadCurrentPageAsync(DecodeTarget? decodeTarget)
     {
+        if (IsTwoPageMode)
+        {
+            await ReloadCurrentSpreadAsync(decodeTarget);
+            return;
+        }
+
         var current = CurrentPageImage;
-        if (_isUpgradingResolution || Comic is null || IsTwoPageMode || !IsDownscaled(current))
+        if (_isUpgradingResolution || Comic is null || !IsDownscaled(current))
         {
             return;
         }
@@ -2233,6 +2244,63 @@ public partial class ReaderViewModel : ViewModelBase
         }
         finally
         {
+            _isUpgradingResolution = false;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ReloadCurrentPageAsync"/> for the two pages of two-page mode
+    /// </summary>
+    private async Task ReloadCurrentSpreadAsync(DecodeTarget? decodeTarget)
+    {
+        var left = LeftPageImage;
+        var right = RightPageImage;
+        if (_isUpgradingResolution || Comic is null || left is null || (!IsDownscaled(left) && !IsDownscaled(right)))
+        {
+            return;
+        }
+
+        _isUpgradingResolution = true;
+        var pageIndex = _lastLoadedPageIndex;
+        var ct = _pageLoadingCts?.Token ?? CancellationToken.None;
+        Bitmap? newLeft = null;
+        Bitmap? newRight = null;
+        try
+        {
+            var readPath = GetActiveReadPath();
+            newLeft = await LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
+            if (right is not null)
+            {
+                newRight = await LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget);
+            }
+
+            // Only swap when we are still looking at the same pages
+            if (newLeft is null || (right is not null && newRight is null) || ct.IsCancellationRequested ||
+                _lastLoadedPageIndex != pageIndex || !ReferenceEquals(LeftPageImage, left) || !ReferenceEquals(RightPageImage, right))
+            {
+                return;
+            }
+
+            IsReplacingPageResolution = true;
+            try
+            {
+                ReplacePageImages(newLeft, newLeft, newRight);
+                newLeft = null;
+                newRight = null;
+            }
+            finally
+            {
+                IsReplacingPageResolution = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ReaderViewModel: Failed to reload the pages at another resolution: {ex.Message}");
+        }
+        finally
+        {
+            newLeft?.Dispose();
+            newRight?.Dispose();
             _isUpgradingResolution = false;
         }
     }

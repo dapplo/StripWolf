@@ -70,54 +70,61 @@ public partial class KomgaViewModel : ViewModelBase
     private DateTime _recentSeriesCacheTime;
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
 
-    private readonly HashSet<string> _downloadedKomgaIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _downloadedKomgaHashes = new(StringComparer.OrdinalIgnoreCase);
-    private bool _downloadedComicsCacheLoaded;
+    /// <summary>
+    /// The Komga ids and file hashes of the downloaded comics, for the "downloaded" marks on the cards.
+    /// Replaced as a whole: the sets used to be cleared and refilled while the download state of books was checked on
+    /// the thread pool, and an invalidation that arrived during a rebuild was lost.
+    /// </summary>
+    private sealed record DownloadedComicsSnapshot(HashSet<string> KomgaIds, HashSet<string> KomgaHashes, int Version);
+    private volatile DownloadedComicsSnapshot? _downloadedComics;
+    private int _downloadedComicsVersion;
     private readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
 
     private void InvalidateDownloadedComicsCache()
     {
-        _downloadedComicsCacheLoaded = false;
+        Interlocked.Increment(ref _downloadedComicsVersion);
     }
 
-    private async Task EnsureDownloadedComicsCacheLoadedAsync()
+    private async Task<DownloadedComicsSnapshot> GetDownloadedComicsAsync()
     {
-        if (_downloadedComicsCacheLoaded)
+        var version = Volatile.Read(ref _downloadedComicsVersion);
+        if (_downloadedComics is { } current && current.Version == version)
         {
-            return;
+            return current;
         }
 
         await _cacheSemaphore.WaitAsync();
         try
         {
-            if (_downloadedComicsCacheLoaded)
+            version = Volatile.Read(ref _downloadedComicsVersion);
+            if (_downloadedComics is { } loaded && loaded.Version == version)
             {
-                return;
+                return loaded;
             }
 
-            _downloadedKomgaIds.Clear();
-            _downloadedKomgaHashes.Clear();
-
-            if (_activeServer is not null)
+            var komgaIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var komgaHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var activeServer = _activeServer;
+            if (activeServer is not null)
             {
                 var allComics = await _databaseService.GetComicsAsync();
-                var serverComics = allComics
-                    .Where(c => c.KomgaServerId == _activeServer.Id || c.KomgaServerId == null)
-                    .ToList();
-                foreach (var comic in serverComics)
+                foreach (var comic in allComics.Where(c => c.KomgaServerId == activeServer.Id || c.KomgaServerId == null))
                 {
                     if (!string.IsNullOrEmpty(comic.KomgaId))
                     {
-                        _downloadedKomgaIds.Add(comic.KomgaId);
+                        komgaIds.Add(comic.KomgaId);
                     }
                     if (!string.IsNullOrEmpty(comic.KomgaHash))
                     {
-                        _downloadedKomgaHashes.Add(comic.KomgaHash);
+                        komgaHashes.Add(comic.KomgaHash);
                     }
                 }
             }
 
-            _downloadedComicsCacheLoaded = true;
+            // Stored with the version read before loading: an invalidation during the load makes the next call reload
+            var snapshot = new DownloadedComicsSnapshot(komgaIds, komgaHashes, version);
+            _downloadedComics = snapshot;
+            return snapshot;
         }
         finally
         {
@@ -1088,14 +1095,14 @@ public partial class KomgaViewModel : ViewModelBase
     {
         try
         {
-            await EnsureDownloadedComicsCacheLoadedAsync();
+            var downloadedComics = await GetDownloadedComicsAsync();
             
-            if (_downloadedKomgaIds.Contains(book.Id))
+            if (downloadedComics.KomgaIds.Contains(book.Id))
             {
                 return true;
             }
             
-            if (!string.IsNullOrEmpty(book.FileHash) && _downloadedKomgaHashes.Contains(book.FileHash))
+            if (!string.IsNullOrEmpty(book.FileHash) && downloadedComics.KomgaHashes.Contains(book.FileHash))
             {
                 return true;
             }

@@ -1171,4 +1171,49 @@
   <data name="DimOutsidePanelDescription" xml:space="preserve">
     <value>In guided reading, darkens the parts of the zoomed view that do not belong to the current panel.</value>
   </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>Up to date</value>
+  </data>
+  <data name="UpdateStatusCheckFailed" xml:space="preserve">
+    <value>Failed to check for updates</value>
+  </data>
+  <data name="UpdateStatusConnectionError" xml:space="preserve">
+    <value>Connection error</value>
+  </data>
+  <data name="ReaderErrorLoadComic" xml:space="preserve">
+    <value>Failed to load comic: {0}</value>
+  </data>
+  <data name="ReaderErrorLoadPage" xml:space="preserve">
+    <value>Failed to load page: {0}</value>
+  </data>
+  <data name="ReaderErrorNotReadable" xml:space="preserve">
+    <value>This book could not be prepared for reading.</value>
+  </data>
+  <data name="ReaderPreparingFirstPage" xml:space="preserve">
+    <value>Preparing the first readable page...</value>
+  </data>
+  <data name="ReaderPreparingPages" xml:space="preserve">
+    <value>Preparing readable pages...</value>
+  </data>
+  <data name="ReaderNoPages" xml:space="preserve">
+    <value>Comic has no pages</value>
+  </data>
+  <data name="SelectComicFiles" xml:space="preserve">
+    <value>Select comic files</value>
+  </data>
+  <data name="ComicFilesFilter" xml:space="preserve">
+    <value>Comic files</value>
+  </data>
+  <data name="PdfFilesFilter" xml:space="preserve">
+    <value>PDF files</value>
+  </data>
+  <data name="AllFilesFilter" xml:space="preserve">
+    <value>All files</value>
+  </data>
+  <data name="ImportFailed" xml:space="preserve">
+    <value>Import failed: {0}</value>
+  </data>
 </root>

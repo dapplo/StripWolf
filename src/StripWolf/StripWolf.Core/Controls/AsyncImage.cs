@@ -17,9 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using System.Collections.Concurrent;
-using System.Net.Http.Headers;
-using System.Text;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -29,15 +26,13 @@ using Avalonia.Threading;
 namespace StripWolf.Core.Controls;
 
 /// <summary>
-/// Image control that loads images asynchronously with optional Basic authentication.
-/// Uses a shared HttpClient for efficient connection pooling and resource management.
+/// Image control that loads a local image (a cover) asynchronously, decoded off the UI thread and shared between
+/// instances through a reference counted cache.
+/// It used to load http(s) URLs with Basic authentication as well; nothing used that anymore (Komga covers have their
+/// own disk cache and pipeline, see KomgaViewModel/KomgaThumbnailCache), it was removed with its static HttpClient.
 /// </summary>
 public class AsyncImage : Control
 {
-    // Shared HttpClient is intentionally kept as a static singleton for efficient connection pooling.
-    // This is the recommended pattern for HttpClient as per Microsoft guidelines.
-    // The client is never disposed as it's shared across all AsyncImage instances.
-    private static readonly HttpClient SharedHttpClient;
     private static readonly SharedBitmapCache LocalBitmapCache = new(200); // Cache up to 200 bitmaps
     // Decoding happens on the thread pool now (it used to run on the UI thread), allow a little parallelism
     private static readonly SemaphoreSlim BitmapDecodeSemaphore = new(2, 2);
@@ -48,7 +43,6 @@ public class AsyncImage : Control
     private const int MaxDecodeWidth = 600;
     
     private Bitmap? _loadedBitmap;
-    private bool _ownsLoadedBitmap;
     private SharedBitmapCache.Entry? _sharedEntry;
     private bool _isLoading;
     private int _loadVersion;
@@ -57,29 +51,12 @@ public class AsyncImage : Control
 
     static AsyncImage()
     {
-        var handler = new HttpClientHandler
-        {
-            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
-        };
-        SharedHttpClient = new HttpClient(handler)
-        {
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-        
         AffectsRender<AsyncImage>(SourceUrlProperty, PlaceholderBrushProperty, StretchProperty);
         SourceUrlProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnSourceUrlChanged());
-        UsernameProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnCredentialsChanged());
-        PasswordProperty.Changed.AddClassHandler<AsyncImage>((x, _) => x.OnCredentialsChanged());
     }
 
     public static readonly StyledProperty<string?> SourceUrlProperty =
         AvaloniaProperty.Register<AsyncImage, string?>(nameof(SourceUrl));
-
-    public static readonly StyledProperty<string?> UsernameProperty =
-        AvaloniaProperty.Register<AsyncImage, string?>(nameof(Username));
-
-    public static readonly StyledProperty<string?> PasswordProperty =
-        AvaloniaProperty.Register<AsyncImage, string?>(nameof(Password));
 
     public static readonly StyledProperty<IBrush?> PlaceholderBrushProperty =
         AvaloniaProperty.Register<AsyncImage, IBrush?>(nameof(PlaceholderBrush), Brushes.LightGray);
@@ -91,30 +68,12 @@ public class AsyncImage : Control
         AvaloniaProperty.Register<AsyncImage, bool>(nameof(IsImageLoaded), false);
 
     /// <summary>
-    /// URL of the image to load
+    /// Path of the (local) image to load
     /// </summary>
     public string? SourceUrl
     {
         get => GetValue(SourceUrlProperty);
         set => SetValue(SourceUrlProperty, value);
-    }
-
-    /// <summary>
-    /// Username for Basic authentication (optional)
-    /// </summary>
-    public string? Username
-    {
-        get => GetValue(UsernameProperty);
-        set => SetValue(UsernameProperty, value);
-    }
-
-    /// <summary>
-    /// Password for Basic authentication (optional)
-    /// </summary>
-    public string? Password
-    {
-        get => GetValue(PasswordProperty);
-        set => SetValue(PasswordProperty, value);
     }
 
     /// <summary>
@@ -151,24 +110,6 @@ public class AsyncImage : Control
         InvalidateVisual();
     }
 
-    /// <summary>
-    /// Called when Username or Password changes - reload the image if we have a URL but no loaded bitmap
-    /// </summary>
-    private void OnCredentialsChanged()
-    {
-        // Only retry loading if:
-        // 1. We have a URL but no bitmap loaded (possibly due to failed auth)
-        // 2. Both username AND password are now available (not null)
-        // 3. We're still attached to the visual tree
-        var hasCredentials = !string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password);
-        
-        if (!string.IsNullOrEmpty(SourceUrl) && _loadedBitmap is null && !_isLoading && hasCredentials && IsAttachedToVisualTree)
-        {
-            System.Diagnostics.Debug.WriteLine($"AsyncImage: Credentials now available, retrying load for '{SourceUrl}'");
-            TryStartLoading();
-        }
-    }
-    
     /// <summary>
     /// Tracks whether this control is currently attached to the visual tree
     /// </summary>
@@ -211,138 +152,66 @@ public class AsyncImage : Control
             return;
         }
 
-        // For remote URLs, require credentials before attempting to load
-        // This prevents unnecessary failed requests
-        var isRemoteUrl = SourceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                          SourceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
-        
-        if (isRemoteUrl && (string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password)))
-        {
-            // Don't log for every image, just silently wait for credentials
-            return;
-        }
-
         if (IsStale(loadVersion))
         {
             return;
         }
 
-        if (isRemoteUrl)
+        var sourceUrl = SourceUrl;
+        if (LocalBitmapCache.TryAcquire(sourceUrl, out var cachedEntry))
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, SourceUrl);
-            
-            // Add Basic authentication if credentials are provided
-            if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
+            if (!IsStale(loadVersion))
             {
-                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Username}:{Password}"));
-                request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-            }
-
-            using var response = await SharedHttpClient.SendAsync(request, cancellationToken);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-                Bitmap? bitmap = null;
-                try
-                {
-                    await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
-                    try
-                    {
-                        if (!IsStale(loadVersion))
-                        {
-                            // Decode on a background thread, bitmaps can be created off the UI thread
-                            bitmap = await Task.Run(() => DecodeThumbnail(imageBytes), cancellationToken);
-                        }
-                    }
-                    finally
-                    {
-                        BitmapDecodeSemaphore.Release();
-                    }
-
-                    if (bitmap is not null)
-                    {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            if (!IsStale(loadVersion))
-                            {
-                                _loadedBitmap = bitmap;
-                                _ownsLoadedBitmap = true;
-                                IsImageLoaded = true;
-                                InvalidateVisual();
-                                bitmap = null;
-                            }
-                        }, DispatcherPriority.ContextIdle);
-                    }
-                }
-                finally
-                {
-                    bitmap?.Dispose();
-                }
+                SetSharedBitmap(cachedEntry);
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"AsyncImage: Failed to load '{SourceUrl}': HTTP {(int)response.StatusCode}");
+                LocalBitmapCache.Release(cachedEntry);
             }
+            return;
         }
-        else
+
+        if (!File.Exists(SourceUrl))
         {
-            var sourceUrl = SourceUrl;
-            if (LocalBitmapCache.TryAcquire(sourceUrl, out var cachedEntry))
-            {
-                if (!IsStale(loadVersion))
-                {
-                    SetSharedBitmap(cachedEntry);
-                }
-                else
-                {
-                    LocalBitmapCache.Release(cachedEntry);
-                }
-                return;
-            }
+            return;
+        }
 
-            if (!File.Exists(SourceUrl))
-            {
-                return;
-            }
+        await Task.Delay(UncachedLocalLoadDelayMs, cancellationToken);
+        if (IsStale(loadVersion))
+        {
+            return;
+        }
 
-            await Task.Delay(UncachedLocalLoadDelayMs, cancellationToken);
+        var imageBytes = await File.ReadAllBytesAsync(sourceUrl, cancellationToken);
+        SharedBitmapCache.Entry sharedEntry;
+        await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
             if (IsStale(loadVersion))
             {
                 return;
             }
 
-            var imageBytes = await File.ReadAllBytesAsync(sourceUrl, cancellationToken);
-            SharedBitmapCache.Entry sharedEntry;
-            await BitmapDecodeSemaphore.WaitAsync(cancellationToken);
-            try
-            {
-                if (IsStale(loadVersion))
-                {
-                    return;
-                }
-
-                // Decode on a background thread (this used to run on the UI thread and caused scroll stutter)
-                var bitmap = await Task.Run(() => DecodeThumbnail(imageBytes), cancellationToken);
-                sharedEntry = LocalBitmapCache.AddOrAcquire(sourceUrl, bitmap);
-            }
-            finally
-            {
-                BitmapDecodeSemaphore.Release();
-            }
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (!IsStale(loadVersion))
-                {
-                    SetSharedBitmap(sharedEntry);
-                }
-                else
-                {
-                    LocalBitmapCache.Release(sharedEntry);
-                }
-            });
+            // Decode on a background thread (this used to run on the UI thread and caused scroll stutter)
+            var bitmap = await Task.Run(() => DecodeThumbnail(imageBytes), cancellationToken);
+            sharedEntry = LocalBitmapCache.AddOrAcquire(sourceUrl, bitmap);
         }
+        finally
+        {
+            BitmapDecodeSemaphore.Release();
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (!IsStale(loadVersion))
+            {
+                SetSharedBitmap(sharedEntry);
+            }
+            else
+            {
+                LocalBitmapCache.Release(sharedEntry);
+            }
+        });
     }
 
     private void SetSharedBitmap(SharedBitmapCache.Entry entry)
@@ -353,7 +222,6 @@ public class AsyncImage : Control
         }
         _sharedEntry = entry;
         _loadedBitmap = entry.Bitmap;
-        _ownsLoadedBitmap = false;
         IsImageLoaded = true;
         InvalidateVisual();
     }
@@ -561,7 +429,6 @@ public class AsyncImage : Control
 
     /// <summary>
     /// When attached to the visual tree, check if we need to load an image
-    /// This handles the case where credentials become available after initial binding
     /// </summary>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -642,11 +509,6 @@ public class AsyncImage : Control
             cts.Dispose();
         }
 
-        if (_ownsLoadedBitmap)
-        {
-            _loadedBitmap?.Dispose();
-        }
-
         if (_sharedEntry is not null)
         {
             LocalBitmapCache.Release(_sharedEntry);
@@ -654,7 +516,6 @@ public class AsyncImage : Control
         }
 
         _loadedBitmap = null;
-        _ownsLoadedBitmap = false;
         _isLoading = false;
     }
 }

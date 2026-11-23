@@ -238,7 +238,7 @@ public partial class UpdateService : ObservableObject
         Dispatcher.UIThread.Post(() =>
         {
             IsChecking = true;
-            UpdateStatus = "Checking for updates...";
+            UpdateStatus = Resources.Loc.Instance.UpdateStatusChecking;
         });
 
         try
@@ -268,7 +268,7 @@ public partial class UpdateService : ObservableObject
                     {
                         LatestVersion = release.TagName;
                         IsNewerVersionAvailable = isNewer;
-                        UpdateStatus = isNewer ? "Newer version available!" : "Up to date";
+                        UpdateStatus = isNewer ? Resources.Loc.Instance.NewerVersionAvailable : Resources.Loc.Instance.UpdateStatusUpToDate;
 
                         if (isNewer)
                         {
@@ -280,7 +280,7 @@ public partial class UpdateService : ObservableObject
                 {
                     Dispatcher.UIThread.Post(() =>
                     {
-                        UpdateStatus = "Failed to parse update info";
+                        UpdateStatus = Resources.Loc.Instance.UpdateStatusCheckFailed;
                     });
                 }
             }
@@ -288,7 +288,7 @@ public partial class UpdateService : ObservableObject
             {
                 Dispatcher.UIThread.Post(() =>
                 {
-                    UpdateStatus = $"Failed to check updates (HTTP {response.StatusCode})";
+                    UpdateStatus = $"{Resources.Loc.Instance.UpdateStatusCheckFailed} (HTTP {(int)response.StatusCode})";
                 });
             }
         }
@@ -297,7 +297,7 @@ public partial class UpdateService : ObservableObject
             Logger.Error("Update check failed", ex);
             Dispatcher.UIThread.Post(() =>
             {
-                UpdateStatus = manual ? "Connection error" : null;
+                UpdateStatus = manual ? Resources.Loc.Instance.UpdateStatusConnectionError : null;
             });
         }
         finally

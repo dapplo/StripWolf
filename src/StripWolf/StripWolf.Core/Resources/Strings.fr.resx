@@ -1059,4 +1059,49 @@
   <data name="DimOutsidePanelDescription" xml:space="preserve">
     <value>En lecture guidée, assombrit les parties de la vue agrandie qui n'appartiennent pas à la case actuelle.</value>
   </data>
+  <data name="UpdateStatusChecking" xml:space="preserve">
+    <value>Recherche de mises à jour...</value>
+  </data>
+  <data name="UpdateStatusUpToDate" xml:space="preserve">
+    <value>À jour</value>
+  </data>
+  <data name="UpdateStatusCheckFailed" xml:space="preserve">
+    <value>Échec de la recherche de mises à jour</value>
+  </data>
+  <data name="UpdateStatusConnectionError" xml:space="preserve">
+    <value>Erreur de connexion</value>
+  </data>
+  <data name="ReaderErrorLoadComic" xml:space="preserve">
+    <value>Impossible de charger la BD : {0}</value>
+  </data>
+  <data name="ReaderErrorLoadPage" xml:space="preserve">
+    <value>Impossible de charger la page : {0}</value>
+  </data>
+  <data name="ReaderErrorNotReadable" xml:space="preserve">
+    <value>Ce livre n'a pas pu être préparé pour la lecture.</value>
+  </data>
+  <data name="ReaderPreparingFirstPage" xml:space="preserve">
+    <value>Préparation de la première page lisible...</value>
+  </data>
+  <data name="ReaderPreparingPages" xml:space="preserve">
+    <value>Préparation des pages lisibles...</value>
+  </data>
+  <data name="ReaderNoPages" xml:space="preserve">
+    <value>La BD n'a aucune page</value>
+  </data>
+  <data name="SelectComicFiles" xml:space="preserve">
+    <value>Sélectionner des fichiers de BD</value>
+  </data>
+  <data name="ComicFilesFilter" xml:space="preserve">
+    <value>Fichiers de BD</value>
+  </data>
+  <data name="PdfFilesFilter" xml:space="preserve">
+    <value>Fichiers PDF</value>
+  </data>
+  <data name="AllFilesFilter" xml:space="preserve">
+    <value>Tous les fichiers</value>
+  </data>
+  <data name="ImportFailed" xml:space="preserve">
+    <value>Échec de l'importation : {0}</value>
+  </data>
 </root>

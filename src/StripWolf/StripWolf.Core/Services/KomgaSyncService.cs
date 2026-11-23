@@ -34,6 +34,28 @@ public class KomgaSyncService
     private readonly SemaphoreSlim _syncAllSemaphore = new(1, 1);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, SemaphoreSlim> _comicSemaphores = new();
 
+    /// <summary>
+    /// A full sync sends one request per downloaded Komga comic. It is requested on every return to the app and by the
+    /// library maintenance; within this interval after the last one those requests are skipped.
+    /// </summary>
+    internal static readonly TimeSpan SyncAllMinimumInterval = TimeSpan.FromMinutes(15);
+    private DateTime _lastSyncAllUtc = DateTime.MinValue;
+    private int _readerComicId;
+
+    /// <summary>
+    /// The comic which is open in the reader (null when the reader is closed). The reader syncs that comic itself;
+    /// the full sync works on copies from the database and could push an older page of it while it is being read.
+    /// </summary>
+    public int? ReaderComicId
+    {
+        get
+        {
+            var id = Volatile.Read(ref _readerComicId);
+            return id == 0 ? null : id;
+        }
+        set => Volatile.Write(ref _readerComicId, value ?? 0);
+    }
+
     public KomgaSyncService(
         LibraryService libraryService,
         KomgaApiServiceFactory komgaApiServiceFactory,
@@ -234,7 +256,8 @@ public class KomgaSyncService
     /// <summary>
     /// Synchronizes reading progress for all comics in the library that come from Komga.
     /// </summary>
-    public async Task SyncAllComicsAsync()
+    /// <param name="force">False: skipped when the last full sync was less than <see cref="SyncAllMinimumInterval"/> ago</param>
+    public async Task SyncAllComicsAsync(bool force = false)
     {
         var settings = _settingsService.LoadSettings();
         if (!settings.SyncReadProgress)
@@ -249,6 +272,12 @@ public class KomgaSyncService
 
         try
         {
+            if (!force && DateTime.UtcNow - _lastSyncAllUtc < SyncAllMinimumInterval)
+            {
+                return;
+            }
+            _lastSyncAllUtc = DateTime.UtcNow;
+
             var komgaComics = (await _libraryService.GetAllComicsAsync())
                 .Where(c => c.Source == ComicSource.Komga && !string.IsNullOrEmpty(c.KomgaId) && c.KomgaServerId.HasValue)
                 .GroupBy(c => c.KomgaServerId!.Value)
@@ -277,6 +306,10 @@ public class KomgaSyncService
 
                 foreach (var comic in serverGroup)
                 {
+                    if (comic.Id == ReaderComicId)
+                    {
+                        continue;
+                    }
                     await SyncComicReadProgressInternalAsync(comic, server, komgaApiService);
                 }
             }
@@ -301,6 +334,15 @@ public class KomgaSyncService
 
         try
         {
+            // The comics were loaded when the full sync started, with many comics that can be minutes ago: compare the
+            // current state, otherwise an older local page could be pushed (and then pulled back as the newest).
+            var current = await _libraryService.GetComicAsync(comic.Id);
+            if (current is null || current.Source != ComicSource.Komga || string.IsNullOrEmpty(current.KomgaId))
+            {
+                return;
+            }
+            comic = current;
+
             if (!await TryPushPendingReadProgressAsync(comic, server, komgaApiService))
             {
                 return;
