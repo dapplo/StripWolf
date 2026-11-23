@@ -1104,4 +1104,40 @@
   <data name="ImportFailed" xml:space="preserve">
     <value>Échec de l'importation : {0}</value>
   </data>
+  <data name="KomgaSyncPending" xml:space="preserve">
+    <value>Synchronisation en attente</value>
+  </data>
+  <data name="KomgaSyncSynced" xml:space="preserve">
+    <value>Synchronisé avec Komga</value>
+  </data>
+  <data name="KomgaSyncUpdatedFromKomga" xml:space="preserve">
+    <value>Mis à jour depuis Komga</value>
+  </data>
+  <data name="KomgaSyncInSync" xml:space="preserve">
+    <value>Synchronisé</value>
+  </data>
+  <data name="KomgaSyncServerNotFound" xml:space="preserve">
+    <value>Serveur introuvable</value>
+  </data>
+  <data name="KomgaSyncNetworkError" xml:space="preserve">
+    <value>Erreur réseau</value>
+  </data>
+  <data name="KomgaSyncFailed" xml:space="preserve">
+    <value>Échec de la synchronisation</value>
+  </data>
+  <data name="ReaderImageQuality" xml:space="preserve">
+    <value>Qualité d'image</value>
+  </data>
+  <data name="ReaderImageQualityDescription" xml:space="preserve">
+    <value>Haute affiche les pages aussi nettes que l'original à la taille de votre écran. Originale décode toujours l'image complète : le zoom est net tout de suite, mais utilise le plus de mémoire. Économiser la mémoire aide les appareils avec peu de mémoire ou un processeur lent.</value>
+  </data>
+  <data name="ReaderImageQualityHigh" xml:space="preserve">
+    <value>Haute (recommandé)</value>
+  </data>
+  <data name="ReaderImageQualityOriginal" xml:space="preserve">
+    <value>Résolution originale</value>
+  </data>
+  <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
+    <value>Économiser la mémoire</value>
+  </data>
 </root>

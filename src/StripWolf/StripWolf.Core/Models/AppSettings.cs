@@ -144,6 +144,12 @@ public class AppSettings
     public EpubOutputResolution EpubOutputResolution { get; set; } = EpubOutputResolution.Low;
 
     /// <summary>
+    /// How the reader decodes pages, High keeps the quality of the original on screen.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<ReaderImageQuality>))]
+    public ReaderImageQuality ReaderImageQuality { get; set; } = ReaderImageQuality.High;
+
+    /// <summary>
     /// Controls whether unsupported formats are converted up front or rendered page-by-page while reading.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter<UnsupportedFormatHandlingMode>))]
@@ -257,6 +263,7 @@ public class AppSettings
             DimOutsidePanel = DimOutsidePanel,
             EpubConversionTheme = EpubConversionTheme,
             EpubOutputResolution = EpubOutputResolution,
+            ReaderImageQuality = ReaderImageQuality,
             UnsupportedFormatHandlingMode = UnsupportedFormatHandlingMode,
             SkipExternalDeleteConfirmation = SkipExternalDeleteConfirmation,
             LibrarySections = LibrarySections.Select(section => section.Clone()).ToList(),

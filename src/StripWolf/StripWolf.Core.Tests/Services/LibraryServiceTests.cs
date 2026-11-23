@@ -359,7 +359,7 @@ public sealed class LibraryServiceTests
 
         await host.Library.UpdateReadingProgressAsync(comic, 4, notifyLibraryChanged: false);
 
-        Assert.Equal("Pending sync", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Pending, comic.KomgaSyncState);
         var pending = await host.Database.GetPendingKomgaReadProgressAsync(comic.Id);
         Assert.NotNull(pending);
         Assert.Equal(4, pending.Page);

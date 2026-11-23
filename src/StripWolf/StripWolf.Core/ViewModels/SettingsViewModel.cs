@@ -41,6 +41,7 @@ public record HandednessOption(Handedness Value, string DisplayName);
 public record AppThemeOption(AppThemePreference Value, string DisplayName);
 public record EpubConversionThemeOption(EpubConversionTheme Value, string DisplayName);
 public record EpubOutputResolutionOption(EpubOutputResolution Value, string DisplayName);
+public record ReaderImageQualityOption(ReaderImageQuality Value, string DisplayName);
 public record UnsupportedFormatHandlingModeOption(UnsupportedFormatHandlingMode Value, string DisplayName);
 
 /// <summary>
@@ -241,6 +242,9 @@ public partial class SettingsViewModel : ViewModelBase
     private EpubOutputResolutionOption? _selectedEpubOutputResolutionOption;
 
     [ObservableProperty]
+    private ReaderImageQualityOption? _selectedReaderImageQualityOption;
+
+    [ObservableProperty]
     private UnsupportedFormatHandlingModeOption? _selectedUnsupportedFormatHandlingModeOption;
 
     [ObservableProperty]
@@ -334,6 +338,13 @@ public partial class SettingsViewModel : ViewModelBase
         new(EpubOutputResolution.Low, Loc.Instance.ResolutionLow),
         new(EpubOutputResolution.Medium, Loc.Instance.ResolutionMedium),
         new(EpubOutputResolution.High, Loc.Instance.ResolutionHigh)
+    ];
+
+    public IReadOnlyList<ReaderImageQualityOption> AvailableReaderImageQualities =>
+    [
+        new(ReaderImageQuality.High, Loc.Instance.ReaderImageQualityHigh),
+        new(ReaderImageQuality.Original, Loc.Instance.ReaderImageQualityOriginal),
+        new(ReaderImageQuality.SaveMemory, Loc.Instance.ReaderImageQualitySaveMemory)
     ];
 
     public IReadOnlyList<UnsupportedFormatHandlingModeOption> AvailableUnsupportedFormatHandlingModes =>
@@ -645,6 +656,7 @@ public partial class SettingsViewModel : ViewModelBase
         DimOutsidePanel = _appSettings.DimOutsidePanel;
         SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme) ?? AvailableEpubConversionThemes[0];
         SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution) ?? AvailableEpubOutputResolutions[0];
+        SelectedReaderImageQualityOption = AvailableReaderImageQualities.FirstOrDefault(o => o.Value == _appSettings.ReaderImageQuality) ?? AvailableReaderImageQualities[0];
         SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode) ?? AvailableUnsupportedFormatHandlingModes[0];
         SkipExternalDeleteConfirmation = _appSettings.SkipExternalDeleteConfirmation;
         SyncReadProgress = _appSettings.SyncReadProgress;
@@ -731,6 +743,7 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableAppThemes));
         OnPropertyChanged(nameof(AvailableEpubConversionThemes));
         OnPropertyChanged(nameof(AvailableEpubOutputResolutions));
+        OnPropertyChanged(nameof(AvailableReaderImageQualities));
         OnPropertyChanged(nameof(AvailableUnsupportedFormatHandlingModes));
         OnPropertyChanged(nameof(UnsupportedFormatHandlingDescription));
 
@@ -744,6 +757,7 @@ public partial class SettingsViewModel : ViewModelBase
             SelectedAppThemeOption = AvailableAppThemes.FirstOrDefault(o => o.Value == _appSettings.AppTheme);
             SelectedEpubConversionThemeOption = AvailableEpubConversionThemes.FirstOrDefault(o => o.Value == _appSettings.EpubConversionTheme);
             SelectedEpubOutputResolutionOption = AvailableEpubOutputResolutions.FirstOrDefault(o => o.Value == _appSettings.EpubOutputResolution);
+            SelectedReaderImageQualityOption = AvailableReaderImageQualities.FirstOrDefault(o => o.Value == _appSettings.ReaderImageQuality);
             SelectedUnsupportedFormatHandlingModeOption = AvailableUnsupportedFormatHandlingModes.FirstOrDefault(o => o.Value == _appSettings.UnsupportedFormatHandlingMode);
         }
 
@@ -811,6 +825,14 @@ public partial class SettingsViewModel : ViewModelBase
         if (value is not null && _appSettings is not null)
         {
             UpdateSetting(s => s.EpubConversionTheme = value.Value);
+        }
+    }
+
+    partial void OnSelectedReaderImageQualityOptionChanged(ReaderImageQualityOption? value)
+    {
+        if (value is not null && _appSettings is not null)
+        {
+            UpdateSetting(s => s.ReaderImageQuality = value.Value);
         }
     }
 

@@ -92,6 +92,7 @@ public class DatabaseService : IAsyncDisposable
             await _database.ExecuteScalarAsync<string>("PRAGMA synchronous=NORMAL");
 
             await _database.CreateTableAsync<Comic>();
+            await MigrateKomgaSyncStatusAsync(_database);
             await _database.CreateTableAsync<EpubConversionState>();
             // Komga servers are stored in settings.json (credentials encrypted separately). The old, unused table
             // still contained the passwords and API keys in plain text, remove it.
@@ -466,6 +467,40 @@ public class DatabaseService : IAsyncDisposable
     #endregion
 
     #region Usage Stats
+
+    /// <summary>
+    /// The Komga sync status used to be stored as English text (KomgaSyncStatus), it is now a KomgaSyncState code
+    /// which the UI shows localized. Map the old texts once (they were a fixed set, nothing is lost) and clear them,
+    /// so this does nothing on the next start. The old column stays, SQLite can't drop columns on all platforms.
+    /// </summary>
+    internal static async Task MigrateKomgaSyncStatusAsync(SQLiteAsyncConnection database)
+    {
+        try
+        {
+            var columns = await database.GetTableInfoAsync(nameof(Comic));
+            if (!columns.Any(c => string.Equals(c.Name, "KomgaSyncStatus", StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            await database.ExecuteAsync(
+                "UPDATE Comic SET KomgaSyncState = CASE KomgaSyncStatus " +
+                $"WHEN 'Pending sync' THEN {(int)KomgaSyncState.Pending} " +
+                $"WHEN 'Synced to Komga' THEN {(int)KomgaSyncState.Synced} " +
+                $"WHEN 'Updated from Komga' THEN {(int)KomgaSyncState.UpdatedFromKomga} " +
+                $"WHEN 'In sync' THEN {(int)KomgaSyncState.InSync} " +
+                $"WHEN 'Server not found' THEN {(int)KomgaSyncState.ServerNotFound} " +
+                $"WHEN 'Network error' THEN {(int)KomgaSyncState.NetworkError} " +
+                $"WHEN 'Sync failed' THEN {(int)KomgaSyncState.Failed} " +
+                "ELSE KomgaSyncState END, KomgaSyncStatus = NULL " +
+                "WHERE KomgaSyncStatus IS NOT NULL");
+        }
+        catch (Exception ex)
+        {
+            // Only a status text, not important enough to block the database initialization
+            System.Diagnostics.Debug.WriteLine($"DatabaseService: Failed to migrate the Komga sync status: {ex.Message}");
+        }
+    }
 
     /// <summary>
     /// The old UsageStats table had a row per event (including every page turn) and grew forever,

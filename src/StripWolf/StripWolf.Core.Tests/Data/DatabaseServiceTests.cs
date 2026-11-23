@@ -519,4 +519,55 @@ public sealed class DatabaseServiceTests : IAsyncLifetime
         Assert.NotNull(await _database.GetPendingKomgaReadProgressAsync(ofOther.Id));
         Assert.Equal(new[] { "B2" }, await _database.GetPendingKomgaDownloadBookIdsAsync());
     }
+
+    [Fact]
+    public async Task MigrateKomgaSyncStatusAsync_MapsTheOldTextsToCodes()
+    {
+        var connection = new SQLite.SQLiteAsyncConnection(_temp.Combine("legacy.db"));
+        try
+        {
+            await connection.CreateTableAsync<Comic>();
+            await connection.ExecuteAsync("ALTER TABLE Comic ADD COLUMN KomgaSyncStatus TEXT");
+            string?[] oldTexts = ["Pending sync", "Synced to Komga", "Updated from Komga", "In sync", "Server not found", "Network error", "Sync failed", "Something else", null];
+            foreach (var text in oldTexts)
+            {
+                var comic = NewComic(text ?? "Never synced");
+                await connection.InsertAsync(comic);
+                await connection.ExecuteAsync("UPDATE Comic SET KomgaSyncStatus = ? WHERE Id = ?", text, comic.Id);
+            }
+
+            await DatabaseService.MigrateKomgaSyncStatusAsync(connection);
+            // A second run (next app start) must not change anything
+            await DatabaseService.MigrateKomgaSyncStatusAsync(connection);
+
+            var states = (await connection.Table<Comic>().OrderBy(c => c.Id).ToListAsync()).Select(c => c.KomgaSyncState).ToArray();
+            Assert.Equal(new[]
+            {
+                KomgaSyncState.Pending, KomgaSyncState.Synced, KomgaSyncState.UpdatedFromKomga, KomgaSyncState.InSync,
+                KomgaSyncState.ServerNotFound, KomgaSyncState.NetworkError, KomgaSyncState.Failed, KomgaSyncState.None, KomgaSyncState.None
+            }, states);
+            Assert.Equal(0, await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Comic WHERE KomgaSyncStatus IS NOT NULL"));
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MigrateKomgaSyncStatusAsync_DoesNothingWithoutTheOldColumn()
+    {
+        var comic = await InsertAsync("Fresh", c => c.KomgaSyncState = KomgaSyncState.InSync);
+        var connection = new SQLite.SQLiteAsyncConnection(DatabasePath);
+        try
+        {
+            await DatabaseService.MigrateKomgaSyncStatusAsync(connection);
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+
+        Assert.Equal(KomgaSyncState.InSync, (await _database.GetComicAsync(comic.Id))!.KomgaSyncState);
+    }
 }

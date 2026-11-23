@@ -532,7 +532,7 @@ public partial class LibraryViewModel : ViewModelBase
                     existing.IsFavorite = newItem.IsFavorite;
                     existing.LastReadDate = newItem.LastReadDate;
                     existing.ReadProgressLastModified = newItem.ReadProgressLastModified;
-                    existing.KomgaSyncStatus = newItem.KomgaSyncStatus;
+                    existing.KomgaSyncState = newItem.KomgaSyncState;
                     existing.AddedDate = newItem.AddedDate;
                     existing.Source = newItem.Source;
                     existing.KomgaId = newItem.KomgaId;

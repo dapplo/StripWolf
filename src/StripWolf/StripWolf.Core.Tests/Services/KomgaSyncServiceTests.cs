@@ -139,7 +139,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Updated from Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.UpdatedFromKomga, comic.KomgaSyncState);
         Assert.Equal(7, comic.CurrentPage);
         Assert.False(comic.IsCompleted);
         var stored = await context.Host.Database.GetComicAsync(comic.Id);
@@ -157,7 +157,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Synced to Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Synced, comic.KomgaSyncState);
         var push = Assert.Single(context.ReadProgressRequests);
         Assert.Equal((10, false), ParseProgress(push));
         Assert.Null(await context.Host.Database.GetPendingKomgaReadProgressAsync(comic.Id));
@@ -179,7 +179,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Updated from Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.UpdatedFromKomga, comic.KomgaSyncState);
         Assert.Equal(11, comic.CurrentPage);
         Assert.Empty(context.ReadProgressRequests);
     }
@@ -194,7 +194,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Synced to Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Synced, comic.KomgaSyncState);
         Assert.Equal(4, comic.CurrentPage);
         Assert.Equal((5, false), ParseProgress(Assert.Single(context.ReadProgressRequests)));
     }
@@ -227,7 +227,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("In sync", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.InSync, comic.KomgaSyncState);
         Assert.Empty(context.ReadProgressRequests);
     }
 
@@ -239,7 +239,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Synced to Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Synced, comic.KomgaSyncState);
         Assert.Equal((20, true), ParseProgress(Assert.Single(context.ReadProgressRequests)));
     }
 
@@ -252,7 +252,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.PushProgressToKomgaAsync(comic);
 
-        Assert.Equal("Sync failed", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Failed, comic.KomgaSyncState);
         var pending = await context.Host.Database.GetPendingKomgaReadProgressAsync(comic.Id);
         Assert.NotNull(pending);
         Assert.Equal(5, pending.Page);
@@ -275,7 +275,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.PushProgressToKomgaAsync(comic);
 
-        Assert.Equal("Synced to Komga", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.Synced, comic.KomgaSyncState);
         Assert.Equal((1, false), ParseProgress(Assert.Single(context.ReadProgressRequests)));
         var authorization = Assert.Single(context.Server.Requests).Headers["Authorization"];
         Assert.StartsWith("Basic ", authorization);
@@ -302,7 +302,7 @@ public sealed class KomgaSyncServiceTests
 
         await context.Sync.SyncComicReadProgressAsync(comic);
 
-        Assert.Equal("Server not found", comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.ServerNotFound, comic.KomgaSyncState);
         Assert.Empty(context.Server.Requests);
     }
 
@@ -316,7 +316,7 @@ public sealed class KomgaSyncServiceTests
         await context.Sync.PushProgressToKomgaAsync(comic);
         await context.Sync.SyncAllComicsAsync();
 
-        Assert.Null(comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.None, comic.KomgaSyncState);
         Assert.Empty(context.Server.Requests);
     }
 
@@ -330,7 +330,7 @@ public sealed class KomgaSyncServiceTests
         await context.Sync.SyncComicReadProgressAsync(comic);
         await context.Sync.PushProgressToKomgaAsync(comic);
 
-        Assert.Null(comic.KomgaSyncStatus);
+        Assert.Equal(KomgaSyncState.None, comic.KomgaSyncState);
         Assert.Empty(context.Server.Requests);
     }
 

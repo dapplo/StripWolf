@@ -1104,4 +1104,40 @@
   <data name="ImportFailed" xml:space="preserve">
     <value>Import fehlgeschlagen: {0}</value>
   </data>
+  <data name="KomgaSyncPending" xml:space="preserve">
+    <value>Synchronisierung ausstehend</value>
+  </data>
+  <data name="KomgaSyncSynced" xml:space="preserve">
+    <value>Mit Komga synchronisiert</value>
+  </data>
+  <data name="KomgaSyncUpdatedFromKomga" xml:space="preserve">
+    <value>Von Komga aktualisiert</value>
+  </data>
+  <data name="KomgaSyncInSync" xml:space="preserve">
+    <value>Synchron</value>
+  </data>
+  <data name="KomgaSyncServerNotFound" xml:space="preserve">
+    <value>Server nicht gefunden</value>
+  </data>
+  <data name="KomgaSyncNetworkError" xml:space="preserve">
+    <value>Netzwerkfehler</value>
+  </data>
+  <data name="KomgaSyncFailed" xml:space="preserve">
+    <value>Synchronisierung fehlgeschlagen</value>
+  </data>
+  <data name="ReaderImageQuality" xml:space="preserve">
+    <value>Bildqualität</value>
+  </data>
+  <data name="ReaderImageQualityDescription" xml:space="preserve">
+    <value>Hoch zeigt Seiten so scharf wie das Original in Ihrer Bildschirmgröße. Original dekodiert immer das ganze Bild, dadurch ist Zoomen sofort scharf, es braucht aber den meisten Speicher. Speicher sparen hilft Geräten mit wenig Speicher oder einem langsamen Prozessor.</value>
+  </data>
+  <data name="ReaderImageQualityHigh" xml:space="preserve">
+    <value>Hoch (empfohlen)</value>
+  </data>
+  <data name="ReaderImageQualityOriginal" xml:space="preserve">
+    <value>Originalauflösung</value>
+  </data>
+  <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
+    <value>Speicher sparen</value>
+  </data>
 </root>

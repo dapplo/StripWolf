@@ -1104,4 +1104,40 @@
   <data name="ImportFailed" xml:space="preserve">
     <value>La importación falló: {0}</value>
   </data>
+  <data name="KomgaSyncPending" xml:space="preserve">
+    <value>Sincronización pendiente</value>
+  </data>
+  <data name="KomgaSyncSynced" xml:space="preserve">
+    <value>Sincronizado con Komga</value>
+  </data>
+  <data name="KomgaSyncUpdatedFromKomga" xml:space="preserve">
+    <value>Actualizado desde Komga</value>
+  </data>
+  <data name="KomgaSyncInSync" xml:space="preserve">
+    <value>Sincronizado</value>
+  </data>
+  <data name="KomgaSyncServerNotFound" xml:space="preserve">
+    <value>Servidor no encontrado</value>
+  </data>
+  <data name="KomgaSyncNetworkError" xml:space="preserve">
+    <value>Error de red</value>
+  </data>
+  <data name="KomgaSyncFailed" xml:space="preserve">
+    <value>Error de sincronización</value>
+  </data>
+  <data name="ReaderImageQuality" xml:space="preserve">
+    <value>Calidad de imagen</value>
+  </data>
+  <data name="ReaderImageQualityDescription" xml:space="preserve">
+    <value>Alta muestra las páginas tan nítidas como el original al tamaño de tu pantalla. Original siempre decodifica la imagen completa, así el zoom es nítido al instante, pero usa más memoria. Ahorrar memoria ayuda a dispositivos con poca memoria o un procesador lento.</value>
+  </data>
+  <data name="ReaderImageQualityHigh" xml:space="preserve">
+    <value>Alta (recomendado)</value>
+  </data>
+  <data name="ReaderImageQualityOriginal" xml:space="preserve">
+    <value>Resolución original</value>
+  </data>
+  <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
+    <value>Ahorrar memoria</value>
+  </data>
 </root>

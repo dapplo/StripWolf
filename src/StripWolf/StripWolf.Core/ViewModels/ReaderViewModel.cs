@@ -70,7 +70,7 @@ public partial class ReaderViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ComicFormatDisplay))]
     private Comic? _comic;
 
-    public string? KomgaSyncStatus => Comic?.KomgaSyncStatus;
+    public string? KomgaSyncStatus => Comic is null ? null : Resources.Loc.Instance.GetKomgaSyncStateText(Comic.KomgaSyncState);
 
     private int _currentPage;
 
@@ -175,10 +175,17 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     public bool IsReplacingPageResolution { get; private set; }
 
-    // Pre-decoded bitmap cache for instant page display without loading bar
-    private readonly Dictionary<int, Bitmap> _bitmapPrefetchCache = new();
+    // Pre-decoded bitmap cache for instant page display without loading bar.
+    // Each entry remembers the decode target it was made for, so a page prepared for single-page mode is never
+    // shown in two-page mode (or after a zoom/stretch change) at the wrong resolution.
+    private readonly Dictionary<int, PrefetchedBitmap> _bitmapPrefetchCache = new();
     private readonly object _bitmapPrefetchLock = new();
-    private const int MaxPrefetchedBitmaps = 3; // Reverted from 2 for better speed
+    private int _prefetchAnchorPage;
+
+    private readonly record struct PrefetchedBitmap(Bitmap Bitmap, DecodeTarget? Target);
+
+    // Image quality setting, read when a comic is opened
+    private ReaderImageQuality _imageQuality = ReaderImageQuality.High;
 
     public bool HasPreviousPage => CanMoveWithinBounds(-GetNavigationDirectionSign());
     public bool HasNextPage =>
@@ -1035,6 +1042,7 @@ public partial class ReaderViewModel : ViewModelBase
             ReadingMode = NormalizeReadingMode(settings.PreferredReadingMode);
             Handedness = settings.Handedness;
             DimOutsidePanel = settings.DimOutsidePanel;
+            _imageQuality = settings.ReaderImageQuality;
             SelectedReadingDirectionModeOption = AvailableReadingDirectionModes.FirstOrDefault(o => o.Value == settings.PreferredReadingDirectionMode) ?? AvailableReadingDirectionModes[0];
             ZoomRegion = new ZoomRegion { Size = settings.DefaultZoomRegionSize };
             IsFullScreen = settings.UseFullScreenWhenReading;
@@ -1271,8 +1279,10 @@ public partial class ReaderViewModel : ViewModelBase
                     return;
                 }
 
-                // Only show the loading indicator when the bitmap is not already pre-decoded
-                bool hasPrefetchedBitmap = !IsTwoPageMode && HasPrefetchedBitmap(pageIndex);
+                // Only show the loading indicator when the bitmap(s) are not already pre-decoded
+                bool hasPrefetchedBitmap = IsTwoPageMode
+                    ? HasPrefetchedBitmap(pageIndex) && (pageIndex + 1 >= Comic.PageCount || HasPrefetchedBitmap(pageIndex + 1))
+                    : HasPrefetchedBitmap(pageIndex);
 
                 if (!hasPrefetchedBitmap)
                 {
@@ -1290,10 +1300,15 @@ public partial class ReaderViewModel : ViewModelBase
                         var readPath = GetActiveReadPath();
 
                         // Load in parallel but with cancellation support
+                        // Pages of a prefetched spread are used as they are
                         var decodeTarget = GetDecodeTarget();
-                        var leftTask = LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
+                        var leftTask = TakePrefetchedBitmap(pageIndex) is { } prefetchedLeft
+                            ? Task.FromResult<Bitmap?>(prefetchedLeft)
+                            : LoadBitmapAsync(readPath, pageIndex, ct, decodeTarget);
                         var rightTask = pageIndex + 1 < Comic.PageCount
-                            ? LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget)
+                            ? TakePrefetchedBitmap(pageIndex + 1) is { } prefetchedRight
+                                ? Task.FromResult<Bitmap?>(prefetchedRight)
+                                : LoadBitmapAsync(readPath, pageIndex + 1, ct, decodeTarget)
                             : Task.FromResult<Bitmap?>(null);
 
                         Bitmap? newLeftBitmap = null;
@@ -2091,7 +2106,7 @@ public partial class ReaderViewModel : ViewModelBase
     /// <summary>
     /// Describes the size a page will be displayed at, used to decode large pages at screen resolution.
     /// </summary>
-    private readonly record struct DecodeTarget(int ViewportWidth, int ViewportHeight, StretchMode StretchMode)
+    private readonly record struct DecodeTarget(int ViewportWidth, int ViewportHeight, StretchMode StretchMode, BitmapInterpolationMode Interpolation)
     {
         /// <summary>
         /// Scale factor (&lt;= 1 means the page is shown smaller than its native resolution)
@@ -2117,6 +2132,11 @@ public partial class ReaderViewModel : ViewModelBase
     /// </summary>
     private DecodeTarget? GetDecodeTarget()
     {
+        if (_imageQuality == ReaderImageQuality.Original)
+        {
+            return null;
+        }
+
         if (ReadingMode != ReadingMode.Normal || StretchMode == StretchMode.Original || ZoomLevel > 1.01)
         {
             return null;
@@ -2128,9 +2148,21 @@ public partial class ReaderViewModel : ViewModelBase
             return null;
         }
 
-        // Two-page mode shows each page in half of the width. It used to always decode both pages at full resolution
+        int width = DecodeWidth;
+        int height = DecodeHeight;
+        var interpolation = BitmapInterpolationMode.HighQuality;
+        if (_imageQuality == ReaderImageQuality.SaveMemory)
+        {
+            // Drop the 20% margin the view adds and use the cheaper scaler
+            width = Math.Max(1, (int)(width / 1.2));
+            height = Math.Max(1, (int)(height / 1.2));
+            interpolation = BitmapInterpolationMode.MediumQuality;
+        }
+
+        // Two-page mode shows each page in half of the width, so each page is still decoded at (at least) the
+        // resolution it has on screen. It used to always decode both pages at full resolution
         // (two ~96MB bitmaps for 4000x6000 scans), on tablets, the devices two-page mode is mostly used on.
-        return new DecodeTarget(IsTwoPageMode ? Math.Max(1, DecodeWidth / 2) : DecodeWidth, DecodeHeight, StretchMode);
+        return new DecodeTarget(IsTwoPageMode ? Math.Max(1, width / 2) : width, height, StretchMode, interpolation);
     }
 
     /// <summary>
@@ -2151,7 +2183,7 @@ public partial class ReaderViewModel : ViewModelBase
                 if (scale < 0.9)
                 {
                     int targetWidth = Math.Max(1, (int)Math.Ceiling(info.Width * scale));
-                    var scaledBitmap = Bitmap.DecodeToWidth(stream, targetWidth, BitmapInterpolationMode.HighQuality);
+                    var scaledBitmap = Bitmap.DecodeToWidth(stream, targetWidth, decodeTarget.Interpolation);
                     _originalPageSizes.AddOrUpdate(scaledBitmap, new StrongBox<Avalonia.Size>(new Avalonia.Size(info.Width, info.Height)));
                     return scaledBitmap;
                 }
@@ -2383,47 +2415,70 @@ public partial class ReaderViewModel : ViewModelBase
 
     #region Bitmap Prefetch Cache
 
-    private bool HasPrefetchedBitmap(int pageIndex)
+    /// <summary>
+    /// How many pages are kept prepared: the neighbouring page (or spread) on both sides,
+    /// only the next one when saving memory.
+    /// </summary>
+    private int MaxPrefetchedBitmaps
     {
-        lock (_bitmapPrefetchLock)
+        get
         {
-            return _bitmapPrefetchCache.ContainsKey(pageIndex);
+            int pagesPerStep = IsTwoPageMode ? 2 : 1;
+            int neighbours = _imageQuality == ReaderImageQuality.SaveMemory ? 1 : 2;
+            return pagesPerStep * neighbours;
         }
     }
 
-    private Bitmap? TakePrefetchedBitmap(int pageIndex)
+    private bool HasPrefetchedBitmap(int pageIndex)
     {
+        var target = GetDecodeTarget();
         lock (_bitmapPrefetchLock)
         {
-            if (_bitmapPrefetchCache.TryGetValue(pageIndex, out var bitmap))
+            return _bitmapPrefetchCache.TryGetValue(pageIndex, out var entry) && entry.Target == target;
+        }
+    }
+
+    /// <summary>
+    /// Take a prefetched page out of the cache, only when it was decoded for the current decode target
+    /// </summary>
+    private Bitmap? TakePrefetchedBitmap(int pageIndex)
+    {
+        var target = GetDecodeTarget();
+        lock (_bitmapPrefetchLock)
+        {
+            if (!_bitmapPrefetchCache.Remove(pageIndex, out var entry))
             {
-                _bitmapPrefetchCache.Remove(pageIndex);
-                return bitmap;
+                return null;
             }
+
+            if (entry.Target == target)
+            {
+                return entry.Bitmap;
+            }
+
+            entry.Bitmap.Dispose();
             return null;
         }
     }
 
-    private void StorePrefetchedBitmap(int pageIndex, Bitmap bitmap)
+    private void StorePrefetchedBitmap(int pageIndex, Bitmap bitmap, DecodeTarget? target)
     {
         lock (_bitmapPrefetchLock)
         {
             // Dispose existing entry if present
             if (_bitmapPrefetchCache.TryGetValue(pageIndex, out var existing))
             {
-                existing.Dispose();
+                existing.Bitmap.Dispose();
             }
-            _bitmapPrefetchCache[pageIndex] = bitmap;
+            _bitmapPrefetchCache[pageIndex] = new PrefetchedBitmap(bitmap, target);
 
-            // Evict entries furthest from the stored page when over limit
-            while (_bitmapPrefetchCache.Count > MaxPrefetchedBitmaps)
+            // Evict the entries furthest from the page (or spread) the user is on when over the limit
+            int anchor = _prefetchAnchorPage;
+            int max = MaxPrefetchedBitmaps;
+            while (_bitmapPrefetchCache.Count > max)
             {
-                var toRemove = _bitmapPrefetchCache.Keys
-                    .MaxBy(k => Math.Abs(k - pageIndex))!;
-                if (_bitmapPrefetchCache.TryGetValue(toRemove, out var toDispose))
-                {
-                    toDispose.Dispose();
-                }
+                var toRemove = _bitmapPrefetchCache.Keys.MaxBy(k => Math.Abs(k - anchor))!;
+                _bitmapPrefetchCache[toRemove].Bitmap.Dispose();
                 _bitmapPrefetchCache.Remove(toRemove);
             }
         }
@@ -2433,28 +2488,51 @@ public partial class ReaderViewModel : ViewModelBase
     {
         lock (_bitmapPrefetchLock)
         {
-            foreach (var bitmap in _bitmapPrefetchCache.Values)
+            foreach (var entry in _bitmapPrefetchCache.Values)
             {
-                bitmap.Dispose();
+                entry.Bitmap.Dispose();
             }
             _bitmapPrefetchCache.Clear();
         }
     }
 
     /// <summary>
+    /// Drop prepared pages which are no longer next to the current page (or spread), or were decoded for
+    /// another decode target, so they don't take memory until they are evicted.
+    /// </summary>
+    private void TrimBitmapPrefetchCache(int currentPage, DecodeTarget? target)
+    {
+        int step = IsTwoPageMode ? 2 : 1;
+        int keepBefore = _imageQuality == ReaderImageQuality.SaveMemory ? 0 : step;
+        int keepAfter = 2 * step - 1;
+        lock (_bitmapPrefetchLock)
+        {
+            foreach (var key in _bitmapPrefetchCache.Keys.ToList())
+            {
+                var entry = _bitmapPrefetchCache[key];
+                if (entry.Target != target || key < currentPage - keepBefore || key > currentPage + keepAfter)
+                {
+                    entry.Bitmap.Dispose();
+                    _bitmapPrefetchCache.Remove(key);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Pre-decode a page bitmap on a background thread so it is ready for instant display
     /// </summary>
-    private async Task PrefetchPageBitmapAsync(int pageIndex)
+    private async Task PrefetchPageBitmapAsync(int pageIndex, DecodeTarget? target)
     {
-        if (Comic is null || pageIndex < 0 || pageIndex >= Comic.PageCount || IsTwoPageMode)
+        if (Comic is null || pageIndex < 0 || pageIndex >= Comic.PageCount)
         {
             return;
         }
 
-        // Skip if already prefetched
+        // Skip if already prefetched for this decode target
         lock (_bitmapPrefetchLock)
         {
-            if (_bitmapPrefetchCache.ContainsKey(pageIndex))
+            if (_bitmapPrefetchCache.TryGetValue(pageIndex, out var existing) && existing.Target == target)
             {
                 return;
             }
@@ -2464,14 +2542,14 @@ public partial class ReaderViewModel : ViewModelBase
         try
         {
             var filePath = GetActiveReadPath();
-            var bitmap = await LoadBitmapAsync(filePath, pageIndex, ct, GetDecodeTarget(), PrefetchDecodeSemaphore);
+            var bitmap = await LoadBitmapAsync(filePath, pageIndex, ct, target, PrefetchDecodeSemaphore);
 
             if (bitmap is null) return;
 
-            // Only cache if still reading the same comic
-            if (!ct.IsCancellationRequested && GetActiveReadPath() == filePath)
+            // Only cache if still reading the same comic with the same decode target
+            if (!ct.IsCancellationRequested && GetActiveReadPath() == filePath && GetDecodeTarget() == target)
             {
-                StorePrefetchedBitmap(pageIndex, bitmap);
+                StorePrefetchedBitmap(pageIndex, bitmap, target);
             }
             else
             {
@@ -2491,25 +2569,44 @@ public partial class ReaderViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Kick off background prefetch tasks for the pages immediately before and after the current one
+    /// Kick off background prefetch tasks for the page (or spread) after the current one, and the one before it
+    /// unless memory is being saved. The next one goes first, it is where the user most likely goes.
     /// </summary>
     private void PrefetchAdjacentPages(int currentPage)
     {
-        if (Comic is null || IsTwoPageMode)
+        if (Comic is null)
         {
             return;
         }
 
         _prefetchCts ??= new CancellationTokenSource();
+        _prefetchAnchorPage = currentPage;
 
-        if (currentPage + 1 < Comic.PageCount)
+        var target = GetDecodeTarget();
+        TrimBitmapPrefetchCache(currentPage, target);
+
+        int step = IsTwoPageMode ? 2 : 1;
+        for (int i = 0; i < step; i++)
         {
-            _ = PrefetchPageBitmapAsync(currentPage + 1);
+            int next = currentPage + step + i;
+            if (next < Comic.PageCount)
+            {
+                _ = PrefetchPageBitmapAsync(next, target);
+            }
         }
 
-        if (currentPage - 1 >= 0)
+        if (_imageQuality == ReaderImageQuality.SaveMemory)
         {
-            _ = PrefetchPageBitmapAsync(currentPage - 1);
+            return;
+        }
+
+        for (int i = 0; i < step; i++)
+        {
+            int previous = currentPage - step + i;
+            if (previous >= 0)
+            {
+                _ = PrefetchPageBitmapAsync(previous, target);
+            }
         }
     }
 
