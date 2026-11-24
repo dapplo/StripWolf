@@ -60,7 +60,7 @@ public class CloudLibraryService : ICloudLibraryService
         {
             var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Select Comic Folder",
+                Title = Resources.Loc.Instance.SelectComicFolder,
                 AllowMultiple = false
             });
 

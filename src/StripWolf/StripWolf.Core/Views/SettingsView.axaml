@@ -93,7 +93,7 @@
                 <Button Content="{Binding ProjectOnGitHub, Source={x:Static res:Loc.Instance}}" Command="{Binding OpenGitHubCommand}"
                         Background="Transparent" Padding="0"/>
                 <TextBlock Text="•" Foreground="Gray" VerticalAlignment="Center"/>
-                <Button Content="Report an Issue" Command="{Binding ReportIssueCommand}"
+                <Button Content="{Binding ReportIssue, Source={x:Static res:Loc.Instance}}" Command="{Binding ReportIssueCommand}"
                         Background="Transparent" Padding="0"/>
               </StackPanel>
 
@@ -737,7 +737,7 @@
         
         <StackPanel Spacing="4">
           <TextBlock Text="{Binding Name, Source={x:Static res:Loc.Instance}}"/>
-          <TextBox Text="{Binding ServerName}" PlaceholderText="My Komga Server"/>
+          <TextBox Text="{Binding ServerName}" PlaceholderText="{Binding ServerNamePlaceholder, Source={x:Static res:Loc.Instance}}"/>
         </StackPanel>
 
         <StackPanel Spacing="4">
@@ -847,11 +847,7 @@
           <TextBlock Text="{Binding ConfirmDeleteServer, Source={x:Static res:Loc.Instance}}" 
                      FontSize="18" FontWeight="Bold"/>
           
-          <TextBlock TextWrapping="Wrap">
-            <Run Text="There are "/>
-            <Run Text="{Binding LinkedComicsCount}" FontWeight="Bold"/>
-            <Run Text=" comics linked to this server. If you delete it, their reading progress will no longer be synchronized. Do you want to proceed?"/>
-          </TextBlock>
+          <TextBlock TextWrapping="Wrap" Text="{Binding DeleteServerMessage}"/>
 
           <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
             <Button Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}" 

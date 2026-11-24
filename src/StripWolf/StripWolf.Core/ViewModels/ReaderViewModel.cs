@@ -1571,7 +1571,7 @@ public partial class ReaderViewModel : ViewModelBase
         var delta = GetNavigationDirectionSign() * step;
         if (delta > 0 && HasPendingEpubConversion && CurrentPage >= Comic.PageCount - 1)
         {
-            ReaderStatusMessage = "Preparing next page...";
+            ReaderStatusMessage = Resources.Loc.Instance.ReaderPreparingNextPage;
             await EnsureEpubPagesAvailableAsync(CurrentPage + 1);
             if (CurrentPage >= Comic.PageCount - 1)
             {
@@ -1612,7 +1612,7 @@ public partial class ReaderViewModel : ViewModelBase
 
         if (HasPendingEpubConversion && page >= Comic.PageCount)
         {
-            ReaderStatusMessage = "Preparing requested page...";
+            ReaderStatusMessage = Resources.Loc.Instance.ReaderPreparingRequestedPage;
             await EnsureEpubPagesAvailableAsync(page);
         }
 

@@ -254,10 +254,20 @@ public partial class KomgaViewModel : ViewModelBase
     private ObservableCollection<KomgaReadList> _availableReadLists = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReadListPickerPrompt))]
     private KomgaBookDisplay? _bookPendingReadListSelection;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SeriesDownloadPrompt))]
     private KomgaSeriesDisplay? _seriesPendingDownloadSelection;
+
+    public string ReadListPickerPrompt => BookPendingReadListSelection is null
+        ? string.Empty
+        : string.Format(Resources.Loc.Instance.ChooseReadListFor, BookPendingReadListSelection.Name);
+
+    public string SeriesDownloadPrompt => SeriesPendingDownloadSelection is null
+        ? string.Empty
+        : string.Format(Resources.Loc.Instance.ChooseSeriesDownloadFor, SeriesPendingDownloadSelection.Name);
 
     [ObservableProperty]
     private bool _isLoadingReadListSelection;
@@ -1164,7 +1174,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to initialize: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaInitFailed, ex.Message);
             Logger.Error("Failed to initialize Komga", ex);
         }
     }
@@ -1422,7 +1432,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load libraries: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadLibrariesFailed, ex.Message);
             Logger.Error("Error loading libraries", ex);
         }
     }
@@ -1469,7 +1479,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load series: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadSeriesFailed, ex.Message);
         }
         finally
         {
@@ -1507,7 +1517,7 @@ public partial class KomgaViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             await ApplyServerAsync(server, useCache: false, persistSelection: true);
-        }, "Failed to switch Komga server");
+        }, Resources.Loc.Instance.SwitchKomgaServerFailed);
     }
 
     private static bool HasSameConnectionSettings(KomgaServer current, KomgaServer updated)
@@ -1751,7 +1761,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load series: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadSeriesFailed, ex.Message);
             System.Diagnostics.Debug.WriteLine($"Error loading series: {ex}");
         }
         finally
@@ -2090,7 +2100,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load books: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadBooksFailed, ex.Message);
             System.Diagnostics.Debug.WriteLine($"Error loading books: {ex}");
         }
         finally
@@ -2428,7 +2438,7 @@ public partial class KomgaViewModel : ViewModelBase
 
             if (AvailableReadLists.Count == 0)
             {
-                ErrorMessage = "No Komga read lists are available on the active server.";
+                ErrorMessage = Resources.Loc.Instance.KomgaNoReadLists;
                 return;
             }
 
@@ -2656,7 +2666,7 @@ public partial class KomgaViewModel : ViewModelBase
                 workItem.PendingImport.IsProcessing = false;
                 workItem.PendingImport.IsCompleted = true;
                 workItem.PendingImport.Progress = 1;
-                workItem.PendingImport.Status = "Completed";
+                workItem.PendingImport.Status = Resources.Loc.Instance.Completed;
 
                 SetDownloadState(bookId, trackedBook =>
                 {
@@ -2681,7 +2691,7 @@ public partial class KomgaViewModel : ViewModelBase
             {
                 workItem.PendingImport.IsProcessing = false;
                 workItem.PendingImport.IsFailed = true;
-                workItem.PendingImport.Status = "Failed";
+                workItem.PendingImport.Status = Resources.Loc.Instance.Failed;
                 workItem.PendingImport.ErrorMessage = ex.Message;
 
                 _downloadPendingBookIds.Remove(bookId);
@@ -2691,7 +2701,7 @@ public partial class KomgaViewModel : ViewModelBase
                 RefreshSeriesDownloadState(seriesId);
             });
 
-            ErrorMessage = $"Failed to import '{workItem.PendingImport.FileName}'.";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaImportFailedForFile, workItem.PendingImport.FileName);
             System.Diagnostics.Debug.WriteLine($"Post-download import error: {ex}");
         }
     }
@@ -3064,7 +3074,7 @@ public partial class KomgaViewModel : ViewModelBase
                     if (IsLikelyConnectivityIssue(ex))
                     {
                         queueItem.IsFailed = false;
-                        queueItem.ErrorMessage = "Paused, waiting for connection...";
+                        queueItem.ErrorMessage = Resources.Loc.Instance.DownloadPausedNoConnection;
                         queueItem.IsDownloading = false;
                         queueItem.IsCancelling = false;
                         queueItem.IsQueued = true;
@@ -3095,7 +3105,7 @@ public partial class KomgaViewModel : ViewModelBase
                         trackedBook.IsCancelling = false;
                         trackedBook.DownloadProgress = 0;
                     });
-                    ErrorMessage = $"Failed to download '{queueItem.Name}' after {MaxDownloadRetryCount} attempts.";
+                    ErrorMessage = string.Format(Resources.Loc.Instance.DownloadFailedAfterRetries, queueItem.Name, MaxDownloadRetryCount);
                     System.Diagnostics.Debug.WriteLine($"Download error: {ex}");
                     RefreshSeriesDownloadState(queueItem.BookDisplay.Book.SeriesId);
                     ScheduleRefreshDownloadQueueState();
@@ -3443,7 +3453,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load read lists: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadReadListsFailed, ex.Message);
             System.Diagnostics.Debug.WriteLine($"Error loading read lists: {ex}");
         }
         finally
@@ -3536,7 +3546,7 @@ public partial class KomgaViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load books for read list: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.KomgaLoadReadListBooksFailed, ex.Message);
             System.Diagnostics.Debug.WriteLine($"Error loading books for read list: {ex}");
         }
         finally

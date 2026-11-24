@@ -1,43 +1,45 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:res="using:StripWolf.Core.Resources"
+        x:DataType="res:Loc"
         x:Class="StripWolf.Core.Views.DirectoryImportSeriesPromptWindow"
         Width="480"
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Title="Import folder">
+        Title="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}">
   <Border Padding="20">
     <StackPanel Spacing="16">
       <StackPanel Spacing="4">
-        <TextBlock Text="Import folder" FontSize="20" FontWeight="Bold"/>
+        <TextBlock Text="{Binding ImportFolder, Source={x:Static res:Loc.Instance}}" FontSize="20" FontWeight="Bold"/>
         <TextBlock x:Name="DirectoryNameTextBlock" Foreground="Gray" TextWrapping="Wrap"/>
       </StackPanel>
 
       <CheckBox x:Name="UseSeriesNameCheckBox"
-                Content="Apply a series name to all imported comics"
+                Content="{Binding ApplySeriesNameToAll, Source={x:Static res:Loc.Instance}}"
                 IsChecked="True"
                 IsCheckedChanged="OnUseSeriesNameChanged"/>
 
       <StackPanel Spacing="8">
-        <TextBlock Text="Series name"/>
+        <TextBlock Text="{Binding SeriesNameLabel, Source={x:Static res:Loc.Instance}}"/>
         <TextBox x:Name="SeriesNameTextBox"/>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="Reset to folder name"
+          <Button Content="{Binding ResetToFolderName, Source={x:Static res:Loc.Instance}}"
                   Click="OnResetSeriesNameClicked"/>
         </StackPanel>
       </StackPanel>
 
       <TextBlock Foreground="Gray"
                  TextWrapping="Wrap"
-                 Text="The suggested value uses the selected folder name only. You can disable it, reset to the original folder name, or edit it manually."/>
+                 Text="{Binding ImportFolderSeriesHint, Source={x:Static res:Loc.Instance}}"/>
 
       <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
         <Button Grid.Column="0"
-                Content="Cancel"
+                Content="{Binding Cancel, Source={x:Static res:Loc.Instance}}"
                 Click="OnCancelClicked"
                 HorizontalAlignment="Stretch"/>
         <Button Grid.Column="1"
-                Content="Import"
+                Content="{Binding ImportAction, Source={x:Static res:Loc.Instance}}"
                 Click="OnImportClicked"
                 HorizontalAlignment="Stretch"/>
       </Grid>

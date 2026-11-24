@@ -802,7 +802,7 @@ public partial class LibraryViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to open directory: {ex.Message}";
+            ErrorMessage = $"{Resources.Loc.Instance.FailedToOpenDirectory}: {ex.Message}";
         }
     }
 
@@ -847,7 +847,7 @@ public partial class LibraryViewModel : ViewModelBase
         var filePaths = _libraryService.GetSupportedComicFilesInDirectory(directoryPath);
         if (filePaths.Count == 0)
         {
-            ErrorMessage = "No supported comic files were found in the selected folder.";
+            ErrorMessage = Resources.Loc.Instance.NoSupportedFilesFound;
             return;
         }
 
@@ -873,13 +873,13 @@ public partial class LibraryViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to read folder contents: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.FailedToReadFolder, ex.Message);
             return;
         }
 
         if (files.Count == 0)
         {
-            ErrorMessage = "No supported comic files were found in the selected folder.";
+            ErrorMessage = Resources.Loc.Instance.NoSupportedFilesFound;
             return;
         }
 
@@ -891,7 +891,7 @@ public partial class LibraryViewModel : ViewModelBase
                 FileName = file.Name,
                 FilePath = file.TryGetLocalPath() ?? file.Path.ToString(),
                 StorageFile = file,
-                Status = "Waiting..."
+                Status = Resources.Loc.Instance.Waiting
             };
             pendingItems.Add(pending);
             await _importQueueService.EnqueueAsync(pending);
@@ -904,7 +904,7 @@ public partial class LibraryViewModel : ViewModelBase
             pending.IsProcessing = true;
             try
             {
-                pending.Status = "Streaming file...";
+                pending.Status = Resources.Loc.Instance.StreamingFile;
                 pending.Progress = 0.05;
 
                 string? localPath = null;
@@ -958,7 +958,7 @@ public partial class LibraryViewModel : ViewModelBase
 
                 pending.IsProcessing = false;
                 pending.IsCompleted = true;
-                pending.Status = "Completed";
+                pending.Status = Resources.Loc.Instance.Completed;
                 pending.Progress = 1.0;
 
                 if (!NewComics.Any(c => c.Id == comic.Id))
@@ -973,9 +973,9 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 pending.IsProcessing = false;
                 pending.IsFailed = true;
-                pending.Status = "Failed";
+                pending.Status = Resources.Loc.Instance.Failed;
                 pending.ErrorMessage = ex.Message;
-                ErrorMessage = $"Failed to import '{pending.FileName}': {ex.Message}";
+                ErrorMessage = string.Format(Resources.Loc.Instance.ImportFailedForFile, pending.FileName, ex.Message);
             }
         }
     }
@@ -1121,7 +1121,7 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 FilePath = filePath,
                 FileName = GetImportDisplayName(filePath, importRootDirectory),
-                Status = "Waiting..."
+                Status = Resources.Loc.Instance.Waiting
             };
             pendingItems.Add(pending);
             await _importQueueService.EnqueueAsync(pending);
@@ -1168,7 +1168,7 @@ public partial class LibraryViewModel : ViewModelBase
                 
                 pending.IsProcessing = false;
                 pending.IsCompleted = true;
-                pending.Status = "Completed";
+                pending.Status = Resources.Loc.Instance.Completed;
                 pending.Progress = 1.0;
 
                 if (!NewComics.Any(c => c.Id == comic.Id))
@@ -1184,9 +1184,9 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 pending.IsProcessing = false;
                 pending.IsFailed = true;
-                pending.Status = "Failed";
+                pending.Status = Resources.Loc.Instance.Failed;
                 pending.ErrorMessage = ex.Message;
-                ErrorMessage = $"Failed to import '{pending.FileName}': {ex.Message}";
+                ErrorMessage = string.Format(Resources.Loc.Instance.ImportFailedForFile, pending.FileName, ex.Message);
             }
         }
     }
@@ -1234,7 +1234,7 @@ public partial class LibraryViewModel : ViewModelBase
         {
             FilePath = comic.FilePath,
             FileName = comic.Title,
-            Status = "Waiting to convert EPUB..."
+            Status = Resources.Loc.Instance.WaitingToConvertEpub
         };
 
         try
@@ -1244,27 +1244,27 @@ public partial class LibraryViewModel : ViewModelBase
             await _importQueueService.EnqueueAsync(pending);
 
             pending.IsProcessing = true;
-            pending.Status = "Converting EPUB...";
+            pending.Status = Resources.Loc.Instance.ConvertingEpub;
             var progress = UiProgressThrottle.Create(value =>
             {
                 pending.Progress = value;
-                pending.Status = $"Converting EPUB... {value:P0}";
+                pending.Status = string.Format(Resources.Loc.Instance.ConvertingEpubProgress, value);
             });
 
             await _libraryService.ConvertPendingEpubAsync(comic, progress);
             pending.IsProcessing = false;
             pending.IsCompleted = true;
             pending.Progress = 1.0;
-            pending.Status = "Completed";
+            pending.Status = Resources.Loc.Instance.Completed;
             ScheduleCompletedImportRemoval(pending);
         }
         catch (Exception ex)
         {
             pending.IsProcessing = false;
             pending.IsFailed = true;
-            pending.Status = "Failed";
+            pending.Status = Resources.Loc.Instance.Failed;
             pending.ErrorMessage = ex.Message;
-            ErrorMessage = $"Failed to convert '{comic.Title}': {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.ConvertFailedForComic, comic.Title, ex.Message);
         }
         finally
         {
@@ -1460,7 +1460,7 @@ public partial class LibraryViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to perform action: {ex.Message}";
+            ErrorMessage = string.Format(Resources.Loc.Instance.ActionFailed, ex.Message);
             comic.IsDeleting = false;
         }
     }
@@ -1536,7 +1536,7 @@ public partial class LibraryViewModel : ViewModelBase
             }
 
             RefreshSeriesGroups();
-        }, "Failed to update read status");
+        }, Resources.Loc.Instance.UpdateReadStatusFailed);
     }
 
     [RelayCommand]
@@ -1570,7 +1570,7 @@ public partial class LibraryViewModel : ViewModelBase
             {
                 RemoveComic(FavoriteComics, comic.Id);
             }
-        }, "Failed to update favorite status");
+        }, Resources.Loc.Instance.UpdateFavoriteFailed);
     }
 
     [RelayCommand]
