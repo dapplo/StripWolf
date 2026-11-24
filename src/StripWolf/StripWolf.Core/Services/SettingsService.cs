@@ -281,12 +281,23 @@ public class SettingsService
                 var json = File.ReadAllText(_settingsPath);
                 loadedSettings = JsonSerializer.Deserialize(json, StripWolfJsonContext.Default.AppSettings) ?? new AppSettings();
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 loadedSettings = new AppSettings();
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+                // The next save overwrites the file with the defaults (servers, trial state and bookmarks gone):
+                // keep the broken file, so it can be repaired by hand
+                Logger.Error("The settings file can't be read, starting with the default settings", ex);
+                try
+                {
+                    File.Copy(_settingsPath, _settingsPath + ".corrupt", overwrite: true);
+                }
+                catch (Exception copyException) when (copyException is IOException or UnauthorizedAccessException)
+                {
+                    // Nothing more we can do
+                }
                 loadedSettings = new AppSettings();
             }
         }

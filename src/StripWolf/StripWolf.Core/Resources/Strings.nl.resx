@@ -44,239 +44,239 @@
     <value>StripWolf</value>
   </data>
   <data name="Settings" xml:space="preserve">
-    <value>Settings</value>
+    <value>Instellingen</value>
   </data>
   <data name="Library" xml:space="preserve">
-    <value>Library</value>
+    <value>Bibliotheek</value>
   </data>
   <data name="Komga" xml:space="preserve">
     <value>Komga</value>
   </data>
   <data name="Reader" xml:space="preserve">
-    <value>Reader</value>
+    <value>Lezer</value>
   </data>
   <!-- Navigation -->
   <data name="Back" xml:space="preserve">
-    <value>Back</value>
+    <value>Terug</value>
   </data>
   <data name="Home" xml:space="preserve">
-    <value>Home</value>
+    <value>Start</value>
   </data>
   <data name="Refresh" xml:space="preserve">
-    <value>Refresh</value>
+    <value>Vernieuwen</value>
   </data>
   <!-- Library View -->
   <data name="AllComics" xml:space="preserve">
-    <value>All Comics</value>
+    <value>Alle strips</value>
   </data>
   <data name="ReadingNow" xml:space="preserve">
-    <value>Reading Now</value>
+    <value>Nu aan het lezen</value>
   </data>
   <data name="Completed" xml:space="preserve">
-    <value>Completed</value>
+    <value>Uitgelezen</value>
   </data>
   <data name="Favorites" xml:space="preserve">
-    <value>Favorites</value>
+    <value>Favorieten</value>
   </data>
   <data name="ImportComic" xml:space="preserve">
-    <value>Import Comic</value>
+    <value>Strip importeren</value>
   </data>
   <data name="ImportFolder" xml:space="preserve">
-    <value>Import Folder</value>
+    <value>Map importeren</value>
   </data>
   <data name="NoComicsFound" xml:space="preserve">
-    <value>No comics found</value>
+    <value>Geen strips gevonden</value>
   </data>
   <data name="NoComicsInLibrary" xml:space="preserve">
-    <value>Your library is empty. Import comics or download from Komga to get started.</value>
+    <value>Je bibliotheek is leeg. Importeer strips of download ze van Komga om te beginnen.</value>
   </data>
   <data name="Pages" xml:space="preserve">
-    <value>Pages</value>
+    <value>Pagina's</value>
   </data>
   <!-- Komga View -->
   <data name="NotConnected" xml:space="preserve">
-    <value>Not Connected</value>
+    <value>Niet verbonden</value>
   </data>
   <data name="ConfigureServer" xml:space="preserve">
-    <value>Configure a Komga server in settings to browse and download comics</value>
+    <value>Stel in de instellingen een Komga-server in om strips te bekijken en te downloaden</value>
   </data>
   <data name="SearchOnKomga" xml:space="preserve">
-    <value>Search on Komga...</value>
+    <value>Zoeken op Komga...</value>
   </data>
   <data name="KeepReading" xml:space="preserve">
-    <value>Keep Reading</value>
+    <value>Verder lezen</value>
   </data>
   <data name="OnDeck" xml:space="preserve">
-    <value>On Deck</value>
+    <value>Volgende</value>
   </data>
   <data name="RecentlyAddedBooks" xml:space="preserve">
-    <value>Recently Added Books</value>
+    <value>Recent toegevoegde boeken</value>
   </data>
   <data name="RecentlyAddedSeries" xml:space="preserve">
-    <value>Recently Added Series</value>
+    <value>Recent toegevoegde series</value>
   </data>
   <data name="Libraries" xml:space="preserve">
-    <value>Libraries</value>
+    <value>Bibliotheken</value>
   </data>
   <data name="ReadLists" xml:space="preserve">
-    <value>Read Lists</value>
+    <value>Leeslijsten</value>
   </data>
   <data name="Series" xml:space="preserve">
     <value>Series</value>
   </data>
   <data name="Books" xml:space="preserve">
-    <value>Books</value>
+    <value>Boeken</value>
   </data>
   <data name="Download" xml:space="preserve">
-    <value>Download</value>
+    <value>Downloaden</value>
   </data>
   <data name="Downloading" xml:space="preserve">
-    <value>Downloading...</value>
+    <value>Downloaden...</value>
   </data>
   <data name="LoadMore" xml:space="preserve">
-    <value>Load More</value>
+    <value>Meer laden</value>
   </data>
   <data name="LoadMoreSeries" xml:space="preserve">
-    <value>Load More Series</value>
+    <value>Meer series laden</value>
   </data>
   <data name="LoadMoreBooks" xml:space="preserve">
-    <value>Load More Books</value>
+    <value>Meer boeken laden</value>
   </data>
   <data name="LoadMoreReadLists" xml:space="preserve">
-    <value>Load More Read Lists</value>
+    <value>Meer leeslijsten laden</value>
   </data>
   <data name="NoResults" xml:space="preserve">
-    <value>No results found</value>
+    <value>Geen resultaten gevonden</value>
   </data>
   <data name="SeriesResults" xml:space="preserve">
-    <value>Series Results</value>
+    <value>Series</value>
   </data>
   <data name="BookResults" xml:space="preserve">
-    <value>Book Results</value>
+    <value>Boeken</value>
   </data>
   <data name="BooksFormat" xml:space="preserve">
-    <value>{0} books</value>
+    <value>{0} boeken</value>
   </data>
   <data name="PagesFormat" xml:space="preserve">
-    <value>{0} pages</value>
+    <value>{0} pagina's</value>
   </data>
   <!-- Settings View -->
   <data name="KomgaServers" xml:space="preserve">
-    <value>Komga Servers</value>
+    <value>Komga-servers</value>
   </data>
   <data name="KomgaBrowsingAndDownloads" xml:space="preserve">
     <value>Bladeren &amp; downloads</value>
   </data>
   <data name="AddServer" xml:space="preserve">
-    <value>Add Server</value>
+    <value>Server toevoegen</value>
   </data>
   <data name="Active" xml:space="preserve">
-    <value>Active</value>
+    <value>Actief</value>
   </data>
   <data name="NoServersConfigured" xml:space="preserve">
-    <value>No servers configured</value>
+    <value>Geen servers ingesteld</value>
   </data>
   <data name="AddServerHint" xml:space="preserve">
-    <value>Add a Komga server to browse and download comics</value>
+    <value>Voeg een Komga-server toe om strips te bekijken en te downloaden</value>
   </data>
   <data name="ServerConfiguration" xml:space="preserve">
-    <value>Server Configuration</value>
+    <value>Serverinstellingen</value>
   </data>
   <data name="Name" xml:space="preserve">
-    <value>Name</value>
+    <value>Naam</value>
   </data>
   <data name="ServerUrl" xml:space="preserve">
-    <value>Server URL</value>
+    <value>Server-URL</value>
   </data>
   <data name="Username" xml:space="preserve">
-    <value>Username</value>
+    <value>Gebruikersnaam</value>
   </data>
   <data name="Password" xml:space="preserve">
-    <value>Password</value>
+    <value>Wachtwoord</value>
   </data>
   <data name="TestConnection" xml:space="preserve">
-    <value>Test Connection</value>
+    <value>Verbinding testen</value>
   </data>
   <data name="Save" xml:space="preserve">
-    <value>Save</value>
+    <value>Opslaan</value>
   </data>
   <data name="Cancel" xml:space="preserve">
-    <value>Cancel</value>
+    <value>Annuleren</value>
   </data>
   <data name="ConnectionSuccessful" xml:space="preserve">
-    <value>Connection successful!</value>
+    <value>Verbinding geslaagd!</value>
   </data>
   <data name="ConnectionFailed" xml:space="preserve">
-    <value>Connection failed</value>
+    <value>Verbinding mislukt</value>
   </data>
   <data name="TestingConnection" xml:space="preserve">
-    <value>Testing connection...</value>
+    <value>Verbinding testen...</value>
   </data>
   <data name="AllFieldsRequired" xml:space="preserve">
-    <value>All fields are required.</value>
+    <value>Alle velden zijn verplicht.</value>
   </data>
   <data name="InvalidUrl" xml:space="preserve">
-    <value>Please enter a valid URL (e.g., https://komga.example.com)</value>
+    <value>Voer een geldige URL in (bijv. https://komga.example.com)</value>
   </data>
   <data name="CustomHttpHeaders" xml:space="preserve">
-    <value>Custom HTTP Headers</value>
+    <value>Eigen HTTP-headers</value>
   </data>
   <data name="CustomHeadersHint" xml:space="preserve">
-    <value>Add custom headers for authentication or proxy requirements.</value>
+    <value>Voeg eigen headers toe voor authenticatie of een proxy.</value>
   </data>
   <data name="HeaderName" xml:space="preserve">
-    <value>Header Name</value>
+    <value>Headernaam</value>
   </data>
   <data name="Value" xml:space="preserve">
-    <value>Value</value>
+    <value>Waarde</value>
   </data>
   <data name="AddHeader" xml:space="preserve">
-    <value>Add Header</value>
+    <value>Header toevoegen</value>
   </data>
   <!-- Language Settings -->
   <data name="LanguageSettings" xml:space="preserve">
-    <value>Language Settings</value>
+    <value>Taalinstellingen</value>
   </data>
   <data name="Language" xml:space="preserve">
-    <value>Language</value>
+    <value>Taal</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
-    <value>Use System Language</value>
+    <value>Systeemtaal gebruiken</value>
   </data>
   <data name="SystemDefault" xml:space="preserve">
-    <value>System Default</value>
+    <value>Systeemstandaard</value>
   </data>
   <!-- About Section -->
   <data name="About" xml:space="preserve">
-    <value>About</value>
+    <value>Over</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>A modern comic book reader for local files and Komga.</value>
+    <value>Een moderne striplezer voor lokale bestanden en Komga.</value>
   </data>
   <data name="Version" xml:space="preserve">
     <value>Version</value>
   </data>
   <data name="ViewReleaseNotes" xml:space="preserve">
-    <value>View Release Notes</value>
+    <value>Release notes bekijken</value>
   </data>
   <data name="ReleaseNotes" xml:space="preserve">
-    <value>Release Notes</value>
+    <value>Release notes</value>
   </data>
   <data name="SupportMe" xml:space="preserve">
-    <value>Support Me</value>
+    <value>Steun mij</value>
   </data>
   <data name="ProjectOnGitHub" xml:space="preserve">
-    <value>Project on GitHub</value>
+    <value>Project op GitHub</value>
   </data>
   <data name="DonateWithPayPal" xml:space="preserve">
-    <value>Donate with PayPal</value>
+    <value>Doneren met PayPal</value>
   </data>
   <data name="DonateWithKoFi" xml:space="preserve">
-    <value>Donate with KoFi</value>
+    <value>Doneren met Ko-fi</value>
   </data>
   <!-- Reader View -->
   <data name="Page" xml:space="preserve">
-    <value>Page</value>
+    <value>Pagina</value>
   </data>
   <data name="PageDisplay" xml:space="preserve">
     <value>{0} / {1}</value>
@@ -288,192 +288,192 @@
     <value>Info (I)</value>
   </data>
   <data name="ToggleTwoPageMode" xml:space="preserve">
-    <value>Toggle two-page mode</value>
+    <value>Twee pagina's aan/uit</value>
   </data>
   <data name="ChangeFitMode" xml:space="preserve">
-    <value>Change fit mode</value>
+    <value>Schaalmodus wijzigen</value>
   </data>
   <data name="ToggleFullscreen" xml:space="preserve">
-    <value>Toggle fullscreen</value>
+    <value>Volledig scherm aan/uit</value>
   </data>
   <data name="ResetZoom" xml:space="preserve">
-    <value>Reset zoom</value>
+    <value>Zoom herstellen</value>
   </data>
   <!-- Comic Info Panel -->
   <data name="ComicInformation" xml:space="preserve">
-    <value>Comic Information</value>
+    <value>Stripinformatie</value>
   </data>
   <data name="Title" xml:space="preserve">
-    <value>Title</value>
+    <value>Titel</value>
   </data>
   <data name="IssueNumber" xml:space="preserve">
-    <value>Issue Number</value>
+    <value>Nummer</value>
   </data>
   <data name="Authors" xml:space="preserve">
-    <value>Authors</value>
+    <value>Auteurs</value>
   </data>
   <data name="Publisher" xml:space="preserve">
-    <value>Publisher</value>
+    <value>Uitgever</value>
   </data>
   <data name="ReleaseDate" xml:space="preserve">
-    <value>Release Date</value>
+    <value>Verschijningsdatum</value>
   </data>
   <data name="Summary" xml:space="preserve">
-    <value>Summary</value>
+    <value>Samenvatting</value>
   </data>
   <data name="ExtendedMetadata" xml:space="preserve">
-    <value>Extended Metadata (ComicInfo.xml)</value>
+    <value>Uitgebreide metadata (ComicInfo.xml)</value>
   </data>
   <data name="Volume" xml:space="preserve">
-    <value>Volume</value>
+    <value>Deel</value>
   </data>
   <data name="Genre" xml:space="preserve">
     <value>Genre</value>
   </data>
   <data name="Characters" xml:space="preserve">
-    <value>Characters</value>
+    <value>Personages</value>
   </data>
   <data name="Teams" xml:space="preserve">
     <value>Teams</value>
   </data>
   <data name="StoryArc" xml:space="preserve">
-    <value>Story Arc</value>
+    <value>Verhaallijn</value>
   </data>
   <data name="Notes" xml:space="preserve">
-    <value>Notes</value>
+    <value>Notities</value>
   </data>
   <data name="Web" xml:space="preserve">
     <value>Web</value>
   </data>
   <data name="NoExtendedMetadata" xml:space="preserve">
-    <value>No extended metadata (ComicInfo.xml) available</value>
+    <value>Geen uitgebreide metadata (ComicInfo.xml) beschikbaar</value>
   </data>
   <!-- Error Messages -->
   <data name="Error" xml:space="preserve">
-    <value>Error</value>
+    <value>Fout</value>
   </data>
   <data name="FailedToLoad" xml:space="preserve">
-    <value>Failed to load</value>
+    <value>Laden mislukt</value>
   </data>
   <data name="FailedToDownload" xml:space="preserve">
-    <value>Failed to download</value>
+    <value>Downloaden mislukt</value>
   </data>
   <data name="FailedToConnect" xml:space="preserve">
-    <value>Failed to connect</value>
+    <value>Verbinden mislukt</value>
   </data>
   <data name="SearchPlaceholder" xml:space="preserve">
-    <value>Search comics...</value>
+    <value>Strips zoeken...</value>
   </data>
   <data name="Importing" xml:space="preserve">
-    <value>Importing...</value>
+    <value>Importeren...</value>
   </data>
   <data name="ConfirmExternalDelete" xml:space="preserve">
-    <value>Confirm External File Deletion</value>
+    <value>Verwijderen van extern bestand bevestigen</value>
   </data>
   <data name="ConfirmExternalDeleteMessage" xml:space="preserve">
-    <value>This comic is located outside of the application's internal directory. Are you sure you want to delete it from its original location?</value>
+    <value>Deze strip staat buiten de map van de app. Weet je zeker dat je het bestand op de oorspronkelijke locatie wilt verwijderen?</value>
   </data>
   <data name="RemoveFromLibraryKeepFile" xml:space="preserve">
-    <value>Remove from Library (Keep File)</value>
+    <value>Uit bibliotheek verwijderen (bestand behouden)</value>
   </data>
   <data name="DeletePermanently" xml:space="preserve">
-    <value>Delete Permanently</value>
+    <value>Definitief verwijderen</value>
   </data>
   <data name="Number" xml:space="preserve">
-    <value>Number</value>
+    <value>Nummer</value>
   </data>
   <data name="ReadNow" xml:space="preserve">
-    <value>Read Now</value>
+    <value>Nu lezen</value>
   </data>
   <data name="ConvertNow" xml:space="preserve">
-    <value>Convert Now</value>
+    <value>Nu converteren</value>
   </data>
   <data name="Converting" xml:space="preserve">
-    <value>Converting...</value>
+    <value>Converteren...</value>
   </data>
   <data name="Favorite" xml:space="preserve">
-    <value>Favorite</value>
+    <value>Favoriet</value>
   </data>
   <data name="MarkRead" xml:space="preserve">
-    <value>Mark Read</value>
+    <value>Als gelezen markeren</value>
   </data>
   <data name="EditMetadata" xml:space="preserve">
-    <value>Edit Metadata</value>
+    <value>Metadata bewerken</value>
   </data>
   <data name="DeleteComic" xml:space="preserve">
-    <value>Delete Comic</value>
+    <value>Strip verwijderen</value>
   </data>
   <data name="SaveChanges" xml:space="preserve">
-    <value>Save Changes</value>
+    <value>Wijzigingen opslaan</value>
   </data>
   <data name="Format" xml:space="preserve">
-    <value>Format</value>
+    <value>Formaat</value>
   </data>
   <data name="NotConvertedYet" xml:space="preserve">
-    <value>Not converted yet</value>
+    <value>Nog niet geconverteerd</value>
   </data>
   <data name="PagesDisplay" xml:space="preserve">
-    <value>{0} / {1} pages</value>
+    <value>{0} / {1} pagina's</value>
   </data>
   <data name="TotalPagesDisplay" xml:space="preserve">
-    <value>{0} pages</value>
+    <value>{0} pagina's</value>
   </data>
   <data name="Downloads" xml:space="preserve">
     <value>Downloads</value>
   </data>
   <data name="PauseAll" xml:space="preserve">
-    <value>Pause All</value>
+    <value>Alles pauzeren</value>
   </data>
   <data name="ResumeAll" xml:space="preserve">
-    <value>Resume All</value>
+    <value>Alles hervatten</value>
   </data>
   <data name="RetryFailed" xml:space="preserve">
-    <value>Retry Failed</value>
+    <value>Mislukte opnieuw proberen</value>
   </data>
   <data name="CancelAll" xml:space="preserve">
-    <value>Cancel All</value>
+    <value>Alles annuleren</value>
   </data>
   <data name="Queued" xml:space="preserve">
-    <value>Queued</value>
+    <value>In de wachtrij</value>
   </data>
   <data name="Failed" xml:space="preserve">
-    <value>Failed</value>
+    <value>Mislukt</value>
   </data>
   <data name="Imports" xml:space="preserve">
     <value>Imports</value>
   </data>
   <data name="EpubConversions" xml:space="preserve">
-    <value>EPUB conversions</value>
+    <value>EPUB-conversies</value>
   </data>
   <data name="PagesReady" xml:space="preserve">
-    <value>pages ready</value>
+    <value>pagina's klaar</value>
   </data>
   <data name="Undo" xml:space="preserve">
-    <value>Undo</value>
+    <value>Ongedaan maken</value>
   </data>
   <data name="Deleting" xml:space="preserve">
-    <value>DELETING...</value>
+    <value>VERWIJDEREN...</value>
   </data>
   <data name="DeleteStatusSingle" xml:space="preserve">
-    <value>Deleting 1 comic in {0}s</value>
+    <value>1 strip wordt verwijderd over {0}s</value>
   </data>
   <data name="DeleteStatusPlural" xml:space="preserve">
-    <value>Deleting {0} comics in {1}s</value>
+    <value>{0} strips worden verwijderd over {1}s</value>
   </data>
   <data name="DeleteActionUndo" xml:space="preserve">
-    <value>Undo ({0})</value>
+    <value>Ongedaan maken ({0})</value>
   </data>
   <data name="DeleteActionUndoMultiple" xml:space="preserve">
-    <value>Undo {0} ({1})</value>
+    <value>{0} ongedaan maken ({1})</value>
   </data>
   <data name="NoNewComics" xml:space="preserve">
-    <value>No new comics</value>
+    <value>Geen nieuwe strips</value>
   </data>
   <data name="NoNewComicsHint" xml:space="preserve">
-    <value>Import a comic file or download from Komga to get started</value>
+    <value>Importeer een stripbestand of download er een van Komga om te beginnen</value>
   </data>
   <data name="ViewSeriesOnKomga" xml:space="preserve">
-    <value>View Series on Komga</value>
+    <value>Serie bekijken op Komga</value>
   </data>
   <data name="OpenBookOnline" xml:space="preserve">
     <value>Open boek online</value>
@@ -482,313 +482,313 @@
     <value>Open serie online</value>
   </data>
   <data name="OpenFolder" xml:space="preserve">
-    <value>Open Folder</value>
+    <value>Map openen</value>
   </data>
   <data name="SummaryPlaceholder" xml:space="preserve">
-    <value>Description</value>
+    <value>Beschrijving</value>
   </data>
   <data name="ComicCountDisplay" xml:space="preserve">
-    <value>{0} comics</value>
+    <value>{0} strips</value>
   </data>
   <data name="ReadCountDisplay" xml:space="preserve">
-    <value>{0} read</value>
+    <value>{0} gelezen</value>
   </data>
   <data name="ComicsReady" xml:space="preserve">
-    <value>comics ready</value>
+    <value>strips klaar</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>Status</value>
   </data>
   <data name="FileName" xml:space="preserve">
-    <value>File Name</value>
+    <value>Bestandsnaam</value>
   </data>
   <data name="Waiting" xml:space="preserve">
-    <value>Waiting...</value>
+    <value>Wachten...</value>
   </data>
   <data name="AnalyzingEpub" xml:space="preserve">
-    <value>Analyzing EPUB...</value>
+    <value>EPUB analyseren...</value>
   </data>
   <data name="ConvertingPdf" xml:space="preserve">
-    <value>Converting PDF...</value>
+    <value>PDF converteren...</value>
   </data>
   <data name="ConvertingEpub" xml:space="preserve">
-    <value>Converting EPUB...</value>
+    <value>EPUB converteren...</value>
   </data>
   <data name="PreparingEpub" xml:space="preserve">
-    <value>Preparing EPUB...</value>
+    <value>EPUB voorbereiden...</value>
   </data>
   <data name="CopyingEpub" xml:space="preserve">
-    <value>Copying EPUB...</value>
+    <value>EPUB kopiëren...</value>
   </data>
   <data name="FinalizingEpub" xml:space="preserve">
-    <value>Finalizing EPUB...</value>
+    <value>EPUB afronden...</value>
   </data>
   <data name="NoSupportedFilesFound" xml:space="preserve">
-    <value>No supported comic files were found in the selected folder.</value>
+    <value>Er zijn geen ondersteunde stripbestanden gevonden in de gekozen map.</value>
   </data>
   <data name="FailedToOpenDirectory" xml:space="preserve">
-    <value>Failed to open directory</value>
+    <value>Map openen mislukt</value>
   </data>
   <data name="Search" xml:space="preserve">
-    <value>Search</value>
+    <value>Zoeken</value>
   </data>
   <data name="SearchResults" xml:space="preserve">
-    <value>Search Results</value>
+    <value>Zoekresultaten</value>
   </data>
   <data name="ReadingModeGuidedTitle" xml:space="preserve">
-    <value>Guided Mode</value>
+    <value>Begeleide modus</value>
   </data>
   <data name="HandednessAction" xml:space="preserve">
-    <value>Handedness</value>
+    <value>Hand</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
-    <value>Two-Page</value>
+    <value>Twee pagina's</value>
   </data>
   <data name="ReadingModeZoomedTitle" xml:space="preserve">
-    <value>Zoomed Mode</value>
+    <value>Zoommodus</value>
   </data>
   <data name="ReadingModeNormalTitle" xml:space="preserve">
-    <value>Normal Mode</value>
+    <value>Normale modus</value>
   </data>
   <data name="ContinueReadingAction" xml:space="preserve">
-    <value>Continue Reading</value>
+    <value>Verder lezen</value>
   </data>
   <data name="BackToLibrary" xml:space="preserve">
-    <value>Back to Library</value>
+    <value>Terug naar bibliotheek</value>
   </data>
   <data name="SaveOriginalPage" xml:space="preserve">
-    <value>Save Original Page (Debug)</value>
+    <value>Originele pagina opslaan (debug)</value>
   </data>
   <data name="EndOfComicQuestion" xml:space="preserve">
-    <value>What would you like to do next?</value>
+    <value>Wat wil je nu doen?</value>
   </data>
   <data name="NoNextComic" xml:space="preserve">
-    <value>No next comic from this series is available locally.</value>
+    <value>Er is lokaal geen volgende strip uit deze serie.</value>
   </data>
   <data name="FitMode" xml:space="preserve">
-    <value>Fit Mode</value>
+    <value>Schaalmodus</value>
   </data>
   <data name="MarkReadAction" xml:space="preserve">
-    <value>Mark Read</value>
+    <value>Als gelezen markeren</value>
   </data>
   <data name="EndOfComic" xml:space="preserve">
-    <value>End of Comic</value>
+    <value>Einde van de strip</value>
   </data>
   <data name="Creators" xml:space="preserve">
-    <value>Creators</value>
+    <value>Makers</value>
   </data>
   <data name="Tags" xml:space="preserve">
     <value>Tags</value>
   </data>
   <data name="FullScreen" xml:space="preserve">
-    <value>Full Screen</value>
+    <value>Volledig scherm</value>
   </data>
   <data name="OpenNextInSeries" xml:space="preserve">
-    <value>Open Next in Series</value>
+    <value>Volgende in serie openen</value>
   </data>
   <data name="DeleteComicAction" xml:space="preserve">
-    <value>Delete Comic</value>
+    <value>Strip verwijderen</value>
   </data>
   <data name="SeriesDescription" xml:space="preserve">
-    <value>Series with multiple comics in your library</value>
+    <value>Series met meerdere strips in je bibliotheek</value>
   </data>
   <data name="UsernamePasswordTitle" xml:space="preserve">
-    <value>Username &amp; Password</value>
+    <value>Gebruikersnaam &amp; wachtwoord</value>
   </data>
   <data name="EpubConversionThemeDescription" xml:space="preserve">
-    <value>Controls whether EPUB pages are rendered with the system theme, a light theme, or a dark theme during conversion to CBZ.</value>
+    <value>Bepaalt of EPUB-pagina's bij de conversie naar CBZ met het systeemthema, een licht thema of een donker thema worden weergegeven.</value>
   </data>
   <data name="SectionRecentlyAddedBooks" xml:space="preserve">
-    <value>Recently Added Books</value>
+    <value>Recent toegevoegde boeken</value>
   </data>
   <data name="ReadingModeGuided" xml:space="preserve">
-    <value>Guided</value>
+    <value>Begeleid</value>
   </data>
   <data name="SkipExternalDeleteConfirmationEnabled" xml:space="preserve">
-    <value>Skip external delete confirmation</value>
+    <value>Bevestiging bij extern verwijderen overslaan</value>
   </data>
   <data name="HandednessDescription" xml:space="preserve">
-    <value>Right-handed: Overview on left, zoom on right. Left-handed: Overview on right, zoom on left.</value>
+    <value>Rechtshandig: overzicht links, zoom rechts. Linkshandig: overzicht rechts, zoom links.</value>
   </data>
   <data name="SectionLayout" xml:space="preserve">
-    <value>Section Layout</value>
+    <value>Indeling van de secties</value>
   </data>
   <data name="SectionKeepReading" xml:space="preserve">
-    <value>Keep Reading</value>
+    <value>Verder lezen</value>
   </data>
   <data name="AppTheme" xml:space="preserve">
-    <value>App Theme</value>
+    <value>App-thema</value>
   </data>
   <data name="ReadingModeZoomed" xml:space="preserve">
-    <value>Zoomed</value>
+    <value>Zoom</value>
   </data>
   <data name="ApiKeyTitle" xml:space="preserve">
-    <value>API Key (Preferred)</value>
+    <value>API-sleutel (aanbevolen)</value>
   </data>
   <data name="ThemeLight" xml:space="preserve">
-    <value>Light</value>
+    <value>Licht</value>
   </data>
   <data name="HandednessLeft" xml:space="preserve">
-    <value>Left-handed</value>
+    <value>Linkshandig</value>
   </data>
   <data name="Activity" xml:space="preserve">
-    <value>Activity</value>
+    <value>Activiteit</value>
   </data>
   <data name="KomgaParallelDownloads" xml:space="preserve">
-    <value>Komga Parallel Downloads</value>
+    <value>Gelijktijdige Komga-downloads</value>
   </data>
   <data name="SkipExternalDeleteConfirmationDescription" xml:space="preserve">
-    <value>When enabled, deleting a comic outside the managed library folder will always remove it from the library only and will not ask whether to delete the original file.</value>
+    <value>Als dit aan staat, wordt een strip buiten de beheerde bibliotheekmap bij verwijderen altijd alleen uit de bibliotheek gehaald, zonder te vragen of het originele bestand weg moet.</value>
   </data>
   <data name="ReadingModeNormal" xml:space="preserve">
-    <value>Normal</value>
+    <value>Normaal</value>
   </data>
   <data name="UsernamePlaceholder" xml:space="preserve">
-    <value>username</value>
+    <value>gebruikersnaam</value>
   </data>
   <data name="HandednessRight" xml:space="preserve">
-    <value>Right-handed</value>
+    <value>Rechtshandig</value>
   </data>
   <data name="LibraryView" xml:space="preserve">
-    <value>Library View</value>
+    <value>Bibliotheekweergave</value>
   </data>
   <data name="EpubOutputResolutionDescription" xml:space="preserve">
-    <value>Choose the final PNG size for EPUB conversion: Low = 700x1050, Medium = 1400x2100, High = 2100x3150. Higher settings improve text quality but increase conversion time and file size.</value>
+    <value>Kies de uiteindelijke PNG-grootte voor de EPUB-conversie: Laag = 700x1050, Middel = 1400x2100, Hoog = 2100x3150. Hogere instellingen geven scherpere tekst, maar de conversie duurt langer en de bestanden worden groter.</value>
   </data>
   <data name="ThemeDark" xml:space="preserve">
-    <value>Dark</value>
+    <value>Donker</value>
   </data>
   <data name="SectionReadLists" xml:space="preserve">
-    <value>Read Lists</value>
+    <value>Leeslijsten</value>
   </data>
   <data name="Handedness" xml:space="preserve">
-    <value>Handedness (for Zoomed/Guided modes)</value>
+    <value>Hand (voor zoom- en begeleide modus)</value>
   </data>
   <data name="Or" xml:space="preserve">
     <value>OR</value>
   </data>
   <data name="KomgaParallelDownloadsDescription" xml:space="preserve">
-    <value>Choose how many Komga books may download at the same time.</value>
+    <value>Kies hoeveel Komga-boeken tegelijk mogen downloaden.</value>
   </data>
   <data name="SectionLibraries" xml:space="preserve">
-    <value>Libraries</value>
+    <value>Bibliotheken</value>
   </data>
   <data name="Writer" xml:space="preserve">
-    <value>Writer</value>
+    <value>Schrijver</value>
   </data>
   <data name="ReadingModeZoomedDescription" xml:space="preserve">
-    <value>• Zoomed: Split view with overview and magnified area</value>
+    <value>• Zoom: gesplitst beeld met overzicht en vergroot deel</value>
   </data>
   <data name="StartupBehavior" xml:space="preserve">
-    <value>Startup Behavior</value>
+    <value>Bij het opstarten</value>
   </data>
   <data name="ResolutionMedium" xml:space="preserve">
-    <value>Medium</value>
+    <value>Middel</value>
   </data>
   <data name="UnsupportedFormatHandlingConvertOnImport" xml:space="preserve">
-    <value>Convert on import</value>
+    <value>Converteren bij importeren</value>
   </data>
   <data name="ApiKeyHint" xml:space="preserve">
-    <value>Using an API key is more secure than credentials.</value>
+    <value>Een API-sleutel is veiliger dan een gebruikersnaam en wachtwoord.</value>
   </data>
   <data name="PasswordPlaceholder" xml:space="preserve">
-    <value>password</value>
+    <value>wachtwoord</value>
   </data>
   <data name="SectionNewComics" xml:space="preserve">
-    <value>New Comics</value>
+    <value>Nieuwe strips</value>
   </data>
   <data name="DefaultReadingMode" xml:space="preserve">
-    <value>Default Reading Mode</value>
+    <value>Standaard leesmodus</value>
   </data>
   <data name="ApiKeyPlaceholder" xml:space="preserve">
-    <value>Enter your Komga API key</value>
+    <value>Voer je Komga API-sleutel in</value>
   </data>
   <data name="KomgaHome" xml:space="preserve">
-    <value>Komga Home</value>
+    <value>Komga-start</value>
   </data>
   <data name="UnsupportedFormatHandlingConvertWhileReading" xml:space="preserve">
-    <value>Convert while reading</value>
+    <value>Converteren tijdens het lezen</value>
   </data>
   <data name="ResolutionLow" xml:space="preserve">
     <value>Low</value>
   </data>
   <data name="Shown" xml:space="preserve">
-    <value>Shown</value>
+    <value>Zichtbaar</value>
   </data>
   <data name="ThemeSystem" xml:space="preserve">
-    <value>System</value>
+    <value>Systeem</value>
   </data>
   <data name="EpubConversionTheme" xml:space="preserve">
-    <value>EPUB Conversion Theme</value>
+    <value>Thema voor EPUB-conversie</value>
   </data>
   <data name="SectionRead" xml:space="preserve">
-    <value>Read</value>
+    <value>Gelezen</value>
   </data>
   <data name="SkipExternalDeleteConfirmationDisabled" xml:space="preserve">
-    <value>Ask before deleting external comics</value>
+    <value>Vragen voor het verwijderen van externe strips</value>
   </data>
   <data name="SectionFavorites" xml:space="preserve">
-    <value>Favorites</value>
+    <value>Favorieten</value>
   </data>
   <data name="UnsupportedFormatHandling" xml:space="preserve">
-    <value>Unsupported Format Handling</value>
+    <value>Niet-ondersteunde formaten</value>
   </data>
   <data name="EpubOutputResolution" xml:space="preserve">
-    <value>EPUB Output Resolution</value>
+    <value>Resolutie van EPUB-conversie</value>
   </data>
   <data name="SectionSeries" xml:space="preserve">
     <value>Series</value>
   </data>
   <data name="LanguageDescription" xml:space="preserve">
-    <value>Select a language or use the system default. Changes will take effect after restarting the app.</value>
+    <value>Kies een taal of gebruik de systeemstandaard. Wijzigingen worden actief na een herstart van de app.</value>
   </data>
   <data name="ResolutionHigh" xml:space="preserve">
-    <value>High</value>
+    <value>Hoog</value>
   </data>
   <data name="ReadingSettings" xml:space="preserve">
-    <value>Reading Settings</value>
+    <value>Leesinstellingen</value>
   </data>
   <data name="Collapsed" xml:space="preserve">
-    <value>Collapsed</value>
+    <value>Ingeklapt</value>
   </data>
   <data name="Hidden" xml:space="preserve">
-    <value>Hidden</value>
+    <value>Verborgen</value>
   </data>
   <data name="AuthenticationTitle" xml:space="preserve">
-    <value>Authentication (Choose one)</value>
+    <value>Authenticatie (kies er één)</value>
   </data>
   <data name="SectionContinueReading" xml:space="preserve">
-    <value>Continue Reading</value>
+    <value>Verder lezen</value>
   </data>
   <data name="SkipExternalDeleteConfirmation" xml:space="preserve">
-    <value>Skip external delete confirmation</value>
+    <value>Bevestiging bij extern verwijderen overslaan</value>
   </data>
   <data name="Expanded" xml:space="preserve">
-    <value>Expanded</value>
+    <value>Uitgeklapt</value>
   </data>
   <data name="StartupBehaviorHint" xml:space="preserve">
-    <value>Choose whether to open the last read comic or go to the library view on startup.</value>
+    <value>Kies of bij het opstarten de laatst gelezen strip wordt geopend of de bibliotheek.</value>
   </data>
   <data name="SectionLayoutDescription" xml:space="preserve">
-    <value>Choose which sections are shown, whether they start expanded, and the order they appear in.</value>
+    <value>Kies welke secties zichtbaar zijn, of ze uitgeklapt beginnen en in welke volgorde ze staan.</value>
   </data>
   <data name="SectionRecentlyAddedSeries" xml:space="preserve">
-    <value>Recently Added Series</value>
+    <value>Recent toegevoegde series</value>
   </data>
   <data name="ContinueWhereLeftOff" xml:space="preserve">
-    <value>Continue where left off</value>
+    <value>Verdergaan waar je gebleven was</value>
   </data>
   <data name="ReadingModeNormalDescription" xml:space="preserve">
-    <value>• Normal: Standard full-page reading</value>
+    <value>• Normaal: gewoon pagina's lezen</value>
   </data>
   <data name="SectionOnDeck" xml:space="preserve">
-    <value>On Deck</value>
+    <value>Volgende</value>
   </data>
   <data name="AppThemeDescription" xml:space="preserve">
-    <value>Controls the application UI theme. System follows the device theme, while Light and Dark force the app appearance.</value>
+    <value>Bepaalt het thema van de app. Systeem volgt het thema van het apparaat, Licht en Donker leggen het uiterlijk vast.</value>
   </data>
   <data name="ReadingModeGuidedDescription" xml:space="preserve">
-    <value>• Guided: Automatic panel detection for scene-by-scene reading</value>
+    <value>• Begeleid: automatische vakherkenning om de strip vak voor vak te lezen</value>
   </data>
   <data name="Sort" xml:space="preserve">
     <value>Sort</value>
@@ -1150,4 +1150,271 @@
   <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
     <value>Geheugen besparen</value>
   </data>
-</root>
+  <data name="Edit" xml:space="preserve">
+    <value>Bewerken</value>
+  </data>
+  <data name="UiSettings" xml:space="preserve">
+    <value>Weergave-instellingen</value>
+  </data>
+  <data name="LibrarySettings" xml:space="preserve">
+    <value>Bibliotheekinstellingen</value>
+  </data>
+  <data name="KomgaSettings" xml:space="preserve">
+    <value>Komga-instellingen</value>
+  </data>
+  <data name="FileSize" xml:space="preserve">
+    <value>Bestandsgrootte</value>
+  </data>
+  <data name="KomgaSyncPromptTitle" xml:space="preserve">
+    <value>Voortgang gevonden in Komga</value>
+  </data>
+  <data name="KomgaSyncPromptMessage" xml:space="preserve">
+    <value>Komga heeft een nieuwere positie gesynchroniseerd terwijl je verder las. Naar pagina {0} van {1} gaan?</value>
+  </data>
+  <data name="KomgaSyncPromptAccept" xml:space="preserve">
+    <value>Naar gesynchroniseerde pagina</value>
+  </data>
+  <data name="KomgaSyncPromptDecline" xml:space="preserve">
+    <value>Hier blijven</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloads" xml:space="preserve">
+    <value>Downloads op betaalde netwerken toestaan</value>
+  </data>
+  <data name="KomgaSeriesPageSize" xml:space="preserve">
+    <value>Paginagrootte voor Komga-series</value>
+  </data>
+  <data name="KomgaSeriesPageSizeDescription" xml:space="preserve">
+    <value>Aantal boeken dat per pagina wordt geladen bij het openen van een serie. De overige boeken worden na de eerste pagina automatisch op de achtergrond geladen.</value>
+  </data>
+  <data name="KomgaSearchLimit" xml:space="preserve">
+    <value>Maximum aantal Komga-zoekresultaten</value>
+  </data>
+  <data name="KomgaSearchLimitDescription" xml:space="preserve">
+    <value>Maximaal aantal series en boeken dat een zoekopdracht in Komga oplevert.</value>
+  </data>
+  <data name="KomgaSmartListSize" xml:space="preserve">
+    <value>Grootte van de Komga-lijsten</value>
+  </data>
+  <data name="KomgaSmartListSizeDescription" xml:space="preserve">
+    <value>Aantal items in Verder lezen, Volgende, Recent toegevoegde boeken en Recent toegevoegde series.</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
+    <value>Standaard uit om mobiele data te sparen. Zet dit aan om Komga-downloads ook via betaalde verbindingen toe te staan.</value>
+  </data>
+  <data name="UseFullScreenWhenReading" xml:space="preserve">
+    <value>Volledig scherm tijdens het lezen</value>
+  </data>
+  <data name="UseFullScreenWhenReadingEnabled" xml:space="preserve">
+    <value>Volledig scherm aan</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDisabled" xml:space="preserve">
+    <value>Volledig scherm uit</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDescription" xml:space="preserve">
+    <value>Als dit aan staat, schakelt de app bij het openen van een strip automatisch naar volledig scherm.</value>
+  </data>
+  <data name="DefaultReadingDirection" xml:space="preserve">
+    <value>Standaard leesrichting</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Tonen</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Verbergen</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsEnabled" xml:space="preserve">
+    <value>Downloads op betaalde netwerken toegestaan</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDisabled" xml:space="preserve">
+    <value>Downloads op betaalde netwerken geblokkeerd</value>
+  </data>
+  <data name="UnsupportedFormatHandlingDescription" xml:space="preserve">
+    <value>Kies wanneer niet-ondersteunde formaten worden geconverteerd: meteen bij het importeren, of pas bij het openen om te lezen.</value>
+  </data>
+  <data name="ReadingDirectionDescription" xml:space="preserve">
+    <value>Automatisch gebruikt de metadata (Komga of ComicInfo). Je kunt ook westerse of manga-navigatie afdwingen, met of zonder omgekeerde paginavolgorde.</value>
+  </data>
+  <data name="ReadingDirectionAutomatic" xml:space="preserve">
+    <value>Automatisch (metadata)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRight" xml:space="preserve">
+    <value>Links naar rechts</value>
+  </data>
+  <data name="ReadingDirectionRightToLeft" xml:space="preserve">
+    <value>Rechts naar links (manga)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRightReversedPages" xml:space="preserve">
+    <value>Achteraan beginnen, westerse navigatie</value>
+  </data>
+  <data name="ReadingDirectionRightToLeftReversedPages" xml:space="preserve">
+    <value>Vooraan beginnen, manga-navigatie</value>
+  </data>
+  <data name="ReadingDirectionAction" xml:space="preserve">
+    <value>Leesrichting</value>
+  </data>
+  <data name="AddToReadList" xml:space="preserve">
+    <value>Toevoegen aan leeslijst</value>
+  </data>
+  <data name="DownloadSeries" xml:space="preserve">
+    <value>Serie downloaden</value>
+  </data>
+  <data name="ReadNowAction" xml:space="preserve">
+    <value>Nu lezen</value>
+  </data>
+  <data name="ShowHidePassword" xml:space="preserve">
+    <value>Wachtwoord tonen of verbergen</value>
+  </data>
+  <data name="StreamingFile" xml:space="preserve">
+    <value>Bestand overzetten...</value>
+  </data>
+  <data name="ImportFailedForFile" xml:space="preserve">
+    <value>'{0}' importeren mislukt: {1}</value>
+  </data>
+  <data name="WaitingToConvertEpub" xml:space="preserve">
+    <value>Wachten op EPUB-conversie...</value>
+  </data>
+  <data name="ConvertingEpubProgress" xml:space="preserve">
+    <value>EPUB converteren... {0:P0}</value>
+  </data>
+  <data name="ConvertFailedForComic" xml:space="preserve">
+    <value>'{0}' converteren mislukt: {1}</value>
+  </data>
+  <data name="FailedToReadFolder" xml:space="preserve">
+    <value>Inhoud van de map lezen mislukt: {0}</value>
+  </data>
+  <data name="ActionFailed" xml:space="preserve">
+    <value>Actie mislukt: {0}</value>
+  </data>
+  <data name="UpdateReadStatusFailed" xml:space="preserve">
+    <value>Leesstatus bijwerken mislukt</value>
+  </data>
+  <data name="UpdateFavoriteFailed" xml:space="preserve">
+    <value>Favoriet bijwerken mislukt</value>
+  </data>
+  <data name="ServerNameAndUrlRequired" xml:space="preserve">
+    <value>Servernaam en URL zijn verplicht.</value>
+  </data>
+  <data name="ServerCredentialsRequired" xml:space="preserve">
+    <value>Vul een API-sleutel in, of een gebruikersnaam en wachtwoord.</value>
+  </data>
+  <data name="ServerUrlRequired" xml:space="preserve">
+    <value>URL is verplicht</value>
+  </data>
+  <data name="ConnectionFailedWithReason" xml:space="preserve">
+    <value>Verbinding mislukt: {0}</value>
+  </data>
+  <data name="ConnectionErrorWithReason" xml:space="preserve">
+    <value>Fout: {0}</value>
+  </data>
+  <data name="SaveServerFailed" xml:space="preserve">
+    <value>Server opslaan mislukt</value>
+  </data>
+  <data name="DeleteServerFailed" xml:space="preserve">
+    <value>Server verwijderen mislukt</value>
+  </data>
+  <data name="SetBrowsingServerFailed" xml:space="preserve">
+    <value>Browsing-server instellen mislukt</value>
+  </data>
+  <data name="SwitchKomgaServerFailed" xml:space="preserve">
+    <value>Wisselen van Komga-server mislukt</value>
+  </data>
+  <data name="KomgaInitFailed" xml:space="preserve">
+    <value>Initialiseren mislukt: {0}</value>
+  </data>
+  <data name="KomgaLoadLibrariesFailed" xml:space="preserve">
+    <value>Bibliotheken laden mislukt: {0}</value>
+  </data>
+  <data name="KomgaLoadSeriesFailed" xml:space="preserve">
+    <value>Series laden mislukt: {0}</value>
+  </data>
+  <data name="KomgaLoadBooksFailed" xml:space="preserve">
+    <value>Boeken laden mislukt: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListsFailed" xml:space="preserve">
+    <value>Leeslijsten laden mislukt: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListBooksFailed" xml:space="preserve">
+    <value>Boeken van de leeslijst laden mislukt: {0}</value>
+  </data>
+  <data name="KomgaNoReadLists" xml:space="preserve">
+    <value>Er zijn geen Komga-leeslijsten op de actieve server.</value>
+  </data>
+  <data name="KomgaImportFailedForFile" xml:space="preserve">
+    <value>'{0}' importeren mislukt.</value>
+  </data>
+  <data name="DownloadPausedNoConnection" xml:space="preserve">
+    <value>Gepauzeerd, wachten op verbinding...</value>
+  </data>
+  <data name="DownloadFailedAfterRetries" xml:space="preserve">
+    <value>'{0}' downloaden mislukt na {1} pogingen.</value>
+  </data>
+  <data name="ReaderPreparingNextPage" xml:space="preserve">
+    <value>Volgende pagina voorbereiden...</value>
+  </data>
+  <data name="ReaderPreparingRequestedPage" xml:space="preserve">
+    <value>Gevraagde pagina voorbereiden...</value>
+  </data>
+  <data name="SelectComicFolder" xml:space="preserve">
+    <value>Stripmap kiezen</value>
+  </data>
+  <data name="ConnectionTestNotConfigured" xml:space="preserve">
+    <value>De server is niet ingesteld</value>
+  </data>
+  <data name="ConnectionTestCancelled" xml:space="preserve">
+    <value>Geannuleerd</value>
+  </data>
+  <data name="ConnectionTestTimedOut" xml:space="preserve">
+    <value>Verbindingstest na {0} seconden afgebroken</value>
+  </data>
+  <data name="KomgaDownloadHttpError" xml:space="preserve">
+    <value>Komga antwoordde met {0} ({1}).</value>
+  </data>
+  <data name="KomgaDownloadTimedOut" xml:space="preserve">
+    <value>Time-out bij het lezen van gegevens van Komga.</value>
+  </data>
+  <data name="KomgaDownloadEmptyChunk" xml:space="preserve">
+    <value>Komga stuurde geen gegevens meer voordat de download klaar was.</value>
+  </data>
+  <data name="ReportIssue" xml:space="preserve">
+    <value>Probleem melden</value>
+  </data>
+  <data name="ServerNamePlaceholder" xml:space="preserve">
+    <value>Mijn Komga-server</value>
+  </data>
+  <data name="DownloadSkipsExisting" xml:space="preserve">
+    <value>Al gedownloade boeken worden automatisch overgeslagen.</value>
+  </data>
+  <data name="DownloadAllMissing" xml:space="preserve">
+    <value>Alle ontbrekende boeken</value>
+  </data>
+  <data name="DownloadUnreadMissing" xml:space="preserve">
+    <value>Ongelezen ontbrekende boeken</value>
+  </data>
+  <data name="LoadingKomga" xml:space="preserve">
+    <value>Komga laden...</value>
+  </data>
+  <data name="LoadingReadLists" xml:space="preserve">
+    <value>Leeslijsten laden...</value>
+  </data>
+  <data name="ApplySeriesNameToAll" xml:space="preserve">
+    <value>Alle geïmporteerde strips een serienaam geven</value>
+  </data>
+  <data name="SeriesNameLabel" xml:space="preserve">
+    <value>Serienaam</value>
+  </data>
+  <data name="ResetToFolderName" xml:space="preserve">
+    <value>Terugzetten naar mapnaam</value>
+  </data>
+  <data name="ImportFolderSeriesHint" xml:space="preserve">
+    <value>De voorgestelde naam is alleen de naam van de gekozen map. Je kunt hem uitzetten, terugzetten naar de mapnaam of zelf aanpassen.</value>
+  </data>
+  <data name="ImportAction" xml:space="preserve">
+    <value>Importeren</value>
+  </data>
+  <data name="ChooseSeriesDownloadFor" xml:space="preserve">
+    <value>Kies wat je wilt downloaden voor {0}</value>
+  </data>
+  <data name="ChooseReadListFor" xml:space="preserve">
+    <value>Kies een leeslijst voor {0}</value>
+  </data>
+</root>

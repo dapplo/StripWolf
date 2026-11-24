@@ -109,6 +109,42 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public void RemoveInstalledUpdates_KeepsOnlyNewerDownloads()
+    {
+        using var temp = new TempDirectory("update");
+        var directory = temp.CreateDirectory("updates");
+        string[] names =
+        [
+            "StripWolf-Android-arm64-1.2.3-gabc.apk",   // same as running: installed
+            "StripWolf-Android-arm64-1.1.0-gdef.apk",   // older
+            "StripWolf-Android-x86_64-1.3.0-g123.apk",  // newer: keep
+            "old.apk"                                   // no version: left over
+        ];
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(directory, name), "x");
+        }
+
+        UpdateService.RemoveInstalledUpdates(directory, "1.2.3");
+
+        Assert.Equal(new[] { "StripWolf-Android-x86_64-1.3.0-g123.apk" }, Directory.GetFiles(directory).Select(Path.GetFileName).ToArray());
+    }
+
+    [Fact]
+    public void RemoveInstalledUpdates_RemovesTheEmptyDirectory()
+    {
+        using var temp = new TempDirectory("update");
+        var directory = temp.CreateDirectory("updates");
+        File.WriteAllText(Path.Combine(directory, "StripWolf-Android-arm64-v1.0.0-gabc.apk"), "x");
+
+        UpdateService.RemoveInstalledUpdates(directory, "1.0.0");
+        UpdateService.RemoveInstalledUpdates(directory, "1.0.0");
+        UpdateService.RemoveInstalledUpdates(null, "1.0.0");
+
+        Assert.False(Directory.Exists(directory));
+    }
+
+    [Fact]
     public async Task DownloadAssetAsync_WrongChecksum_Throws()
     {
         using var temp = new TempDirectory("update");

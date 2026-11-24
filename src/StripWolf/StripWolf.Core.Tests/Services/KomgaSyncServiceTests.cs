@@ -55,6 +55,11 @@ public sealed class KomgaSyncServiceTests
 
         public int ReadProgressStatus { get; set; } = 204;
 
+        /// <summary>
+        /// When set, GET api/v1/books/0BOOK1 answers with this status code
+        /// </summary>
+        public int? BookStatus { get; set; }
+
         public IEnumerable<LoopbackRequest> ReadProgressRequests => Server.Requests.Where(request => request.Method == "PATCH");
 
         public static async Task<Context> CreateAsync(bool syncReadProgress = true, bool configureServer = true)
@@ -86,6 +91,10 @@ public sealed class KomgaSyncServiceTests
             var path = request.PathAndQuery.Split('?')[0];
             if (request.Method == "GET" && path == $"/api/v1/books/{BookId}")
             {
+                if (BookStatus is { } status)
+                {
+                    return LoopbackResponse.Status(status);
+                }
                 return BookJson is null ? LoopbackResponse.Status(404) : LoopbackResponse.Json(BookJson);
             }
 
@@ -97,12 +106,12 @@ public sealed class KomgaSyncServiceTests
             return LoopbackResponse.Status(404);
         }
 
-        public async Task<Comic> AddKomgaComicAsync(int currentPage, DateTime? readProgressLastModified, bool isCompleted = false)
+        public async Task<Comic> AddKomgaComicAsync(int currentPage, DateTime? readProgressLastModified, bool isCompleted = false, string fileName = "book.cbz")
         {
             var comic = new Comic
             {
                 Title = "Wolf Strips 001",
-                FilePath = Host.Temp.Combine("komga", "book.cbz"),
+                FilePath = Host.Temp.Combine("komga", fileName),
                 PageCount = 20,
                 Format = ComicFormat.Cbz,
                 Source = ComicSource.Komga,
@@ -347,5 +356,20 @@ public sealed class KomgaSyncServiceTests
         Assert.NotNull(stored);
         Assert.Equal(19, stored.CurrentPage);
         Assert.True(stored.IsCompleted);
+    }
+
+    [Fact]
+    public async Task SyncAllComicsAsync_StopsForAServerWhichFails()
+    {
+        await using var context = await Context.CreateAsync();
+        context.BookStatus = 500;
+        var first = await context.AddKomgaComicAsync(currentPage: 1, readProgressLastModified: DateTime.UtcNow);
+        await context.AddKomgaComicAsync(currentPage: 2, readProgressLastModified: DateTime.UtcNow, fileName: "second.cbz");
+        await context.AddKomgaComicAsync(currentPage: 3, readProgressLastModified: DateTime.UtcNow, fileName: "third.cbz");
+
+        await context.Sync.SyncAllComicsAsync();
+
+        Assert.Single(context.Server.Requests, request => request.Method == "GET");
+        Assert.NotNull(await context.Host.Database.GetComicAsync(first.Id));
     }
 }

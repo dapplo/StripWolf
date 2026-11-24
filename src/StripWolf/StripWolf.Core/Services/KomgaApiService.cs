@@ -172,7 +172,7 @@ public class KomgaApiService : IDisposable
     {
         if (!IsConfigured)
         {
-            return (false, "Service is not configured");
+            return (false, Resources.Loc.Instance.ConnectionTestNotConfigured);
         }
 
         try
@@ -196,11 +196,11 @@ public class KomgaApiService : IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return (false, "Operation cancelled");
+            return (false, Resources.Loc.Instance.ConnectionTestCancelled);
         }
         catch (OperationCanceledException)
         {
-            return (false, $"Connection test timed out after {ConnectionTestTimeout.TotalSeconds:0} seconds");
+            return (false, string.Format(Resources.Loc.Instance.ConnectionTestTimedOut, ConnectionTestTimeout.TotalSeconds.ToString("0")));
         }
         catch (Exception ex)
         {
@@ -683,7 +683,7 @@ public class KomgaApiService : IDisposable
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        lastErrorMessage = $"Komga returned {(int)response.StatusCode} ({response.ReasonPhrase ?? response.StatusCode.ToString()}).";
+                        lastErrorMessage = string.Format(Resources.Loc.Instance.KomgaDownloadHttpError, (int)response.StatusCode, response.ReasonPhrase ?? response.StatusCode.ToString());
                         if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
                         {
                             await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
@@ -795,7 +795,7 @@ public class KomgaApiService : IDisposable
                     downloadedBytes += bytesReadThisChunk;
                     if (bytesReadThisChunk == 0)
                     {
-                        return new KomgaDownloadResult(false, "Komga returned an empty chunk before download completion.");
+                        return new KomgaDownloadResult(false, Resources.Loc.Instance.KomgaDownloadEmptyChunk);
                     }
 
                     if (!responseIsPartial || (totalBytes.HasValue && downloadedBytes >= totalBytes.Value))
@@ -811,7 +811,7 @@ public class KomgaApiService : IDisposable
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
                 {
-                    lastErrorMessage = "Download timed out while reading data from Komga.";
+                    lastErrorMessage = Resources.Loc.Instance.KomgaDownloadTimedOut;
                     await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), cancellationToken);
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

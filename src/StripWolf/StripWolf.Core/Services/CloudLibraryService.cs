@@ -60,7 +60,7 @@ public class CloudLibraryService : ICloudLibraryService
         {
             var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Select Comic Folder",
+                Title = Resources.Loc.Instance.SelectComicFolder,
                 AllowMultiple = false
             });
 
@@ -289,6 +289,32 @@ public class CloudLibraryService : ICloudLibraryService
         }
     }
 
+    internal static async Task<bool> HaveSameContentAsync(string firstPath, string secondPath)
+    {
+        if (new FileInfo(firstPath).Length != new FileInfo(secondPath).Length)
+        {
+            return false;
+        }
+
+        await using var first = File.OpenRead(firstPath);
+        await using var second = File.OpenRead(secondPath);
+        var firstBuffer = new byte[81920];
+        var secondBuffer = new byte[81920];
+        while (true)
+        {
+            var read = await first.ReadAtLeastAsync(firstBuffer, firstBuffer.Length, throwOnEndOfStream: false);
+            var secondRead = await second.ReadAtLeastAsync(secondBuffer, secondBuffer.Length, throwOnEndOfStream: false);
+            if (read != secondRead || !firstBuffer.AsSpan(0, read).SequenceEqual(secondBuffer.AsSpan(0, secondRead)))
+            {
+                return false;
+            }
+            if (read == 0)
+            {
+                return true;
+            }
+        }
+    }
+
     public async Task<string?> CopyToLocalDirectoryAsync(IStorageFile file, string targetDirectory)
     {
         string? tempPath = null;
@@ -308,13 +334,21 @@ public class CloudLibraryService : ICloudLibraryService
                 await tempStream.FlushAsync();
             }
 
-            // Handle file collision by appending _1, _2 etc.
+            // Handle file collision by appending _1, _2 etc. The same file opened again (e.g. "open with" on Android,
+            // which always hands over a content URI) used to be copied again under a new name, and imported as
+            // another comic every time: reuse the earlier copy when it has the same content.
             var targetPath = Path.Combine(targetDirectory, sanitizedName);
             var counter = 1;
             var baseName = Path.GetFileNameWithoutExtension(sanitizedName);
             var extension = Path.GetExtension(sanitizedName);
             while (File.Exists(targetPath))
             {
+                if (await HaveSameContentAsync(tempPath, targetPath))
+                {
+                    File.Delete(tempPath);
+                    tempPath = null;
+                    return targetPath;
+                }
                 targetPath = Path.Combine(targetDirectory, $"{baseName}_{counter}{extension}");
                 counter++;
             }

@@ -1252,4 +1252,169 @@
   <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
     <value>Save memory</value>
   </data>
-</root>
+  <data name="AddToReadList" xml:space="preserve">
+    <value>Add to Read List</value>
+  </data>
+  <data name="DownloadSeries" xml:space="preserve">
+    <value>Download Series</value>
+  </data>
+  <data name="ReadNowAction" xml:space="preserve">
+    <value>Read Now</value>
+  </data>
+  <data name="ShowHidePassword" xml:space="preserve">
+    <value>Show or hide the password</value>
+  </data>
+  <data name="StreamingFile" xml:space="preserve">
+    <value>Streaming file...</value>
+  </data>
+  <data name="ImportFailedForFile" xml:space="preserve">
+    <value>Failed to import '{0}': {1}</value>
+  </data>
+  <data name="WaitingToConvertEpub" xml:space="preserve">
+    <value>Waiting to convert EPUB...</value>
+  </data>
+  <data name="ConvertingEpubProgress" xml:space="preserve">
+    <value>Converting EPUB... {0:P0}</value>
+  </data>
+  <data name="ConvertFailedForComic" xml:space="preserve">
+    <value>Failed to convert '{0}': {1}</value>
+  </data>
+  <data name="FailedToReadFolder" xml:space="preserve">
+    <value>Failed to read folder contents: {0}</value>
+  </data>
+  <data name="ActionFailed" xml:space="preserve">
+    <value>Failed to perform action: {0}</value>
+  </data>
+  <data name="UpdateReadStatusFailed" xml:space="preserve">
+    <value>Failed to update read status</value>
+  </data>
+  <data name="UpdateFavoriteFailed" xml:space="preserve">
+    <value>Failed to update favorite status</value>
+  </data>
+  <data name="ServerNameAndUrlRequired" xml:space="preserve">
+    <value>Server name and URL are required.</value>
+  </data>
+  <data name="ServerCredentialsRequired" xml:space="preserve">
+    <value>Enter an API key, or a username and password.</value>
+  </data>
+  <data name="ServerUrlRequired" xml:space="preserve">
+    <value>URL is required</value>
+  </data>
+  <data name="ConnectionFailedWithReason" xml:space="preserve">
+    <value>Connection failed: {0}</value>
+  </data>
+  <data name="ConnectionErrorWithReason" xml:space="preserve">
+    <value>Error: {0}</value>
+  </data>
+  <data name="SaveServerFailed" xml:space="preserve">
+    <value>Failed to save server</value>
+  </data>
+  <data name="DeleteServerFailed" xml:space="preserve">
+    <value>Failed to delete server</value>
+  </data>
+  <data name="SetBrowsingServerFailed" xml:space="preserve">
+    <value>Failed to set browsing server</value>
+  </data>
+  <data name="SwitchKomgaServerFailed" xml:space="preserve">
+    <value>Failed to switch Komga server</value>
+  </data>
+  <data name="KomgaInitFailed" xml:space="preserve">
+    <value>Failed to initialize: {0}</value>
+  </data>
+  <data name="KomgaLoadLibrariesFailed" xml:space="preserve">
+    <value>Failed to load libraries: {0}</value>
+  </data>
+  <data name="KomgaLoadSeriesFailed" xml:space="preserve">
+    <value>Failed to load series: {0}</value>
+  </data>
+  <data name="KomgaLoadBooksFailed" xml:space="preserve">
+    <value>Failed to load books: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListsFailed" xml:space="preserve">
+    <value>Failed to load read lists: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListBooksFailed" xml:space="preserve">
+    <value>Failed to load books for read list: {0}</value>
+  </data>
+  <data name="KomgaNoReadLists" xml:space="preserve">
+    <value>No Komga read lists are available on the active server.</value>
+  </data>
+  <data name="KomgaImportFailedForFile" xml:space="preserve">
+    <value>Failed to import '{0}'.</value>
+  </data>
+  <data name="DownloadPausedNoConnection" xml:space="preserve">
+    <value>Paused, waiting for connection...</value>
+  </data>
+  <data name="DownloadFailedAfterRetries" xml:space="preserve">
+    <value>Failed to download '{0}' after {1} attempts.</value>
+  </data>
+  <data name="ReaderPreparingNextPage" xml:space="preserve">
+    <value>Preparing next page...</value>
+  </data>
+  <data name="ReaderPreparingRequestedPage" xml:space="preserve">
+    <value>Preparing requested page...</value>
+  </data>
+  <data name="SelectComicFolder" xml:space="preserve">
+    <value>Select Comic Folder</value>
+  </data>
+  <data name="ConnectionTestNotConfigured" xml:space="preserve">
+    <value>The server is not configured</value>
+  </data>
+  <data name="ConnectionTestCancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="ConnectionTestTimedOut" xml:space="preserve">
+    <value>Connection test timed out after {0} seconds</value>
+  </data>
+  <data name="KomgaDownloadHttpError" xml:space="preserve">
+    <value>Komga returned {0} ({1}).</value>
+  </data>
+  <data name="KomgaDownloadTimedOut" xml:space="preserve">
+    <value>The download timed out while reading data from Komga.</value>
+  </data>
+  <data name="KomgaDownloadEmptyChunk" xml:space="preserve">
+    <value>Komga sent no data before the download was complete.</value>
+  </data>
+  <data name="ReportIssue" xml:space="preserve">
+    <value>Report an Issue</value>
+  </data>
+  <data name="ServerNamePlaceholder" xml:space="preserve">
+    <value>My Komga Server</value>
+  </data>
+  <data name="DownloadSkipsExisting" xml:space="preserve">
+    <value>Already-downloaded books are skipped automatically.</value>
+  </data>
+  <data name="DownloadAllMissing" xml:space="preserve">
+    <value>All missing books</value>
+  </data>
+  <data name="DownloadUnreadMissing" xml:space="preserve">
+    <value>Unread missing books</value>
+  </data>
+  <data name="LoadingKomga" xml:space="preserve">
+    <value>Loading Komga...</value>
+  </data>
+  <data name="LoadingReadLists" xml:space="preserve">
+    <value>Loading read lists...</value>
+  </data>
+  <data name="ApplySeriesNameToAll" xml:space="preserve">
+    <value>Apply a series name to all imported comics</value>
+  </data>
+  <data name="SeriesNameLabel" xml:space="preserve">
+    <value>Series name</value>
+  </data>
+  <data name="ResetToFolderName" xml:space="preserve">
+    <value>Reset to folder name</value>
+  </data>
+  <data name="ImportFolderSeriesHint" xml:space="preserve">
+    <value>The suggested value uses the selected folder name only. You can disable it, reset to the original folder name, or edit it manually.</value>
+  </data>
+  <data name="ImportAction" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="ChooseSeriesDownloadFor" xml:space="preserve">
+    <value>Choose what to download for {0}</value>
+  </data>
+  <data name="ChooseReadListFor" xml:space="preserve">
+    <value>Choose a read list for {0}</value>
+  </data>
+</root>

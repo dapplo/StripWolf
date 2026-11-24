@@ -1140,4 +1140,271 @@
   <data name="ReaderImageQualitySaveMemory" xml:space="preserve">
     <value>Speicher sparen</value>
   </data>
-</root>
+  <data name="Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="UiSettings" xml:space="preserve">
+    <value>Oberflächeneinstellungen</value>
+  </data>
+  <data name="LibrarySettings" xml:space="preserve">
+    <value>Bibliothekseinstellungen</value>
+  </data>
+  <data name="KomgaSettings" xml:space="preserve">
+    <value>Komga-Einstellungen</value>
+  </data>
+  <data name="FileSize" xml:space="preserve">
+    <value>Dateigröße</value>
+  </data>
+  <data name="KomgaSyncPromptTitle" xml:space="preserve">
+    <value>Fortschritt in Komga gefunden</value>
+  </data>
+  <data name="KomgaSyncPromptMessage" xml:space="preserve">
+    <value>Komga hat eine neuere Position synchronisiert, während Sie weitergelesen haben. Zu Seite {0} von {1} springen?</value>
+  </data>
+  <data name="KomgaSyncPromptAccept" xml:space="preserve">
+    <value>Zur synchronisierten Seite</value>
+  </data>
+  <data name="KomgaSyncPromptDecline" xml:space="preserve">
+    <value>Hier bleiben</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloads" xml:space="preserve">
+    <value>Downloads in getakteten Netzen erlauben</value>
+  </data>
+  <data name="KomgaSeriesPageSize" xml:space="preserve">
+    <value>Komga-Seitengröße für Serien</value>
+  </data>
+  <data name="KomgaSeriesPageSizeDescription" xml:space="preserve">
+    <value>Anzahl der Bücher, die beim Öffnen einer Serie pro Seite geladen werden. Alle weiteren Bücher werden nach der ersten Seite automatisch im Hintergrund geladen.</value>
+  </data>
+  <data name="KomgaSearchLimit" xml:space="preserve">
+    <value>Komga-Suchergebnisse</value>
+  </data>
+  <data name="KomgaSearchLimitDescription" xml:space="preserve">
+    <value>Maximale Anzahl an Serien und Büchern, die eine Suche in Komga liefert.</value>
+  </data>
+  <data name="KomgaSmartListSize" xml:space="preserve">
+    <value>Größe der Komga-Listen</value>
+  </data>
+  <data name="KomgaSmartListSizeDescription" xml:space="preserve">
+    <value>Anzahl der Einträge in „Weiterlesen“, „Als Nächstes“, „Zuletzt hinzugefügte Bücher“ und „Zuletzt hinzugefügte Serien“.</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDescription" xml:space="preserve">
+    <value>Standardmäßig aus, um mobile Daten zu sparen. Schalten Sie es ein, um Komga-Downloads auch über getaktete Verbindungen zu erlauben.</value>
+  </data>
+  <data name="UseFullScreenWhenReading" xml:space="preserve">
+    <value>Vollbild beim Lesen</value>
+  </data>
+  <data name="UseFullScreenWhenReadingEnabled" xml:space="preserve">
+    <value>Vollbild an</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDisabled" xml:space="preserve">
+    <value>Vollbild aus</value>
+  </data>
+  <data name="UseFullScreenWhenReadingDescription" xml:space="preserve">
+    <value>Wenn aktiviert, wechselt die App beim Öffnen eines Comics automatisch in den Vollbildmodus.</value>
+  </data>
+  <data name="DefaultReadingDirection" xml:space="preserve">
+    <value>Standard-Leserichtung</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Anzeigen</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Ausblenden</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsEnabled" xml:space="preserve">
+    <value>Downloads in getakteten Netzen erlaubt</value>
+  </data>
+  <data name="AllowMeteredKomgaDownloadsDisabled" xml:space="preserve">
+    <value>Downloads in getakteten Netzen blockiert</value>
+  </data>
+  <data name="UnsupportedFormatHandlingDescription" xml:space="preserve">
+    <value>Legen Sie fest, wann nicht unterstützte Formate umgewandelt werden: sofort beim Import oder erst beim Öffnen zum Lesen.</value>
+  </data>
+  <data name="ReadingDirectionDescription" xml:space="preserve">
+    <value>Automatisch nutzt die Metadaten (Komga oder ComicInfo). Sie können auch westliche oder Manga-Navigation erzwingen, mit oder ohne umgekehrte Seitenreihenfolge.</value>
+  </data>
+  <data name="ReadingDirectionAutomatic" xml:space="preserve">
+    <value>Automatisch (Metadaten)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRight" xml:space="preserve">
+    <value>Links nach rechts</value>
+  </data>
+  <data name="ReadingDirectionRightToLeft" xml:space="preserve">
+    <value>Rechts nach links (Manga)</value>
+  </data>
+  <data name="ReadingDirectionLeftToRightReversedPages" xml:space="preserve">
+    <value>Hinten beginnen, westliche Navigation</value>
+  </data>
+  <data name="ReadingDirectionRightToLeftReversedPages" xml:space="preserve">
+    <value>Vorne beginnen, Manga-Navigation</value>
+  </data>
+  <data name="ReadingDirectionAction" xml:space="preserve">
+    <value>Leserichtung</value>
+  </data>
+  <data name="AddToReadList" xml:space="preserve">
+    <value>Zur Leseliste hinzufügen</value>
+  </data>
+  <data name="DownloadSeries" xml:space="preserve">
+    <value>Serie herunterladen</value>
+  </data>
+  <data name="ReadNowAction" xml:space="preserve">
+    <value>Jetzt lesen</value>
+  </data>
+  <data name="ShowHidePassword" xml:space="preserve">
+    <value>Passwort anzeigen oder verbergen</value>
+  </data>
+  <data name="StreamingFile" xml:space="preserve">
+    <value>Datei wird übertragen...</value>
+  </data>
+  <data name="ImportFailedForFile" xml:space="preserve">
+    <value>„{0}“ konnte nicht importiert werden: {1}</value>
+  </data>
+  <data name="WaitingToConvertEpub" xml:space="preserve">
+    <value>Wartet auf EPUB-Umwandlung...</value>
+  </data>
+  <data name="ConvertingEpubProgress" xml:space="preserve">
+    <value>EPUB wird umgewandelt... {0:P0}</value>
+  </data>
+  <data name="ConvertFailedForComic" xml:space="preserve">
+    <value>„{0}“ konnte nicht umgewandelt werden: {1}</value>
+  </data>
+  <data name="FailedToReadFolder" xml:space="preserve">
+    <value>Ordnerinhalt konnte nicht gelesen werden: {0}</value>
+  </data>
+  <data name="ActionFailed" xml:space="preserve">
+    <value>Aktion fehlgeschlagen: {0}</value>
+  </data>
+  <data name="UpdateReadStatusFailed" xml:space="preserve">
+    <value>Lesestatus konnte nicht geändert werden</value>
+  </data>
+  <data name="UpdateFavoriteFailed" xml:space="preserve">
+    <value>Favorit konnte nicht geändert werden</value>
+  </data>
+  <data name="ServerNameAndUrlRequired" xml:space="preserve">
+    <value>Servername und URL sind erforderlich.</value>
+  </data>
+  <data name="ServerCredentialsRequired" xml:space="preserve">
+    <value>Geben Sie einen API-Schlüssel oder Benutzername und Passwort ein.</value>
+  </data>
+  <data name="ServerUrlRequired" xml:space="preserve">
+    <value>URL ist erforderlich</value>
+  </data>
+  <data name="ConnectionFailedWithReason" xml:space="preserve">
+    <value>Verbindung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="ConnectionErrorWithReason" xml:space="preserve">
+    <value>Fehler: {0}</value>
+  </data>
+  <data name="SaveServerFailed" xml:space="preserve">
+    <value>Server konnte nicht gespeichert werden</value>
+  </data>
+  <data name="DeleteServerFailed" xml:space="preserve">
+    <value>Server konnte nicht gelöscht werden</value>
+  </data>
+  <data name="SetBrowsingServerFailed" xml:space="preserve">
+    <value>Server zum Durchsuchen konnte nicht festgelegt werden</value>
+  </data>
+  <data name="SwitchKomgaServerFailed" xml:space="preserve">
+    <value>Komga-Server konnte nicht gewechselt werden</value>
+  </data>
+  <data name="KomgaInitFailed" xml:space="preserve">
+    <value>Initialisierung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="KomgaLoadLibrariesFailed" xml:space="preserve">
+    <value>Bibliotheken konnten nicht geladen werden: {0}</value>
+  </data>
+  <data name="KomgaLoadSeriesFailed" xml:space="preserve">
+    <value>Serien konnten nicht geladen werden: {0}</value>
+  </data>
+  <data name="KomgaLoadBooksFailed" xml:space="preserve">
+    <value>Bücher konnten nicht geladen werden: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListsFailed" xml:space="preserve">
+    <value>Leselisten konnten nicht geladen werden: {0}</value>
+  </data>
+  <data name="KomgaLoadReadListBooksFailed" xml:space="preserve">
+    <value>Bücher der Leseliste konnten nicht geladen werden: {0}</value>
+  </data>
+  <data name="KomgaNoReadLists" xml:space="preserve">
+    <value>Auf dem aktiven Server gibt es keine Komga-Leselisten.</value>
+  </data>
+  <data name="KomgaImportFailedForFile" xml:space="preserve">
+    <value>„{0}“ konnte nicht importiert werden.</value>
+  </data>
+  <data name="DownloadPausedNoConnection" xml:space="preserve">
+    <value>Pausiert, wartet auf Verbindung...</value>
+  </data>
+  <data name="DownloadFailedAfterRetries" xml:space="preserve">
+    <value>„{0}“ konnte nach {1} Versuchen nicht heruntergeladen werden.</value>
+  </data>
+  <data name="ReaderPreparingNextPage" xml:space="preserve">
+    <value>Nächste Seite wird vorbereitet...</value>
+  </data>
+  <data name="ReaderPreparingRequestedPage" xml:space="preserve">
+    <value>Gewünschte Seite wird vorbereitet...</value>
+  </data>
+  <data name="SelectComicFolder" xml:space="preserve">
+    <value>Comic-Ordner auswählen</value>
+  </data>
+  <data name="ConnectionTestNotConfigured" xml:space="preserve">
+    <value>Der Server ist nicht eingerichtet</value>
+  </data>
+  <data name="ConnectionTestCancelled" xml:space="preserve">
+    <value>Abgebrochen</value>
+  </data>
+  <data name="ConnectionTestTimedOut" xml:space="preserve">
+    <value>Verbindungstest nach {0} Sekunden abgebrochen</value>
+  </data>
+  <data name="KomgaDownloadHttpError" xml:space="preserve">
+    <value>Komga antwortete mit {0} ({1}).</value>
+  </data>
+  <data name="KomgaDownloadTimedOut" xml:space="preserve">
+    <value>Zeitüberschreitung beim Lesen der Daten von Komga.</value>
+  </data>
+  <data name="KomgaDownloadEmptyChunk" xml:space="preserve">
+    <value>Komga hat vor dem Ende des Downloads keine Daten mehr gesendet.</value>
+  </data>
+  <data name="ReportIssue" xml:space="preserve">
+    <value>Problem melden</value>
+  </data>
+  <data name="ServerNamePlaceholder" xml:space="preserve">
+    <value>Mein Komga-Server</value>
+  </data>
+  <data name="DownloadSkipsExisting" xml:space="preserve">
+    <value>Bereits heruntergeladene Bücher werden automatisch übersprungen.</value>
+  </data>
+  <data name="DownloadAllMissing" xml:space="preserve">
+    <value>Alle fehlenden Bücher</value>
+  </data>
+  <data name="DownloadUnreadMissing" xml:space="preserve">
+    <value>Ungelesene fehlende Bücher</value>
+  </data>
+  <data name="LoadingKomga" xml:space="preserve">
+    <value>Komga wird geladen...</value>
+  </data>
+  <data name="LoadingReadLists" xml:space="preserve">
+    <value>Leselisten werden geladen...</value>
+  </data>
+  <data name="ApplySeriesNameToAll" xml:space="preserve">
+    <value>Allen importierten Comics einen Seriennamen geben</value>
+  </data>
+  <data name="SeriesNameLabel" xml:space="preserve">
+    <value>Serienname</value>
+  </data>
+  <data name="ResetToFolderName" xml:space="preserve">
+    <value>Auf Ordnernamen zurücksetzen</value>
+  </data>
+  <data name="ImportFolderSeriesHint" xml:space="preserve">
+    <value>Der Vorschlag verwendet nur den Namen des gewählten Ordners. Sie können ihn ausschalten, auf den Ordnernamen zurücksetzen oder selbst bearbeiten.</value>
+  </data>
+  <data name="ImportAction" xml:space="preserve">
+    <value>Importieren</value>
+  </data>
+  <data name="ChooseSeriesDownloadFor" xml:space="preserve">
+    <value>Wähle, was für {0} heruntergeladen werden soll</value>
+  </data>
+  <data name="ChooseReadListFor" xml:space="preserve">
+    <value>Wähle eine Leseliste für {0}</value>
+  </data>
+</root>

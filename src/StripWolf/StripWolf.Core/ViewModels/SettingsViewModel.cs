@@ -102,7 +102,10 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _showServerDeleteConfirmation;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeleteServerMessage))]
     private int _linkedComicsCount;
+
+    public string DeleteServerMessage => string.Format(Loc.Instance.ConfirmDeleteServerMessage, LinkedComicsCount);
 
     [ObservableProperty]
     private KomgaServer? _serverPendingDeletion;
@@ -1018,7 +1021,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(ServerName) ||
             string.IsNullOrWhiteSpace(ServerUrl))
         {
-            ErrorMessage = "Server Name and URL are required.";
+            ErrorMessage = Loc.Instance.ServerNameAndUrlRequired;
             return;
         }
 
@@ -1027,7 +1030,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         if (!hasAuth)
         {
-            ErrorMessage = "Either API Key OR Username and Password are required.";
+            ErrorMessage = Loc.Instance.ServerCredentialsRequired;
             return;
         }
 
@@ -1035,7 +1038,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (!Uri.TryCreate(ServerUrl, UriKind.Absolute, out var uri) ||
             (uri.Scheme != "http" && uri.Scheme != "https"))
         {
-            ErrorMessage = "Please enter a valid URL (e.g., https://komga.example.com)";
+            ErrorMessage = Loc.Instance.InvalidUrl;
             return;
         }
 
@@ -1129,7 +1132,7 @@ public partial class SettingsViewModel : ViewModelBase
             IsEditing = false;
             _editingServer = null;
             CustomHeaders.Clear();
-        }, "Failed to save server");
+        }, Loc.Instance.SaveServerFailed);
     }
 
     [RelayCommand]
@@ -1201,7 +1204,7 @@ public partial class SettingsViewModel : ViewModelBase
             // whichever server got the id next, its queued progress/downloads were sent there, and its thumbnails stayed.
             await _databaseService.DetachKomgaServerAsync(server.Id);
             KomgaThumbnailCache.DeleteServer(server.Id);
-        }, "Failed to delete server");
+        }, Loc.Instance.DeleteServerFailed);
     }
 
     [RelayCommand]
@@ -1219,7 +1222,7 @@ public partial class SettingsViewModel : ViewModelBase
 
             // Refresh the list
             LoadServers();
-        }, "Failed to set browsing server");
+        }, Loc.Instance.SetBrowsingServerFailed);
     }
 
     [RelayCommand]
@@ -1227,7 +1230,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(ServerUrl))
         {
-            ConnectionStatus = "URL is required";
+            ConnectionStatus = Loc.Instance.ServerUrlRequired;
             return;
         }
 
@@ -1236,7 +1239,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         if (!hasAuth)
         {
-            ConnectionStatus = "Credentials or API Key required";
+            ConnectionStatus = Loc.Instance.ServerCredentialsRequired;
             return;
         }
 
@@ -1244,7 +1247,7 @@ public partial class SettingsViewModel : ViewModelBase
         var testConnectionCts = new CancellationTokenSource();
         _testConnectionCts = testConnectionCts;
         IsTestingConnection = true;
-        ConnectionStatus = "Testing connection...";
+        ConnectionStatus = Loc.Instance.TestingConnection;
 
         try
         {
@@ -1268,15 +1271,15 @@ public partial class SettingsViewModel : ViewModelBase
             }
 
             ConnectionStatus = result.Success
-                ? "✓ Connection successful!"
+                ? "✓ " + Loc.Instance.ConnectionSuccessful
                 : string.IsNullOrWhiteSpace(result.ErrorMessage)
-                    ? "✗ Connection failed"
-                    : $"✗ Connection failed: {result.ErrorMessage}";
+                    ? "✗ " + Loc.Instance.ConnectionFailed
+                    : "✗ " + string.Format(Loc.Instance.ConnectionFailedWithReason, result.ErrorMessage);
         }
         catch (Exception ex)
         {
             Logger.Error("Komga connection test failed", ex);
-            ConnectionStatus = $"✗ Error: {ex.Message}";
+            ConnectionStatus = "✗ " + string.Format(Loc.Instance.ConnectionErrorWithReason, ex.Message);
         }
         finally
         {

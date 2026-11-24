@@ -23,6 +23,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using StripWolf.Core.Models;
+using StripWolf.Core.Resources;
 using StripWolf.Core.Services;
 using Xunit;
 
@@ -86,7 +87,7 @@ public sealed class KomgaApiServiceTests
         Assert.Null(service.CurrentServerId);
         Assert.Equal(string.Empty, service.GetBookThumbnailUrl("0BOOK1"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetLibrariesAsync());
-        Assert.Equal((false, "Service is not configured"), await service.TestConnectionWithDetailsAsync(TestContext.Current.CancellationToken));
+        Assert.Equal((false, Loc.Instance.ConnectionTestNotConfigured), await service.TestConnectionWithDetailsAsync(TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -491,7 +492,7 @@ public sealed class KomgaApiServiceTests
         var (success, message) = await service.TestConnectionWithDetailsAsync(cancellation.Token);
 
         Assert.False(success);
-        Assert.Equal("Operation cancelled", message);
+        Assert.Equal(Loc.Instance.ConnectionTestCancelled, message);
     }
 
     /// <summary>
